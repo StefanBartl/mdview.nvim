@@ -11,11 +11,10 @@ socket.addEventListener('open', () => {
 
 socket.addEventListener('message', (ev) => {
   try {
-    const msg = JSON.parse(ev.data);
+    const msg = JSON.parse(ev.data.toString ? ev.data.toString() : ev.data);
     if (msg.type === 'render_update' && typeof msg.payload === 'string') {
       const container = document.getElementById('mdview-root');
       if (container) {
-        // replace or patch DOM; initial POC: full replace
         container.innerHTML = msg.payload;
       }
     }
@@ -23,3 +22,4 @@ socket.addEventListener('message', (ev) => {
     console.error('invalid message', err);
   }
 });
+
