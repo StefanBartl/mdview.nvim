@@ -3,9 +3,9 @@ node_modules/
 # Bun lockfile (Bun runtime)
 bun.lockb
 # Package manager lockfiles (ignore all but one if you decide to track one)
-package-lock.json
-yarn.lock
-pnpm-lock.yaml
+# package-lock.json
+# yarn.lock
+# pnpm-lock.yaml
 
 # Build outputs
 dist/
