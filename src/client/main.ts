@@ -1,25 +1,29 @@
+// ADD: Annotations
 /* Client bootstrapping:
    - Connects to WebSocket on server
    - Receives render updates (html) and injects into container
 */
 
-const socket = new WebSocket(`ws://${location.host}`);
+import { createTransport } from "./transport/transportFactory";
 
-socket.addEventListener('open', () => {
-  console.log('connected to mdview server');
-});
+async function boot() {
+  const url = `ws://${location.host}/ws`;
+  const transport = await createTransport(url);
 
-socket.addEventListener('message', (ev) => {
-  try {
-    const msg = JSON.parse(ev.data.toString ? ev.data.toString() : ev.data);
-    if (msg.type === 'render_update' && typeof msg.payload === 'string') {
-      const container = document.getElementById('mdview-root');
-      if (container) {
-        container.innerHTML = msg.payload;
+  transport.onMessage((msg: string) => {
+    // handle incoming render_update etc.
+    try {
+      const parsed = JSON.parse(msg);
+      if (parsed.type === "render_update" && typeof parsed.payload === "string") {
+        const container = document.getElementById("mdview-root");
+        if (container) container.innerHTML = parsed.payload;
       }
+    } catch (err) {
+      console.error("invalid message", err);
     }
-  } catch (err) {
-    console.error('invalid message', err);
-  }
-});
+  });
 
+  await transport.sendMessage(JSON.stringify({ type: "hello" }));
+}
+
+boot().catch((err) => console.error("boot failed:", err));
