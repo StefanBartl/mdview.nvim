@@ -3,6 +3,7 @@
 ## Allgemein
 
 1. `TODO-Comments` lösen
+2. Es muss sichergestellt sein, dass `npm` installiert und im Pfad verfügbar ist, ansonsten muss früh eine Meldung ausgegeben werden.
 
 ---
 
