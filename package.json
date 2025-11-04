@@ -5,12 +5,15 @@
   "description": "Browser-based Markdown preview for Neovim (mdview.nvim)",
   "author": "Stefan Bartl",
   "license": "MIT",
+  "type": "module",
   "engines": {
     "node": ">=18"
   },
   "scripts": {
     "dev": "concurrently \"npm:dev:server\" \"npm:dev:client\"",
-    "dev:server": "nodemon --watch src --ext ts --exec \"ts-node src/server/index.ts\"",
+    "dev:server:tsc": "tsc -w -p tsconfig.server.json",
+    "dev:server:node": "nodemon --watch dist --ext js --exec \"node dist/server/index.js\"",
+    "dev:server": "concurrently --kill-others \"npm:dev:server:tsc\" \"npm:dev:server:node\"",
     "dev:client": "vite --config src/client/vite.config.ts",
     "start": "node ./dist/server/index.js",
     "build": "npm run build:server && npm run build:client",
