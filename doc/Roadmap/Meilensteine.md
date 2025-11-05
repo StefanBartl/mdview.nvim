@@ -46,13 +46,13 @@
 
 Ziel: Neovim erkennt Markdown-Buffer und startet/stellt Verbindung zum lokalen Server her.
 
-* [ ] `plugin/mdview.lua` anlegen (autoload entry, commands)
-* [ ] `lua/mdview/init.lua` (Modul-Entry mit Setup-API)
-* [ ] `lua/mdview/config.lua` (Defaults, user overrides)
+* [x] `plugin/mdview.lua` anlegen (autoload entry, commands)
+* [x] `lua/mdview/init.lua` (Modul-Entry mit Setup-API)
+* [x] `lua/mdview/config.lua` (Defaults, user overrides)
 * [ ] `lua/mdview/core/session.lua` (Session-Management, state)
 * [ ] `lua/mdview/core/events.lua` (Autocommands: BufEnter, BufWritePost, TextChanged)
-* [ ] `lua/mdview/adapter/runner.lua` (spawn persistent server process via `vim.loop.spawn`)
-* [ ] `lua/mdview/adapter/ws_client.lua` (WebSocket client zur Kommunikation mit Server)
+* [r] `lua/mdview/adapter/runner.lua` (spawn persistent server process via `vim.loop.spawn`)
+* [r] `lua/mdview/adapter/ws_client.lua` (WebSocket client zur Kommunikation mit Server)
 * [ ] Unit-Tests für Lua-Module schreiben (z. B. mit `busted` oder `plenary`):
   * [ ] Tests für Config Defaults
   * [ ] Tests für Session-Management (stateless expectations)
@@ -68,9 +68,9 @@ Test-Strategie:
 
 Ziel: minimaler HTTP/WS-Server, der einfachen Markdown → HTML Render liefert.
 
-* [ ] `src/server/index.ts` (Entrypoint)
-* [ ] `src/server/server.ts` (HTTP + WebSocket Server)
-* [ ] `src/server/render.ts` (Markdown → HTML, initial: markdown-it)
+* [x] `src/server/index.ts` (Entrypoint)
+* [x] `src/server/server.ts` (HTTP + WebSocket Server)
+* [x] `src/server/render.ts` (Markdown → HTML, initial: markdown-it)
 * [ ] `src/server/ws-protocol.ts` (Message schema: {type, payload})
 * [ ] `src/server/dev-scripts` (start-dev, restart hooks)
 * [ ] Tests für Server-Units:
@@ -89,11 +89,11 @@ Test-Strategie:
 
 Ziel: TypeScript-Client, empfängt WebSocket-Events und patched DOM inkrementell.
 
-* [ ] `src/client/index.ts` (WebSocket Verbindung + event handling)
+* [x] `src/client/index.ts` (WebSocket Verbindung + event handling)
 * [ ] `src/client/ui.ts` (DOM-Patch-Logik, incremental DOM / morphdom)
 * [ ] `src/client/worker.ts` (optional: WebWorker für heavy tasks)
 * [ ] `src/client/styles.css` (Default Theme + Dark/Light)
-* [ ] `src/client/index.html` (Dev page / client shell)
+* [x] `src/client/index.html` (Dev page / client shell)
 * [ ] Tests / Lint:
   * [ ] Unit tests für DOM-Patcher (jsdom)
   * [ ] Lint / type checks (tsc + eslint)
