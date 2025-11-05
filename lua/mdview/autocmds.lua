@@ -1,14 +1,17 @@
 ---@module 'mdview.autocmds'
 
-local M = {}
-
 local nvim_create_autocmd = vim.api.nvim_create_autocmd
+local runner = require("mdview.adapter.runner")
+
+local M = {}
 
 ---@return nil
 function M.setup()
 	nvim_create_autocmd("VimLeavePre", {
 		callback = function()
-			require("mdview.adapter.runner").stop_server()
+			if runner.proc ~= nil then
+				require("mdview.adapter.runner").stop_server(runner.proc)
+			end
 		end,
 	})
 end

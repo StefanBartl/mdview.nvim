@@ -3,9 +3,9 @@
 --- Minimal changes: replace deprecated buffer option APIs with nvim_set_option_value,
 --- keep behavior and surface stable.
 
-local M = {}
-
 local api = vim.api
+
+local M = {}
 
 -- required config to read debug flag
 local cfg_ok, mdview_config = pcall(require, "mdview.config")
@@ -54,7 +54,7 @@ function M.append(line, prefix)
 
     if DEBUG then
       vim.schedule(function()
-			api.nvim_echo({ { l, nil } }, true, {})
+			-- api.nvim_echo({ { l, nil } }, true, {})
       end)
     end
 
@@ -68,7 +68,7 @@ function M.append(line, prefix)
         -- non-fatal: debug notify if configured
         if DEBUG then
           vim.schedule(function()
-            api.nvim_echo({ { ("mdview.log: failed to write to %s: %s"):format(tostring(log_file_path), tostring(err)), "ErrorMsg" } }, true, { err = true })
+            -- api.nvim_echo({ { ("mdview.log: failed to write to %s: %s"):format(tostring(log_file_path), tostring(err)), "ErrorMsg" } }, true, { err = true })
           end)
         end
       end

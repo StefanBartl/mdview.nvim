@@ -35,7 +35,7 @@ end
 ---@param friendly string|nil Optional friendly name for browser (e.g., "firefox", "chrome")
 ---@return string|nil resolved_cmd Resolved browser command
 ---@return string|nil err Error message if resolution failed
-local function resolve_command(explicit_cmd, friendly)
+return function (explicit_cmd, friendly)
   -- Highest precedence: explicit absolute command
   if explicit_cmd and explicit_cmd ~= "" then
     if try_resolve(explicit_cmd) then
@@ -81,7 +81,3 @@ local function resolve_command(explicit_cmd, friendly)
 
   return nil, "no suitable browser executable found on PATH or common locations"
 end
-
-return {
-  resolve_command = resolve_command,
-}

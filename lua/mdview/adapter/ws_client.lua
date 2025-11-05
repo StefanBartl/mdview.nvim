@@ -2,10 +2,13 @@
 --- Minimal WebSocket/HTTP client helper to send markdown to the local server.
 --- Adds an internal send-queue with retry/backoff and a simple wait_ready() helper
 --- so callers can wait until the HTTP server becomes reachable before sending.
+
 ---@diagnostic disable: redundant-parameter, undefined-field, deprecated, unused-local, empty-block, undefined-global, return-type-mismatch
+
 local fn = vim.fn
 local api = vim.api
 local uv = vim.loop
+
 local M = {}
 
 -- Configuration (tunable)

@@ -2,14 +2,14 @@
 --- Autocommand management for mdview.nvim.
 --- Attaches BufEnter and BufWritePost to trigger server-render actions.
 
-local M = {}
-
-M.augroup = nil
-
 local api = vim.api
 local session = require("mdview.core.session")
 local ws_client = require("mdview.adapter.ws_client")
 local safe_buf_get_option = require("mdview.helper.safe_buf_get_option")
+
+local M = {}
+
+M.augroup = nil
 
 --- Internal handler for BufEnter: record buffer content snapshot.
 ---@param bufnr integer

@@ -7,6 +7,7 @@
 ---@diagnostic disable: undefined-field, deprecated, unused-local
 
 local uv = vim.loop
+
 local M = {}
 
 -- Detect OS
