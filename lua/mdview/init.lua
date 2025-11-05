@@ -1,58 +1,71 @@
 ---@module 'mdview.init'
 --- Module entrypoint for mdview.nvim.
---- Exposes a minimal setup() API plus start/stop runtime controls used by plugin commands.
+--- Integrates browser autostart handle storage and stop-time cleanup.
+---
+--- EmmyLua annotations available in module files.
 
-local config = require("mdview.config")
+local cfg = require("mdview.config")
+local browser_cfg = require("mdview.config.browser")
 local runner = require("mdview.adapter.runner")
 local events = require("mdview.core.events")
 local session = require("mdview.core.session")
+local autostart = require("mdview.usercommands.autostart")
+local browser_adapter = require("mdview.adapter.browser")
 
 local M = {}
 
 -- public state
-M.config = config.defaults
+M.config = cfg.defaults
 M.state = {
   server = nil,   -- will hold runner handle
   attached = false,
+  browser = nil,  -- holds BrowserHandle returned by browser_adapter.open()
 }
 
---- Setup function for user configuration (not needed for dev-opt; placeholder).
---- Accepts a table with allowed overrides; merges into default config.
 ---@param opts table|nil
 function M.setup(opts)
   opts = opts or {}
   for k, v in pairs(opts) do
     M.config[k] = v
   end
+
+  -- Resolve browser at setup time and notify user if resolution failed
+  require("mdview.config.browser").setup_and_notify()
+  require("mdview.usercommands").setup()
+  require("mdview.autocmds").setup()
 end
 
---- Start mdview environment: spawn server, attach autocommands and prepare session.
 function M.start()
   if M.state.server then
     vim.notify("mdview: server already running", vim.log.levels.INFO)
     return
   end
 
-  -- spawn server (runner returns handle table or nil + error)
-  local ok, handle_or_err = pcall(runner.start_server, M.config.server_cmd, M.config.server_args)
+  local ok, handle_or_err = pcall(runner.start_server, M.config.server_cmd, M.config.server_args, M.config.server_cwd)
   if not ok or not handle_or_err then
     vim.notify("mdview: failed to start server: " .. tostring(handle_or_err), vim.log.levels.ERROR)
     return
   end
+
   M.state.server = handle_or_err
-
-  -- initialize session store
   session.init()
-
-  -- attach autocommands
   events.attach()
-
   M.state.attached = true
+
+  -- Wait briefly, then open autostart tab and capture browser handle (if any)
+  vim.defer_fn(function()
+    local handle = autostart.start()
+    if handle then
+      M.state.browser = handle
+    end
+  end, 500)
+
   vim.notify("mdview: started", vim.log.levels.INFO)
 end
 
 --- Stop mdview environment: detach autocommands and stop server if running.
-function M.stop()
+--- If config.browser.stop_closes_browser is true (default), attempt to close stored browser handle.
+function M.stop(close_browser_override)
   if M.state.attached then
     events.detach()
     M.state.attached = false
@@ -64,12 +77,29 @@ function M.stop()
   end
 
   session.shutdown()
+
+  local should_close
+  if type(close_browser_override) == "boolean" then
+    should_close = close_browser_override
+  else
+    should_close = browser_cfg.defaults.stop_closes_browser == true
+  end
+
+  if should_close and M.state.browser then
+    local ok, err = browser_adapter.close(M.state.browser)
+    if not ok then
+      vim.notify(("mdview: failed to close browser: %s"):format(tostring(err)), vim.log.levels.WARN)
+    end
+    M.state.browser = nil
+  end
+
   vim.notify("mdview: stopped", vim.log.levels.INFO)
 end
 
--- For testing / REPL
+-- Expose internals for REPL/testing
 M._session = session
 M._runner = runner
 M._events = events
+M._browser_adapter = browser_adapter
 
 return M

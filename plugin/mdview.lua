@@ -12,6 +12,8 @@ local api = vim.api
 local notify = vim.notify
 local mdview = require("mdview")
 
+--AUDIT: Modulariesieren
+
 -- Detect OS
 local is_windows = uv.os_uname().version:match("Windows")
 
@@ -91,14 +93,5 @@ if not executable_exists(pkg_cmd) then
   end)
   return M
 end
-
--- Register User Commands
-vim.api.nvim_create_user_command("MDViewStart", function()
-  mdview.start()
-end, { desc = "Start mdview preview server and attach autocommands" })
-
-vim.api.nvim_create_user_command("MDViewStop", function()
-  mdview.stop()
-end, { desc = "Stop mdview preview server and detach autocommands" })
 
 return M

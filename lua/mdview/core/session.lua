@@ -2,14 +2,9 @@
 --- Session management and simple buffer-content tracking for mdview.nvim.
 --- Stores last-seen buffer contents (by absolute path) to enable minimal diffing later.
 
-local crypto = vim.loop -- using uv for portability where needed (no heavy deps)
-
 local M = {}
-M.buffers = {}
 
-local function path_of(bufnr)
-  return vim.api.nvim_buf_get_name(bufnr)
-end
+M.buffers = {}
 
 --- Initialize session store.
 function M.init()
