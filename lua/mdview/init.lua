@@ -9,7 +9,7 @@ local events = require("mdview.core.events")
 local session = require("mdview.core.session")
 local autostart = require("mdview.usercmds.autostart")
 local browser_adapter = require("mdview.adapter.browser")
-
+local ws_client = require("mdview.adapter.ws_client")
 local notify = vim.notify
 
 local M = {}
@@ -60,23 +60,26 @@ function M.start()
 	events.attach()
 	M.state.attached = true
 
-	-- Wait before open autostart tab and capture browser handle if any
+	-- Start autostart browser tab and push initial buffer after server is ready
 	vim.defer_fn(function()
-		-- Start autostart tab and store browser handle
 		local handle = autostart.start()
 		if handle then
 			M.state.browser = handle
 		end
 
-		-- Push full content of current buffer to WS immediately
+		-- push initial buffer content after server health confirmed
 		local bufnr = vim.api.nvim_get_current_buf()
 		local path = vim.api.nvim_buf_get_name(bufnr)
 		if path ~= "" then
 			local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
-			local payload = table.concat(lines, "\n")
-			local ws_client = require("mdview.adapter.ws_client")
-			ws_client.send_markdown(path, payload)
-			require("mdview.core.session").store(path, lines)
+			ws_client.wait_ready(function(_ok)
+				if _ok then
+					ws_client.send_markdown(path, table.concat(lines, "\n"))
+					session.store(path, lines)
+				else
+					notify("[mdview] server not ready, initial push skipped", vim.log.levels.WARN)
+				end
+			end)
 		end
 	end, 500)
 
