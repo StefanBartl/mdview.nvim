@@ -1,17 +1,19 @@
 ---@module 'mdview.config.browser'
---- Browser detection and explicit user overrides for mdview.
---- This helper provides:
----  - config defaults for browser detection
----  - a validation/resolve step during setup
----  - a small public API to get the resolved browser command
----  - clear user-facing notifications on failure
+-- Browser detection and explicit user overrides for mdview.
+-- This helper provides:
+--  - config defaults for browser detection
+--  - a validation/resolve step during setup
+--  - a small public API to get the resolved browser command
+--  - clear user-facing notifications on failure
 
 local fn = vim.fn
+local executable = fn.executable
+local filereadable = fn. filereadable
 local notify = vim.notify
 
 local M = {}
 
---- default config fields; plugin should merge user overrides into this table
+-- default config fields; plugin should merge user overrides into this table
 ---@type table
 M.defaults = {
   autodetect_browser = true,    -- try to locate a browser automatically
@@ -23,34 +25,34 @@ M.defaults = {
   _resolved_browser_cmd = nil,
 }
 
---- Known candidate names to probe in PATH and platform locations (order matters)
+-- Known candidate names to probe in PATH and platform locations (order matters)
 ---@type string[]
 M._candidates = { "chrome", "google-chrome", "chromium", "msedge", "firefox" }
 
---- Validate that a path is an executable that can be launched.
---- Uses vim.fn.executable() where appropriate; falls back to filereadable for platform bundle paths.
+-- Validate that a path is an executable that can be launched.
+-- Uses vim.executable() where appropriate; falls back to filereadable for platform bundle paths.
 ---@param path string
 ---@return boolean
 local function is_executable(path)
   if not path or path == "" then return false end
   -- On windows/mac paths might be absolute; try vim's executable() first
-  if fn.executable(path) == 1 then return true end
+  if executable(path) == 1 then return true end
   -- fallback: check readable file (some mac app bundle paths are not "executable" from PATH)
-  if fn.filereadable(path) == 1 then return true end
+  if filereadable(path) == 1 then return true end
   return false
 end
 
---- Try to resolve candidate name via PATH and common platform locations.
---- Returns absolute command string or nil.
+-- Try to resolve candidate name via PATH and common platform locations.
+-- Returns absolute command string or nil.
 ---@param name string
 ---@return string|nil
 local function resolve_candidate(name)
   if not name or name == "" then return nil end
-  -- first try PATH
-  if fn.executable(name) == 1 then
+  if executable(name) == 1 then
     return name
   end
-  -- windows extra checks
+
+	-- windows extra checks
   if fn.has("win32") == 1 then
     local program_files = { os.getenv("PROGRAMFILES"), os.getenv("PROGRAMFILES(X86)"), os.getenv("LOCALAPPDATA") }
     for _, base in ipairs(program_files) do
@@ -61,12 +63,13 @@ local function resolve_candidate(name)
           base .. "\\Microsoft\\Edge\\Application\\msedge.exe",
         }
         for _, p in ipairs(candidates) do
-          if fn.filereadable(p) == 1 then return p end
+          if filereadable(p) == 1 then return p end
         end
       end
     end
   end
-  -- macOS app bundles common locations
+
+	-- macOS app bundles common locations
   if fn.has("mac") == 1 then
     local mac_candidates = {
       "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
@@ -75,12 +78,13 @@ local function resolve_candidate(name)
       "/Applications/Firefox.app/Contents/MacOS/firefox",
     }
     for _, p in ipairs(mac_candidates) do
-      if fn.filereadable(p) == 1 or fn.executable(p) == 1 then
+      if filereadable(p) == 1 or executable(p) == 1 then
         return p
       end
     end
   end
-  -- unix common names (try common bin locations)
+
+	-- unix common names (common bin locations)
   local unix_candidates = {
     "/usr/bin/google-chrome",
     "/usr/bin/chromium-browser",
@@ -90,16 +94,16 @@ local function resolve_candidate(name)
     "/usr/bin/firefox",
   }
   for _, p in ipairs(unix_candidates) do
-    if fn.filereadable(p) == 1 or fn.executable(p) == 1 then return p end
+    if filereadable(p) == 1 or executable(p) == 1 then return p end
   end
   return nil
 end
 
---- Resolve browser command according to config precedence:
---- 1. browser_cmd explicit override (absolute path) -> must be executable
---- 2. browser friendly name -> resolve_candidate
---- 3. autodetect via _candidates list
---- The resolved command is stored in M.defaults._resolved_browser_cmd
+-- Resolve browser command according to config precedence:
+--  1. browser_cmd explicit override (absolute path) -> must be executable
+--  2. browser friendly name -> resolve_candidate
+--  3. autodetect via _candidates list
+-- The resolved command is stored in M.defaults._resolved_browser_cmd
 ---@return string|nil err
 function M.resolve_and_validate()
   -- explicit absolute command override
@@ -155,7 +159,7 @@ function M.setup_and_notify(notify_on_fail)
   local err = M.resolve_and_validate()
   if err then
     if notify_on_fail then
-      notify(("mdview: browser resolution: %s"):format(tostring(err)), vim.log.levels.WARN, {})
+      notify(("[mdview.config.browser] browser resolution: %s"):format(tostring(err)), vim.log.levels.WARN, {})
       notify("Hint: set mdview.config.browser_cmd to an absolute executable path to force use.", vim.log.levels.INFO, {})
     end
     return false, err

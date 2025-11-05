@@ -11,20 +11,22 @@ local uv = vim.loop
 
 local M = {}
 
--- Configuration (tunable)
 local DEFAULT_PORT = 43219
-local MAX_RETRIES = 5         -- number of retry attempts for a single message
-local BASE_RETRY_MS = 150     -- initial retry delay (exponential backoff)
-local HEALTH_POLL_MS = 200    -- polling interval for wait_ready
+local MAX_RETRIES = 5          -- number of retry attempts for a single message
+local BASE_RETRY_MS = 150      -- initial retry delay (exponential backoff)
+local HEALTH_POLL_MS = 200     -- polling interval for wait_ready
 local HEALTH_TIMEOUT_MS = 5000 -- overall timeout for wait_ready
 
--- internal state
 M.last_request = {}
-M._pending = {}              -- pending queue: path -> { markdown=..., tries=0 }
+M._pending = {}                -- pending queue: path -> { markdown=..., tries=0 }
 M._is_waiting = false
 
 -- Helper: execute an HTTP POST using curl via jobstart when available.
 -- Callback signature: cb(exit_code:number, stdout_lines:string[]|nil, stderr_lines:string[]|nil)
+---@param url string # target URL for the POST request
+---@param body string # request body content
+---@param cb fun(exit_code: integer, stdout_lines: string[]|nil, stderr_lines: string[]|nil)? # optional callback invoked on completion
+---@return integer|nil # job ID if curl jobstart was used, nil otherwise
 local function http_post_nonblocking(url, body, cb)
   cb = cb or function() end
   local curl = fn.executable("curl") == 1 and "curl" or nil
@@ -42,23 +44,22 @@ local function http_post_nonblocking(url, body, cb)
       stdout_buffered = true,
       stderr_buffered = true,
       on_stdout = function(_, data, _)
-        -- noop; we'll forward on exit
+        -- noop; forward on exit
       end,
       on_stderr = function(_, data, _)
         -- noop; forward on exit
       end,
       on_exit = function(_, code, _)
-        -- read captured output (jobstart with buffered true returns captured lines via callback args, but here keep simple)
+        -- read captured output
         pcall(function() os.remove(tmpf) end)
-        -- we cannot reliably capture buffered output here directly; call cb with code
         cb(code, nil, nil)
       end,
     })
     return jid
   else
-    -- fallback: blocking call via system (less ideal), but keep compatibility
+    -- fallback: blocking call via system
     local ok, res = pcall(function()
-      -- try portable shell invocation; on Windows this branch may fail if sh not available
+      -- try portable shell invocation; on Windows this may fail if sh not available
       local cmd = string.format("sh -c %q", "curl -sS -X POST " .. url .. " -H 'Content-Type: text/markdown' --data-binary @- <<'BODY'\n" .. body .. "\nBODY")
       return fn.system(cmd)
     end)
@@ -73,6 +74,9 @@ local function http_post_nonblocking(url, body, cb)
 end
 
 -- Simple HTTP GET for health check (non-blocking using curl if available).
+---@param url string # target URL for the GET request
+---@param cb fun(exit_code: integer, stdout_lines: string[]|nil, stderr_lines: string[]|nil)? # optional callback invoked on completion
+---@return integer|nil # job ID if curl jobstart was used, nil otherwise
 local function http_get_nonblocking(url, cb)
   cb = cb or function() end
   local curl = fn.executable("curl") == 1 and "curl" or nil
@@ -111,25 +115,26 @@ local function http_get_nonblocking(url, cb)
 end
 
 -- internal helper: construct URL for /render
+---@param path string # file path to render
+---@return string # constructed URL pointing to the /render endpoint
 local function render_url_for(path)
   local port = vim.g.mdview_server_port or DEFAULT_PORT
   return string.format("http://localhost:%d/render?key=%s", port, fn.fnameescape(path))
 end
 
 -- Try to send a single pending entry. Handles retries and eventual give-up.
+---@param path string # file path whose pending markdown should be sent
 local function try_send_pending(path)
   local entry = M._pending[path]
   if not entry then return end
   entry.tries = (entry.tries or 0) + 1
 
-  -- do the non-blocking http POST
   local url = render_url_for(path)
   http_post_nonblocking(url, entry.markdown, function(code, _, stderr)
     if code == 0 then
-      -- success: clear queue for this path
+      -- success: clear queue
       M._pending[path] = nil
     else
-      -- schedule retry if under limit
       if entry.tries < (entry.max_retries or MAX_RETRIES) then
         local delay = (BASE_RETRY_MS * (2 ^ (entry.tries - 1)))
         vim.defer_fn(function() try_send_pending(path) end, delay)
@@ -137,18 +142,18 @@ local function try_send_pending(path)
         -- give up: expose a message (non-fatal)
         M._pending[path] = nil
         vim.schedule(function()
-          api.nvim_err_writeln("mdview: failed to send markdown for " .. tostring(path) .. " after " .. tostring(entry.tries) .. " attempts")
+          api.nvim_err_writeln("[mdview.ws_client] failed to send markdown for " .. tostring(path) .. " after " .. tostring(entry.tries) .. " attempts")
         end)
       end
     end
   end)
 end
 
---- Public: send markdown to server. This enqueues the payload and attempts an immediate send.
---- Non-blocking; automatically retries on failure with exponential backoff.
+-- Public: send markdown to server. This enqueues the payload and attempts an immediate send.
+-- Non-blocking; automatically retries on failure with exponential backoff.
 ---@param path string absolute file path (used as key)
 ---@param markdown string file content
----@param opts table|nil optional overrides: { max_retries=number }
+---@param opts { max_retries?: integer }|nil # optional overrides for retry behavior
 function M.send_markdown(path, markdown, opts)
   opts = opts or {}
   if type(path) ~= "string" or type(markdown) ~= "string" then return end
@@ -164,10 +169,10 @@ function M.send_markdown(path, markdown, opts)
   try_send_pending(path)
 end
 
---- Public: wait until server health endpoint responds (or timeout).
---- Calls cb(ok:boolean) when ready or false on timeout.
----@param cb function callback receives (ok:boolean)
----@param timeout_ms number|nil total timeout in ms (default HEALTH_TIMEOUT_MS)
+-- Public: wait until server health endpoint responds (or timeout).
+-- Calls cb(ok:boolean) when ready or false on timeout.
+---@param cb fun(ok: boolean) # callback invoked when server is ready or timeout occurs
+---@param timeout_ms integer|nil # optional timeout in milliseconds (default HEALTH_TIMEOUT_MS)
 function M.wait_ready(cb, timeout_ms)
   cb = cb or function() end
   local timeout = timeout_ms or HEALTH_TIMEOUT_MS

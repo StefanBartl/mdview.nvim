@@ -1,18 +1,21 @@
----FIX: `uv`-LSP
-
 ---@module 'mdview.usercommands.autostart'
 --- Autostart helper: start server and open preview. Integrates with mdview.adapter.browser when available.
 --- Returns browser handle when it started a controllable browser instance, otherwise nil.
 
+---FIX: `uv`-LSP-warns
+-- undefined fields on vim.loop; suppress those specific diagnostics for clarity.
+---@diagnostic disable: undefined-field, deprecated, undefined-global, unused-local, return-type-mismatch
+
 local runner = require("mdview.adapter.runner")
+local api = vim.api
 local notify = vim.notify
+local schedule = vim.schedule
+local nvim_create_autocmd = api.nvim_create_autocmd
 
 local M = {}
 local SERVER_URL = "http://localhost:43219"
 
--- Toggle: whether to wait for server before opening preview
-M.wait_for_ready = true
-
+M.wait_for_ready = true -- whether to wait for server before opening preview
 
 -- Main autostart function: starts server and opens browser/preview.
 -- Returns browser handle if a controllable instance was started, otherwise nil.
@@ -29,39 +32,39 @@ function M.start(wait)
 
   local handle, err = require("mdview.adapter.browser").open(SERVER_URL)
   if not handle and err then
-    vim.schedule(function()
-      notify(("[mdview] browser adapter: %s"):format(tostring(err)), vim.log.levels.WARN)
+    schedule(function()
+      notify(("[mdview.usercommands] browser adapter: %s"):format(tostring(err)), vim.log.levels.WARN)
     end)
   end
 
   local function send_current_buffer()
-    local buf = vim.api.nvim_get_current_buf()
-    local path = vim.api.nvim_buf_get_name(buf)
-    local lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
+    local buf = api.nvim_get_current_buf()
+    local path = api.nvim_buf_get_name(buf)
+    local lines = api.nvim_buf_get_lines(buf, 0, -1, false)
     require("mdview.adapter.ws_client").send_markdown(path, table.concat(lines, "\n"))
   end
 
   if wait then
     require("mdview.adapter.ws_client").wait_ready(function(ok)
       if ok then
-        vim.schedule(function()
-          notify("[mdview] Server ready, sending current buffer...", vim.log.levels.INFO)
+        schedule(function()
+          notify("[mdview.usercommands] Server ready, sending current buffer...", vim.log.levels.INFO)
           send_current_buffer()
         end)
       else
-        vim.schedule(function()
-          notify("[mdview] Server health-check failed, preview may not update automatically", vim.log.levels.WARN)
+        schedule(function()
+          notify("[mdview.usercommands] Server health-check failed, preview may not update automatically", vim.log.levels.WARN)
         end)
       end
     end)
   end
 
-  vim.api.nvim_create_autocmd({ "BufWritePost", "TextChanged", "TextChangedI" }, {
+  nvim_create_autocmd({ "BufWritePost", "TextChanged", "TextChangedI" }, {
     pattern = "*.md",
     callback = send_current_buffer,
   })
 
-  vim.api.nvim_create_autocmd("VimLeavePre", {
+  nvim_create_autocmd("VimLeavePre", {
     callback = function()
       if handle then
         require("mdview.adapter.browser").close(handle)

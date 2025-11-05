@@ -1,11 +1,5 @@
 ---@module 'mdview.adapter.browser.resolve_command'
---- Resolve a browser executable by explicit command, configuration, friendly name, autodetection, and platform-specific probes.
-
----@class browser_resolver
----@field try_resolve fun(string): boolean function to test if a candidate command is valid
----@field default_candidates string[] list of fallback browser executable names
----@field browser_cfg table plugin/browser configuration with get_resolved_cmd method
----@field probe_platform_paths fun(): string[] returns platform-specific candidate paths
+-- Resolve a browser executable by explicit command, configuration, friendly name, autodetection, and platform-specific probes
 
 local fn = vim.fn
 local browser_cfg = require("mdview.config.browser")
@@ -17,24 +11,24 @@ local default_candidates = { "chrome", "google-chrome", "chromium", "msedge", "f
 
 -- Test whether a candidate path/name is usable
 ---@param name string
----@return string|nil resolved -- returns the input or absolute candidate path or nil
+---@return string|nil resolved # returns the input or absolute candidate path or nil
 local function try_resolve(name)
   if not name or name == "" then return nil end
   -- If it's directly executable in PATH
   if fn.executable(name) == 1 then
     return name
   end
-  -- If it's an absolute path to an executable-like file, accept it (filereadable fallback)
+  -- If it's an absolute path to an executable-like file, accept it
   if fn.filereadable(name) == 1 then
     return name
   end
   return nil
 end
 
----@param explicit_cmd string|nil Explicit browser command (highest precedence)
----@param friendly string|nil Optional friendly name for browser (e.g., "firefox", "chrome")
----@return string|nil resolved_cmd Resolved browser command
----@return string|nil err Error message if resolution failed
+---@param explicit_cmd string|nil # Explicit browser command (highest precedence)
+---@param friendly string|nil # Optional friendly name for browser (e.g., "firefox", "chrome")
+---@return string|nil  # resolved_cmd Resolved browser command
+---@return string|nil # err Error message if resolution failed
 return function (explicit_cmd, friendly)
   -- Highest precedence: explicit absolute command
   if explicit_cmd and explicit_cmd ~= "" then

@@ -1,41 +1,44 @@
 ---@module 'mdview.core.session'
---- Session management and simple buffer-content tracking for mdview.nvim.
---- Stores last-seen buffer contents (by absolute path) to enable minimal diffing later.
+-- Session management and simple buffer-content tracking for mdview.nvim.
+-- Stores last-seen buffer contents (by absolute path) to enable minimal diffing later.
 
 local M = {}
 
 M.buffers = {}
 
---- Initialize session store.
+-- Initialize session store.
+---@return nil
 function M.init()
   M.buffers = {}
 end
 
---- Shutdown session and clear cached contents.
+-- Shutdown session and clear cached contents.
+---@return nil
 function M.shutdown()
   M.buffers = {}
 end
 
---- Get cached object for path.
+-- Get cached object for path.
 ---@param path string
 ---@return table|nil
 function M.get(path)
   return M.buffers[path]
 end
 
---- Store buffer content snapshot (lines array) and computed hash.
+-- Store buffer content snapshot (lines array) and computed hash
 ---@param path string
 ---@param lines string[]
 function M.store(path, lines)
-  -- simple stable hash using table concat; for large files replace with better hash
+  -- FIX: simple stable hash using table concat; for large files replace with better hash
   local text = table.concat(lines, "\n")
   local h = vim.fn.sha256(text)
   M.buffers[path] = { hash = h, lines = lines }
 end
 
---- Compute a lightweight diff between cached lines and new lines.
---- Returns a table of change ranges: { { start = n, ["end"] = m, lines = {...} }, ... }
---- This is a naive line-diff: it finds first/last differing line. Suitable as a first step.
+-- FIX: This is a naive line-diff: it finds first/last differing line. Suitable as a first step.
+--
+-- Compute a lightweight diff between cached lines and new lines.
+-- Returns a table of change ranges: { { start = n, ["end"] = m, lines = {...} }, ... }
 ---@param old_lines string[]|nil
 ---@param new_lines string[]
 ---@return table change_ranges

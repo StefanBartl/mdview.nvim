@@ -1,6 +1,6 @@
 ---@module 'mdview.adapter.browser.build_args_for_browser'
---- Builds a command-line argument list for launching a given browser executable with a specified URL.
---- Supports Chrome/Chromium/Edge, Firefox, and fallback generic handling.
+-- Builds a command-line argument list for launching a given browser executable with a specified URL.
+-- Supports Chrome/Chromium/Edge, Firefox, and fallback generic handling.
 
 local fn = vim.fn
 
@@ -13,13 +13,13 @@ local function make_tmp_profile()
   return base
 end
 
----@param exe string Absolute path or candidate name of the browser executable
----@param url string URL to open
----@return string[] args Command-line arguments to pass to the executable
----@return string|nil tmp_profile Path to temporary profile/directory (if created)
+---@param exe string # Absolute path or candidate name of the browser executable
+---@param url string # URL to open
+---@return string[] args # Command-line arguments to pass to the executable
+---@return string|nil tmp_profile # Path to temporary profile/directory (if created)
 return function (exe, url)
   local name = exe:lower()
-  local tmp = make_tmp_profile() -- assume this utility exists and returns a temporary path
+  local tmp = make_tmp_profile()
 
   if name:match("chrome") or name:match("chromium") or name:match("msedge") or name:match("google%-chrome") then
     local args = {
@@ -42,7 +42,7 @@ return function (exe, url)
     return args, tmp
 
   else
-    -- generic fallback for other executables (assumes Chrome-like arguments work)
+    -- generic fallback for other executables
     local args = {
       "--user-data-dir=" .. tmp,
       "--app=" .. url,
