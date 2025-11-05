@@ -4,7 +4,7 @@
 
 * [x] `npm run dev` / `npm run build` laufen ohne Fehler.
 * [x] Vite-Client erreichbar unter `http://localhost:43220/` — zeigt "mdview loading...".
-* [ ] `lua/`-Ordner noch nicht vorhanden (Neovim-Plugin fehlt aktuell).
+* [x] `lua/`-Ordner noch nicht vorhanden (Neovim-Plugin fehlt aktuell).
 * [ ] Server liefert aktuell nur eine einfache WS-Verbindung / Hello-Message; Render-Endpoint fehlt noch.
 
 ---
@@ -139,12 +139,11 @@ end, {})
 ## Vorschlag für die nächsten 48 Stunden (Sprint-Plan)
 
 * Tag 1:
-
   * Implementiere `src/server/render.ts` und Endpoint in `index.ts`.
   * Lege `tests/test.md` an und teste mit `curl`.
   * Ergänze README Dev-Anleitung mit curl-Beispiel.
-* Tag 2:
 
+* Tag 2:
   * Minimaler Lua-Scaffold (`plugin/mdview.lua`, `lua/mdview/init.lua`, runner.lua).
   * Test: Starte server per `:MarkdownPreviewStart` in Neovim (headless oder GUI) — prüfe Process gestartet.
   * Implementiere einfache debounce + file-hash precheck im Server.
