@@ -1,13 +1,25 @@
 # Roadmap
 
+## Wichtig
+
+- Statt Browser "TempApp" soll aktuelle Browsersitzung genutzt werden
+- Nach dem stop mus unbedingt der Prozess
+
 ## Allgemein
 
 1. `TODO-Comments` lösen
 2. Stark modularisieren
-2. Es muss sichergestellt sein, dass `npm` installiert und im Pfad verfügbar ist, ansonsten muss früh eine Meldung ausgegeben werden.
-3. In mdview.config ein Feld open_on_start (default true) und open_url (overrides) hinzufügen.
-4. Falls man feinere Kontrolle möchte: nur öffnen, wenn vim.fn.has("gui_running") == 1 oder vim.env.DISPLAY gesetzt ist.
-5. In Debug-Modus optional vim.notify("Opening browser: " .. url).
+3. Es muss sichergestellt sein, dass `npm` installiert und im Pfad verfügbar ist, ansonsten muss früh eine Meldung ausgegeben werden.
+4. In mdview.config ein Feld open_on_start (default true) und open_url (overrides) hinzufügen.
+5. Falls man feinere Kontrolle möchte: nur öffnen, wenn vim.fn.has("gui_running") == 1 oder vim.env.DISPLAY gesetzt ist.
+6. In Debug-Modus optional vim.notify("Opening browser: " .. url).
+7. Fokus nach MDViewStart geht in den Browser
+
+---
+
+## Testing
+
+- Line Diff: `tests\mdview\util\diff.md`
 
 ---
 

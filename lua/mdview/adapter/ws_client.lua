@@ -169,7 +169,71 @@ function M.send_markdown(path, markdown, opts)
   try_send_pending(path)
 end
 
--- Public: wait until server health endpoint responds (or timeout).
+---@param path string absolute file path (used as key)
+---@param diffs table[] list of edit objects { op="replace"|"insert"|"delete", start=number, count=number, lines=string[]? }
+---@param opts table|nil optional overrides
+function M.send_patch(path, diffs, opts)
+  opts = opts or {}
+  if type(path) ~= "string" or type(diffs) ~= "table" then return end
+
+  -- Build JSON payload
+  local payload = {
+    type = "patch",
+    file = path,
+    edits = diffs,
+  }
+
+  local json = vim.fn.json_encode(payload)
+
+  -- Use internal helper to post JSON (re-use http_post_nonblocking or create one)
+  -- We'll post to /render?key=<escaped_path>&patch=1 (server must support this)
+  local port = vim.g.mdview_server_port or DEFAULT_PORT
+  local url = string.format("http://localhost:%d/render?key=%s&patch=1", port, fn.fnameescape(path))
+
+  -- Use the existing http_post_nonblocking (adapted to accept body + content-type)
+  -- If http_post_nonblocking in module doesn't support content-type, add a small wrapper here
+  local function post_json_nonblocking(_url, body, cb)
+    cb = cb or function() end
+    local curl = fn.executable("curl") == 1 and "curl" or nil
+    if curl then
+      local tmpf = fn.tempname()
+      local f = io.open(tmpf, "wb")
+      if f then
+        f:write(body)
+        f:close()
+      end
+      local args = { "-sS", "-X", "POST", _url, "--data-binary", "@" .. tmpf, "-H", "Content-Type: application/json" }
+      fn.jobstart(vim.list_extend({ curl }, args), {
+        stdout_buffered = true,
+        stderr_buffered = true,
+        on_exit = function(_, code, _)
+          pcall(function() os.remove(tmpf) end)
+          cb(code)
+        end,
+      })
+    else
+      -- fallback (blocking)
+      local ok, res = pcall(function()
+        local cmd = string.format("sh -c %q", "curl -sS -X POST " .. _url .. " -H 'Content-Type: application/json' --data-binary @- <<'BODY'\n" .. body .. "\nBODY")
+        return fn.system(cmd)
+      end)
+      if ok then cb(0) else cb(1) end
+    end
+  end
+
+  -- enqueue / attempt send (no retries here; reuse your try_send_pending pattern if desired)
+  post_json_nonblocking(url, json, function(code)
+    if code == 0 then
+      -- success -> nothing to do (or update internal state)
+    else
+      vim.schedule(function()
+        vim.notify(("mdview: failed to post patch for %s (code %s)"):format(path, tostring(code)), vim.log.levels.WARN)
+      end)
+    end
+  end)
+end
+
+-- Wait until server health endpoint responds (or timeout).
 -- Calls cb(ok:boolean) when ready or false on timeout.
 ---@param cb fun(ok: boolean) # callback invoked when server is ready or timeout occurs
 ---@param timeout_ms integer|nil # optional timeout in milliseconds (default HEALTH_TIMEOUT_MS)

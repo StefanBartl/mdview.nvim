@@ -1,6 +1,6 @@
 -- FIX: Sollen nur in Markdown Buffer ausführbar/sichtbar sein -> autocmd?
 
----@module 'mdview.usercommands'
+---@module 'mdview.usercmds'
 --- Registers mdview user commands: start, stop, open, show logs
 
 local mdview = require("mdview")
