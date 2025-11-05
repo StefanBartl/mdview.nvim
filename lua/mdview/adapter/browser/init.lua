@@ -1,43 +1,32 @@
 ---@module 'mdview.adapter.browser'
---- Cross-platform helper to open a disposable browser instance (app mode / isolated profile)
---- and close it later from Neovim.
---- Minimal, validated implementation that respects explicit user overrides from
---- mdview.config.browser when available. Falls back to best-effort detection.
----
---- Usage:
---- local browser = require('mdview.adapter.browser')
---- local handle, err = browser.open(url, { browser_cmd = "/full/path/to/chrome", browser = "chrome" })
---- if handle then ... store handle ... end
---- browser.close(handle)
+-- Cross-platform helper to open a disposable browser instance (app mode / isolated profile)
+-- and close it later from Neovim.
+-- Minimal, validated implementation that respects explicit user overrides from
+-- mdview.config.browser when available. Falls back to best-effort detection.
+
+-- Usage:
+-- local browser = require('mdview.adapter.browser')
+-- local handle, err = browser.open(url, { browser_cmd = "/full/path/to/chrome", browser = "chrome" })
+-- if handle then ... store handle ... end
+-- browser.close(handle)
 
 local fn = vim.fn
 local resolve_command = require("mdview.adapter.browser.resolve_command")
 local build_args_for_browser = require("mdview.adapter.browser.build_args_for_browser")
 
----@class BrowserHandle
----@field job_id number jobstart id
----@field tmp_profile string|nil temporary profile path
----@field cmd string the executable launched
----@field args string[] the args used to start the process
----@field platform "win"|"mac"|"unix"
-
 local M = {}
 
 -- Remove temporary profile directory (recursively)
 ---@param path string|nil
+---@return nil
 local function remove_tmp_profile(path)
   if not path or path == "" then return end
   pcall(fn.delete, path, "rf")
 end
 
---- Open a browser window/tab pointing to `url`.
---- Returns a BrowserHandle on success, nil and error string on failure.
---- opts:
----   browser_cmd: explicit absolute path to executable (overrides detection)
----   browser: friendly name hint (e.g. "chrome", "firefox")
----   on_exit: optional callback(job_id, exit_code)
----@param url string
----@param opts table|nil
+-- Open a browser window/tab pointing to `url`.
+-- Returns a BrowserHandle on success, nil and error string on failure.
+---@param opts BrowserOptions|nil
 ---@return BrowserHandle|nil, string|nil
 function M.open(url, opts)
   opts = opts or {}
@@ -52,7 +41,6 @@ function M.open(url, opts)
 
   local args, tmp = build_args_for_browser(cmd, url)
   if not args then
-    -- should not happen, but guard
     return nil, "failed to construct browser args"
   end
 
@@ -86,9 +74,9 @@ function M.open(url, opts)
   return handle, nil
 end
 
---- Close a previously opened browser handle.
---- Attempts graceful stop via jobstop(); then removes temporary profile directory.
---- If there is no job handle (external opener used), this is a no-op.
+-- Close a previously opened browser handle.
+-- Attempts graceful stop via jobstop(); then removes temporary profile directory.
+-- If there is no job handle (external opener used), this is a no-op.
 ---@param handle BrowserHandle|nil
 ---@return boolean, string|nil
 function M.close(handle)

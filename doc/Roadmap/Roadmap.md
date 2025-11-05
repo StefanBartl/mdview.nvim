@@ -29,3 +29,5 @@
 - Starten einer Datei mit manuell geetzten cwd  `:MDViewStart cwd="c:/Users/bartl/"`
 - Schließen des Browser Tabs soll auch MDView beenden
 - Wie behandlen wir, wenn MDViewOpen bei mehreren Datein ausgeführt wird? Sessions machen ?
+
+---

@@ -1,9 +1,8 @@
 ---@module 'mdview.adapter.browser.probe_platform_paths'
---- Provides platform-specific candidate paths for browser executables.
---- Minimal and conservative probe list for Windows, macOS, and Linux.
+-- Provides platform-specific candidate paths for browser executables.
+-- Minimal and conservative probe list for Windows, macOS, and Linux.
 
----@return string[] List of full paths to browser executables for the current platform.
----@nodiscard
+---@return string[] # List of full paths to browser executables for the current platform.
 return function ()
   local fn = vim.fn
   local paths = {} ---@type string[]

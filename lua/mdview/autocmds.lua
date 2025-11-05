@@ -8,6 +8,7 @@ local M = {}
 ---@return nil
 function M.setup()
 	nvim_create_autocmd("VimLeavePre", {
+		desc = "[mdview] Stop mdview server if running before exiting Neovim",
 		callback = function()
 			if runner.proc ~= nil then
 				require("mdview.adapter.runner").stop_server(runner.proc)

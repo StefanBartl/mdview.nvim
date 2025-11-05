@@ -1,7 +1,7 @@
 ---@module 'mdview.config'
---- Default configuration for mdview.nvim.
---- Contains developer-oriented options (server command + args) and tunables.
---- Users can override via require('mdview').setup({ ... }) in future.
+-- Default configuration for mdview.nvim.
+-- Contains developer-oriented options (server command + args) and tunables.
+-- Users can override via require('mdview').setup({ ... }) in future.
 
 local M = {}
 

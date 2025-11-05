@@ -1,6 +1,6 @@
 ---@module 'mdview.health'
---- CheckHealth module for mdview.nvim
---- Integrates with :checkhealth and provides runtime/package-manager diagnostics.
+-- CheckHealth module for mdview.nvim
+-- Integrates with :checkhealth and provides runtime/package-manager diagnostics.
 
 --AUDIT: Diese Datei muss währen der Development Phase laufend erweitert/angepasst werden
 
@@ -39,7 +39,7 @@ local function detect_runtime()
 				local major = tonumber(output:match("v?(%d+)"))
 				return cmd, major
 			else
-        vim.notify("[mdview] handle to read output in health module is nil", 4)
+        vim.notify("[mdview.health] handle to read output in health module is nil", 4)
 			end
     end
   end
