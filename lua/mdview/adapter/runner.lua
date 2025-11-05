@@ -15,6 +15,18 @@ local M = {}
 M.proc = nil
 M.server_job = nil
 
+-- generate a timestamped log file path
+-- %Y: year, %m: month, %d: day, %H: hour, %M: minute, %S: second
+local timestamp = os.date("%Y%m%d-%H%M%S")
+
+local file_path = string.format("./logs/debug-%s.log", timestamp)
+
+log.setup({
+  debug = false,            -- disable debug mode by default
+  buf_name = "mylogs",      -- buffer name for display
+  file_path = file_path,    -- timestamped logfile path
+})
+
 log.setup({ debug = false, buf_name = "mylogs", file_path = "./logs/debug.log" })
 
 local cfg_ok, mdview_config = pcall(require, "mdview.config")
