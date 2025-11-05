@@ -5,6 +5,7 @@
 local session = require("mdview.core.session")
 local ws_client = require("mdview.adapter.ws_client")
 local safe_buf_get_option = require("mdview.helper.safe_buf_get_option")
+
 local api = vim.api
 local nvim_buf_get_name = api.nvim_buf_get_name
 local nvim_create_autocmd = api.nvim_create_autocmd
@@ -33,28 +34,47 @@ end
 -- Internal handler for BufWritePost: send file (or diffs) to server.
 ---@param bufnr integer
 local function on_buf_write(bufnr)
-	local ft = safe_buf_get_option(bufnr, "filetype") or ""
-	if ft ~= "markdown" and ft ~= "md" then
-		return
-	end
+  local ft = safe_buf_get_option(bufnr, "filetype") or ""
+  if ft ~= "markdown" and ft ~= "md" then
+    return
+  end
 
-	local path = nvim_buf_get_name(bufnr)
-	if path == "" then
-		return
-	end
+  local path = vim.api.nvim_buf_get_name(bufnr)
+  if path == "" then
+    return
+  end
 
-	local lines = api.nvim_buf_get_lines(bufnr, 0, -1, false)
-	-- AUDIT: unused
-	-- local prev = session.get(path)
-	-- local diffs = session.compute_line_diff(prev and prev.lines or nil, lines)
+  local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false) or {}
+  local prev = session.get(path)
+  local old_lines = (prev and prev.lines) or {}
+  local new_lines = lines
 
-	local payload = table.concat(lines, "\n")
+  -- nil-safe check inside tables
+  for i = 1, #old_lines do if old_lines[i] == nil then old_lines[i] = "" end end
+  for i = 1, #new_lines do if new_lines[i] == nil then new_lines[i] = "" end end
 
-	pcall(function()
-		ws_client.send_markdown(path, payload)
-	end)
+  local diff = require("mdview.utils.diff_granular")
+  local diffs = diff(old_lines, new_lines)
 
-	session.store(path, lines)
+  -- Push each diff chunk immediately to the WS client
+  for _, d in ipairs(diffs) do
+    local chunk_lines = {}
+    if d.op == "replace" then
+      -- slice new_lines for the range
+      chunk_lines = vim.list_slice(new_lines, d.start + 1, d.start + (d.count or #new_lines))
+    elseif d.op == "insert" then
+      chunk_lines = d.lines or {}
+    elseif d.op == "delete" then
+      -- send empty payload for deletes
+      chunk_lines = {}
+    end
+
+    local payload = table.concat(chunk_lines, "\n")
+    ws_client.send_markdown(path, payload)
+  end
+
+  -- Store current buffer state for next diff
+  session.store(path, lines)
 end
 
 -- Attach autocommands

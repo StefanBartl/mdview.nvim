@@ -1,4 +1,4 @@
----@module 'mdview.usercommands.autostart'
+---@module 'mdview.usercmds.autostart'
 --- Autostart helper: start server and open preview. Integrates with mdview.adapter.browser when available.
 --- Returns browser handle when it started a controllable browser instance, otherwise nil.
 

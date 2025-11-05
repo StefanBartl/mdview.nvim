@@ -7,7 +7,7 @@ local browser_cfg = require("mdview.config.browser")
 local runner = require("mdview.adapter.runner")
 local events = require("mdview.core.events")
 local session = require("mdview.core.session")
-local autostart = require("mdview.usercommands.autostart")
+local autostart = require("mdview.usercmds.autostart")
 local browser_adapter = require("mdview.adapter.browser")
 
 local notify = vim.notify
@@ -16,22 +16,22 @@ local M = {}
 
 M.config = cfg.defaults
 M.state = {
-  server = nil,   -- hold runner handle
-  attached = false,
-  browser = nil,  -- holds BrowserHandle
+	server = nil, -- hold runner handle
+	attached = false,
+	browser = nil, -- holds BrowserHandle
 }
 
 ---@param opts table|nil
 ---@return nil
 function M.setup(opts)
-  opts = opts or {}
-  for k, v in pairs(opts) do
-    M.config[k] = v
-  end
+	opts = opts or {}
+	for k, v in pairs(opts) do
+		M.config[k] = v
+	end
 
-  require("mdview.config.browser").setup_and_notify() -- Resolve browser at setup time and notify user if resolution failed
-  require("mdview.usercommands").setup()
-  require("mdview.autocmds").setup()
+	require("mdview.config.browser").setup_and_notify() -- Resolve browser at setup time and notify user if resolution failed
+	require("mdview.usercmds").setup()
+	require("mdview.autocmds").setup()
 end
 
 -- Start mdview server, initialize session and attach events.
@@ -44,31 +44,43 @@ end
 --   - notifies the user on success or failure via notify
 ---@return nil
 function M.start()
-  if M.state.server then
-    notify("mdview: server already running", vim.log.levels.INFO)
-    return
-  end
+	if M.state.server then
+		notify("mdview: server already running", vim.log.levels.INFO)
+		return
+	end
 
-  local ok, handle_or_err = pcall(runner.start_server, M.config.server_cmd, M.config.server_args, M.config.server_cwd)
-  if not ok or not handle_or_err then
-    notify("mdview: failed to start server: " .. tostring(handle_or_err), vim.log.levels.ERROR)
-    return
-  end
+	local ok, handle_or_err = pcall(runner.start_server, M.config.server_cmd, M.config.server_args, M.config.server_cwd)
+	if not ok or not handle_or_err then
+		notify("mdview: failed to start server: " .. tostring(handle_or_err), vim.log.levels.ERROR)
+		return
+	end
 
-  M.state.server = handle_or_err
-  session.init()
-  events.attach()
-  M.state.attached = true
+	M.state.server = handle_or_err
+	session.init()
+	events.attach()
+	M.state.attached = true
 
-  -- Wait before open autostart tab and capture browser handle if any
-  vim.defer_fn(function()
-    local handle = autostart.start()
-    if handle then
-      M.state.browser = handle
-    end
-  end, 500)
+	-- Wait before open autostart tab and capture browser handle if any
+	vim.defer_fn(function()
+		-- Start autostart tab and store browser handle
+		local handle = autostart.start()
+		if handle then
+			M.state.browser = handle
+		end
 
-  notify("[mdview] started", vim.log.levels.INFO)
+		-- Push full content of current buffer to WS immediately
+		local bufnr = vim.api.nvim_get_current_buf()
+		local path = vim.api.nvim_buf_get_name(bufnr)
+		if path ~= "" then
+			local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
+			local payload = table.concat(lines, "\n")
+			local ws_client = require("mdview.adapter.ws_client")
+			ws_client.send_markdown(path, payload)
+			require("mdview.core.session").store(path, lines)
+		end
+	end, 500)
+
+	notify("[mdview] started", vim.log.levels.INFO)
 end
 
 -- If config.browser.stop_closes_browser is true (default), attempt to close stored browser handle.
@@ -81,34 +93,34 @@ end
 ---@param close_browser_override boolean?  # when provided, explicitly control whether to close the browser handle; if nil, use browser_cfg.defaults.stop_closes_browser
 ---@return nil
 function M.stop(close_browser_override)
-  if M.state.attached then
-    events.detach()
-    M.state.attached = false
-  end
+	if M.state.attached then
+		events.detach()
+		M.state.attached = false
+	end
 
-  if M.state.server then
-    pcall(runner.stop_server, M.state.server)
-    M.state.server = nil
-  end
+	if M.state.server then
+		pcall(runner.stop_server, M.state.server)
+		M.state.server = nil
+	end
 
-  session.shutdown()
+	session.shutdown()
 
-  local should_close
-  if type(close_browser_override) == "boolean" then
-    should_close = close_browser_override
-  else
-    should_close = browser_cfg.defaults.stop_closes_browser == true
-  end
+	local should_close
+	if type(close_browser_override) == "boolean" then
+		should_close = close_browser_override
+	else
+		should_close = browser_cfg.defaults.stop_closes_browser == true
+	end
 
-  if should_close and M.state.browser then
-    local ok, err = browser_adapter.close(M.state.browser)
-    if not ok then
-      notify(("[mdview] failed to close browser: %s"):format(tostring(err)), vim.log.levels.WARN)
-    end
-    M.state.browser = nil
-  end
+	if should_close and M.state.browser then
+		local ok, err = browser_adapter.close(M.state.browser)
+		if not ok then
+			notify(("[mdview] failed to close browser: %s"):format(tostring(err)), vim.log.levels.WARN)
+		end
+		M.state.browser = nil
+	end
 
-  notify("[mdview] stopped", vim.log.levels.INFO)
+	notify("[mdview] stopped", vim.log.levels.INFO)
 end
 
 -- ADD: testfunctions

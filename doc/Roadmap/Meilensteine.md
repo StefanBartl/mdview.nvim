@@ -28,7 +28,7 @@
   * [x] `wasm/` (WASM proof-of-concept / bindings)
   * [x] `tests/` (Unit & Integration tests)
   * [x] `ci/` (CI Konfiguration)
-* [ ] Initiale Dev-Skripte in `package.json` (dev, build, test, lint)
+* [x] Initiale Dev-Skripte in `package.json` (dev, build, test, lint)
     * [x] CI (GitHub Actions) anlegen: `.github/workflows/ci.yml`
     * [x] `./package.json` für NodeJS anlegen
     * [x] `./tsconfig.json` anlegen
@@ -49,10 +49,10 @@ Ziel: Neovim erkennt Markdown-Buffer und startet/stellt Verbindung zum lokalen S
 * [x] `plugin/mdview.lua` anlegen (autoload entry, commands)
 * [x] `lua/mdview/init.lua` (Modul-Entry mit Setup-API)
 * [x] `lua/mdview/config.lua` (Defaults, user overrides)
-* [ ] `lua/mdview/core/session.lua` (Session-Management, state)
-* [ ] `lua/mdview/core/events.lua` (Autocommands: BufEnter, BufWritePost, TextChanged)
-* [r] `lua/mdview/adapter/runner.lua` (spawn persistent server process via `vim.loop.spawn`)
-* [r] `lua/mdview/adapter/ws_client.lua` (WebSocket client zur Kommunikation mit Server)
+* [x] `lua/mdview/core/session.lua` (Session-Management, state)
+* [x] `lua/mdview/core/events.lua` (Autocommands: BufEnter, BufWritePost, TextChanged)
+* [x] `lua/mdview/adapter/runner.lua` (spawn persistent server process via `vim.loop.spawn`)
+* [x] `lua/mdview/adapter/ws_client.lua` (WebSocket client zur Kommunikation mit Server)
 * [ ] Unit-Tests für Lua-Module schreiben (z. B. mit `busted` oder `plenary`):
   * [ ] Tests für Config Defaults
   * [ ] Tests für Session-Management (stateless expectations)
@@ -109,11 +109,11 @@ Test-Strategie:
 
 Ziel: End-to-End-Workflow funktioniert: Buffer-Change → Server render → Browser Update.
 
-* [ ] Sicherstellen, dass Lua-Adapter `runner` Server startet und WS-Verbindung aufbaut
-* [ ] Implementieren von minimalem Protokoll:
-  * [ ] `file_open` event (Neovim → Server)
-  * [ ] `file_change` event (Neovim → Server; payload: path OR patch)
-  * [ ] `render_update` event (Server → Browser; payload: HTML / patch)
+* [x] Sicherstellen, dass Lua-Adapter `runner` Server startet und WS-Verbindung aufbaut
+* [x] Implementieren von minimalem Protokoll:
+  * [x] `file_open` event (Neovim → Server)
+  * [x] `file_change` event (Neovim → Server; payload: path OR patch)
+  * [x] `render_update` event (Server → Browser; payload: HTML / patch)
 * [ ] Integrationstests:
   * [ ] E2E-Skript: start server → start client (headless) → trigger notify via WebSocket → assert client received `render_update`
   * [ ] Manuelles E2E: in Neovim Datei öffnen/ändern → Browser aktualisiert sich sichtbar

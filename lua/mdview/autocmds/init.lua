@@ -2,6 +2,7 @@
 
 local nvim_create_autocmd = vim.api.nvim_create_autocmd
 local runner = require("mdview.adapter.runner")
+local on_text_change = require("mdview.autocmds.on_text_change")
 
 local M = {}
 
@@ -15,6 +16,8 @@ function M.setup()
 			end
 		end,
 	})
+
+	on_text_change.setup()
 end
 
 return M
