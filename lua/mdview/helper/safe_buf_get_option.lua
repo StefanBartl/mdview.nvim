@@ -4,6 +4,7 @@
 --- vim.bo via nvim_buf_call) to support a wide range of Neovim versions.
 
 ---@diagnostic disable: undefined-field, deprecated, unused-local
+
 local api = vim.api
 
 --- Get buffer option in a backwards-compatible way.

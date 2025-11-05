@@ -6,7 +6,7 @@ Für das Nvim-Plugin `mdview`.
 
 **Unter PowerShell ist es möglich**, das Verhalten neuer Instanzen so zu steuern, dass sie den **aktuellen Arbeitsordner (Working Directory)** der aufrufenden Shell übernehmen. Allerdings hängt das **Wie** davon ab, wie genau du die neue Shell öffnest:
 
----
+-
 
 ### **1. PowerShell-Fenster in aktuellem Pfad öffnen (manuell)**
 

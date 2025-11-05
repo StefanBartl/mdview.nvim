@@ -27,3 +27,5 @@
 - `open_preview_tab` in "./lua/mdview/usercommands/autostart" ermöglichen um die ausgabe im nvim-Tab anstatt im Browser anzuzeigen
 - Rendern einer Datei in einen übergebenen Pfad mit optionalen setzten des cwd wie `:MDViewStart C:/Users/bartl/test.md {cwd?}`
 - Starten einer Datei mit manuell geetzten cwd  `:MDViewStart cwd="c:/Users/bartl/"`
+- Schließen des Browser Tabs soll auch MDView beenden
+- Wie behandlen wir, wenn MDViewOpen bei mehreren Datein ausgeführt wird? Sessions machen ?
