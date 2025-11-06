@@ -9,6 +9,7 @@ local uv = vim.loop
 local notify = vim.notify
 local buf_set_option = api.nvim_buf_set_option
 local log = require("mdview.adapter.log")
+local normalize = require("mdview.helper.normalize")
 
 local M = {}
 
@@ -18,7 +19,6 @@ M.server_job = nil
 -- generate a timestamped log file path
 -- %Y: year, %m: month, %d: day, %H: hour, %M: minute, %S: second
 local timestamp = os.date("%Y%m%d-%H%M%S")
-
 local file_path = string.format("./logs/debug-%s.log", timestamp)
 
 log.setup({
@@ -109,7 +109,8 @@ end
 ---@param path string  # file or directory path to check
 ---@return boolean  # true if the path exists, false otherwise
 local function file_exists(path)
-  return uv.fs_stat(path) ~= nil
+	local normalized = normalize.path(path)
+  return uv.fs_stat(normalized) ~= nil
 end
 
 -- project root detector used for reasonable default cwd

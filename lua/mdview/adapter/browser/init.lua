@@ -13,6 +13,7 @@
 local fn = vim.fn
 local resolve_command = require("mdview.adapter.browser.resolve_command")
 local build_args_for_browser = require("mdview.adapter.browser.build_args_for_browser")
+local normalize = require("mdview.helper.normalize")
 
 local M = {}
 
@@ -21,7 +22,8 @@ local M = {}
 ---@return nil
 local function remove_tmp_profile(path)
   if not path or path == "" then return end
-  pcall(fn.delete, path, "rf")
+  local norm_path = normalize.path(path)
+  pcall(fn.delete, norm_path, "rf")
 end
 
 -- Open a browser window/tab pointing to `url`.

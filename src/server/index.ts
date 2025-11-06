@@ -1,5 +1,5 @@
 // ADD: Annotations
-
+// src/server/index.ts
 /* Minimal server using express + ws with correct TypeScript typings.
    - Provides HTTP static folder for client
    - Provides WebSocket server for live updates
@@ -9,25 +9,25 @@
 - HTTP + WebSocket server with /render endpoint and WS broadcast of render_update events.
 */
 
-import express from "express";
-import http from "http";
-import path from "path";
-import { WebSocketServer, type RawData } from "ws";
-import { renderWithCache } from "./render.js";
+import express from 'express';
+import http from 'http';
+import path from 'path';
+import { WebSocketServer, type RawData } from 'ws';
+import { renderWithCache } from './render.js';
+import { MdviewServer } from './mdviewServer';
 
 const app = express();
 const PORT = Number(process.env.MDVIEW_PORT) || 43219;
 
-// parse raw body for markdown POSTs
-app.use(express.text({ type: ["text/*", "application/*+md", "application/octet-stream"], limit: "10mb" }));
+app.use(
+  express.text({ type: ['text/*', 'application/*+md', 'application/octet-stream'], limit: '10mb' }),
+);
 
-// Serve static client in production. In dev Vite serves client on 43220.
-const clientDist = path.join(process.cwd(), "dist", "client");
-app.use("/", express.static(clientDist));
+const clientDist = path.join(process.cwd(), 'dist', 'client');
+app.use('/', express.static(clientDist));
 
-// HTTP health endpoint
-app.get("/health", (_req, res) => {
-  res.status(200).send("ok");
+app.get('/health', (_req, res) => {
+  res.status(200).send('ok');
 });
 
 /**
@@ -39,58 +39,66 @@ app.get("/health", (_req, res) => {
  *
  * Also broadcasts a `render_update` message over active WebSocket clients.
  */
-app.post("/render", (req, res) => {
+app.post('/render', (req, res) => {
   try {
-    const markdown = typeof req.body === "string" ? req.body : String(req.body || "");
-    const key = (req.query.key as string) || `inline-${Date.now()}`;
+    const rawKey = String(req.query.key || `inline-${Date.now()}`);
+    const key = rawKey.replace(/\\/g, '/'); // normalize Windows path separators
+    const markdown = typeof req.body === 'string' ? req.body : String(req.body || '');
+    console.log(`[mdview-server] POST /render key=${key} markdown_len=${markdown.length}`);
+
     const { html, cached } = renderWithCache(key, markdown);
 
     // Broadcast to all connected WS clients
     try {
-      const payload = JSON.stringify({ type: "render_update", payload: html, key, cached });
-      wss.clients.forEach((client) => {
+      const payload = JSON.stringify({ type: 'render_update', payload: html, key, cached });
+      let broadcastCount = 0;
+      wss.clients.forEach(client => {
         if (client.readyState === client.OPEN) {
           client.send(payload);
+          broadcastCount++;
         }
       });
+      console.log(
+        `[mdview-server] broadcasted render_update key=${key} clients=${broadcastCount} cached=${cached}`,
+      );
     } catch (bcastErr) {
-      // don't fail the HTTP response if broadcast fails
-      console.warn("broadcast failed", bcastErr);
+      console.warn('broadcast failed', bcastErr);
     }
 
-    res.setHeader("Content-Type", "application/json");
+    res.setHeader('Content-Type', 'application/json');
     res.status(200).send(JSON.stringify({ html, cached }));
   } catch (err) {
+    console.error('[mdview-server] render handler error', err);
     res.status(500).send(String(err));
   }
 });
 
 // create HTTP server + attach WS server
 const server = http.createServer(app);
-const wss = new WebSocketServer({ server, path: "/ws" });
+const wss = new WebSocketServer({ server, path: '/ws' });
 
-wss.on("connection", (ws) => {
-  console.log("ws: client connected");
+wss.on('connection', ws => {
+  console.log('ws: client connected');
 
   // greet client
   try {
-    ws.send(JSON.stringify({ type: "hello", payload: "mdview" }));
+    ws.send(JSON.stringify({ type: 'hello', payload: 'mdview' }));
   } catch {}
 
-  ws.on("message", (msg: RawData) => {
+  ws.on('message', (msg: RawData) => {
     // convert RawData -> string robustly
-    let text = "";
-    if (typeof msg === "string") text = msg;
-    else if (Array.isArray(msg)) text = Buffer.concat(msg as Buffer[]).toString("utf8");
-    else if (msg instanceof ArrayBuffer) text = Buffer.from(new Uint8Array(msg)).toString("utf8");
-    else if (ArrayBuffer.isView(msg)) text = Buffer.from(msg as Uint8Array).toString("utf8");
-    else text = Buffer.from(msg as Buffer).toString("utf8");
+    let text = '';
+    if (typeof msg === 'string') text = msg;
+    else if (Array.isArray(msg)) text = Buffer.concat(msg as Buffer[]).toString('utf8');
+    else if (msg instanceof ArrayBuffer) text = Buffer.from(new Uint8Array(msg)).toString('utf8');
+    else if (ArrayBuffer.isView(msg)) text = Buffer.from(msg as Uint8Array).toString('utf8');
+    else text = Buffer.from(msg as Buffer).toString('utf8');
 
     // handle control messages from client (optional)
     try {
       const data = JSON.parse(text);
-      if (data?.type === "ping") {
-        ws.send(JSON.stringify({ type: "pong" }));
+      if (data?.type === 'ping') {
+        ws.send(JSON.stringify({ type: 'pong' }));
       }
       // extend with more control messages as needed
     } catch {
@@ -98,12 +106,12 @@ wss.on("connection", (ws) => {
     }
   });
 
-  ws.on("close", (code, reason) => {
-    console.log("ws: client disconnected", code, reason?.toString());
+  ws.on('close', (code, reason) => {
+    console.log('ws: client disconnected', code, reason?.toString());
   });
 
-  ws.on("error", (err) => {
-    console.warn("ws: error", err);
+  ws.on('error', err => {
+    console.warn('ws: error', err);
   });
 });
 
