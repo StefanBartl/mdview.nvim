@@ -6,6 +6,7 @@
 local mdview = require("mdview")
 local log = require("mdview.adapter.log")
 local nvim_create_user_command = vim.api.nvim_create_user_command
+local ft_pattern = { ".markdown", "*.md", "*.mdx" }
 
 local M = {}
 
@@ -19,13 +20,13 @@ function M.setup()
 		mdview.stop()
 	end, { desc = "[mdview] Stop mdview preview server and detach autocommands" })
 
-	nvim_create_user_command("MDViewOpen", function()
-		mdview.open()
-	end, { desc = "[mdview] Open preview in browser (tries vite dev then server)" })
+	-- nvim_create_user_command("MDViewOpen", function()
+	-- 	mdview.open()
+	-- end, { desc = "[mdview] Open preview in browser (tries vite dev then server)" })
 
-	nvim_create_user_command("MDViewShowLogs", function()
+	nvim_create_user_command("MDViewShowWebLogs", function()
 		log.show()
-	end, { desc = "[mdview] Show mdview debug logs" })
+	end, { desc = "[mdview] Show mdview debug logs from the Web-Application" })
 end
 
 return M

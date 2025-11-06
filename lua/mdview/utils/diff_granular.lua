@@ -2,6 +2,8 @@
 -- Line-based minimal diff using Myers LCS algorithm.
 -- 1-based indexing, nil-safe, produces edits suitable for incremental sending.
 
+-- AUDIT: Optimize it
+
 ---@param old_lines string[]|nil previous lines
 ---@param new_lines string[] current lines
 ---@return table[] list of edits { op="replace"|"insert"|"delete", start=number, count=number, lines=string[]? }

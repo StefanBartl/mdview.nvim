@@ -1,92 +1,45 @@
-# Dies ist eine Testdatei
+# Dies der Beginn der Testdatei `tests/test.md`...
 
-Für das Nvim-Plugin `mdview`.
-saöldöäaslödläöasldäölas
-## Powershell
-
-**Unter PowerShell ist es möglich**, das Verhalten neuer Instanzen so zu steuern, dass sie den **aktuellen Arbeitsordner (Working Directory)** der aufrufenden Shell übernehmen. Allerdings hängt das **Wie** davon ab, wie genau du die neue Shell öffnest:
+...für das Nvim-Plugin `mdview`.
 
 -
 
-### **1. PowerShell-Fenster in aktuellem Pfad öffnen (manuell)**
+## Table of content
 
-Wenn du z. B. in einem Terminal in `C:\configs` bist und dort `powershell` eingibst, startet standardmäßig **eine neue PowerShell-Instanz im gleichen Verzeichnis**.
-
-```powershell
-PS C:\configs> powershell
-PS C:\configs>
-```
-
-→ **Dieses Verhalten ist bereits so gewünscht.**
+- [Lorem Ipsum](#lorem-ipsum)
+  - [At vero...](#at-vero)
+- [Duis autem](#duis-autem)
 
 ---
 
-### **2. Neue PowerShell über GUI (z. B. Kontextmenü, Verknüpfung, Taskleiste)**
+## Lorem Ipsum
 
-Diese starten meist im Standardverzeichnis (`C:\Users\<Name>`, `$HOME`), **nicht** im aktuellen Ordner deiner Shell.
-
-#### Lösung: Manuell konfigurierte Verknüpfung
-
-1. Rechtsklick auf die PowerShell-Verknüpfung (Desktop, Startmenü etc.)
-2. Eigenschaften → Ziel:
-
-   ```text
-   C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe -NoExit -Command "Set-Location 'C:\configs'"
-   ```
-3. Oder dynamisch über `%CD%` (funktioniert nur in `.cmd`- oder `.bat`-Skripten):
-
-   ```bat
-   powershell.exe -NoExit -Command "Set-Location '%CD%'"
-   ```
+**Lorem ipsum** dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum.
 
 ---
 
-### **3. Neue PowerShell-Instanz aus einem Skript heraus im gleichen Verzeichnis**
+### At vero...
 
-Du kannst z. B. aus einer PowerShell-Sitzung heraus eine **neue Instanz im aktuellen Pfad starten**:
+... eos et accusam et justo duo dolores et ea rebum.
 
-```powershell
-Start-Process powershell -ArgumentList "-NoExit", "-Command", "Set-Location '$PWD'"
-```
+1. Lorem
+2. [Interner anchor link](#Duis)
+3. [Interner id link](#fig--nvimlogo)
 
-* `$PWD` ist der aktuelle Pfad der aufrufenden Shell.
-* `-NoExit` verhindert, dass die Shell sofort schließt.
-
----
-
-### **4. Für Windows Terminal (wt.exe)**
-
-Wenn du `wt` verwendest, kannst du es so starten:
-
-```powershell
-wt -d .
-```
-
-Oder explizit:
-
-```powershell
-wt -d "$PWD"
-```
+- [Extern anchor link](./linkfile.md#Codetesting)
+- [Extern id link](./linkfile.md#Codetesting#fig-nvimlogo)
 
 ---
 
-### **5. Für VSCode (integrierte Shell)**
+## Duis autem
 
-VSCode kann den Startpfad für das integrierte Terminal so setzen:
+Lorem ipsum dolor sit amet, consectetuer adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat.
 
-```jsonc
-// settings.json
-"terminal.integrated.cwd": "${fileDirname}"
-```
+<figure style="text-align:center;" id="#fig-nvimlogo">
+  <img src="./ressources/neovim-logo.png" alt="Testfigure nvim-Logo">
+  <figcaption>Testfigure nvim-Logo</figcaption>
+</figure>
 
 ---
 
-### Fazit
-
-| Methode                    | Pfad übernommen?    | Bemerkung                          |
-| -------------------------- | ------------------- | ---------------------------------- |
-| `powershell` im Terminal   | ✅                   | funktioniert wie erwartet          |
-| `Start-Process powershell` | ✅                   | nur mit `-NoExit` + `Set-Location` |
-| Kontextmenü/GUI            | ❌ (außer angepasst) | Startet meist im Home              |
-| `wt -d "$PWD"`             | ✅                   | ideal für Windows Terminal         |
-
+----TESTDATEI ENDE------------TESTDATEI ENDE------------TESTDATEI ENDE------------TESTDATEI ENDE--------

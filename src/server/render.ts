@@ -1,7 +1,7 @@
 // ADD: Annotations
 // Small rendering utility that converts Markdown -> HTML, computes a content hash,
 // and exports helpers for caching and rendering. Uses markdown-it + markdown-it-anchor.
-
+// src/server/rendert.ts
 import MarkdownIt from "markdown-it";
 import markdownItAnchor from "markdown-it-anchor";
 import crypto from "crypto";

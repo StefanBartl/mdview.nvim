@@ -104,7 +104,8 @@ function M.check()
 
   -- Additional optional checks: package.json presence when running from editor
   local function file_exists(path)
-    return uv.fs_stat(path) ~= nil
+     local normalized = tostring(path):gsub("\\", "/")
+    return uv.fs_stat(normalized) ~= nil
   end
 
   -- Attempt to detect project root similarly to dev fallback logic

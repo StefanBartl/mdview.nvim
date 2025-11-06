@@ -1,4 +1,5 @@
 // ADD: Annotations
+// src/client/transport/websocket.transport.ts
 import type { Transport } from "./transport.interface";
 
 export class WebSocketTransport implements Transport {
