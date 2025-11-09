@@ -1,6 +1,8 @@
 // ADD: Annotations
 // NOTE: This is a stub/POC skeleton. Real implementation needs HTTP/3 server & TLS.
 
+// src/client/webtransport.transport.ts
+
 // This is a POC adapter for WebTransport. Many WebTransport types are still
 // experimental in TypeScript lib definitions; safe casts are used to satisfy LSP.
 

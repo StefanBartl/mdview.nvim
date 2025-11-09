@@ -1,122 +1,64 @@
-// ADD: Annotations
 // src/server/index.ts
-/* Minimal server using express + ws with correct TypeScript typings.
-   - Provides HTTP static folder for client
-   - Provides WebSocket server for live updates
-   - Import WebSocket types from 'ws' to avoid DOM WebSocket conflicts.
-   - Use http.createServer to attach WebSocketServer.
+// Updated: optimize POST /render handling with cache-aware broadcast
 
-- HTTP + WebSocket server with /render endpoint and WS broadcast of render_update events.
-*/
-
-import express from 'express';
-import http from 'http';
-import path from 'path';
-import { WebSocketServer, type RawData } from 'ws';
 import { renderWithCache } from './render.js';
-import { MdviewServer } from './mdviewServer';
+import { MdviewServer } from './mdviewServer.js';
 
-const app = express();
 const PORT = Number(process.env.MDVIEW_PORT) || 43219;
 
-app.use(
-  express.text({ type: ['text/*', 'application/*+md', 'application/octet-stream'], limit: '10mb' }),
-);
-
-const clientDist = path.join(process.cwd(), 'dist', 'client');
-app.use('/', express.static(clientDist));
-
-app.get('/health', (_req, res) => {
-  res.status(200).send('ok');
-});
-
-/**
- * POST /render
- * Accepts raw markdown body and optional query `key` (identifier).
- * If key not provided, server uses a timestamp-derived id (not cached).
- *
- * Response: JSON { html, cached }
- *
- * Also broadcasts a `render_update` message over active WebSocket clients.
- */
-app.post('/render', (req, res) => {
+(async () => {
   try {
-    const rawKey = String(req.query.key || `inline-${Date.now()}`);
-    const key = rawKey.replace(/\\/g, '/'); // normalize Windows path separators
-    const markdown = typeof req.body === 'string' ? req.body : String(req.body || '');
-    console.log(`[mdview-server] POST /render key=${key} markdown_len=${markdown.length}`);
+    // Singleton-Server starten
+    const server = await MdviewServer.getInstance(PORT);
 
-    const { html, cached } = renderWithCache(key, markdown);
+    console.log(`[mdview-server] Running on http://localhost:${server.getPort()}`);
+    console.log(`ws endpoint: ws://localhost:${server.getPort()}/ws`);
 
-    // Broadcast to all connected WS clients
-    try {
-      const payload = JSON.stringify({ type: 'render_update', payload: html, key, cached });
-      let broadcastCount = 0;
-      wss.clients.forEach(client => {
-        if (client.readyState === client.OPEN) {
-          client.send(payload);
-          broadcastCount++;
+    // Minimal HTTP-Listener
+    const httpServer = (server as any).server as import('node:http').Server;
+    httpServer.on('request', async (req, res) => {
+      try {
+        if (req.method === 'POST' && req.url?.startsWith('/render')) {
+          let body = '';
+          req.on('data', chunk => (body += chunk));
+          req.on('end', () => {
+            const urlObj = new URL(req.url!, `http://localhost`);
+            const rawKey = String(urlObj.searchParams.get('key') || `inline-${Date.now()}`);
+            const key = rawKey.replace(/\\/g, '/'); // Windows-safe
+            const markdown = String(body || '');
+
+            console.log(`[mdview-server] POST /render key=${key} markdown_len=${markdown.length}`);
+
+            // Markdown rendern mit Cache
+            const { html, cached } = renderWithCache(key, markdown);
+
+            // Broadcast nur bei Cache-Miss
+            if (!cached) {
+              const payload = JSON.stringify({ type: 'render_update', payload: html, key, cached });
+              server.broadcast(payload);
+            }
+
+            // Response an Client
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ html, cached }));
+          });
+        } else if (req.method === 'GET' && req.url === '/health') {
+          res.writeHead(200, { 'Content-Type': 'text/plain' });
+          res.end('ok');
+        } else {
+          res.writeHead(404);
+          res.end();
         }
-      });
-      console.log(
-        `[mdview-server] broadcasted render_update key=${key} clients=${broadcastCount} cached=${cached}`,
-      );
-    } catch (bcastErr) {
-      console.warn('broadcast failed', bcastErr);
-    }
-
-    res.setHeader('Content-Type', 'application/json');
-    res.status(200).send(JSON.stringify({ html, cached }));
-  } catch (err) {
-    console.error('[mdview-server] render handler error', err);
-    res.status(500).send(String(err));
-  }
-});
-
-// create HTTP server + attach WS server
-const server = http.createServer(app);
-const wss = new WebSocketServer({ server, path: '/ws' });
-
-wss.on('connection', ws => {
-  console.log('ws: client connected');
-
-  // greet client
-  try {
-    ws.send(JSON.stringify({ type: 'hello', payload: 'mdview' }));
-  } catch {}
-
-  ws.on('message', (msg: RawData) => {
-    // convert RawData -> string robustly
-    let text = '';
-    if (typeof msg === 'string') text = msg;
-    else if (Array.isArray(msg)) text = Buffer.concat(msg as Buffer[]).toString('utf8');
-    else if (msg instanceof ArrayBuffer) text = Buffer.from(new Uint8Array(msg)).toString('utf8');
-    else if (ArrayBuffer.isView(msg)) text = Buffer.from(msg as Uint8Array).toString('utf8');
-    else text = Buffer.from(msg as Buffer).toString('utf8');
-
-    // handle control messages from client (optional)
-    try {
-      const data = JSON.parse(text);
-      if (data?.type === 'ping') {
-        ws.send(JSON.stringify({ type: 'pong' }));
+      } catch (err) {
+        console.error('[mdview-server] HTTP request error', err);
+        // Nur einmalig Fehler senden
+        if (!res.headersSent) {
+          res.writeHead(500);
+          res.end(String(err));
+        }
       }
-      // extend with more control messages as needed
-    } catch {
-      // ignore non-json messages
-    }
-  });
-
-  ws.on('close', (code, reason) => {
-    console.log('ws: client disconnected', code, reason?.toString());
-  });
-
-  ws.on('error', err => {
-    console.warn('ws: error', err);
-  });
-});
-
-// start server
-server.listen(PORT, () => {
-  console.log(`mdview server running at http://localhost:${PORT}`);
-  console.log(`ws endpoint: ws://localhost:${PORT}/ws`);
-});
+    });
+  } catch (err) {
+    console.error('[mdview-server] failed to start', err);
+  }
+})();

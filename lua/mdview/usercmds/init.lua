@@ -1,32 +1,36 @@
--- FIX: Sollen nur in Markdown Buffer ausführbar/sichtbar sein -> autocmd?
-
 ---@module 'mdview.usercmds'
 --- Registers mdview user commands: start, stop, open, show logs
 
-local mdview = require("mdview")
-local log = require("mdview.adapter.log")
-local nvim_create_user_command = vim.api.nvim_create_user_command
-local ft_pattern = { ".markdown", "*.md", "*.mdx" }
+local open = require("mdview.usercmds.open")
+local start = require("mdview.usercmds.start")
+local stop = require("mdview.usercmds.stop")
+local show_weblogs = require("mdview.usercmds.show_weblogs")
+local usercmds_registry = require("mdview.helper.usercmds_registry")
 
 local M = {}
 
 ---@return nil
-function M.setup()
-	nvim_create_user_command("MDViewStart", function()
-		mdview.start()
-	end, { desc = "[mdview] Start mdview preview server and attach autocommands" })
+function M.detach()
+	usercmds_registry.detach_all() -- all non persistent
+end
 
-	nvim_create_user_command("MDViewStop", function()
-		mdview.stop()
-	end, { desc = "[mdview] Stop mdview preview server and detach autocommands" })
+---@return nil
+function M.attach()
+	M.attach_persistent()
+	M.attach_non_persistent()
+end
 
-	-- nvim_create_user_command("MDViewOpen", function()
-	-- 	mdview.open()
-	-- end, { desc = "[mdview] Open preview in browser (tries vite dev then server)" })
+-- They are available after detach(); they must be available outside of the runtime of the plugin to
+---@return nil
+function M.attach_persistent()
+	start.attach()
+	show_weblogs.attach()
+end
 
-	nvim_create_user_command("MDViewShowWebLogs", function()
-		log.show()
-	end, { desc = "[mdview] Show mdview debug logs from the Web-Application" })
+---@return nil
+function M.attach_non_persistent()
+	open.attach()
+	stop.attach()
 end
 
 return M

@@ -12,10 +12,8 @@ local diff_util = require("mdview.utils.diff_granular")
 
 local api = vim.api
 local nvim_buf_get_name = api.nvim_buf_get_name
-local nvim_create_autocmd = api.nvim_create_autocmd
 
 local M = {}
-M.augroup = nil
 
 -- Push buffer content to server, optionally forcing full buffer
 ---@param bufnr integer
@@ -76,70 +74,28 @@ function M.push_buffer(bufnr, force)
 	session.store(path, lines)
 end
 
--- BufEnter: nur für snapshot, kein Push beim Start
+-- AUDIT: Unused so far
+--- Snapshot helper used on BufEnter (no autocmds here).
 ---@param bufnr integer
-local function on_buf_enter(bufnr)
-	local ft = safe_buf_get_option(bufnr, "filetype") or ""
-	if ft ~= "markdown" and ft ~= "md" then
-		return
-	end
+function M.store_snapshot_on_enter(bufnr)
+  local ft = safe_buf_get_option(bufnr, "filetype") or ""
+  if ft ~= "markdown" and ft ~= "md" then return end
 
-	local path = nvim_buf_get_name(bufnr)
-	if path == "" then
-		return
-	end
+  local path = nvim_buf_get_name(bufnr)
+  if path == "" then return end
 
-	local norm_path = normalize.path(path)
-	if norm_path then
-		path = norm_path
-	else
-		log.debug("normalized path ist nil", vim.log.levels.ERROR, "events", true)
-		return
-	end
+  local norm_path = normalize.path(path)
+  if not norm_path then
+    log.debug("normalized path ist nil", vim.log.levels.ERROR, "events", true)
+    return
+  end
+  path = norm_path
 
-	if not session.get(path) then
-		local lines = api.nvim_buf_get_lines(bufnr, 0, -1, false)
-		session.store(path, copy_lines(lines))
-		log.debug("BufEnter snapshot stored for path: " .. path, nil, "bufenter", true)
-	end
+  if not session.get(path) then
+    local lines = api.nvim_buf_get_lines(bufnr, 0, -1, false)
+    session.store(path, copy_lines(lines))
+    log.debug("BufEnter snapshot stored for path: " .. path, nil, "bufenter", true)
+  end
+
 end
-
--- BufWritePost: send full buffer
----@param bufnr integer
-local function on_buf_write(bufnr)
-	M.push_buffer(bufnr, true)
-end
-
--- Attach autocommands
-function M.attach()
-	if M.augroup then
-		return
-	end
-	M.augroup = api.nvim_create_augroup("MdviewAutocmds", { clear = true })
-
-	nvim_create_autocmd({ "BufEnter" }, {
-		group = M.augroup,
-		desc = "[mdview] Snapshot on enter",
-		callback = function(args)
-			on_buf_enter(args.buf)
-		end,
-	})
-
-	nvim_create_autocmd({ "BufWritePost" }, {
-		group = M.augroup,
-		desc = "[mdview] Push full buffer on write",
-		callback = function(args)
-			on_buf_write(args.buf)
-		end,
-	})
-end
-
-function M.detach()
-	if not M.augroup then
-		return
-	end
-	pcall(api.nvim_del_augroup_by_id, M.augroup)
-	M.augroup = nil
-end
-
 return M

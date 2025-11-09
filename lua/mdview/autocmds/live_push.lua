@@ -13,8 +13,12 @@ local safe_buf_get_option = require("mdview.helper.safe_buf_get_option")
 local diff = require("mdview.utils.diff_granular")
 local log = require("mdview.helper.log")
 local normalize = require("mdview.helper.normalize")
+local defaults = require("mdview.config").defaults
+local autocmd_registry = require("mdview.helper.autocmds_registry")
 
 local M = {}
+
+M._attached_groups = M._attached_groups or {}
 
 -- Small tweak to push_buffer_changes:
 --  * skip if diffs == {} (no-op)
@@ -106,28 +110,40 @@ function M.push_buffer_changes(bufnr, full_push)
 end
 
 --- Setup autocmds for live push and save
-function M.setup()
+--- @param group integer|nil
+function M.attach(group)
+	group = group or 0
+	if M._attached_groups[group] then
+		return
+	end
+	M._attached_groups[group] = true
 	log.debug("setting up live push autocmds", nil, "livepush", true)
 
-	api.nvim_create_autocmd({ "TextChanged", "TextChangedI" }, {
-		pattern = "*.md",
+	local opts_a = {
+		group = group,
+		pattern = defaults.ft_pattern,
 		callback = function(args)
 			ws_client.wait_ready(function()
 				log.debug("TextChanged fired, buf: " .. args.buf, nil, "livepush", true)
 				M.push_buffer_changes(args.buf, false)
 			end, ws_client.WAIT_READY_TIMEOUT)
 		end,
-	})
+	}
+	local id_a = api.nvim_create_autocmd({ "TextChanged", "TextChangedI" }, opts_a)
+	autocmd_registry.register(group, id_a)
 
-	api.nvim_create_autocmd("BufWritePost", {
-		pattern = "*.md",
+	local opts_b = {
+		group = group,
+		pattern = defaults.ft_pattern,
 		callback = function(args)
 			ws_client.wait_ready(function()
 				log.debug("BufWritePost fired, full push, buf: " .. args.buf, nil, "livepush", true)
 				M.push_buffer_changes(args.buf, true)
 			end, ws_client.WAIT_READY_TIMEOUT)
 		end,
-	})
+	}
+	local id_b = api.nvim_create_autocmd("BufWritePost", opts_b)
+	autocmd_registry.register(group, id_b)
 end
 
 return M

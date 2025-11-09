@@ -8,67 +8,11 @@ local api = vim.api
 local uv = vim.loop
 local notify = vim.notify
 local buf_set_option = api.nvim_buf_set_option
-local log = require("mdview.adapter.log")
 local normalize = require("mdview.helper.normalize")
+local state = require("mdview.core.state")
+local log = require("mdview.adapter.log")
 
 local M = {}
-
-M.proc = nil
-M.server_job = nil
-
--- generate a timestamped log file path
--- %Y: year, %m: month, %d: day, %H: hour, %M: minute, %S: second
-local timestamp = os.date("%Y%m%d-%H%M%S")
-local file_path = string.format("./logs/debug-%s.log", timestamp)
-
-log.setup({
-  debug = false,            -- disable debug mode by default
-  buf_name = "mylogs",      -- buffer name for display
-  file_path = file_path,    -- timestamped logfile path
-})
-
-log.setup({ debug = false, buf_name = "mylogs", file_path = "./logs/debug.log" })
-
-local cfg_ok, mdview_config = pcall(require, "mdview.config")
-
--- Open or reuse a named scratch buffer and populate it with log_lines (read-only)
----@return nil
-local function open_log_buffer()
-	-- find existing buffer by name
-	for _, bufnr in ipairs(api.nvim_list_bufs()) do
-		if api.nvim_buf_is_valid(bufnr) and api.nvim_buf_get_name(bufnr) == LOG_BUF_NAME then
-			-- populate and show
-			buf_set_option(bufnr, "modifiable", true)
-			api.nvim_buf_set_lines(bufnr, 0, -1, false, log_lines)
-			buf_set_option(bufnr, "modifiable", false)
-			api.nvim_set_current_buf(bufnr)
-			return
-		end
-	end
-	-- create new scratch buffer
-	local bufnr = api.nvim_create_buf(false, true)
-	api.nvim_buf_set_name(bufnr, LOG_BUF_NAME)
-	buf_set_option(bufnr, "buftype", "nofile")
-	buf_set_option(bufnr, "bufhidden", "wipe")
-	buf_set_option(bufnr, "modifiable", true)
-	api.nvim_buf_set_lines(bufnr, 0, -1, false, log_lines)
-	buf_set_option(bufnr, "modifiable", false)
-	api.nvim_open_win(bufnr, true, {
-		relative = "editor",
-		width = math.floor(vim.o.columns * 0.8),
-		height = math.floor(vim.o.lines * 0.6),
-		row = math.floor(vim.o.lines * 0.1),
-		col = math.floor(vim.o.columns * 0.1),
-		style = "minimal",
-		border = "single",
-	})
-end
-
--- Public helper to open logs (callable from user, e.g., via :lua require('mdview.adapter.runner').show_logs())
----@return nil
-function M.show_logs()
-	vim.schedule(open_log_buffer)
-end
 
 -- Detect Windows OS in a robust way (uv.os_uname may be nil in some environments)
 ---@return string|boolean
@@ -98,11 +42,11 @@ end
 ---@param ... string  # one or more path segments to join
 ---@return string # concatenated path using forward slashes
 local function path_join(...)
-  local parts = {}
-  for i = 1, select("#", ...) do
-    parts[#parts + 1] = select(i, ...)
-  end
-  return table.concat(parts, "/")
+	local parts = {}
+	for i = 1, select("#", ...) do
+		parts[#parts + 1] = select(i, ...)
+	end
+	return table.concat(parts, "/")
 end
 
 -- check file existence using luv
@@ -110,13 +54,13 @@ end
 ---@return boolean  # true if the path exists, false otherwise
 local function file_exists(path)
 	local normalized = normalize.path(path)
-  return uv.fs_stat(normalized) ~= nil
+	return uv.fs_stat(normalized) ~= nil
 end
 
 -- project root detector used for reasonable default cwd
 ---@return string|nil  # returns the detected project root path or nil if none found
 local function detect_project_root()
-  -- DEVONLY: Remove REPOS_DIR in production
+	-- DEVONLY: Remove REPOS_DIR in production
 	-- 1) REPOS_DIR if set and contains mdview repo
 	local repos_dir = vim.env.REPOS_DIR
 	if repos_dir and repos_dir ~= "" then
@@ -156,17 +100,17 @@ end
 ---@param optional_cwd string|nil  # optional working directory override
 ---@return string # resolved path to use as cwd for spawning processes
 local function resolve_spawn_cwd(optional_cwd)
-  if optional_cwd and optional_cwd ~= "" then
-    return optional_cwd
-  end
-  if cfg_ok and mdview_config and mdview_config.defaults and mdview_config.defaults.server_cwd then
-    return mdview_config.defaults.server_cwd
-  end
-  local root = detect_project_root()
-  if root then
-    return root
-  end
-  return vim.fn.getcwd()
+	if optional_cwd and optional_cwd ~= "" then
+		return optional_cwd
+	end
+	if cfg_ok and mdview_config and mdview_config.defaults and mdview_config.defaults.server_cwd then
+		return mdview_config.defaults.server_cwd
+	end
+	local root = detect_project_root()
+	if root then
+		return root
+	end
+	return vim.fn.getcwd()
 end
 
 -- Start the server process in a cross-platform way.
@@ -179,7 +123,7 @@ end
 ---@return SpawnedProcess|nil # Returns a process handle table on success, nil on failure
 function M.start_server(cmd, args, cwd)
 	args = args or {}
-	if M.proc and M.proc.handle and not M.proc.handle:is_closing() then
+	if state.get_proc() and state.get_proc().handle and not state.get_proc().handle:is_closing() then
 		return M.proc
 	end
 

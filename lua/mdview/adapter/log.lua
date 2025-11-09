@@ -23,16 +23,109 @@ local LOG_BUF_NAME = (cfg_ok and mdview_config and mdview_config.defaults and md
 ---@type string[]
 local log_lines = {}
 
+-- generate a timestamped log file path
+-- %Y: year, %m: month, %d: day, %H: hour, %M: minute, %S: second
+local timestamp = os.date("%Y%m%d-%H%M%S")
+M.LOG_BUF_NAME = string.format("./logs/debug-%s.log", timestamp)
+
 ---@type string|nil
-local log_file_path = "./logs/debuglog" -- optional file path for persistent logs AUDIT: Nach Development Phase auf üblichen Logfolder ändern, zb stdpath('data')
+local log_file_path = "./logs/debuglog" -- optional file path for persistent logs
 
 -- Configure the logger using an options table.
----@param opts LoggerOptions|nil
+---@param opts table|nil
 function M.setup(opts)
+	-- English comments:
+	-- Configure DEBUG, LOG_BUF_NAME and persistent file path via opts.
 	opts = opts or {}
 	DEBUG = opts.debug or false
-	LOG_BUF_NAME = opts.buf_name or LOG_BUF_NAME
+	LOG_BUF_NAME = opts.buf_name or M.LOG_BUF_NAME
 	log_file_path = opts.file_path
+end
+
+-- Helper: return dirname of a path, works with both '/' and '\'
+-- English comments:
+-- Use pattern matching to avoid calling vim.fn.fnamemodify or vim.fn.expand.
+---@param path string
+---@return string dirname
+local function path_dirname(path)
+	if not path or path == "" then
+		return ""
+	end
+	-- normalize separators to '/'
+	local p = tostring(path):gsub("\\", "/")
+	-- remove trailing slash
+	p = p:gsub("/+$", "")
+	-- find last slash
+	local dir = p:match("^(.*)/")
+	if not dir then
+		return ""
+	end
+	return dir
+end
+
+-- Helper: ensure directory exists by creating missing segments using luv (vim.loop)
+-- English comments:
+-- Avoid calling vim.fn.mkdir to prevent E5560 in fast event contexts.
+---@param dir string
+---@return boolean ok, string|nil err
+local function ensure_dir(dir)
+	if not dir or dir == "" then
+		return false, "empty directory"
+	end
+			---@diagnostic disable-next-line LSP-problems with uv.loop
+	local stat = vim.loop.fs_stat(dir)
+	if stat then
+		-- already exists
+		return true, nil
+	end
+
+	-- collect parts and create recursively
+	local parts = {}
+	for part in dir:gmatch("[^/]+") do
+		parts[#parts + 1] = part
+	end
+
+	-- handle absolute path or Windows drive letter
+	local prefix = ""
+	-- unix absolute
+	if dir:sub(1, 1) == "/" then
+		prefix = "/"
+	end
+	-- windows drive (e.g. "C:/path")
+	local drive = dir:match("^([A-Za-z]:)")
+	if drive then
+		prefix = drive .. "/"
+		-- remove drive component from parts if present
+		if parts[1] and parts[1]:lower():match("^%a:$") then
+			table.remove(parts, 1)
+		end
+	end
+
+	local cur = prefix
+	for i = 1, #parts do
+		if cur == "" then
+			cur = parts[i]
+		else
+			cur = cur .. parts[i]
+		end
+		-- make sure path separators are present
+		if i < #parts then
+			cur = cur .. "/"
+		end
+			---@diagnostic disable-next-line  LSP-Problems with uuv.loop
+		local st = vim.loop.fs_stat(cur)
+		if not st then
+			---@diagnostic disable-next-line  LSP_Problems with uv.loop
+			local ok, _ = pcall(vim.loop.fs_mkdir, cur, tonumber("755", 8))
+			if not ok then
+				-- fs_mkdir may return nil and set errno; attempt non-pcall call for message
+			---@diagnostic disable-next-line  lsp problemsuuv.loop
+				local _, e = vim.loop.fs_mkdir(cur, tonumber("755", 8))
+				return false, e
+			end
+		end
+	end
+	return true, nil
 end
 
 -- Append a line to the in-memory log store and optionally to a file.
@@ -61,18 +154,27 @@ function M.append(line, prefix)
 		end
 
 		if DEBUG then
+			-- schedule UI echo to avoid calling UI functions in IO/fast callback directly
 			schedule(function()
 				echo({ { l, nil } }, true, {})
 			end)
 		end
 
-		-- append to persistent file
+		-- append to persistent file (if configured)
 		if log_file_path then
-			local log_dir = vim.fn.fnamemodify(log_file_path, ":h")
+			-- derive directory without vim.fn calls
+			local log_dir = path_dirname(log_file_path)
 			if log_dir and log_dir ~= "" then
-				pcall(vim.fn.mkdir, log_dir, "p")
+				-- ensure directory exists using luv
+				local ok, err = ensure_dir(log_dir)
+				if not ok and DEBUG then
+					schedule(function()
+						echo({ { ("[mdview.log] failed to create dir %s: %s"):format(tostring(log_dir), tostring(err)), "ErrorMsg" } }, true, { err = true })
+					end)
+				end
 			end
 
+			-- open and write to file using Lua io (safe)
 			local fd, err = io.open(log_file_path, "a")
 			if fd then
 				fd:write(l .. "\n")
@@ -80,19 +182,12 @@ function M.append(line, prefix)
 			else
 				if DEBUG then
 					schedule(function()
-						echo(
+						echo({
 							{
-								{
-									("[mdview.log] failed to write to %s: %s"):format(
-										tostring(log_file_path),
-										tostring(err)
-									),
-									"ErrorMsg",
-								},
+								("[mdview.log] failed to write to %s: %s"):format(tostring(log_file_path), tostring(err)),
+								"ErrorMsg",
 							},
-							true,
-							{ err = true }
-						)
+						}, true, { err = true })
 					end)
 				end
 			end
