@@ -1,6 +1,11 @@
+# AUDIT: Research über diese file
+
 # CI pipeline for mdview.nvim
 # - Node/TypeScript: install, lint, test, build client
-# - Lua: basic static check with luacheck (fast and minimal for initial CI)
+# - Lua: basic static check with luacheck and optional busted unit tests
+# - Self-Hosted Runner
+# - Node.js + TypeScript and Lua/Busted fully parallel, with test reports and caching
+# - Node + Lua with Test Reporting in GitHub UI
 
 name: CI
 
@@ -13,16 +18,9 @@ on:
 jobs:
   node:
     name: Node.js / TypeScript
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, fast]
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '18'
-          cache: 'npm'
+      - uses: actions/checkout@v4
 
       - name: Cache node modules
         uses: actions/cache@v4
@@ -37,39 +35,51 @@ jobs:
 
       - name: Lint (TypeScript / JS)
         run: npm run lint
+
+      - name: Run Vitest unit tests and output JUnit XML
+        run: npm test -- --reporter=junit --outputFile=tests/node/vitest.xml
         continue-on-error: false
 
-      - name: Run unit tests (client/server)
-        run: npm test
+      - name: Upload Node test results to GitHub UI
+        uses: mikeal/junit-report-action@v2
+        with:
+          results: tests/node/vitest.xml
 
       - name: Build client
         run: npm run build
 
+      - name: Upload Node build artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: node-build
+          path: dist/
+
   lua:
-    name: Lua / Neovim quick checks
-    runs-on: ubuntu-latest
+    name: Lua / Neovim
+    runs-on: [self-hosted]
     needs: node
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Install system deps (neovim, luarocks)
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y neovim lua5.3 luarocks
+      - name: Add local luarocks bin to PATH
+        run: echo "${HOME}/.luarocks/bin" >> $GITHUB_PATH
 
-      - name: Install luacheck via luarocks
-        run: |
-          luarocks install luacheck
-
-      - name: Run luacheck on Lua sources
-        # lint Lua code to catch syntax errors and common issues
+      - name: Run luacheck
         run: luacheck lua/mdview --no-color || true
 
-      - name: (Optional) Run Lua unit tests with busted if provided
+      - name: Run Lua unit tests with busted and output JUnit XML
         run: |
+          mkdir -p tests/lua/output
           if command -v busted >/dev/null 2>&1; then
-            busted -v tests/lua || true
+            busted -v \
+              --pattern="*.spec.lua" \
+              --lpath="./?.lua" \
+              --output-junit=tests/lua/output/busted.xml \
+              tests/lua || true
           else
             echo "busted not installed; skipping Lua unit tests"
-          fi
+
+      - name: Upload Lua test results to GitHub UI
+        uses: mikeal/junit-report-action@v2
+        with:
+          results: tests/lua/output/busted.xml

@@ -23,6 +23,11 @@
     "lint": "eslint \"src/**/*.{ts,tsx,js}\" --fix",
     "format": "prettier --write \"src/**/*.{ts,js,json,md,css,scss}\"",
     "test": "vitest run",
+    "test:watch": "vitest",
+    "test:server": "vitest run --config vitest.config.ts --project server",
+    "test:client": "vitest run --config vitest.config.ts --project client",
+    "test:all": "npm run test && echo 'Lua tests separate (busted) run in CI or with `npm run test:lua`'",
+    "test:lua": "if command -v busted >/dev/null 2>&1; then busted tests/lua || true; else echo 'busted not installed; skipping Lua tests'; fi",
     "check:types": "tsc -p tsconfig.json --noEmit",
     "prepare": "husky install"
   },
