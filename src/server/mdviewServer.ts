@@ -1,29 +1,19 @@
-/**  src/server/MdviewServer
- *
- * @class MdviewServer
- * @description
- * Singleton-/Factory-basierter WebSocket- und HTTP-Server für mdview.nvim.
- *
- * Verantwortlichkeiten:
- * - Startet HTTP-Server für POST /render Requests
- * - Startet WebSocket-Server für Live-Updates
- * - Debounced Broadcasting nach Dateiänderungen (z. B. 3000ms)
- * - Dynamische Portwahl, um Konflikte zu vermeiden (cross-platform)
- * - Kontrollierter Lifecycle: start, stop, reset
- *
- * Vorteile:
- * - Keine globalen Prozesse mehr manuell killen
- * - Debounced Updates verhindern Flooding bei vielen keystrokes
- * - Singleton garantiert nur eine Server-Instanz
- */
+// src/server/mdviewServer.ts
+// This file defines a singleton WebSocket + HTTP server for mdview.nvim.
 
-import http from 'node:http';
-import WebSocket, { WebSocketServer } from 'ws';
-import getPort from 'get-port';
-import { debounce } from './mdviewServer.debounce.js';
+import http from "node:http";
+import WebSocket, { WebSocketServer } from "ws";
+import getPort from "get-port";
+import { debounce } from "./mdviewServer.debounce.js";
 
 /**
- * Singleton WebSocket + HTTP Server
+ * MdviewServer
+ *
+ * Singleton WebSocket + HTTP Server that:
+ * - starts an HTTP server to receive POST /render requests
+ * - starts a WebSocketServer for live updates
+ * - debounces broadcasts to avoid flooding (default 3000ms)
+ * - supports dynamic port selection to avoid conflicts
  */
 export class MdviewServer {
   private static instance: MdviewServer | null = null;
@@ -37,6 +27,7 @@ export class MdviewServer {
   private constructor(port: number) {
     this.port = port;
 
+    // debounce broadcasting to reduce update flood
     this.broadcastDebounced = debounce((data: string) => {
       for (const ws of this.clients) {
         if (ws.readyState === WebSocket.OPEN) {
@@ -46,7 +37,7 @@ export class MdviewServer {
     }, 3000);
   }
 
-  public static async getInstance(preferredPort = 43219) {
+  public static async getInstance(preferredPort = 43219): Promise<MdviewServer> {
     if (!MdviewServer.instance) {
       const port = await getPort({ port: preferredPort });
       MdviewServer.instance = new MdviewServer(port);
@@ -55,26 +46,27 @@ export class MdviewServer {
     return MdviewServer.instance;
   }
 
-  public static async reset() {
+  public static async reset(): Promise<void> {
     if (MdviewServer.instance) {
       await MdviewServer.instance.stop();
       MdviewServer.instance = null;
     }
   }
 
-  public async start() {
+  public async start(): Promise<void> {
     if (this.isRunning) return;
 
-    this.server = http.createServer(); // Listener in index.ts hinzugefügt
+    // create a plain HTTP server; request listener may be attached elsewhere (index.ts)
+    this.server = http.createServer();
 
-    this.wss = new WebSocketServer({ server: this.server, path: '/ws' });
-    this.wss.on('connection', ws => {
+    this.wss = new WebSocketServer({ server: this.server, path: "/ws" });
+    this.wss.on("connection", (ws: WebSocket) => {
       this.clients.add(ws);
-      ws.on('close', () => this.clients.delete(ws));
-      ws.on('error', () => this.clients.delete(ws));
+      ws.on("close", () => this.clients.delete(ws));
+      ws.on("error", () => this.clients.delete(ws));
     });
 
-    await new Promise<void>(resolve => {
+    await new Promise<void>((resolve) => {
       this.server?.listen(this.port, () => {
         console.log(`[mdview-server] Running on http://localhost:${this.port}`);
         resolve();
@@ -84,10 +76,10 @@ export class MdviewServer {
     this.isRunning = true;
   }
 
-  public async stop() {
+  public async stop(): Promise<void> {
     if (!this.isRunning) return;
 
-    await new Promise<void>(resolve => {
+    await new Promise<void>((resolve) => {
       this.wss?.close(() => {
         this.server?.close(() => {
           this.clients.clear();
@@ -98,11 +90,11 @@ export class MdviewServer {
     });
   }
 
-  public broadcast(data: string) {
+  public broadcast(data: string): void {
     this.broadcastDebounced(data);
   }
 
-  public getPort() {
+  public getPort(): number {
     return this.port;
   }
 }
