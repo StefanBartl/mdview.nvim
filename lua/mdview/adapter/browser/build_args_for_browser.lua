@@ -14,7 +14,7 @@ local function make_tmp_profile()
 end
 
 ---@param exe string # Absolute path or candidate name of the browser executable
----@param url string # URL to open
+---@param url URL # URL to open
 ---@return string[] args # Command-line arguments to pass to the executable
 ---@return string|nil tmp_profile # Path to temporary profile/directory (if created)
 return function (exe, url)

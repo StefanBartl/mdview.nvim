@@ -8,6 +8,9 @@ local M = {}
 -- Default developer-friendly values. These are safe defaults for most systems.
 -- server_cmd defaults to "npm" so that "npm run dev:server" is used.
 M.defaults = {
+	-- AUDIT: Check other filetypes that are possible bzw. mach andere filetypes möglich (future milestone)
+	ft_pattern = { ".markdown", "*.md", "*.mdx" }, -- filetype extension patterns for commands
+
 	server_cmd = "npm",
 	server_args = { "run", "dev:server" },
 	server_port = 43219,
@@ -25,8 +28,8 @@ M.defaults = {
 	-- name for the scratch buffer used to show logs when debug=true
 	log_buffer_name = "mdview://logs",
 
-	debug_plugin = false, -- allgemeines Plugin-Debug
-	debug_preview = false, -- Rendering/WebSocket-spezifisches Debug
+	debug_plugin = true, -- allgemeines Plugin-Debug
+	debug_preview = true, -- Rendering/WebSocket-spezifisches Debug
 }
 
 return M

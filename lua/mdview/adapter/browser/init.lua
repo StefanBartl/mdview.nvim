@@ -28,6 +28,7 @@ end
 
 -- Open a browser window/tab pointing to `url`.
 -- Returns a BrowserHandle on success, nil and error string on failure.
+---@param url URL
 ---@param opts BrowserOptions|nil
 ---@return BrowserHandle|nil, string|nil
 function M.open(url, opts)

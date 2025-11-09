@@ -14,6 +14,7 @@ function M.kill_port_async(port)
 		return
 	end
 
+	---@diagnostic disable-next-line LSP-Problems with uv.
 	local os_name = uv.os_uname().sysname or ""
 
 	if os_name:match("Windows") then
@@ -27,6 +28,7 @@ if ($connections) {
 }
 ]]):format(port)
 
+		---@diagnostic disable-next-line LSP-Problems with uv.
 		uv.spawn(
 			"powershell",
 			{ args = { "-NoProfile", "-Command", ps_cmd }, stdio = { nil, nil, nil } },
@@ -42,10 +44,13 @@ if ($connections) {
 		)
 	else
 		-- Unix: asynchrones lsof + kill
+		---@diagnostic disable-next-line LSP-Problems with uv.
 		local stdout = uv.new_pipe(false)
+		---@diagnostic disable-next-line LSP-Problems with uv.
 		local stderr = uv.new_pipe(false)
 
 		local handle
+		---@diagnostic disable-next-line LSP-Problems with uv.
 		handle = uv.spawn(
 			"lsof",
 			{ args = { "-ti", string.format("tcp:%d", port) }, stdio = { nil, stdout, stderr } },
@@ -81,10 +86,12 @@ if ($connections) {
 		stdout:read_stop()
 
 		-- kill collected PIDs
+		---@diagnostic disable-next-line LSP-Problems with uv.
 		uv.new_timer():start(50, 0, function(timer)
 			timer:stop()
 			timer:close()
 			for _, pid in ipairs(output_lines) do
+				---@diagnostic disable-next-line LSP-Problems with uv.
 				uv.spawn("kill", { args = { "-9", pid } }, function() end)
 			end
 		end)

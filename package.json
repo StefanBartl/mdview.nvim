@@ -12,12 +12,13 @@
   "scripts": {
     "dev": "concurrently \"npm:dev:server\" \"npm:dev:client\"",
     "dev:server:tsc": "tsc -w -p tsconfig.server.json",
+    "dev:server:esbuild": "esbuild src/server/index.ts --bundle --platform=node --outfile=dist/server/index.js --target=node18 --format=esm --external:markdown-it --external:markdown-it-anchor --external:lodash --external:ws --external:events --watch",
     "dev:server:node": "nodemon --watch dist --ext js --exec \"node dist/server/index.js\"",
-    "dev:server": "concurrently --kill-others \"npm:dev:server:tsc\" \"npm:dev:server:node\"",
+    "dev:server": "concurrently --kill-others \"npm:dev:server:tsc\" \"npm:dev:server:esbuild\" \"npm:dev:server:node\"",
     "dev:client": "vite --config src/client/vite.config.ts",
     "start": "node ./dist/server/index.js",
     "build": "npm run build:server && npm run build:client",
-    "build:server": "tsc -p tsconfig.server.json && esbuild src/server/index.ts --bundle --platform=node --outfile=dist/server/index.js --target=node18",
+    "build:server": "tsc -p tsconfig.server.json && esbuild src/server/index.ts --bundle --platform=node --outfile=dist/server/index.js --target=node18 --format=esm --external:markdown-it --external:markdown-it-anchor --external:lodash",
     "build:client": "vite build --config src/client/vite.config.ts",
     "lint": "eslint \"src/**/*.{ts,tsx,js}\" --fix",
     "format": "prettier --write \"src/**/*.{ts,js,json,md,css,scss}\"",
@@ -28,14 +29,15 @@
   "dependencies": {
     "chokidar": "^3.5.3",
     "express": "^4.18.2",
-    "markdown-it": "^13.0.1",
-    "markdown-it-anchor": "^8.6.6",
+    "get-port": "^6.1.2",
+    "markdown-it": "^13.0.2",
+    "markdown-it-anchor": "^8.6.7",
     "micromatch": "^4.0.8",
-    "ws": "^8.13.0"
+    "ws": "^8.18.3"
   },
   "devDependencies": {
     "@types/express": "^4.17.21",
-    "@types/node": "^20.5.1",
+    "@types/node": "^20.19.24",
     "@types/ws": "^8.18.1",
     "concurrently": "^8.2.0",
     "esbuild": "^0.25.12",

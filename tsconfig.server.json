@@ -10,7 +10,6 @@
     "sourceMap": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "allowImportingTsExtensions": false
   },
   "include": ["src/server/**/*"]
 }

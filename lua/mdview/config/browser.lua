@@ -21,10 +21,13 @@ M.defaults = {
 	autodetect_browser = true, -- try to locate a browser automatically
 	browser = "", -- friendly name e.g. "chrome" or "firefox"
 	browser_cmd = "", -- absolute path to executable to force use
-	stop_closes_browser = true, -- :MDViewStop closes controlled browser by default
-	autostart_open_browser = false, -- open browser automatically on start
+	browser_autoclose = true, -- :MDViewStop closes controlled browser by default
+	browser_autostart = true, -- open browser automatically on start
 	-- internal resolved value (populated during setup())
-	_resolved_browser_cmd = nil,
+	resolved_browser_cmd = nil,
+	-- allow callers to provide an array of CLI args for the resolved browser executable,
+	-- e.g. { "--app=http://localhost:43219", "--new-window" } or nil for none.
+	browser_args = nil,
 }
 
 -- Known candidate names to probe in PATH and platform locations (order matters)
@@ -125,13 +128,13 @@ end
 --  1. browser_cmd explicit override (absolute path) -> must be executable
 --  2. browser friendly name -> resolve_candidate
 --  3. autodetect via _candidates list
--- The resolved command is stored in M.defaults._resolved_browser_cmd
+-- The resolved command is stored in M.defaults.resolved_browser_cmd
 ---@return string|nil err
 function M.resolve_and_validate()
 	-- explicit absolute command override
 	if M.defaults.browser_cmd and M.defaults.browser_cmd ~= "" then
 		if is_executable(M.defaults.browser_cmd) then
-			M.defaults._resolved_browser_cmd = M.defaults.browser_cmd
+			M.defaults.resolved_browser_cmd = M.defaults.browser_cmd
 			return nil
 		else
 			return ("configured browser_cmd is not executable: %s"):format(tostring(M.defaults.browser_cmd))
@@ -142,7 +145,7 @@ function M.resolve_and_validate()
 	if M.defaults.browser and M.defaults.browser ~= "" then
 		local r = resolve_candidate(M.defaults.browser)
 		if r then
-			M.defaults._resolved_browser_cmd = r
+			M.defaults.resolved_browser_cmd = r
 			return nil
 		else
 			return ("configured browser '%s' could not be resolved on this system"):format(M.defaults.browser)
@@ -154,7 +157,7 @@ function M.resolve_and_validate()
 		for _, cand in ipairs(M._candidates) do
 			local r = resolve_candidate(cand)
 			if r then
-				M.defaults._resolved_browser_cmd = r
+				M.defaults.resolved_browser_cmd = r
 				return nil
 			end
 		end
@@ -169,7 +172,7 @@ end
 --- Public accessor for resolved browser command (nil if none)
 ---@return string|nil
 function M.get_resolved_cmd()
-	return M.defaults._resolved_browser_cmd
+	return M.defaults.resolved_browser_cmd
 end
 
 --- Convenience: call at plugin setup to attempt resolution and optionally notify user.
@@ -178,6 +181,7 @@ end
 ---@return boolean success, string|nil msg
 function M.setup_and_notify(notify_on_fail)
 	notify_on_fail = notify_on_fail == nil and true or notify_on_fail
+
 	local err = M.resolve_and_validate()
 	if err then
 		if notify_on_fail then
