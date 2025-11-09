@@ -154,7 +154,7 @@ on:
 jobs:
   node:
     name: Node.js / TypeScript
-    runs-on: [self-hosted, linux, fast]   # Node 18 + npm installed
+    runs-on: [self-hosted]
     steps:
       - uses: actions/checkout@v4
 
@@ -193,7 +193,7 @@ jobs:
 
   lua:
     name: Lua / Neovim
-    runs-on: [self-hosted, linux, fast]   # Lua 5.3 + LuaRocks + Busted installed
+    runs-on: [self-hosted]
     steps:
       - uses: actions/checkout@v4
 

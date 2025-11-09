@@ -29,7 +29,7 @@
 **mdview.nvim** is a **browser-based Markdown preview plugin for Neovim**.
 It provides a fast, real-time rendering pipeline powered by Node.js or Bun (future option),
 and uses WebSocket communication to synchronize Markdown buffers with a live browser view.
-- WebSocket - WASM - NodeJS - Bun -
+- WebSocket - WASM - NodeJS - Bun - WebTransport ready
 
 **Key features:**
 * Live browser preview for Markdown documents
