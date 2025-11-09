@@ -1,5 +1,3 @@
-# AUDIT: Research über diese file
-
 # .github/workflows/ci.yml
 # CI pipeline for mdview.nvim
 # - Node/TypeScript: install, lint, test, build client
