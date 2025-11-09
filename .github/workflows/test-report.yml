@@ -1,0 +1,55 @@
+# .github/workflows/test-report.yml
+# This workflow runs on the default branch after the "CI" workflow completes.
+# It downloads the artifact produced by CI and publishes test reports (JUnit XML)
+# using dorny/test-reporter (creates Check Runs so results appear in PR UI).
+name: Test Report
+
+on:
+  workflow_run:
+    workflows: ['CI']   # must match the "name" of CI workflow
+    types:
+      - completed
+
+permissions:
+  contents: read
+  actions: read
+  checks: write
+
+jobs:
+  publish-report:
+    name: Publish Test Report
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download test-results artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: test-results
+          path: ./test-results
+
+      - name: List downloaded files (diagnose)
+        run: |
+          ls -R test-results || true
+
+      - name: Publish Vitest JUnit report
+        uses: dorny/test-reporter@v2
+        if: always()
+        with:
+          artifact: test-results
+          name: Vitest
+          path: 'tests/node/vitest.xml'
+          reporter: java-junit
+          fail-on-empty: false
+          only-summary: 'false'
+          max-annotations: '10'
+
+      - name: Publish Busted JUnit report
+        uses: dorny/test-reporter@v2
+        if: always()
+        with:
+          artifact: test-results
+          name: Busted
+          path: 'tests/lua/output/busted.xml'
+          reporter: java-junit
+          fail-on-empty: false
+          only-summary: 'true'
+          max-annotations: '5'

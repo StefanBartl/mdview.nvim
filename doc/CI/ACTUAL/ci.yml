@@ -1,0 +1,101 @@
+# AUDIT: Research über diese file
+
+# .github/workflows/ci.yml
+# CI pipeline for mdview.nvim
+# CI workflow (first-stage): run tests, produce JUnit XML reports and upload them as artifact.
+# This workflow intentionally DOES NOT attempt to create CheckRuns (test-reporting) so it
+# works for PRs from forks. A separate workflow should consume the uploaded artifact
+# and publish the report (workflow_run on default branch).
+# - Node/TypeScript: install, lint, test, build client
+# - Lua: basic static check with luacheck and optional busted unit tests
+# - Self-Hosted Runner
+# - Node.js + TypeScript and Lua/Busted fully parallel, with test reports and caching
+# - Node + Lua with Test Reporting in GitHub UI
+
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-and-test:
+    name: Build & Test
+    runs-on: [ubuntu-latest]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Cache node modules
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint (TypeScript / JS)
+        run: npm run lint
+
+      - name: Ensure vitest report dir exists
+        run: mkdir -p tests/node
+
+      - name: Run Vitest and output JUnit XML
+        run: npm test -- --reporter=junit --outputFile=tests/node/vitest.xml
+
+      - name: Ensure busted output dir exists
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path tests/lua/output -Force | Out-Null
+
+      - name: Ensure Podman machine is running
+        shell: pwsh
+        run: |
+          $machineStatus = podman machine list --format json | ConvertFrom-Json
+          if ($machineStatus.Count -eq 0) { podman machine init }
+          podman machine start
+
+      - name: Run Lua tests (Busted) via container
+        shell: pwsh
+        run: |
+          $tool = if (Get-Command podman -ErrorAction SilentlyContinue) { "podman" } elseif (Get-Command docker -ErrorAction SilentlyContinue) { "docker" } else { "" }
+          if ($tool -eq "") {
+            Write-Host "Neither Podman nor Docker found on runner. Attempting native Linux installation if applicable."
+            if ($env:RUNNER_OS -eq "Linux") {
+              sudo apt-get update
+              sudo apt-get install -y lua5.3 liblua5.3-dev luarocks build-essential
+              luarocks install --local busted
+            } else {
+              Write-Host "Busted not available on this platform. Skipping Lua tests."
+              exit 0
+            }
+          }
+
+          if ($tool -ne "") {
+            Write-Host "Using container runtime: $tool"
+            & $tool run --rm -v "${{ github.workspace }}:/work" -w /work ubuntu:22.04 bash -lc `
+              "apt-get update -qq && apt-get install -y -qq lua5.3 liblua5.3-dev luarocks build-essential && luarocks install --local busted && busted --pattern='*.spec.lua' --lpath='./?.lua' --output-junit=/work/tests/lua/output/busted.xml tests/lua || true"
+          }
+
+      - name: Upload test-results artifact
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results
+          path: |
+            tests/node/vitest.xml
+            tests/lua/output/busted.xml
+
+      - name: Build client
+        run: npm run build
+
+      - name: Upload Node build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: node-build
+          path: dist/
