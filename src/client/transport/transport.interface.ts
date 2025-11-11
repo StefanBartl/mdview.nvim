@@ -1,4 +1,6 @@
 // ADD: Annotations
+// src/client/transport/trabsport.interface.ts
+//
 export interface Transport {
   /**
    * Open / initialize the transport (connect or wait for ready).

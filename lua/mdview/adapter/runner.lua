@@ -8,92 +8,20 @@ local api = vim.api
 local uv = vim.loop
 local notify = vim.notify
 local buf_set_option = api.nvim_buf_set_option
-local normalize = require("mdview.helper.normalize")
-local state = require("mdview.core.state")
 local log = require("mdview.adapter.log")
+local defaults = require("mdview.config").defaults
+local normalize = require("mdview.helper.normalize")
+local is_windows = require("mdview.helper.is_windows")
+local detect_project_root = require("mdview.helper.detect_project_root")
+local get_exec = require("mdview.helper.get_exec")
+local path_join = require("mdview.helper.path_join")
+local file_exists = require("mdview.helper.file_exists")
 
 local M = {}
 
--- Detect Windows OS in a robust way (uv.os_uname may be nil in some environments)
----@return string|boolean
-local function is_windows()
-	local ok, uname = pcall(uv.os_uname)
-	if not ok or not uname or not uname.version then
-		return false
-	end
-	return tostring(uname.version):match("Windows") and true or false
-end
+local desc_tag = "[mdview.runner] "
 
--- Map common command names to their Windows equivalents where appropriate.
--- Example: "npm" -> "npm.cmd" on Windows so uv.spawn can execute the file directly.
----@param cmd string
----@return string|nil
-local function get_exec(cmd)
-	if not cmd then
-		return nil
-	end
-	if is_windows() and cmd == "npm" then
-		return "npm.cmd"
-	end
-	return cmd
-end
-
--- small path join helper (forward slashes are fine on Windows with luv)
----@param ... string  # one or more path segments to join
----@return string # concatenated path using forward slashes
-local function path_join(...)
-	local parts = {}
-	for i = 1, select("#", ...) do
-		parts[#parts + 1] = select(i, ...)
-	end
-	return table.concat(parts, "/")
-end
-
--- check file existence using luv
----@param path string  # file or directory path to check
----@return boolean  # true if the path exists, false otherwise
-local function file_exists(path)
-	local normalized = normalize.path(path)
-	return uv.fs_stat(normalized) ~= nil
-end
-
--- project root detector used for reasonable default cwd
----@return string|nil  # returns the detected project root path or nil if none found
-local function detect_project_root()
-	-- DEVONLY: Remove REPOS_DIR in production
-	-- 1) REPOS_DIR if set and contains mdview repo
-	local repos_dir = vim.env.REPOS_DIR
-	if repos_dir and repos_dir ~= "" then
-		local candidates = { path_join(repos_dir, "mdview.nvim"), path_join(repos_dir, "mdview") }
-		for _, cand in ipairs(candidates) do
-			if
-				file_exists(path_join(cand, "package.json"))
-				or file_exists(path_join(cand, "lua", "mdview", "health.lua"))
-			then
-				return cand
-			end
-		end
-	end
-
-	-- 2) git root
-	local ok, handle = pcall(io.popen, "git rev-parse --show-toplevel 2>nul")
-	if ok and handle then
-		local out = handle:read("*a")
-		pcall(handle.close, handle)
-		out = out and out:gsub("%s+$", "") or ""
-		if out ~= "" and file_exists(path_join(out, "package.json")) then
-			return out
-		end
-	end
-
-	-- 3) cwd if it contains package.json
-	local cwd = vim.fn.getcwd()
-	if file_exists(path_join(cwd, "package.json")) then
-		return cwd
-	end
-
-	return nil
-end
+-- FIX: Modularize disese funktionen
 
 -- Resolve spawn cwd precedence:
 -- 1) explicit argument -> 2) config.server_cwd -> 3) project detection -> 4) current working dir
@@ -103,8 +31,8 @@ local function resolve_spawn_cwd(optional_cwd)
 	if optional_cwd and optional_cwd ~= "" then
 		return optional_cwd
 	end
-	if cfg_ok and mdview_config and mdview_config.defaults and mdview_config.defaults.server_cwd then
-		return mdview_config.defaults.server_cwd
+	if cfg_ok and defaults and defaults.server_cwd then
+		return defaults.server_cwd
 	end
 	local root = detect_project_root()
 	if root then
@@ -116,15 +44,16 @@ end
 -- Start the server process in a cross-platform way.
 -- Ensures stdout/stderr pipes are created and spawn arguments are set.
 -- Performs a pre-check for package.json when running npm scripts to provide
---  a clearer error message instead of long npm stack traces.
+-- a clearer error message instead of long npm stack traces.
 ---@param cmd string # Command to execute (e.g., "npm" or "node")
 ---@param args string[]|nil # Optional array of arguments to pass to the command
 ---@param cwd string|nil # Optional working directory override for the spawned process
 ---@return SpawnedProcess|nil # Returns a process handle table on success, nil on failure
 function M.start_server(cmd, args, cwd)
 	args = args or {}
+	local state = require("mdview.core.state")
 	if state.get_proc() and state.get_proc().handle and not state.get_proc().handle:is_closing() then
-		return M.proc
+		return state.get_proc()
 	end
 
 	local spawn_cmd = get_exec(cmd)
@@ -140,7 +69,7 @@ function M.start_server(cmd, args, cwd)
 		if not file_exists(path_join(spawn_cwd, "package.json")) then
 			vim.schedule(function()
 				notify(
-					"[mdview.runner] npm start aborted — no package.json found in cwd: " .. tostring(spawn_cwd),
+					desc_tag .. "npm start aborted — no package.json found in cwd: " .. tostring(spawn_cwd),
 					vim.log.levels.ERROR,
 					{}
 				)
@@ -154,7 +83,7 @@ function M.start_server(cmd, args, cwd)
 
 	if type(spawn_cmd) ~= "string" then
 		vim.schedule(function()
-			notify("[mdview.runner] invalid spawn command: " .. tostring(cmd), vim.log.levels.ERROR, {})
+			notify(desc_tag .. "invalid spawn command: " .. tostring(cmd), vim.log.levels.ERROR, {})
 		end)
 		pcall(stdout.close, stdout)
 		pcall(stderr.close, stderr)
@@ -176,16 +105,16 @@ function M.start_server(cmd, args, cwd)
 		if handle then
 			pcall(handle.close, handle)
 		end
-		M.proc = nil
+		state.set_proc(nil)
 		vim.schedule(function()
-			notify("[mdview.runner] server exited (code=" .. tostring(code) .. ")", vim.log.levels.WARN, {})
+			notify(desc_tag .. "server exited (code=" .. tostring(code) .. ")", vim.log.levels.WARN, {})
 		end)
 	end)
 
 	if not handle then
 		vim.schedule(function()
 			notify(
-				"[mdview.runner] failed to spawn server process\ncmd="
+				desc_tag .. "failed to spawn server process\ncmd="
 					.. tostring(spawn_cmd)
 					.. "\nargs="
 					.. vim.inspect(spawn_args)
@@ -205,24 +134,44 @@ function M.start_server(cmd, args, cwd)
 	stdout:read_start(function(read_err, data)
 		if read_err then
 			vim.schedule(function()
-				notify("[mdview.runner] stdout error: " .. tostring(read_err), vim.log.levels.ERROR, {})
+				notify(desc_tag .. "stdout error: " .. tostring(read_err), vim.log.levels.ERROR, {})
 			end)
 			return
 		end
-		if data then
-			log.append(data, "[mdview.runner]")
-			if DEBUG then
-				vim.schedule(function()
-					api.nvim_out_write(strip_ansi(tostring(data)))
-				end)
-			end
+
+		if not data then return	end
+
+		log.append(data, desc_tag)
+
+		local s = tostring(data)
+
+		local server_port = s:match("Running on http://localhost:(%d+)")
+		if server_port then
+			vim.schedule(function()
+				vim.g.mdview_server_port = tonumber(server_port)
+				log.append(("runner: detected backend server port %d"):format(tonumber(server_port)), desc_tag)
+			end)
+		end
+
+		local dev_port = s:match("Local:%s*http://localhost:(%d+)")
+		if dev_port then
+			vim.schedule(function()
+				vim.g.mdview_dev_port = tonumber(dev_port)
+				log.append(("runner: detected dev server port %d"):format(tonumber(dev_port)), desc_tag)
+			end)
+		end
+
+		if DEBUG then
+			vim.schedule(function()
+				api.nvim_out_write(strip_ansi(s))
+			end)
 		end
 	end)
 
 	stderr:read_start(function(read_err, data)
 		if read_err then
 			vim.schedule(function()
-				notify("[mdview.runner] stderr error: " .. tostring(read_err), vim.log.levels.ERROR, {})
+				notify(desc_tag .. "stderr error: " .. tostring(read_err), vim.log.levels.ERROR, {})
 			end)
 			return
 		end
@@ -236,8 +185,8 @@ function M.start_server(cmd, args, cwd)
 		end
 	end)
 
-	M.proc = { handle = handle, pid = pid, stdout = stdout, stderr = stderr, cwd = spawn_cwd }
-	return M.proc
+	state.set_proc({ handle = handle, pid = pid, stdout = stdout, stderr = stderr, cwd = spawn_cwd })
+	return state.get_proc()
 end
 
 --- Stop the server process; fallback to force kill
@@ -273,13 +222,7 @@ function M.stop_server(proc)
 		end
 	end)
 
-	M.proc = nil
-end
-
---- Returns whether server is running
----@return boolean
-function M.is_running()
-	return M.proc ~= nil
+	state.set_proc(nil)
 end
 
 return M

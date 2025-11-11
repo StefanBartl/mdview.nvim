@@ -10,7 +10,7 @@
     "node": ">=18"
   },
   "scripts": {
-    "dev": "concurrently \"npm:dev:server\" \"npm:dev:client\"",
+    "dev": "cross-env MDVIEW_PORT=43219 concurrently \"npm:dev:server\" \"npm:dev:client\"",
     "dev:server:tsc": "tsc -w -p tsconfig.server.json",
     "dev:server:esbuild": "esbuild src/server/index.ts --bundle --platform=node --outfile=dist/server/index.js --target=node18 --format=esm --external:markdown-it --external:markdown-it-anchor --external:lodash --external:ws --external:events --watch",
     "dev:server:node": "nodemon --watch dist --ext js --exec \"node dist/server/index.js\"",
@@ -49,6 +49,7 @@
     "@typescript-eslint/eslint-plugin": "^8.46.3",
     "@typescript-eslint/parser": "^8.46.3",
     "concurrently": "^8.2.0",
+    "cross-env": "^10.1.0",
     "esbuild": "^0.25.12",
     "eslint": "^9.39.0",
     "eslint-config-prettier": "^10.1.8",

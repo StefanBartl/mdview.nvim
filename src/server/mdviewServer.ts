@@ -1,10 +1,11 @@
 // src/server/mdviewServer.ts
 // This file defines a singleton WebSocket + HTTP server for mdview.nvim.
 
-import http from "node:http";
-import WebSocket, { WebSocketServer } from "ws";
-import getPort from "get-port";
-import { debounce } from "./mdviewServer.debounce.js";
+import http from 'node:http';
+import WebSocket, { WebSocketServer } from 'ws';
+import getPort from 'get-port';
+import { debounce } from './mdviewServer.debounce.js';
+import { getAllCached } from './render.js';
 
 /**
  * MdviewServer
@@ -59,14 +60,12 @@ export class MdviewServer {
     // create a plain HTTP server; request listener may be attached elsewhere (index.ts)
     this.server = http.createServer();
 
-    this.wss = new WebSocketServer({ server: this.server, path: "/ws" });
-    this.wss.on("connection", (ws: WebSocket) => {
-      this.clients.add(ws);
-      ws.on("close", () => this.clients.delete(ws));
-      ws.on("error", () => this.clients.delete(ws));
-    });
-
-    await new Promise<void>((resolve) => {
+    // const wss = new WebSocketServer({ port: 43219, path: '/ws' });
+    // wss.on('connection', socket => {
+    //   console.log('Client connected');
+    //   socket.on('message', msg => console.log('Message:', msg.toString()));
+    // });
+    await new Promise<void>(resolve => {
       this.server?.listen(this.port, () => {
         console.log(`[mdview-server] Running on http://localhost:${this.port}`);
         resolve();
@@ -79,7 +78,7 @@ export class MdviewServer {
   public async stop(): Promise<void> {
     if (!this.isRunning) return;
 
-    await new Promise<void>((resolve) => {
+    await new Promise<void>(resolve => {
       this.wss?.close(() => {
         this.server?.close(() => {
           this.clients.clear();

@@ -2,18 +2,98 @@
 
 ## Generell
 
-- Im Terminal `curl -X POST "http://localhost:43219/render?key=test" -H "Content-Type: text/markdown" --data-binary "$(cat tests/test.md)"` ausführen — sollte JSON mit `html` zurückgeben.
+- Einen folgender Befehle ausführen:
+
+```sh
+# 1
+Test-NetConnection -ComputerName localhost -Port 43219
+# 2
+$body = Get-Content .\tests\test.md -Raw
+Invoke-RestMethod -Uri 'http://localhost:43219/render?key=test' -Method Post -Headers @{ 'Content-Type' = 'text/markdown' } -Body $body
+# 3&4
+node tests/test-ws.js ws://localhost:43219/ws
+node tests/test-ws.js ws://localhost:43220/ws
+
+curl -X POST "http://localhost:43220/render?key=test" -H "Content-Type: text/markdown" --data-binary "$(cat tests/test.md)"
+
+# send file content as text/markdown using PowerShell native cmdlet
+Invoke-RestMethod -Uri 'http://localhost:43219/render?key=test' -Method Post -ContentType 'text/markdown' -Body (Get-Content .\tests\test.md -Raw)
+
+# use --% to stop PowerShell from parsing the remaining arguments
+curl.exe --% -v -X POST "http://localhost:43219/render?key=test" -H "Content-Type: text/markdown" --data-binary @tests/test.md
+
+# pipe file content into curl.exe; use --% to stop PowerShell parsing
+Get-Content .\tests\test.md -Raw | curl.exe --% -v -X POST "http://localhost:43219/render?key=test" -H "Content-Type: text/markdown" --data-binary @-
+```
+
+sollte JSON mit `html` zurückgeben.
+
+---
+
+### server-Prozess wirklich auf dem Port läuft
+
+  ```powershell
+  Test-NetConnection -ComputerName localhost -Port 43219
+  ```
+* Wenn `wscat` / `node test-ws.js` anzeigt `Connected` → WS ist erreichbar.
+* Wenn `Invoke-RestMethod` fehlschlägt, prüfe Windows-Firewall / Antivirus evtl. Blockierung.
+* Nutze `curl.exe -v ...` um raw HTTP traffic zu sehen (mehrere Tests oben).
+
+---
+
+
+## Browser-Konsole
+
+- quick manual checks:
+Wenn das readyState === 1 wird, ist WS verbunden. Wenn Connection closed before receiving a handshake response kommt, ist Proxy/Backend nicht erreichbar oder geschlossen — mit obigem Launcher-Patch sollte das nicht mehr vorkommen.
+
+```js
+console.log("location", location.href);
+new WebSocket((location.protocol === 'https:' ? 'wss' : 'ws') + '://' + location.host + '/ws');
+```
+- Upgrade Check
+    Öffne DevTools → Network → Reload (F5) → beobachte /ws Upgrade und 101 Switching Protocols.
+    Falls handshake fehlschlägt: prüfe backend logs ([mdview-server] Running on http://localhost:...) und ob runner die Ports in vim.g.mdview_server_port / vim.g.mdview_dev_port schreib
+
+---
+
+## Websocket
+
+### wscat
+
+```sh
+# install wscat globally once (requires npm)
+npm install -g wscat
+
+# from powershell try to open websocket to backend directly:
+wscat -c ws://localhost:43219/ws
+
+# or try via vite port (should proxy)
+wscat -c ws://localhost:43220/ws
+```
+
+Wenn wscat verbindet to 43219 but client can't, proxy problem; if neither connects, backend WebSocket server not bound/accepting upgrades.
+
+### node websocket test
+
+Node test script for websockets (cross-platform, run with node)
+
+Speichern als `tests/test-ws.js` und mit `node tests/test-ws.js ws://localhost:43219/ws` ausführen.
+
+---
 
 
 ## server
 
-- Ports:
+- Ports beenden:
 
 ```sh
 # powershell
 netstat -ano | findstr 43219
 taskkill /PID <PID> /F
 Get-NetTCPConnection -LocalPort 43219 -ErrorAction SilentlyContinue | Where-Object { $_.OwningProcess -ne 0 } | Select-Object -ExpandProperty OwningProcess -Unique | ForEach-Object { Stop-Process -Id $_ -Force -ErrorAction SilentlyContinue }
+
+Stop-Process -Name node -Force
 
 # Linux/macOS:
 lsof -i :43219
@@ -37,7 +117,6 @@ Stop-Process -Name node -Force
 # oder
 taskkill /F /IM node.exe
 ```
-
 
 
 * Server-Health prüfen (lokal):

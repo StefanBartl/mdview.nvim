@@ -44,3 +44,19 @@ export function invalidateCache(key: string): void {
 export function clearAllCache(): void {
   cache.clear();
 }
+
+/**
+ * getAllCached
+ *
+ * Return a shallow array of cached entries { key, html } so that a newly-connected
+ * WebSocket client may be seeded with the last rendered HTML for each known document.
+ *
+ * This is safe as we only expose readonly snapshots (no direct access to internal Map).
+ */
+export function getAllCached(): Array<{ key: string; html: string }> {
+  const out: Array<{ key: string; html: string }> = [];
+  for (const [key, v] of cache.entries()) {
+    out.push({ key, html: v.html });
+  }
+  return out;
+}
