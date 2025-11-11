@@ -1,6 +1,8 @@
 ---@module 'mdview.adapter.ws_client'
 -- Enhanced wait_ready helper with robust logging, retries, and Windows support.
 
+--AUDIT: Modularieseren
+
 local fn = vim.fn
 local uv = vim.loop
 local api = vim.api
@@ -27,6 +29,12 @@ M._is_waiting = false
 local function health_url(port)
 	return string.format("http://localhost:%d/health", port)
 end
+
+local function ws_url()
+  local port = vim.g.mdview_server_port or DEFAULT_PORT
+  return "ws://localhost:" .. tostring(port) .. "/ws"
+end
+
 
 -- Non-blocking curl GET fallback
 ---@param url string
@@ -57,7 +65,7 @@ end
 function M.wait_ready(cb, timeout_ms)
 	cb = cb or function() end
 	local timeout = timeout_ms or HEALTH_TIMEOUT_MS
-	---@diagnostic disable-next-line LSP-Problems with uv.
+	---@diagnostic disable-next-line LSP-Problems with lib.uv
 	local start_time = uv.now()
 	local attempt = 0
 
@@ -213,7 +221,7 @@ local function try_send_pending(path)
 	end
 	entry.tries = (entry.tries or 0) + 1
 
-	local url = render_url_for(path)
+	local url = ws_url()
 	http_post_nonblocking(url, entry.markdown, function(code, stdout_lines, stderr_lines)
 		if code == 0 then
 			-- success: clear queue

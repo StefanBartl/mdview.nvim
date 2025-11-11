@@ -15,6 +15,9 @@ type WebSocketModule = {
   WebSocketTransport: new (url: string) => Transport;
 };
 
+
+
+
 /**
  * createTransport
  *

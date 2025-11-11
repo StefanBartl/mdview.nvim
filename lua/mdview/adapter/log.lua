@@ -11,13 +11,13 @@ local set_option_value = api.nvim_set_option_value
 local M = {}
 
 -- required config to read debug flag
-local cfg_ok, mdview_config = pcall(require, "mdview.config")
+local cfg require("mdview.config")
 
 ---@type boolean
-local DEBUG = (cfg_ok and mdview_config and mdview_config.defaults and mdview_config.defaults.debug) or false
+local DEBUG = (cfg and cfg.defaults and cfg.defaults.debug) or false
 
 ---@type string
-local LOG_BUF_NAME = (cfg_ok and mdview_config and mdview_config.defaults and mdview_config.defaults.log_buffer_name)
+local LOG_BUF_NAME = (cfg and cfg.defaults and cfg.defaults.log_buffer_name)
 	or "mdview://logs"
 
 ---@type string[]

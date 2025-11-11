@@ -1,13 +1,12 @@
 ---@module 'mdview.autocmds.vim_leave'
 
-local runner = require("mdview.adapter.runner")
 local defaults = require("mdview.config").defaults
 local autocmds_registry = require("mdview.helper.autocmds_registry")
 local nvim_create_autocmd = vim.api.nvim_create_autocmd
+local state = require("mdview.core.state")
 
 local M = {}
 -- AUDIT: Neben vime_leave und bufenter auch andere autcmds id nach state?
-local state = require("mdview.core.state")
 
 --- @param group integer|nil
 function M.attach(group)
@@ -15,8 +14,8 @@ function M.attach(group)
 		desc = "[mdview] Stop mdview server if running before exiting Neovim",
 		pattern = defaults.ft_pattern,
 		callback = function()
-			if runner.proc ~= nil then
-				require("mdview.adapter.runner").stop_server(runner.proc)
+			if state.get_proc() ~= nil then
+				require("mdview.adapter.runner").stop_server(state.get_proc())
 			end
 		end,
 	}

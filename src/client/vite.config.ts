@@ -1,5 +1,8 @@
+// src/client/vite.config.ts
 import { defineConfig } from 'vite';
 import path from 'path';
+
+const backendPort = process.env.MDVIEW_PORT || '43219';
 
 export default defineConfig({
   root: path.resolve(__dirname),
@@ -12,12 +15,21 @@ export default defineConfig({
   },
   server: {
     port: 43220,
-    // Proxy websocket path /ws to the backend server running on 43219
+    // Proxy websocket path /ws to the backend server running on backendPort
     proxy: {
-      // forward HTTP and WS requests under /ws to backend
       '/ws': {
-        target: 'ws://localhost:43219',
+        target: `ws://localhost:${backendPort}`,
         ws: true,
+        changeOrigin: true,
+        rewrite: path => path.replace(/^\/ws/, ''), // falls Backend nicht /ws erwartet
+      },
+      // Also proxy /render and other HTTP endpoints to backend during dev, so the browser can call /render directly.
+      '/render': {
+        target: `http://localhost:${backendPort}`,
+        changeOrigin: true,
+      },
+      '/health': {
+        target: `http://localhost:${backendPort}`,
         changeOrigin: true,
       },
     },

@@ -4,6 +4,7 @@
 -- modules do not mutate the internal table directly.
 
 local vim = vim
+
 local M = {}
 
 -- AUDIT: Neben vime_leave und bufenter auch andere autcmds id nach state?
@@ -20,6 +21,7 @@ local web_state = {
 ---@type mdview.core.state.runner
 M.runner = {
 	proc = nil,
+	is_running = nil,
 	server_job = nil,
 }
 
@@ -231,11 +233,30 @@ end
 
 -- Runner API  ----------------
 
+function M.ensure_proc_started()
+	local runner = require("mdview.adapter.runner")
+
+	-- spawn server process if not already running via runner API
+	if M.proc_is_running() then
+		return M.get_proc()
+	end
+	local defaults = require("mdview.config").defaults
+	local proc = runner.start_server(defaults.server_cmd, defaults.server_args, defaults.server_cwd)
+	return proc
+end
+
+--- Returns whether server is running
+---@return boolean
+function M.proc_is_running()
+	return M.proc ~= nil
+end
+
 --- Get the current proc handle (may be nil).
 --- @return any|nil
 function M.get_proc()
 	return M.runner.proc
 end
+
 --- Set the proc handle; returns previous handle.
 --- @param h any
 --- @return any previous

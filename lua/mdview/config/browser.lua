@@ -28,6 +28,7 @@ M.defaults = {
 	-- allow callers to provide an array of CLI args for the resolved browser executable,
 	-- e.g. { "--app=http://localhost:43219", "--new-window" } or nil for none.
 	browser_args = nil,
+	dev_server_port = 43220,
 }
 
 -- Known candidate names to probe in PATH and platform locations (order matters)

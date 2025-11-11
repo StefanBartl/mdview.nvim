@@ -9,7 +9,8 @@ import { createTransport } from './transport/transportFactory';
 
 async function boot() {
   // const url = `ws://${location.host}/ws`;
-  const url = 'ws://localhost:43219/ws';
+	const scheme = location.protocol === 'https:' ? 'wss' : 'ws';
+  const url = `${scheme}://${location.host}/ws`; //${location.host}/ws;
   const transport = await createTransport(url);
 
   transport.onMessage((msg: string) => {

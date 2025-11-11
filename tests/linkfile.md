@@ -16,7 +16,7 @@
 Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum.
 
 <figure style="text-align:center;" id="#fig-nvimlogo">
-  <img src="./ressources/neovim-logo.png" alt="Testfigure nvim-Logo">
+  <img src="../doc/testdoku/ressources/neovim-logo.png" alt="Testfigure nvim-Logo">
   <figcaption>Testfigure nvim-Logo</figcaption>
 </figure>
 

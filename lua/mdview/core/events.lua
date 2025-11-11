@@ -67,7 +67,7 @@ function M.push_buffer(bufnr, force)
 			chunk_lines = vim.list_slice(new_lines, d.start + 1, d.start + (d.count or #new_lines))
 		end
 		local payload = table.concat(chunk_lines, "\n")
-		ws_client.send_markdown(path, payload)
+ws_client.send_markdown(path, payload, { immediate = (force == true) })
 		log.debug(string.format("Sent chunk op=%s lines=%d for %s", d.op, #chunk_lines, path), nil, "push", true)
 	end
 
