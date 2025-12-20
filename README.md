@@ -1,3 +1,5 @@
+🔧 Alpha stage – this project is highly experimental and under active development. Don't expect this plugin is working with your system yet.
+
 ```sh
    ##     ## ########  ##     ## #### ######## ##      ##           ##    ## ##     ## #### ##     ##
    ###   ### ##     ## ##     ##  ##  ##       ##  ##  ##           ###   ## ##     ##  ##  ###   ###
