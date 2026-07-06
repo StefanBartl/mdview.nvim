@@ -62,7 +62,10 @@ turned into DOM content without passing through an allowlist-based sanitizer.
   "StefanBartl/mdview.nvim",
   dependencies = { "StefanBartl/lib.nvim" },
   ft = { "markdown" },
-  cmd = { "MDViewStart", "MDViewStop", "MDViewOpen", "MDViewShowWebLogs" },
+  cmd = {
+    "MDViewStart", "MDViewStop", "MDViewOpen",
+    "MDViewShowWebLogs", "MDViewPreviewTab",
+  },
   config = function()
     require("mdview").setup()
   end,
@@ -88,7 +91,10 @@ use {
   "StefanBartl/mdview.nvim",
   requires = { "StefanBartl/lib.nvim" },
   ft = { "markdown" },
-  cmd = { "MDViewStart", "MDViewStop", "MDViewOpen", "MDViewShowWebLogs" },
+  cmd = {
+    "MDViewStart", "MDViewStop", "MDViewOpen",
+    "MDViewShowWebLogs", "MDViewPreviewTab",
+  },
   config = function()
     require("mdview").setup()
   end,

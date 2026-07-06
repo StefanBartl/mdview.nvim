@@ -147,10 +147,24 @@
 
 ## bonus features
 
-  1. `open_preview_tab` in "./lua/mdview/usercommands/autostart" ermöglichen um die ausgabe im nvim-Tab anstatt im Browser anzuzeigen —
-     eigener Task ausgelagert (architektonisch eigenständig: die aktuelle Pipeline rendert +
-     sanitized ausschließlich im Browser via Rust/WASM, siehe |mdview-security|; ein
-     nvim-Tab-Preview bräuchte einen komplett separaten Rendering-Pfad, kein kleiner Zusatz).
+  1. ~~`open_preview_tab` ermöglichen um die Ausgabe im nvim-Tab anstatt im Browser
+     anzuzeigen~~ — umgesetzt, bewusst komplett entkoppelt von der Browser/WASM-Pipeline
+     (kein HTML, kein Relay/WebSocket, kein externes Tool wie `glow`):
+     - Neues `lua/mdview/adapter/preview_tab.lua`: öffnet einen eigenen Tab mit einem
+       read-only Mirror-Buffer des Quell-Buffers, gehighlighted via Neovims Markdown-
+       Treesitter-Parser (Fallback auf Vims mitgeliefertes `syntax=markdown`, falls der
+       Parser fehlt — nie ungehighlighted). Live-Sync über eine eigene, selbstständige
+       Autocmd-Gruppe (`bindings/autocmds/preview_tab_sync.lua`), komplett unabhängig vom
+       `:MDViewStart`/`:MDViewStop`-Lifecycle — funktioniert eigenständig ohne laufenden Server.
+     - Neuer Command `:MDViewPreviewTab` (Toggle, funktioniert standalone).
+     - Neues Config-Feld `open_preview_tab` (default false): wenn true, öffnet
+       `:MDViewStart` den Tab-Preview statt des Browsers (Relay/WASM-Pipeline läuft trotzdem
+       im Hintergrund weiter, `:MDViewOpen` kann den Browser jederzeit nachträglich öffnen).
+     - Bewusst gegen `glow`/externe Renderer entschieden: kein zusätzlicher optionaler
+       Toolchain-Kandidat, keine Subprozess-Ausführung für dieses Feature — passt besser
+       zum "minimale Angriffsfläche"-Ziel des Rewrites als ein weiteres opt-in External-Tool.
+     - End-to-End verifiziert (headless nvim: Toggle open/close, Treesitter-Highlighting,
+       Live-Sync bei Buffer-Änderung, korrektes Cleanup beim Schließen).
   2. ~~Rendern einer Datei in einen übergebenen Pfad mit optionalem cwd:
      `:MDViewStart C:/Users/bartl/test.md {cwd?}`~~ — behoben: `:MDViewStart` akzeptiert jetzt
      `nargs="*"`, parsed Datei-Pfad + optionales `cwd=...` in beliebiger Reihenfolge.

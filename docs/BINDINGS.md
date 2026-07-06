@@ -8,6 +8,7 @@
 | `:MDViewStop` | none | Stops the relay process, detaches autocommands, shuts down the session, and (if `mdview.config.browser.browser_autoclose` is true) closes the browser tab it opened. |
 | `:MDViewOpen` | none | Re-opens a browser tab for the current buffer against the **already-running** session (does not start a new server — requires `:MDViewStart` first). Pushes the current buffer's content so the new tab isn't empty, then opens the browser via the same key/token URL logic `:MDViewStart` uses. Fails loudly with `vim.notify` if no session is running. |
 | `:MDViewShowWebLogs` | none | Opens a scratch buffer showing the relay server's stdout/stderr log. |
+| `:MDViewPreviewTab` | none | Toggles an nvim-tab Markdown preview for the current buffer — a read-only, Treesitter-highlighted (falls back to Vim's bundled `syntax=markdown` if the parser isn't installed) mirror buffer in its own tab. **No browser, no relay server, no HTML rendering at all** — fully decoupled from `:MDViewStart`/the WASM pipeline; works standalone. If `mdview.config.defaults.open_preview_tab` is `true`, `:MDViewStart` opens this instead of the browser (the relay/WASM pipeline still runs in the background, so `:MDViewOpen` can still open the browser later). See [`adapter/preview_tab.lua`](../lua/mdview/adapter/preview_tab.lua). |
 
 ## Autocommands
 
@@ -22,6 +23,8 @@ All registered in a single augroup (`MdviewAutocmds`), created by [`mdview.bindi
 | `VimLeavePre` | [`bindings/autocmds/vim_leave.lua`](../lua/mdview/bindings/autocmds/vim_leave.lua) | Stops the relay server process so it doesn't outlive the Neovim session. **Not** pattern-restricted to markdown files — it must always fire regardless of which buffer is focused when Neovim quits. |
 
 Two additional autocmd modules exist but are intentionally **not** wired up (`bindings/autocmds/on_text_change.lua`, `bindings/autocmds/bufwrite.lua`) — kept only for reference; `live_push.lua` supersedes both.
+
+[`bindings/autocmds/preview_tab_sync.lua`](../lua/mdview/bindings/autocmds/preview_tab_sync.lua) registers its own `TextChanged`/`TextChangedI`/`BufWritePost` autocmds in a **separate** augroup (`MdviewPreviewTabSync`), created lazily the first time `:MDViewPreviewTab` opens a preview — independent of `MdviewAutocmds` and `:MDViewStart`/`:MDViewStop`'s lifecycle entirely.
 
 ## Keymaps
 

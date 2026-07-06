@@ -12,6 +12,7 @@ local open = require("mdview.bindings.usrcmds.open")
 local start = require("mdview.bindings.usrcmds.start")
 local stop = require("mdview.bindings.usrcmds.stop")
 local show_weblogs = require("mdview.bindings.usrcmds.show_weblogs")
+local preview_tab = require("mdview.bindings.usrcmds.preview_tab")
 
 local M = {}
 
@@ -21,6 +22,7 @@ function M.attach()
 	stop.attach()
 	open.attach()
 	show_weblogs.attach()
+	preview_tab.attach()
 end
 
 return M

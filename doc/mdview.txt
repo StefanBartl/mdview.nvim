@@ -54,7 +54,10 @@ lazy.nvim, lazy-loaded on markdown files or the plugin's own commands
     "StefanBartl/mdview.nvim",
     dependencies = { "StefanBartl/lib.nvim" },
     ft  = { "markdown" },
-    cmd = { "MDViewStart", "MDViewStop", "MDViewOpen", "MDViewShowWebLogs" },
+    cmd = {
+      "MDViewStart", "MDViewStop", "MDViewOpen",
+      "MDViewShowWebLogs", "MDViewPreviewTab",
+    },
     config = function()
       require("mdview").setup()
     end,
@@ -79,7 +82,10 @@ packer.nvim: >lua
     "StefanBartl/mdview.nvim",
     requires = { "StefanBartl/lib.nvim" },
     ft  = { "markdown" },
-    cmd = { "MDViewStart", "MDViewStop", "MDViewOpen", "MDViewShowWebLogs" },
+    cmd = {
+      "MDViewStart", "MDViewStop", "MDViewOpen",
+      "MDViewShowWebLogs", "MDViewPreviewTab",
+    },
     config = function()
       require("mdview").setup()
     end,
@@ -116,6 +122,8 @@ Defaults: >lua
 
     scroll_sync             = true, -- nvim-to-browser cursor-follow scroll
     scroll_sync_throttle_ms = 150,  -- min. time between scroll-position pings
+
+    open_preview_tab = false, -- :MDViewStart opens an nvim tab, not a browser
 
     browser = {
       autodetect_browser  = true,
@@ -171,6 +179,12 @@ scroll_sync ~
 
 scroll_sync_throttle_ms ~
   Minimum time between scroll-position pings sent to the relay.
+
+open_preview_tab ~
+  When `true`, |:MDViewStart| opens an nvim-tab preview (see
+  |:MDViewPreviewTab|) instead of the browser. The relay/WASM pipeline still
+  runs normally in the background, so |:MDViewOpen| can still open the
+  browser afterwards if wanted.
 
 browser.autodetect_browser ~
   Try to locate an installed browser automatically (chrome, chromium, edge,
@@ -232,6 +246,19 @@ install.repo / install.version ~
 :MDViewShowWebLogs                                        *:MDViewShowWebLogs*
   Opens a scratch buffer showing the relay server's captured stdout/stderr
   log (subject to `debug` in |mdview-config|).
+
+:MDViewPreviewTab                                          *:MDViewPreviewTab*
+  Toggles an nvim-tab Markdown preview for the current buffer: a read-only
+  mirror buffer in its own tab, highlighted via Neovim's markdown Treesitter
+  parser (falls back to Vim's bundled `syntax=markdown` if the parser isn't
+  installed). Live-synced on TextChanged/TextChangedI/BufWritePost.
+
+  Deliberately decoupled from the browser/WASM rendering pipeline: no HTML
+  is ever produced, no relay server or WebSocket is involved, and no
+  external tool (e.g. `glow`) is shelled out to — this works standalone,
+  with or without `:MDViewStart` ever having run. See |mdview-architecture|
+  and `open_preview_tab` in |mdview-config| to make `:MDViewStart` open this
+  instead of the browser.
 
 Lua API ~
 
@@ -336,12 +363,18 @@ are downloaded automatically the first time |:MDViewStart| runs.
       log.lua                      In-memory + optional file logging
       browser/                     Cross-platform browser executable
                                    resolution and launching
+      preview_tab.lua               Standalone nvim-tab preview: no HTML, no
+                                   relay/WebSocket, no external tool — a
+                                   Treesitter-highlighted mirror buffer (see
+                                   |:MDViewPreviewTab|)
     bindings/
       usrcmds/                     :MDViewStart, :MDViewStop, :MDViewOpen,
-                                   :MDViewShowWebLogs
+                                   :MDViewShowWebLogs, :MDViewPreviewTab
       autocmds/                    BufEnter, TextChanged*, BufWritePost,
                                    CursorMoved*, VimLeavePre wiring (see
-                                   |mdview-autocmds|)
+                                   |mdview-autocmds|); preview_tab_sync.lua
+                                   is separate, self-managing, and
+                                   independent of :MDViewStart/:MDViewStop
       keymaps/                     Reserved; mdview.nvim ships no keymaps (see
                                    |mdview-keymaps|)
     helper/                        Small cross-platform utilities; several

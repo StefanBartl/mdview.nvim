@@ -42,6 +42,7 @@
 ---@field dev_server_port integer Vite dev server port for client (dev workflow only)
 ---@field scroll_sync boolean send cursor position to the browser preview so it scrolls to follow (nvim-to-browser only)
 ---@field scroll_sync_throttle_ms integer minimum time between scroll-position pings
+---@field open_preview_tab boolean :MDViewStart opens an nvim-tab preview (Treesitter-highlighted mirror, no browser/relay HTML) instead of the browser
 ---@field browser mdview.config.BrowserDefaults
 ---@field start mdview.config.StartDefaults
 ---@field install mdview.config.InstallDefaults
@@ -64,6 +65,8 @@ return {
 
 	scroll_sync = true,
 	scroll_sync_throttle_ms = 150,
+
+	open_preview_tab = false,
 
 	browser = {
 		autodetect_browser = true,
