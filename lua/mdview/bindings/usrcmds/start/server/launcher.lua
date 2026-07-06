@@ -132,6 +132,16 @@ function M.start(opts)
 				live_push.attach() -- ensure live_push autocmds are installed (idempotent)
 				live_push.push_buffer_changes(buf)
 
+				-- open_preview_tab replaces the browser tab with an nvim-tab
+				-- preview (Treesitter mirror, no HTML/relay involved at all —
+				-- see mdview.adapter.preview_tab) — the relay/WASM pipeline
+				-- above still runs normally, so :MDViewOpen can still open the
+				-- browser later if wanted.
+				if require("mdview.config").defaults.open_preview_tab then
+					require("mdview.adapter.preview_tab").open(buf)
+					return
+				end
+
 				-- open browser after readiness (best-effort)
 				if browser_autostart and browser_adapter and browser_adapter.open then
 					local browser_defaults = require("mdview.config.browser").defaults
