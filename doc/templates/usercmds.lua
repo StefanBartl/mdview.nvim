@@ -2,12 +2,11 @@
 
 
 
----@module 'mdview.usercmds.'
+---@module 'mdview.bindings.usrcmds.'
 --- ADD: Annotaions
 
-local api = vim.api
 local log = require("mdview.helper.log")
-local nvim_create_user_command = api.nvim_create_user_command
+local libusercmd = require("lib.nvim.usercmd")
 
 local M = {}
 
@@ -18,8 +17,8 @@ function M.attach()
     nargs = 0,
   }
 
-  nvim_create_user_command("MDView   ", function()
-    pcall(log.show)
+  libusercmd.create("MDView   ", function()
+    log.show()
   end, opts)
 end
 

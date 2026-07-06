@@ -12,17 +12,14 @@ local M = {}
 
 M.config = cfg.defaults
 
----@param opts table|nil
+---@param opts table|nil supports nested overrides, e.g. { browser = { browser = "firefox" } }
 ---@return nil
 function M.setup(opts)
-	opts = opts or {}
-	for k, v in pairs(opts) do
-		M.config[k] = v
-	end
+	cfg.merge(opts)
 
 	-- Resolve browser at setup time and notify user if resolution failed
 	require("mdview.config.browser").setup_and_notify()
-	require("mdview.usercmds").attach()
+	require("mdview.bindings.usrcmds").attach()
 end
 
 -- ADD: testfunctions

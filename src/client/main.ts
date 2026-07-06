@@ -1,32 +1,42 @@
-// ADD: Annotations
 // src/client/main.ts
 /* Client bootstrapping:
-   - Connects to WebSocket on server
-   - Receives render updates (html) and injects into container
+   - Loads the Rust/WASM render+sanitize module
+   - Connects to the relay's WebSocket for this document (key/token from the URL)
+   - Renders every incoming raw-markdown message through WASM and injects the
+     result (already sanitized inside the WASM module) into the DOM
 */
 
 import { createTransport } from './transport/transportFactory';
+import init, { render_markdown } from './wasm-render/mdview_wasm_render.js';
 
 async function boot() {
-  // const url = `ws://${location.host}/ws`;
-	const scheme = location.protocol === 'https:' ? 'wss' : 'ws';
-  const url = `${scheme}://${location.host}/ws`; //${location.host}/ws;
+  await init();
+
+  const params = new URLSearchParams(window.location.search);
+  const key = params.get('key');
+  const token = params.get('token');
+
+  if (!key || !token) {
+    console.error('[mdview] missing key/token in URL; refusing to connect');
+    return;
+  }
+
+  const scheme = location.protocol === 'https:' ? 'wss' : 'ws';
+  const url = `${scheme}://${location.host}/ws?key=${encodeURIComponent(key)}&token=${encodeURIComponent(token)}`;
   const transport = await createTransport(url);
 
-  transport.onMessage((msg: string) => {
-    // handle incoming render_update etc.
+  const container = document.getElementById('mdview-root');
+
+  transport.onMessage((rawMarkdown: string) => {
+    if (!container) return;
     try {
-      const parsed = JSON.parse(msg);
-      if (parsed.type === 'render_update' && typeof parsed.payload === 'string') {
-        const container = document.getElementById('mdview-root');
-        if (container) container.innerHTML = parsed.payload;
-      }
+      // render_markdown returns HTML that has already passed through the
+      // sanitizer inside the WASM module — safe to assign directly.
+      container.innerHTML = render_markdown(rawMarkdown);
     } catch (err) {
-      console.error('invalid message', err);
+      console.error('[mdview] render failed', err);
     }
   });
-
-  await transport.sendMessage(JSON.stringify({ type: 'hello' }));
 }
 
-boot().catch(err => console.error('boot failed:', err));
+boot().catch(err => console.error('[mdview] boot failed:', err));

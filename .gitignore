@@ -1,3 +1,12 @@
+# Rust / WASM
+native/wasm-render/target/
+native/wasm-render/pkg/
+src/client/wasm-render/
+native/server/mdview-server
+native/server/mdview-server.exe
+native/server/.goreleaser-dist/
+release-assets/
+
 # Node / JS
 node_modules/
 # Bun lockfile (Bun runtime)

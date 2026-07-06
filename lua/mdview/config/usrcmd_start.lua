@@ -1,16 +1,12 @@
----@moddule 'mdview-config.usrcmd_start'
+---@module 'mdview.config.usrcmd_start'
+--- Configuration for the :MDViewStart command's initial-push strategy.
 
 local M = {}
 
---- configuration defaults for the usercommand module
---- @type table
-M.defaults = {
-	push_strategy = "launcher", -- "launcher" | "try_push"
-	try_push_opts = nil, -- forwarded to try_push when used
-	wait_timeout_ms = nil, -- forwarded to launcher.wait_ready
-	browser_autostart = nil,
-	browser_cmd = nil,
-	browser_args = nil,
-}
+-- Shared with the top-level config: this is the same table object as
+-- mdview.config's M.defaults.start (see config/DEFAULTS.lua), so overrides
+-- passed to require('mdview').setup({ start = {...} }) are visible here too.
+---@type mdview.config.StartDefaults
+M.defaults = require("mdview.config").defaults.start
 
 return M

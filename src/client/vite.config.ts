@@ -23,8 +23,8 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: path => path.replace(/^\/ws/, ''), // falls Backend nicht /ws erwartet
       },
-      // Also proxy /render and other HTTP endpoints to backend during dev, so the browser can call /render directly.
-      '/render': {
+      // Proxy /update and /health to the backend during dev too.
+      '/update': {
         target: `http://localhost:${backendPort}`,
         changeOrigin: true,
       },

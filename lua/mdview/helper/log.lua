@@ -1,7 +1,10 @@
 ---@module 'mdview.helper.log'
--- Central debug logging helper for mdview.nvim
+-- Central debug logging helper for mdview.nvim.
+-- Gates on mdview.config.defaults.debug_preview; delegates the actual
+-- notification to lib.nvim's prefixed notifier.
 
 local cfg = require("mdview.config")
+local notify = require("lib.nvim.notify").create("[mdview]")
 
 local M = {}
 
@@ -14,7 +17,7 @@ function M.debug(msg, level, tag, debug)
     tag = tag or ""
 
     if debug and cfg.defaults.debug_preview then
-        vim.notify(("[mdview.%s] %s"):format(tag, msg), level)
+        notify.notify(("[%s] %s"):format(tag, msg), level)
     end
 end
 

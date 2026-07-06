@@ -1,8 +1,9 @@
 ---@module 'mdview.helper.normalize'
 --- Helper utilities to normalize file paths for internal comparison and for use in URLs.
 --- Provides:
----  - normalize_path(path): convert backslashes to forward-slashes (Windows -> POSIX style)
----  - normalize_path_for_url(path): normalize then escape using fnameescape for safe use as a query key
+---  - normalize_path(path): convert backslashes to forward-slashes (Windows -> POSIX style),
+---    delegating to lib.nvim's cross-platform separator helper
+---  - normalize_path_for_url(path): normalize then percent-encode for safe use as a URL query value
 
 --[[ USAGE:
 local normalize = require("mdview.helper.normalize")
@@ -18,6 +19,8 @@ end
 
 ]]--
 
+local unify_slashes = require("lib.nvim.cross.fs.separators.unify_slashes")
+
 local M = {}
 
 ---@param path string
@@ -26,8 +29,7 @@ function M.path(path)
   if not path then
     return nil
   end
-	---@diagnostic disable-next-line
-  return tostring(path):gsub("\\", "/")
+  return unify_slashes(tostring(path))
 end
 
 ---@param path string
@@ -36,8 +38,7 @@ function M.path_for_url(path)
   if not path then
     return nil
   end
-  local s = tostring(path):gsub("\\", "/")
-  return vim.fn.fnameescape(s)
+  return vim.uri_encode(unify_slashes(tostring(path)))
 end
 
 return M

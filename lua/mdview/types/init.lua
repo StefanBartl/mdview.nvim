@@ -7,10 +7,8 @@
 
 -- == config ==
 ---@class mdview.config
----@field server_cmd string executable used to start the server
----@field server_args string[] arguments for the server command
----@field server_port integer port the server listens on (informational)
----@field send_diffs boolean whether to attempt sending diffs (placeholder)
+---@field server_port integer preferred port the server listens on
+---@field server_cwd string|nil optional working directory override for the server
 ---@field dev_local boolean developer-only flags
 
 -- == core/session ==

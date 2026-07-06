@@ -1,16 +1,7 @@
 ---@module 'mdview.helper.is_windows'
--- Detect Windows OS in a robust way (uv.os_uname may be nil in some environments)
+-- Detect native Windows (not WSL). Delegates to lib.nvim, which mdview.nvim
+-- depends on for this and other small cross-platform helpers (see README's
+-- Installation section for the required lazy.nvim `dependencies` entry).
 
----@diagnostic disable: undefined-field
-
-local uv = vim.loop
-
----@return string|boolean
-return function ()
-	local ok, uname = pcall(uv.os_uname)
-	if not ok or not uname or not uname.version then
-		return false
-	end
-	return tostring(uname.version):match("Windows") and true or false
-end
-
+---@return boolean
+return require("lib.nvim.cross.platform.is_windows")

@@ -1,7 +1,12 @@
 ---@module 'mdview.helper.usercmds_registry'
 --- Helper to track and cleanup usercommands.
+--- Registration itself goes through lib.nvim's usercmd wrapper, which adds
+--- pcall-safety around the callback (an error in a command handler gets
+--- reported via notify instead of aborting silently); this module adds the
+--- name-tracking + bulk teardown lib.nvim's wrapper doesn't provide.
 
 local api = vim.api
+local libusercmd = require("lib.nvim.usercmd")
 
 local M = {}
 
@@ -15,7 +20,7 @@ M._registered = {}
 ---@param opts table
 function M.register(name, cmd_fun, opts)
     opts = opts or {}
-    api.nvim_create_user_command(name, cmd_fun, opts)
+    libusercmd.create(name, cmd_fun, opts)
     M._registered[name] = true
 end
 

@@ -1,45 +1,35 @@
-// ADD: Annotations
 // src/client/transport/websocket.transport.ts
 import type { Transport } from './transport.interface';
 
 export class WebSocketTransport implements Transport {
   private ws!: WebSocket;
   private onMessageCb?: (message: string) => void;
-  private url: string;
 
-  constructor(url: string) {
-    this.url = url;
-  }
+  constructor(private readonly url: string) {}
 
   async initialize(): Promise<void> {
     return new Promise((resolve, reject) => {
-      const serverPort =
-        (window as any).__MDVIEW_SERVER_PORT__ ||
-        new URLSearchParams(window.location.search).get('server_port') ||
-        43219;
-
-      const ws = new WebSocket(`ws://localhost:${serverPort}/ws`);
+      const ws = new WebSocket(this.url);
+      this.ws = ws;
 
       ws.onopen = () => {
-        console.log('[mdview] WebSocket connected on port', serverPort);
+        console.log('[mdview] WebSocket connected:', this.url);
+        resolve();
       };
 
       ws.onmessage = ev => {
-        console.log('[mdview] WS message:', ev.data);
+        this.onMessageCb?.(String(ev.data));
       };
 
       ws.onerror = ev => {
         console.error('[mdview] WebSocket error', ev);
+        reject(ev);
       };
     });
   }
 
   async sendMessage(message: string): Promise<void> {
     if (this.ws.readyState === WebSocket.OPEN) {
-      this.ws.send(message);
-    } else {
-      // Wait briefly, then attempt send once
-      await new Promise(r => setTimeout(r, 10));
       this.ws.send(message);
     }
   }
