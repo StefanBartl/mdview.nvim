@@ -3,7 +3,7 @@
 -- mdview session. See mdview.open() in lua/mdview/init.lua.
 
 local mdview = require("mdview")
-local usercmds_registry = require("mdview.helper.usercmds_registry")
+local libusercmd = require("lib.nvim.usercmd")
 
 local M = {}
 
@@ -13,11 +13,8 @@ function M.attach()
 		nargs = 0,
 	}
 
-	usercmds_registry.register("MDViewOpen", function()
-		local ok, err = pcall(mdview.open)
-		if not ok then
-			vim.notify(("[mdview] :MDViewOpen failed: %s"):format(tostring(err)), vim.log.levels.ERROR)
-		end
+	libusercmd.create("MDViewOpen", function()
+		mdview.open()
 	end, opts)
 end
 

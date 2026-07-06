@@ -1,8 +1,15 @@
 ---@module 'mdview.adapter.browser'
--- Cross-platform helper to open a disposable browser instance (app mode / isolated profile)
--- and close it later from Neovim.
+-- Cross-platform helper to open a browser instance (app mode, isolated from
+-- the user's real default browser profile) and close it later from Neovim.
 -- Minimal, validated implementation that respects explicit user overrides from
 -- mdview.config.browser when available. Falls back to best-effort detection.
+--
+-- The profile directory (see build_args_for_browser.make_tmp_profile) is
+-- persistent, not a one-off temp dir — it's intentionally reused across
+-- :MDViewStart / :MDViewOpen invocations so mdview reuses its own dedicated
+-- browser session/window instead of spawning a fresh isolated instance every
+-- time. Nothing here deletes it; treat it like a normal browser profile
+-- directory.
 
 -- Usage:
 -- local browser = require('mdview.adapter.browser')
@@ -13,18 +20,8 @@
 local fn = vim.fn
 local resolve_command = require("mdview.adapter.browser.resolve_command")
 local build_args_for_browser = require("mdview.adapter.browser.build_args_for_browser")
-local normalize = require("mdview.helper.normalize")
 
 local M = {}
-
--- Remove temporary profile directory (recursively)
----@param path string|nil
----@return nil
-local function remove_tmp_profile(path)
-  if not path or path == "" then return end
-  local norm_path = normalize.path(path)
-  pcall(fn.delete, norm_path, "rf")
-end
 
 -- Open a browser window/tab pointing to `url`.
 -- Returns a BrowserHandle on success, nil and error string on failure.
@@ -62,7 +59,6 @@ function M.open(url, opts)
   })
 
   if not jid or jid <= 0 then
-    remove_tmp_profile(tmp)
     return nil, ("failed to start browser process (jobstart returned %s)"):format(tostring(jid))
   end
 
@@ -77,8 +73,9 @@ function M.open(url, opts)
   return handle, nil
 end
 
--- Close a previously opened browser handle.
--- Attempts graceful stop via jobstop(); then removes temporary profile directory.
+-- Close a previously opened browser handle via jobstop(). The profile
+-- directory is intentionally left alone (see module docstring) — it's
+-- reused by the next :MDViewStart / :MDViewOpen, not deleted.
 -- If there is no job handle (external opener used), this is a no-op.
 ---@param handle BrowserHandle|nil
 ---@return boolean, string|nil
@@ -91,9 +88,6 @@ function M.close(handle)
       pcall(fn.jobstop, handle.job_id)
     end
   end)
-
-  -- best-effort cleanup of temporary profile
-  pcall(remove_tmp_profile, handle.tmp_profile)
 
   if not ok then
     return false, tostring(err)

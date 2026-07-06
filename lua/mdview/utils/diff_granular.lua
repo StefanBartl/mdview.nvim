@@ -1,8 +1,11 @@
 ---@module 'mdview.utils.diff_granular'
 -- Line-based minimal diff using Myers LCS algorithm.
 -- 1-based indexing, nil-safe, produces edits suitable for incremental sending.
-
--- AUDIT: Optimize it
+--
+-- Used by core/events.lua (dormant) and core/state.lua's compute_line_diff
+-- sibling; not on the current live-push path (see core/events.lua's module
+-- docstring and docs/Roadmap/Roadmap.md — the client WASM renderer needs
+-- whole-document context, so line-diff transport is deferred, not gone).
 
 ---@param old_lines string[]|nil previous lines
 ---@param new_lines string[] current lines

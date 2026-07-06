@@ -91,3 +91,44 @@ func TestRegistry_BroadcastCollectsSendErrorsWithoutStoppingFanout(t *testing.T)
 		t.Fatalf("expected healthy connection to still receive the payload despite the other's failure")
 	}
 }
+
+func TestRegistry_BroadcastEphemeralReachesRoomWithoutTouchingLastPayload(t *testing.T) {
+	r := NewRegistry()
+	c := &fakeConn{}
+	r.Join("/doc/a.md", c)
+
+	r.Broadcast("/doc/a.md", []byte("real content"))
+	r.BroadcastEphemeral("/doc/a.md", []byte("\x0142/100"))
+
+	if len(c.received) != 2 {
+		t.Fatalf("expected connection to receive both the content broadcast and the ephemeral one, got %v", c.received)
+	}
+	if string(c.received[1]) != "\x0142/100" {
+		t.Fatalf("expected connection to receive the ephemeral payload, got %q", c.received[1])
+	}
+
+	payload, ok := r.LastPayload("/doc/a.md")
+	if !ok {
+		t.Fatalf("expected a last payload to still be recorded")
+	}
+	if string(payload) != "real content" {
+		t.Fatalf("BroadcastEphemeral must not overwrite LastPayload; expected %q, got %q", "real content", payload)
+	}
+}
+
+func TestRegistry_BroadcastEphemeralOnlyReachesSameRoom(t *testing.T) {
+	r := NewRegistry()
+	a1 := &fakeConn{}
+	b1 := &fakeConn{}
+	r.Join("/doc/a.md", a1)
+	r.Join("/doc/b.md", b1)
+
+	r.BroadcastEphemeral("/doc/a.md", []byte("\x015/10"))
+
+	if len(a1.received) != 1 {
+		t.Fatalf("expected a1 to receive the ephemeral broadcast, got %v", a1.received)
+	}
+	if len(b1.received) != 0 {
+		t.Fatalf("expected b1 (different room) to receive nothing, got %v", b1.received)
+	}
+}

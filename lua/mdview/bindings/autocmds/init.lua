@@ -7,6 +7,7 @@ local libautocmd = require("lib.nvim.autocmd")
 local live_push = require("mdview.bindings.autocmds.live_push")
 local bufenter = require("mdview.bindings.autocmds.bufenter")
 local vim_leave = require("mdview.bindings.autocmds.vim_leave")
+local scroll_sync = require("mdview.bindings.autocmds.scroll_sync")
 -- local on_text_change = require("mdview.bindings.autocmds.on_text_change")
 -- local bufwrite = require("mdview.bindings.autocmds.bufwrite")
 local autocmd_registry = require("mdview.helper.autocmds_registry")
@@ -32,6 +33,7 @@ function M.attach()
 
 	bufenter.attach(M.augroup_id)  -- BufEnter snapshot
   live_push.attach(M.augroup_id) -- Live Markdown push (diffs + full push on write)
+  scroll_sync.attach(M.augroup_id) -- nvim-to-browser scroll sync (config: scroll_sync)
   vim_leave.attach(M.augroup_id) -- Stop server on VimLeave
 
   -- optional debug/legacy modules

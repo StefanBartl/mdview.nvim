@@ -1,5 +1,7 @@
 ---@module 'mdview.bindings.autocmds.on_text_changed'
--- Live markdown push on insert/change
+-- Live markdown push on insert/change.
+-- Dormant — not attached (see bindings/autocmds/init.lua); superseded by
+-- bindings/autocmds/live_push.lua. Kept for reference.
 
 local api = vim.api
 local push_buffer = require("mdview.core.events").push_buffer
@@ -9,6 +11,7 @@ local autocmd_registry = require("mdview.helper.autocmds_registry")
 
 local M = {}
 
+---@param bufnr integer
 local function on_text_changed(bufnr)
 	log.debug("TextChanged fired for buf " .. bufnr, nil, "textchange", true)
 	push_buffer(bufnr, false) -- only push diffs

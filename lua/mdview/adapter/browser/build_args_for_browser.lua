@@ -4,11 +4,17 @@
 
 local fn = vim.fn
 
--- Create a temporary directory for browser profile; returns path string
----@return string tmpdir
+-- A dedicated, persistent profile directory reused across invocations
+-- (instead of a fresh fn.tempname() every time), so repeated :MDViewStart /
+-- :MDViewOpen calls reuse the same isolated mdview browser
+-- session/window rather than piling up a new orphaned browser process each
+-- time (the roadmap's "reuse the current browser session" request). Still
+-- fully isolated from the user's real default browser profile — no
+-- extensions/cookies/history from their everyday browsing leak in, and
+-- vice versa.
+---@return string profile_dir
 local function make_tmp_profile()
-  local base = fn.tempname()
-  -- ensure directory exists (mkdir 'p')
+  local base = fn.stdpath("data") .. "/mdview/browser-profile"
   pcall(fn.mkdir, base, "p")
   return base
 end

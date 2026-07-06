@@ -9,11 +9,12 @@ local gen_token = require("mdview.helper.gen_token")
 
 local M = {}
 
+--- @param cwd_override string|nil # takes precedence over mdview.config.defaults.server_cwd, e.g. from `:MDViewStart cwd=...`
 --- @return string|nil cmd
 --- @return string[]|nil args
 --- @return string|nil cwd
 --- @return string|nil err
-function M.resolve()
+function M.resolve(cwd_override)
 	local defaults = require("mdview.config").defaults
 	local state = require("mdview.core.state")
 
@@ -39,7 +40,12 @@ function M.resolve()
 		web_root,
 	}
 
-	return bin_path, args, defaults.server_cwd, nil
+	local cwd = cwd_override
+	if not cwd or cwd == "" then
+		cwd = defaults.server_cwd
+	end
+
+	return bin_path, args, cwd, nil
 end
 
 return M

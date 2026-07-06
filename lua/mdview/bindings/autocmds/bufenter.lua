@@ -12,9 +12,6 @@ local log = require("mdview.helper.log")
 local defaults = require("mdview.config").defaults
 local autocmds_registry =require("mdview.helper.autocmds_registry")
 
--- AUDIT: Neben vime_leave und bufenter auch andere autcmds id nach state?
-local state = require("mdview.core.state")
-
 local M = {}
 
 
@@ -63,7 +60,6 @@ function M.attach(group)
 
 	local id = api.nvim_create_autocmd("BufEnter", opts)
 	if group then
-		state._autocmd_ids[group] = state._autocmd_ids[group] or {}
 		autocmds_registry.register(group, id)
 	end
 end

@@ -17,6 +17,9 @@
 ---@field resolved_browser_cmd string|nil internal, populated by config.browser.resolve_and_validate()
 ---@field browser_args string[]|nil extra CLI args for the resolved browser executable
 ---@field dev_server_port integer Vite dev server port, preferred over server_port when set and > 0
+---@field open_url string|nil static override URL always used instead of the computed key/token URL
+---@field require_display boolean don't auto-open a browser without a GUI/DISPLAY available (see mdview-security)
+---@field stop_on_browser_exit boolean run :MDViewStop when the opened browser process exits (e.g. tab/window closed)
 
 ---@class mdview.config.StartDefaults
 ---@field push_strategy "launcher"|"try_push" initial-push strategy used by :MDViewStart
@@ -37,6 +40,8 @@
 ---@field debug_plugin boolean enable plugin-internal debug notifications
 ---@field debug_preview boolean enable live-push debug notifications
 ---@field dev_server_port integer Vite dev server port for client (dev workflow only)
+---@field scroll_sync boolean send cursor position to the browser preview so it scrolls to follow (nvim-to-browser only)
+---@field scroll_sync_throttle_ms integer minimum time between scroll-position pings
 ---@field browser mdview.config.BrowserDefaults
 ---@field start mdview.config.StartDefaults
 ---@field install mdview.config.InstallDefaults
@@ -57,6 +62,9 @@ return {
 
 	dev_server_port = 43220,
 
+	scroll_sync = true,
+	scroll_sync_throttle_ms = 150,
+
 	browser = {
 		autodetect_browser = true,
 		browser = "",
@@ -66,6 +74,9 @@ return {
 		resolved_browser_cmd = nil,
 		browser_args = nil,
 		dev_server_port = 43220,
+		open_url = nil,
+		require_display = true,
+		stop_on_browser_exit = true,
 	},
 
 	start = {

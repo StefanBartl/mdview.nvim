@@ -62,12 +62,35 @@ func (r *Registry) LastPayload(key string) ([]byte, bool) {
 func (r *Registry) Broadcast(key string, payload []byte) []error {
 	r.mu.Lock()
 	r.last[key] = payload
+	conns := r.connsForLocked(key)
+	r.mu.Unlock()
+
+	return sendAll(conns, payload)
+}
+
+// BroadcastEphemeral fans payload out to key's room exactly like Broadcast,
+// but does NOT record it as the room's "last content" — for transient
+// signals (e.g. cursor/scroll position) that a newly-joined connection
+// should not be seeded with in place of the actual document content.
+func (r *Registry) BroadcastEphemeral(key string, payload []byte) []error {
+	r.mu.Lock()
+	conns := r.connsForLocked(key)
+	r.mu.Unlock()
+
+	return sendAll(conns, payload)
+}
+
+// connsForLocked snapshots the current members of key's room. Caller must
+// hold r.mu.
+func (r *Registry) connsForLocked(key string) []Conn {
 	conns := make([]Conn, 0, len(r.rooms[key]))
 	for c := range r.rooms[key] {
 		conns = append(conns, c)
 	}
-	r.mu.Unlock()
+	return conns
+}
 
+func sendAll(conns []Conn, payload []byte) []error {
 	var errs []error
 	for _, c := range conns {
 		if err := c.Send(payload); err != nil {
