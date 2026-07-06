@@ -1,0 +1,364 @@
+*mdview.txt*  Browser-based Markdown preview for Neovim          *mdview.nvim*
+
+==============================================================================
+CONTENTS                                                     *mdview-contents*
+
+  1. Introduction ............................................. |mdview-intro|
+  2. Requirements ...................................... |mdview-requirements|
+  3. Installation ...................................... |mdview-installation|
+  4. Configuration ........................................... |mdview-config|
+  5. Commands .............................................. |mdview-commands|
+  6. Autocommands .......................................... |mdview-autocmds|
+  7. Keymaps ................................................ |mdview-keymaps|
+  8. Health check ............................................ |mdview-health|
+  9. Architecture ...................................... |mdview-architecture|
+ 10. Security model ........................................ |mdview-security|
+
+==============================================================================
+1. INTRODUCTION                                                 *mdview-intro*
+
+mdview.nvim renders the current Markdown buffer live in a browser tab.
+
+A small Go relay process streams raw buffer text to the browser over
+WebSocket. Rendering and HTML sanitization happen entirely client-side, in a
+Rust module compiled to WebAssembly (comrak for Markdown -> HTML, ammonia for
+allowlist-based sanitization). The relay never touches HTML — it only ever
+transports the raw text and the already-sanitized-in-the-browser output never
+leaves the browser again. See |mdview-security| for the full threat model.
+
+No Node.js, Go or Rust toolchain is required to run the plugin. The relay
+binary and the browser client bundle are fetched once from GitHub Releases on
+first use and cached under |stdpath('data')|, the same pattern mason.nvim and
+nvim-treesitter use for external binaries.
+
+==============================================================================
+2. REQUIREMENTS                                          *mdview-requirements*
+
+  - Neovim 0.9 or later
+  - lib.nvim (https://github.com/StefanBartl/lib.nvim) — hard dependency,
+    used for cross-platform helpers (path normalization, OS detection,
+    user command / autocmd registration wrappers)
+  - `curl` on PATH — downloads the relay binary and client bundle
+  - `tar` on PATH — extracts the downloaded client bundle
+    (bundled with Windows 10 1803+, macOS and virtually every Linux distro)
+
+Run |:checkhealth-mdview| to verify all of the above on your system.
+
+==============================================================================
+3. INSTALLATION                                          *mdview-installation*
+
+lazy.nvim, lazy-loaded on markdown files or the plugin's own commands
+(recommended): >lua
+
+  {
+    "StefanBartl/mdview.nvim",
+    dependencies = { "StefanBartl/lib.nvim" },
+    ft  = { "markdown" },
+    cmd = { "MDViewStart", "MDViewStop", "MDViewOpen", "MDViewShowWebLogs" },
+    config = function()
+      require("mdview").setup()
+    end,
+  }
+<
+
+lazy.nvim, eager (loads at startup instead of on demand): >lua
+
+  {
+    "StefanBartl/mdview.nvim",
+    dependencies = { "StefanBartl/lib.nvim" },
+    lazy = false,
+    config = function()
+      require("mdview").setup()
+    end,
+  }
+<
+
+packer.nvim: >lua
+
+  use {
+    "StefanBartl/mdview.nvim",
+    requires = { "StefanBartl/lib.nvim" },
+    ft  = { "markdown" },
+    cmd = { "MDViewStart", "MDViewStop", "MDViewOpen", "MDViewShowWebLogs" },
+    config = function()
+      require("mdview").setup()
+    end,
+  }
+<
+
+No external toolchain is required by end users — the relay binary and client
+bundle download automatically the first time |:MDViewStart| runs.
+
+==============================================================================
+4. CONFIGURATION                                               *mdview-config*
+
+                                                            *mdview.setup()*
+Call `require("mdview").setup({opts})` from your plugin manager's config
+function. All defaults live in a single typed table in
+lua/mdview/config/DEFAULTS.lua; `setup()` deep-merges your overrides into it
+in place, so a partial nested override (e.g. only `browser.browser`) never
+wipes out the rest of that sub-table's defaults.
+
+Defaults: >lua
+
+  {
+    ft_pattern = { ".markdown", "*.md", "*.mdx" },
+
+    server_port     = 43219,  -- preferred port for the relay server
+    server_cwd      = nil,    -- optional explicit cwd for the relay process
+    dev_server_port = 43220,  -- Vite dev server port (dev workflow only)
+
+    dev_local       = true,
+    debug           = true,   -- print relay stdout/stderr into Neovim
+    log_buffer_name = "mdview://logs",
+    debug_plugin    = true,
+    debug_preview   = true,
+
+    browser = {
+      autodetect_browser  = true,
+      browser             = "",    -- friendly name, e.g. "firefox"
+      browser_cmd         = "",    -- absolute path, forces this executable
+      browser_autoclose   = true,  -- :MDViewStop closes the browser tab too
+      browser_autostart   = true,  -- open the browser on :MDViewStart
+      browser_args        = nil,
+      dev_server_port     = 43220,
+    },
+
+    start = {
+      push_strategy    = "launcher", -- "launcher" | "try_push"
+      try_push_opts    = nil,
+      wait_timeout_ms  = nil,
+    },
+
+    install = {
+      repo    = "StefanBartl/mdview.nvim", -- override to use a fork
+      version = "v0.1.0",                  -- pin a specific release tag
+    },
+  }
+<
+
+Example override: >lua
+
+  require("mdview").setup({
+    server_port = 43219,
+    browser = { browser = "firefox", browser_autostart = false },
+    start   = { push_strategy = "try_push" },
+    install = { repo = "your-fork/mdview.nvim", version = "v0.2.0" },
+  })
+<
+
+Field reference ~
+
+ft_pattern ~
+  Filetype/glob patterns mdview's autocommands attach to.
+
+server_port / server_cwd ~
+  Preferred port and optional working directory for the spawned
+  mdview-server relay process. The relay itself falls back to the next free
+  port if `server_port` is taken.
+
+dev_server_port ~
+  Vite dev server port; only relevant to the contributor dev workflow (see
+  README.md's Development section), not to end users.
+
+browser.autodetect_browser ~
+  Try to locate an installed browser automatically (chrome, chromium, edge,
+  firefox, in that order) when `browser` / `browser_cmd` are unset.
+
+browser.browser ~
+  Friendly name of a browser to prefer, e.g. `"chrome"` or `"firefox"`.
+
+browser.browser_cmd ~
+  Absolute path to a browser executable; takes precedence over
+  `browser` / autodetection when set.
+
+browser.browser_autoclose ~
+  Whether |:MDViewStop| also closes the browser tab it opened.
+
+browser.browser_autostart ~
+  Whether |:MDViewStart| opens a browser tab automatically.
+
+browser.browser_args ~
+  Extra CLI arguments passed to the resolved browser executable.
+
+start.push_strategy ~
+  `"launcher"` waits for the relay to become healthy, then performs one
+  initial full push. `"try_push"` retries the initial push with exponential
+  backoff instead of a single wait.
+
+install.repo / install.version ~
+  GitHub `owner/repo` and release tag the relay binary and client bundle are
+  downloaded from. Override `repo` if you maintain a fork; override
+  `version` to pin an older release.
+
+==============================================================================
+5. COMMANDS                                                   *mdview-commands*
+
+:MDViewStart [file]                                             *:MDViewStart*
+  Ensures the mdview-server relay binary and client bundle are installed
+  (downloading them from GitHub Releases on first use, checksum-verified),
+  spawns the relay process, attaches the buffer-change autocommands (see
+  |mdview-autocmds|), and opens the browser preview. If `[file]` is given
+  (tab-completed as a file path), that file is targeted instead of the
+  current buffer. Calling it again while already running is a no-op that
+  still allows pushing a newly given `[file]`.
+
+:MDViewStop                                                      *:MDViewStop*
+  Stops the relay process, detaches all mdview autocommands, shuts down the
+  session, and — when `browser.browser_autoclose` is true (the default) —
+  closes the browser tab |:MDViewStart| opened.
+
+:MDViewOpen                                                      *:MDViewOpen*
+  Re-opens a browser tab for the *current* buffer against the
+  *already-running* session. It does NOT start a new relay process — run
+  |:MDViewStart| first. Pushes the current buffer's content once so the new
+  tab isn't empty, then opens the browser using the same key/token URL logic
+  |:MDViewStart| uses. If no session is running, or the current buffer has
+  no file path, it fails loudly via |vim.notify()| instead of doing nothing.
+
+:MDViewShowWebLogs                                        *:MDViewShowWebLogs*
+  Opens a scratch buffer showing the relay server's captured stdout/stderr
+  log (subject to `debug` in |mdview-config|).
+
+Lua API ~
+
+                                                               *mdview.open()*
+`require("mdview").open({opts})` is the function behind |:MDViewOpen|.
+{opts} (all optional): `browser_url` (explicit URL override), `browser_cmd`,
+`browser_args`. Returns `true` on success, `false` on failure (after
+notifying why).
+
+==============================================================================
+6. AUTOCOMMANDS                                               *mdview-autocmds*
+
+All registered in a single augroup (`MdviewAutocmds`) by
+`mdview.bindings.autocmds.attach()` when |:MDViewStart| runs, and torn down
+together by |:MDViewStop|.
+
+  Event                           Purpose ~
+  BufEnter                        Take a session snapshot of the entered
+                                   buffer.
+  TextChanged, TextChangedI        Push the full current buffer content to
+                                   the relay for live preview.
+  BufWritePost                    Same full push, triggered on save.
+  VimLeavePre                     Stop the relay process so it doesn't
+                                   outlive the Neovim session.
+
+Two additional autocmd modules exist in the source tree but are intentionally
+not wired up (`on_text_change.lua`, `bufwrite.lua`) — kept only for
+reference; `live_push.lua` supersedes both.
+
+==============================================================================
+7. KEYMAPS                                                      *mdview-keymaps*
+
+mdview.nvim does not define any keymaps of its own — only the user commands
+in |mdview-commands|. Map them yourself if you want keymaps: >lua
+
+  vim.keymap.set("n", "<leader>mp", "<cmd>MDViewStart<cr>",
+    { desc = "mdview: start preview" })
+  vim.keymap.set("n", "<leader>mq", "<cmd>MDViewStop<cr>",
+    { desc = "mdview: stop preview" })
+<
+
+Since these are plain |vim.keymap.set()| calls with a `desc`, they show up
+correctly in which-key.nvim (https://github.com/folke/which-key.nvim)
+without any extra integration needed.
+
+==============================================================================
+8. HEALTH CHECK                                                  *mdview-health*
+
+                                                          *:checkhealth-mdview*
+>vim
+  :checkhealth mdview
+<
+
+Reports, without downloading or installing anything:
+
+  - Neovim >= 0.9
+  - `curl` found on PATH
+  - `tar` found on PATH
+  - Whether the mdview-server binary for the configured
+    `install.version` is already cached, and where
+  - Whether the client bundle for the configured `install.version` is
+    already cached, and where
+
+A missing binary/client bundle is reported as a warning, not an error — both
+are downloaded automatically the first time |:MDViewStart| runs.
+
+==============================================================================
+9. ARCHITECTURE                                            *mdview-architecture*
+
+  plugin/mdview.lua                Load guard only (require('mdview').setup()
+                                   does the actual work)
+  lua/mdview/
+    init.lua                       Public API: setup(), open()
+    health.lua                     checkhealth provider
+    config/
+      init.lua                     Deep-merge setup() over DEFAULTS
+      DEFAULTS.lua                 Single typed source of truth for defaults
+      browser.lua                  Browser resolution config + validation
+      usrcmd_start.lua             :MDViewStart strategy config
+    core/
+      state.lua                    Runtime handles (server proc, browser,
+                                   session token)
+      session.lua                  Per-buffer content snapshots
+      events.lua                   Internal event helpers
+    adapter/
+      install.lua                  Downloads + checksum-verifies the relay
+                                   binary and client bundle from GitHub
+                                   Releases
+      server_args.lua              Resolves the relay binary path + spawn args
+                                   (port, token, web-root)
+      runner.lua                   Cross-platform process spawn/stop
+      ws_client.lua                Pushes buffer text to the relay over HTTP,
+                                   with retry/backoff
+      log.lua                      In-memory + optional file logging
+      browser/                     Cross-platform browser executable
+                                   resolution and launching
+    bindings/
+      usrcmds/                     :MDViewStart, :MDViewStop, :MDViewOpen,
+                                   :MDViewShowWebLogs
+      autocmds/                    BufEnter, TextChanged*, BufWritePost,
+                                   VimLeavePre wiring (see |mdview-autocmds|)
+      keymaps/                     Reserved; mdview.nvim ships no keymaps (see
+                                   |mdview-keymaps|)
+    helper/                        Small cross-platform utilities; several
+                                   delegate to lib.nvim
+
+  native/server/                   Go relay server: binds 127.0.0.1 only,
+                                   relays raw text over WebSocket per document
+                                   key, serves the static client bundle
+  native/wasm-render/               Rust crate compiled to WebAssembly:
+                                   Markdown -> HTML (comrak) piped through an
+                                   allowlist sanitizer (ammonia)
+  src/client/                       Thin TypeScript glue: WebSocket transport
+                                   + loads the WASM module + assigns its
+                                   (already sanitized) output to the DOM
+
+  docs/BINDINGS.md                  Cheatsheet of every command/autocmd
+  docs/Roadmap/Roadmap.md           Planned features and fixed-bug log
+
+Module load order: config -> core -> adapter -> bindings -> init
+
+==============================================================================
+10. SECURITY MODEL                                            *mdview-security*
+
+mdview.nvim is designed so that no server-side process ever renders
+Markdown, and no unsanitized HTML ever reaches the DOM:
+
+  - Rendering AND sanitization happen together, client-side, inside the
+    WASM module (comrak -> ammonia). There is no code path that returns
+    rendered HTML without it having passed through the sanitizer first.
+  - The Go relay only ever transports raw text. It has no rendering logic
+    and therefore no HTML-related attack surface at all.
+  - The relay binds to 127.0.0.1 only — never reachable from the network.
+  - Every WebSocket upgrade is checked against the request's Origin header,
+    rejecting cross-site/DNS-rebinding attempts against the local server.
+  - Every request (WebSocket and HTTP) must present a per-session token,
+    generated fresh each time |:MDViewStart| runs and known only to the
+    Neovim process and the browser tab it opens.
+  - The downloaded relay binary and client bundle are checksum-verified
+    against the release's published checksums.txt before first execution.
+
+==============================================================================
+vim:tw=78:ts=8:noet:ft=help:norl:

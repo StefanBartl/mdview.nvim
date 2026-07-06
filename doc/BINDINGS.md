@@ -6,7 +6,7 @@
 | --- | --- | --- |
 | `:MDViewStart [file]` | optional file path, `complete=file` | Spawns the mdview-server relay (downloading it on first use), attaches buffer-change autocommands, and opens the browser preview. If `file` is given, that file is targeted instead of the current buffer. |
 | `:MDViewStop` | none | Stops the relay process, detaches autocommands, shuts down the session, and (if `mdview.config.browser.browser_autoclose` is true) closes the browser tab it opened. |
-| `:MDViewOpen` | none | **Not yet implemented** — calls `require("mdview").open()`, which doesn't exist yet; currently a no-op (see [doc/Roadmap/Roadmap.md](Roadmap/Roadmap.md)). |
+| `:MDViewOpen` | none | Re-opens a browser tab for the current buffer against the **already-running** session (does not start a new server — requires `:MDViewStart` first). Pushes the current buffer's content so the new tab isn't empty, then opens the browser via the same key/token URL logic `:MDViewStart` uses. Fails loudly with `vim.notify` if no session is running. |
 | `:MDViewShowWebLogs` | none | Opens a scratch buffer showing the relay server's stdout/stderr log. |
 
 ## Autocommands

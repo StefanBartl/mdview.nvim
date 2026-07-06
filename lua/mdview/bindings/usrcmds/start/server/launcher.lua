@@ -55,6 +55,7 @@ local function resolve_browser_url(opts)
 	end
 	return base .. "?key=" .. normalize.path_for_url(key) .. "&token=" .. vim.uri_encode(token)
 end
+M.resolve_browser_url = resolve_browser_url
 
 --- Start server and perform a single wait_ready -> initial push.
 --- Returns browser handle if launched, otherwise nil.
