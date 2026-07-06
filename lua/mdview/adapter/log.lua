@@ -11,14 +11,30 @@ local set_option_value = api.nvim_set_option_value
 local M = {}
 
 -- required config to read debug flag
-local cfg require("mdview.config")
+local cfg = require("mdview.config")
 
----@type boolean
-local DEBUG = (cfg and cfg.defaults and cfg.defaults.debug) or false
+-- Read live rather than caching a snapshot at require-time: this module is
+-- required before require('mdview').setup(opts) runs (via adapter.runner),
+-- so a cached snapshot would permanently miss any user override of
+-- `debug`/`log_buffer_name`. M.setup() below still allows an explicit
+-- manual override that takes precedence over the main config.
+---@type boolean|nil
+local debug_override = nil
+---@type string|nil
+local buf_name_override = nil
 
----@type string
-local LOG_BUF_NAME = (cfg and cfg.defaults and cfg.defaults.log_buffer_name)
-	or "mdview://logs"
+---@return boolean
+local function is_debug()
+	if debug_override ~= nil then
+		return debug_override
+	end
+	return cfg.defaults.debug == true
+end
+
+---@return string
+local function log_buf_name()
+	return buf_name_override or cfg.defaults.log_buffer_name or "mdview://logs"
+end
 
 ---@type string[]
 local log_lines = {}
@@ -31,14 +47,17 @@ M.LOG_BUF_NAME = string.format("./logs/debug-%s.log", timestamp)
 ---@type string|nil
 local log_file_path = "./logs/debuglog" -- optional file path for persistent logs
 
--- Configure the logger using an options table.
+-- Configure the logger using an options table. Explicit overrides here take
+-- precedence over mdview.config.defaults.debug / .log_buffer_name.
 ---@param opts table|nil
 function M.setup(opts)
-	-- English comments:
-	-- Configure DEBUG, LOG_BUF_NAME and persistent file path via opts.
 	opts = opts or {}
-	DEBUG = opts.debug or false
-	LOG_BUF_NAME = opts.buf_name or M.LOG_BUF_NAME
+	if opts.debug ~= nil then
+		debug_override = opts.debug
+	end
+	if opts.buf_name then
+		buf_name_override = opts.buf_name
+	end
 	log_file_path = opts.file_path
 end
 
@@ -153,7 +172,7 @@ function M.append(line, prefix)
 			table.remove(log_lines, 1)
 		end
 
-		if DEBUG then
+		if is_debug() then
 			-- schedule UI echo to avoid calling UI functions in IO/fast callback directly
 			schedule(function()
 				echo({ { l, nil } }, true, {})
@@ -167,7 +186,7 @@ function M.append(line, prefix)
 			if log_dir and log_dir ~= "" then
 				-- ensure directory exists using luv
 				local ok, err = ensure_dir(log_dir)
-				if not ok and DEBUG then
+				if not ok and is_debug() then
 					schedule(function()
 						echo({ { ("[mdview.log] failed to create dir %s: %s"):format(tostring(log_dir), tostring(err)), "ErrorMsg" } }, true, { err = true })
 					end)
@@ -180,7 +199,7 @@ function M.append(line, prefix)
 				fd:write(l .. "\n")
 				fd:close()
 			else
-				if DEBUG then
+				if is_debug() then
 					schedule(function()
 						echo({
 							{
@@ -202,7 +221,7 @@ function M.show()
 		local buf = nil
 
 		for _, b in ipairs(api.nvim_list_bufs()) do
-			if api.nvim_buf_is_valid(b) and api.nvim_buf_get_name(b) == LOG_BUF_NAME then
+			if api.nvim_buf_is_valid(b) and api.nvim_buf_get_name(b) == log_buf_name() then
 				buf = b
 				break
 			end
@@ -210,7 +229,7 @@ function M.show()
 
 		if not buf then
 			buf = api.nvim_create_buf(false, true)
-			api.nvim_buf_set_name(buf, LOG_BUF_NAME)
+			api.nvim_buf_set_name(buf, log_buf_name())
 
 			set_option_value("buftype", "nofile", { scope = "local", buf = buf })
 			set_option_value("bufhidden", "wipe", { scope = "local", buf = buf })

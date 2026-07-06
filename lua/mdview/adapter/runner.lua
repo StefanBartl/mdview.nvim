@@ -7,45 +7,32 @@
 local api = vim.api
 local uv = vim.loop
 local notify = vim.notify
-local buf_set_option = api.nvim_buf_set_option
 local log = require("mdview.adapter.log")
 local defaults = require("mdview.config").defaults
-local normalize = require("mdview.helper.normalize")
-local is_windows = require("mdview.helper.is_windows")
-local detect_project_root = require("mdview.helper.detect_project_root")
-local get_exec = require("mdview.helper.get_exec")
-local path_join = require("mdview.helper.path_join")
-local file_exists = require("mdview.helper.file_exists")
 
 local M = {}
 
 local desc_tag = "[mdview.runner] "
 
--- FIX: Modularize disese funktionen
-
--- Resolve spawn cwd precedence:
--- 1) explicit argument -> 2) config.server_cwd -> 3) project detection -> 4) current working dir
+-- Resolve spawn cwd precedence: explicit argument -> config.server_cwd ->
+-- current working dir. The mdview-server binary doesn't read anything
+-- relative to its cwd (it takes --web-root explicitly), so no project-root
+-- detection is needed here.
 ---@param optional_cwd string|nil  # optional working directory override
 ---@return string # resolved path to use as cwd for spawning processes
 local function resolve_spawn_cwd(optional_cwd)
 	if optional_cwd and optional_cwd ~= "" then
 		return optional_cwd
 	end
-	if cfg_ok and defaults and defaults.server_cwd then
+	if defaults.server_cwd and defaults.server_cwd ~= "" then
 		return defaults.server_cwd
-	end
-	local root = detect_project_root()
-	if root then
-		return root
 	end
 	return vim.fn.getcwd()
 end
 
 -- Start the server process in a cross-platform way.
 -- Ensures stdout/stderr pipes are created and spawn arguments are set.
--- Performs a pre-check for package.json when running npm scripts to provide
--- a clearer error message instead of long npm stack traces.
----@param cmd string # Command to execute (e.g., "npm" or "node")
+---@param cmd string # Absolute path to the mdview-server executable
 ---@param args string[]|nil # Optional array of arguments to pass to the command
 ---@param cwd string|nil # Optional working directory override for the spawned process
 ---@return SpawnedProcess|nil # Returns a process handle table on success, nil on failure
@@ -56,30 +43,13 @@ function M.start_server(cmd, args, cwd)
 		return state.get_proc()
 	end
 
-	local spawn_cmd = get_exec(cmd)
+	local spawn_cmd = cmd
 	local spawn_args = args
 
 	local stdout = uv.new_pipe(false)
 	local stderr = uv.new_pipe(false)
 
 	local spawn_cwd = resolve_spawn_cwd(cwd)
-
-	-- if run npm scripts, ensure package.json is present
-	if spawn_cmd and (spawn_cmd:match("npm") or spawn_cmd == "npm.cmd") then
-		if not file_exists(path_join(spawn_cwd, "package.json")) then
-			vim.schedule(function()
-				notify(
-					desc_tag .. "npm start aborted — no package.json found in cwd: " .. tostring(spawn_cwd),
-					vim.log.levels.ERROR,
-					{}
-				)
-			end)
-
-			pcall(stdout.close, stdout)
-			pcall(stderr.close, stderr)
-			return nil
-		end
-	end
 
 	if type(spawn_cmd) ~= "string" then
 		vim.schedule(function()
@@ -90,7 +60,14 @@ function M.start_server(cmd, args, cwd)
 		return nil
 	end
 
-	local handle, pid, err = uv.spawn(spawn_cmd, {
+	-- `handle` must be declared before the uv.spawn() call (not via the same
+	-- `local handle, pid, err = uv.spawn(...)` statement) so the exit
+	-- callback closure captures this local by reference. Otherwise the
+	-- callback body — built while evaluating uv.spawn's arguments — closes
+	-- over a not-yet-declared `handle`, and its `handle:close()` on exit
+	-- silently no-ops on the wrong variable instead of closing the real handle.
+	local handle, pid, err
+	handle, pid, err = uv.spawn(spawn_cmd, {
 		args = spawn_args,
 		stdio = { nil, stdout, stderr },
 		cwd = spawn_cwd,
@@ -195,6 +172,8 @@ function M.stop_server(proc)
 	if not proc or not proc.handle then
 		return
 	end
+
+	local state = require("mdview.core.state")
 
 	local handle = proc.handle
 	local pid = proc.pid

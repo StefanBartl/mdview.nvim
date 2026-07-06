@@ -1,0 +1,93 @@
+package relay
+
+import (
+	"errors"
+	"testing"
+)
+
+// fakeConn records every payload sent to it, so tests can assert exactly
+// which connections received a broadcast without needing a real socket.
+type fakeConn struct {
+	received [][]byte
+	failNext bool
+}
+
+func (f *fakeConn) Send(payload []byte) error {
+	if f.failNext {
+		f.failNext = false
+		return errors.New("simulated send failure")
+	}
+	f.received = append(f.received, payload)
+	return nil
+}
+
+func TestRegistry_BroadcastOnlyReachesSameRoom(t *testing.T) {
+	r := NewRegistry()
+	a1 := &fakeConn{}
+	a2 := &fakeConn{}
+	b1 := &fakeConn{}
+
+	r.Join("/doc/a.md", a1)
+	r.Join("/doc/a.md", a2)
+	r.Join("/doc/b.md", b1)
+
+	r.Broadcast("/doc/a.md", []byte("hello a"))
+
+	if len(a1.received) != 1 || string(a1.received[0]) != "hello a" {
+		t.Fatalf("expected a1 to receive the broadcast, got %v", a1.received)
+	}
+	if len(a2.received) != 1 || string(a2.received[0]) != "hello a" {
+		t.Fatalf("expected a2 to receive the broadcast, got %v", a2.received)
+	}
+	if len(b1.received) != 0 {
+		t.Fatalf("expected b1 (different room) to receive nothing, got %v", b1.received)
+	}
+}
+
+func TestRegistry_LeaveStopsFurtherBroadcasts(t *testing.T) {
+	r := NewRegistry()
+	c := &fakeConn{}
+	r.Join("/doc/a.md", c)
+	r.Leave("/doc/a.md", c)
+
+	r.Broadcast("/doc/a.md", []byte("after leave"))
+
+	if len(c.received) != 0 {
+		t.Fatalf("expected no payloads after Leave, got %v", c.received)
+	}
+}
+
+func TestRegistry_LastPayloadSeedsLateJoiners(t *testing.T) {
+	r := NewRegistry()
+
+	if _, ok := r.LastPayload("/doc/a.md"); ok {
+		t.Fatalf("expected no last payload before any broadcast")
+	}
+
+	r.Broadcast("/doc/a.md", []byte("current content"))
+
+	payload, ok := r.LastPayload("/doc/a.md")
+	if !ok {
+		t.Fatalf("expected a last payload to be recorded")
+	}
+	if string(payload) != "current content" {
+		t.Fatalf("expected %q, got %q", "current content", payload)
+	}
+}
+
+func TestRegistry_BroadcastCollectsSendErrorsWithoutStoppingFanout(t *testing.T) {
+	r := NewRegistry()
+	failing := &fakeConn{failNext: true}
+	healthy := &fakeConn{}
+	r.Join("/doc/a.md", failing)
+	r.Join("/doc/a.md", healthy)
+
+	errs := r.Broadcast("/doc/a.md", []byte("payload"))
+
+	if len(errs) != 1 {
+		t.Fatalf("expected exactly 1 send error, got %d", len(errs))
+	}
+	if len(healthy.received) != 1 {
+		t.Fatalf("expected healthy connection to still receive the payload despite the other's failure")
+	}
+}

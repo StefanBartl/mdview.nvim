@@ -8,5 +8,6 @@
 ---@class mdview.core.state.runner
 ---@field proc integer|nil
 ---@field server_job integer|nil
+---@field token string|nil shared session token for the running mdview-server process
 
 ---@alias URL string # must be a valid HTTP(S) address, e.g. "http://localhost:43219"

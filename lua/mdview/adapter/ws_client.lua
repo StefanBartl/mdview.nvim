@@ -30,12 +30,6 @@ local function health_url(port)
 	return string.format("http://localhost:%d/health", port)
 end
 
-local function ws_url()
-  local port = vim.g.mdview_server_port or DEFAULT_PORT
-  return "ws://localhost:" .. tostring(port) .. "/ws"
-end
-
-
 -- Non-blocking curl GET fallback
 ---@param url string
 ---@param cb fun(code:integer)
@@ -107,13 +101,20 @@ function M.wait_ready(cb, timeout_ms)
 	poll()
 end
 
--- internal helper: construct URL for /render
----@param path string # file path to render
----@return string # constructed URL pointing to the /render endpoint
-local function render_url_for(path)
+-- internal helper: construct URL for /update, authenticated with the shared
+-- session token generated for the currently running mdview-server process.
+---@param path string # file path being previewed (used as the room key)
+---@return string # constructed URL pointing to the /update endpoint
+local function update_url_for(path)
 	local port = vim.g.mdview_server_port or DEFAULT_PORT
 	local normalized = normalize.path_for_url(path)
-	return string.format("http://localhost:%d/render?key=%s", port, normalized)
+	local token = require("mdview.core.state").get_token() or ""
+	return string.format(
+		"http://localhost:%d/update?key=%s&token=%s",
+		port,
+		normalized,
+		vim.uri_encode(token)
+	)
 end
 
 -- Collects stdout/stderr lines and returns them to the callback so caller
@@ -221,7 +222,7 @@ local function try_send_pending(path)
 	end
 	entry.tries = (entry.tries or 0) + 1
 
-	local url = ws_url()
+	local url = update_url_for(path)
 	http_post_nonblocking(url, entry.markdown, function(code, stdout_lines, stderr_lines)
 		if code == 0 then
 			-- success: clear queue
@@ -307,12 +308,12 @@ function M.send_markdown(path, markdown, opts)
 
 	-- In send_markdown, where opts.immediate branch posts directly, add logging of stdout.
 	if opts.immediate then
-		http_post_nonblocking(render_url_for(path), markdown, function(code, stdout_lines, stderr_lines)
+		http_post_nonblocking(update_url_for(path), markdown, function(code, stdout_lines, stderr_lines)
 			if code == 0 then
 				if stdout_lines and #stdout_lines > 0 then
 					local body = table.concat(stdout_lines, "\n")
 					api.nvim_echo(
-						{ { "[mdview.ws_client] immediate post success for " .. render_url_for(path), nil } },
+						{ { "[mdview.ws_client] immediate post success for " .. update_url_for(path), nil } },
 						true,
 						{}
 					)

@@ -17,12 +17,12 @@ local web_state = {
 	server = nil,
 }
 
--- AUDIT: Momentan nicht verwendet
 ---@type mdview.core.state.runner
 M.runner = {
 	proc = nil,
 	is_running = nil,
 	server_job = nil,
+	token = nil,
 }
 
 -- Helper ------------------------------------------------------------
@@ -240,9 +240,30 @@ function M.ensure_proc_started()
 	if M.proc_is_running() then
 		return M.get_proc()
 	end
-	local defaults = require("mdview.config").defaults
-	local proc = runner.start_server(defaults.server_cmd, defaults.server_args, defaults.server_cwd)
-	return proc
+
+	local cmd, args, cwd, err = require("mdview.adapter.server_args").resolve()
+	if not cmd then
+		vim.notify("[mdview] " .. tostring(err), vim.log.levels.ERROR)
+		return nil
+	end
+
+	return runner.start_server(cmd, args, cwd)
+end
+
+--- Set the shared session token used to authenticate /update and /ws
+--- requests against the running mdview-server process. Returns previous value.
+---@param token string|nil
+---@return string|nil previous
+function M.set_token(token)
+	local prev = M.runner.token
+	M.runner.token = token
+	return prev
+end
+
+--- Get the current shared session token (may be nil if no server started yet).
+---@return string|nil
+function M.get_token()
+	return M.runner.token
 end
 
 --- Returns whether server is running

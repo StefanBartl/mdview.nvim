@@ -1,61 +1,118 @@
 # .github/workflows/ci.yml
 # CI pipeline for mdview.nvim
-# - Node/TypeScript: install, lint, test, build client
-# - Lua: basic static check with luacheck and optional busted unit tests
+# - Rust: cargo tests (incl. XSS-neutralization checks) + wasm-pack build,
+#   shared with the Node job via an artifact
+# - Node/TypeScript: install, lint, type-check, test, build client
+# - Go: vet, build, test the relay server
+# - Lua: luacheck + optional busted unit tests
+# - Release (tag pushes only): cross-compile the relay server, package the
+#   client bundle, publish both to a GitHub Release for mdview.nvim's
+#   install.lua to download
 
 name: CI
 
 on:
   push:
     branches: [ main ]
+    tags: [ 'v*' ]
   pull_request:
     branches: [ main ]
 
 jobs:
+  rust:
+    name: Rust / WASM render module
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            native/wasm-render/target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('native/wasm-render/Cargo.lock') }}
+
+      - name: Run cargo tests (incl. XSS-neutralization checks)
+        working-directory: native/wasm-render
+        run: cargo test
+
+      - name: Install wasm-pack
+        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+
+      - name: Build WASM package
+        working-directory: native/wasm-render
+        run: wasm-pack build --target web --out-dir ../../src/client/wasm-render
+
+      - name: Upload WASM render module
+        uses: actions/upload-artifact@v4
+        with:
+          name: wasm-render-pkg
+          path: src/client/wasm-render
+
   node:
     name: Node.js / TypeScript
     runs-on: ubuntu-latest
+    needs: rust
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: '18'
           cache: 'npm'
-
-      - name: Cache node modules
-        uses: actions/cache@v4
-        with:
-          path: ~/.npm
-          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
-          restore-keys: |
-            ${{ runner.os }}-node-
-
-      - name: Cache Vite build
-        uses: actions/cache@v4
-        with:
-          path: node_modules/.vite
-          key: ${{ runner.os }}-vite-${{ hashFiles('**/package-lock.json') }}
 
       - name: Install dependencies
         run: npm ci
 
       - name: Lint (TypeScript / JS)
         run: npm run lint
-        continue-on-error: false
 
-      - name: Run unit tests (client/server)
+      - name: Type-check client
+        run: npm run check:types
+
+      - name: Run unit tests
         run: npm test
 
+      - name: Download WASM render module
+        uses: actions/download-artifact@v4
+        with:
+          name: wasm-render-pkg
+          path: src/client/wasm-render
+
       - name: Build client
-        run: npm run build
+        run: npm run build:client
+
+  go:
+    name: Go relay server
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: native/server/go.mod
+
+      - name: Vet
+        working-directory: native/server
+        run: go vet ./...
+
+      - name: Build
+        working-directory: native/server
+        run: go build ./...
+
+      - name: Test (incl. auth/origin/room-isolation checks)
+        working-directory: native/server
+        run: go test ./...
 
   lua:
     name: Lua / Neovim quick checks
     runs-on: ubuntu-latest
-    needs: node
     steps:
       - uses: actions/checkout@v4
 
@@ -64,23 +121,103 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y lua5.3 liblua5.3-dev luarocks git neovim build-essential
 
+      # mdview.nvim now depends on lib.nvim at runtime (see README's Installation
+      # section). luacheck is purely static and doesn't need it resolvable, and
+      # the busted step below only runs a trivial standalone assertion today —
+      # but any future busted spec that exercises real mdview modules will need
+      # both lib.nvim and a `vim` global shim (busted doesn't run inside
+      # Neovim). Cloning it here now so that groundwork is in place.
+      - name: Clone lib.nvim (runtime dependency, needed to resolve require("lib.nvim...."))
+        uses: actions/checkout@v4
+        with:
+          repository: StefanBartl/lib.nvim
+          path: .deps/lib.nvim
+
       - name: Install luacheck via luarocks locally
-        run: |
-          # Install into local tree (~/.luarocks) for Lua 5.3
-          luarocks install --lua-version=5.3 --local luacheck
+        run: luarocks install --lua-version=5.3 --local luacheck
 
       - name: Add local luarocks bin to PATH
         run: echo "${HOME}/.luarocks/bin" >> $GITHUB_PATH
 
       - name: Run luacheck on Lua sources
-        run: |
-          luacheck lua/mdview --no-color || true
+        run: luacheck lua/mdview --no-color
 
-      - name: (Optional) Run Lua unit tests with busted
+      - name: Run Lua unit tests with busted
         run: |
           if command -v busted >/dev/null 2>&1; then
-            busted -v tests/lua || true
+            busted -v tests/lua
           else
             echo "busted not installed; skipping Lua unit tests"
           fi
 
+  release:
+    name: Release (tag push only)
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [rust, node, go, lua]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: native/server/go.mod
+
+      - name: Cross-compile mdview-server binaries
+        uses: goreleaser/goreleaser-action@v6
+        with:
+          version: latest
+          args: release --clean --skip=publish --config .goreleaser.yml
+          workdir: native/server
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Install wasm-pack
+        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build client bundle (WASM + HTML/JS)
+        run: npm run build
+
+      - name: Package client bundle
+        run: tar -czf mdview-client.tar.gz -C dist/client .
+
+      - name: Stage release assets under their public download names
+        # GoReleaser's local "binary" format archives land in per-target
+        # subdirectories (e.g. .goreleaser-dist/mdview-server_linux_amd64_v1/mdview-server)
+        # named differently from the final asset name it uses when actually
+        # publishing. artifacts.json has the authoritative name -> path
+        # mapping (entries with extra.Format == "binary"); use that instead
+        # of guessing paths, so install.lua's downloads always match exactly
+        # what checksums.txt and the release assets are named.
+        run: |
+          mkdir -p release-assets
+          jq -r '.[] | select(.extra.Format == "binary") | "\(.path)\t\(.name)"' \
+            native/server/.goreleaser-dist/artifacts.json |
+          while IFS=$'\t' read -r path name; do
+            cp "$path" "release-assets/$name"
+          done
+          cp native/server/.goreleaser-dist/checksums.txt release-assets/checksums.txt
+          cp mdview-client.tar.gz release-assets/mdview-client.tar.gz
+
+      - name: Append client bundle checksum to the binaries' checksums.txt
+        working-directory: release-assets
+        run: sha256sum mdview-client.tar.gz >> checksums.txt
+
+      - name: Publish GitHub release with all assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${{ github.ref_name }}" release-assets/* \
+            --title "${{ github.ref_name }}" \
+            --generate-notes

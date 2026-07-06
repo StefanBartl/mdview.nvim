@@ -1,0 +1,41 @@
+version: 2
+
+# Run from native/server (working dir = go.mod location):
+#   goreleaser release --clean
+# dist is redirected out of native/server so it never collides with the
+# repo-root `dist/` directory produced by `npm run build` (client bundle).
+dist: .goreleaser-dist
+
+builds:
+  - id: mdview-server
+    main: .
+    binary: mdview-server
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    env:
+      - CGO_ENABLED=0
+    ldflags:
+      - -s -w
+
+archives:
+  - id: mdview-server-archive
+    ids: [mdview-server]
+    formats: [binary]
+    name_template: "mdview-server_{{ .Os }}_{{ .Arch }}"
+
+checksum:
+  name_template: "checksums.txt"
+
+release:
+  github:
+    owner: StefanBartl
+    name: mdview.nvim
+  # The client bundle (mdview-client.tar.gz) is built separately (Node/Rust,
+  # not Go) and attached to the same release by the CI workflow via
+  # `gh release upload`, with its checksum appended to this checksums.txt —
+  # see .github/workflows/ci.yml's release job.

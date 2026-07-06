@@ -15,21 +15,11 @@ local log = require("mdview.helper.log")
 
 local M = {}
 
--- default config fields; plugin should merge user overrides into this table
----@type table
-M.defaults = {
-	autodetect_browser = true, -- try to locate a browser automatically
-	browser = "", -- friendly name e.g. "chrome" or "firefox"
-	browser_cmd = "", -- absolute path to executable to force use
-	browser_autoclose = true, -- :MDViewStop closes controlled browser by default
-	browser_autostart = true, -- open browser automatically on start
-	-- internal resolved value (populated during setup())
-	resolved_browser_cmd = nil,
-	-- allow callers to provide an array of CLI args for the resolved browser executable,
-	-- e.g. { "--app=http://localhost:43219", "--new-window" } or nil for none.
-	browser_args = nil,
-	dev_server_port = 43220,
-}
+-- Shared with the top-level config: this is the same table object as
+-- mdview.config's M.defaults.browser (see config/DEFAULTS.lua), so overrides
+-- passed to require('mdview').setup({ browser = {...} }) are visible here too.
+---@type mdview.config.BrowserDefaults
+M.defaults = require("mdview.config").defaults.browser
 
 -- Known candidate names to probe in PATH and platform locations (order matters)
 ---@type string[]

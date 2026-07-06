@@ -46,5 +46,5 @@ module.exports = defineConfig([
       'no-console': 'off',
     },
   },
-  globalIgnores(['**/dist', '**/node_modules']),
+  globalIgnores(['**/dist', '**/node_modules', 'src/client/wasm-render/**']),
 ]);

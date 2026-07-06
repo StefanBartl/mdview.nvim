@@ -1,4 +1,4 @@
----@module 'mdview.autocmds.'
+---@module 'mdview.bindings.autocmds.'
 --- ADD: Annotaions
 
 local defaults = require("mdview.config").defaults
