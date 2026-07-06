@@ -1,18 +1,22 @@
 ---@module 'mdview.bindings.autocmds.vim_leave'
+-- VimLeavePre is a global lifecycle event, not a buffer event — it must NOT
+-- be pattern-restricted to markdown files. Neovim matches an autocmd's
+-- `pattern` against the current buffer's name at the moment the event
+-- fires; a `pattern = defaults.ft_pattern` here previously meant the relay
+-- process was only stopped if the *last-focused* buffer happened to be
+-- markdown, orphaning the process whenever Neovim was quit from any other
+-- buffer (confirmed and fixed — see docs/Roadmap/Roadmap.md).
 
-local defaults = require("mdview.config").defaults
 local autocmds_registry = require("mdview.helper.autocmds_registry")
 local nvim_create_autocmd = vim.api.nvim_create_autocmd
 local state = require("mdview.core.state")
 
 local M = {}
--- AUDIT: Neben vime_leave und bufenter auch andere autcmds id nach state?
 
 --- @param group integer|nil
 function M.attach(group)
 	local opts = {
 		desc = "[mdview] Stop mdview server if running before exiting Neovim",
-		pattern = defaults.ft_pattern,
 		callback = function()
 			if state.get_proc() ~= nil then
 				require("mdview.adapter.runner").stop_server(state.get_proc())
@@ -23,8 +27,7 @@ function M.attach(group)
 
 	local id = nvim_create_autocmd("VimLeavePre", opts)
 	if group then
-		state._autocmd_ids[group] = state._autocmd_ids[group] or {}
-	autocmds_registry.register(group, id)
+		autocmds_registry.register(group, id)
 	end
 end
 

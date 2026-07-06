@@ -1,8 +1,10 @@
 ---@module 'mdview.bindings.usrcmds.start.server.launcher'
 --- Lightweight launcher for server autostart.
 --- Uses ws_client.wait_ready as primary readiness mechanism and triggers single initial push.
-
---AUDIT: Modularisieren
+--- Reviewed for a further split ("Modularisieren"): `resolve_browser_url` and
+--- `has_display` are already extracted as named, independently-exported
+--- locals; the remaining `M.start` is one linear spawn-then-wait-then-open
+--- sequence. Kept as one file.
 
 local runner = require("mdview.adapter.runner")
 local ws_client = require("mdview.adapter.ws_client")
@@ -20,6 +22,21 @@ local schedule = vim.schedule
 
 local M = {}
 
+-- Reports whether a browser could plausibly be shown: always true on
+-- Windows/macOS (no DISPLAY concept there), and on Unix only when a display
+-- server is actually reachable (DISPLAY for X11, WAYLAND_DISPLAY for
+-- Wayland). Without this, a headless SSH session with no X forwarding would
+-- silently spawn a `jobstart` for a browser that can never open a window.
+---@return boolean
+local function has_display()
+	local is_windows = require("mdview.helper.is_windows")
+	if is_windows() or vim.fn.has("mac") == 1 then
+		return true
+	end
+	return (vim.env.DISPLAY and vim.env.DISPLAY ~= "") or (vim.env.WAYLAND_DISPLAY and vim.env.WAYLAND_DISPLAY ~= "")
+end
+M.has_display = has_display
+
 -- Resolve the URL for the browser tab, including the document key and the
 -- shared session token as query params: the relay server rejects any /ws
 -- upgrade that doesn't present both (see native/server/main.go handleWS).
@@ -30,9 +47,15 @@ local M = {}
 local function resolve_browser_url(opts)
 	opts = opts or {}
 
-	-- explicit override (useful for tests or external launchers)
+	-- explicit per-call override (useful for tests or external launchers)
 	if type(opts.browser_url) == "string" and opts.browser_url ~= "" then
 		return opts.browser_url
+	end
+
+	-- static config override (mdview.config.browser.open_url)
+	local open_url = require("mdview.config.browser").defaults.open_url
+	if type(open_url) == "string" and open_url ~= "" then
+		return open_url
 	end
 
 	local base
@@ -111,12 +134,29 @@ function M.start(opts)
 
 				-- open browser after readiness (best-effort)
 				if browser_autostart and browser_adapter and browser_adapter.open then
+					local browser_defaults = require("mdview.config.browser").defaults
+					if browser_defaults.require_display and not has_display() then
+						notify(
+							"[mdview] no display available (headless/SSH session without DISPLAY) — "
+								.. "skipping browser autostart. Set browser.require_display = false to override.",
+							vim.log.levels.WARN
+						)
+						return
+					end
+
 					local browser_url = resolve_browser_url({ browser_url = opts.browser_url, key = key })
+					log.debug("Opening browser: " .. browser_url, nil, "launcher", true)
+
 					local opts_table = {
 						browser_cmd = browser_cmd,
 						browser_args = browser_args,
 						on_exit = function(_, code)
 							log.debug(("browser exited with code %s"):format(tostring(code)), nil, "launcher", true)
+							if browser_defaults.stop_on_browser_exit then
+								schedule(function()
+									require("mdview.bindings.usrcmds.stop").stop()
+								end)
+							end
 						end,
 					}
 					local ok2, handle_or_err = pcall(browser_adapter.open, browser_url, opts_table)

@@ -31,6 +31,12 @@ end
 --- `browser`/`start` merge recursively, so a partial override such as
 --- `{ browser = { browser = "firefox" } }` doesn't wipe out the rest of that
 --- sub-table's defaults).
+---
+--- Note: `{ key = nil }` cannot be used to reset `key` back to nil — Lua
+--- never stores a nil-valued key in a table constructor, so `pairs(opts)`
+--- never sees it. This matches `vim.tbl_deep_extend`'s own behavior, not a
+--- bug specific to this function; call setup() with the field genuinely
+--- omitted (not set to nil) if you don't want to override it.
 ---@param opts table|nil
 ---@return mdview.config.Defaults
 function M.merge(opts)

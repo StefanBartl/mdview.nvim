@@ -22,6 +22,14 @@ import (
 )
 
 const maxUpdateBodyBytes = 32 << 20 // 32 MiB ceiling against runaway request bodies
+const maxScrollBodyBytes = 256      // scroll payload is just "<line>/<total>"
+
+// scrollMessagePrefix tags a WebSocket message as a scroll-position ping
+// rather than document content, so the client's single onmessage handler can
+// tell them apart without a JSON envelope. \x01 is a non-printable control
+// byte that can never appear in typed Markdown text, so there's no
+// ambiguity with real content.
+const scrollMessagePrefix = "\x01"
 
 // wsConn adapts a *websocket.Conn to relay.Conn so relay.Registry stays
 // decoupled from the WebSocket library and can be tested without a network.
@@ -56,6 +64,7 @@ func main() {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/health", handleHealth)
 	mux.HandleFunc("/update", handleUpdate(registry, *token))
+	mux.HandleFunc("/scroll", handleScroll(registry, *token))
 	mux.HandleFunc("/ws", handleWS(registry, *token, port))
 	mux.Handle("/", fileServer)
 
@@ -97,6 +106,37 @@ func handleUpdate(registry *relay.Registry, token string) http.HandlerFunc {
 			return
 		}
 		registry.Broadcast(key, body)
+		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
+// handleScroll accepts a "<line>/<total>" cursor-position ping from the
+// trusted Lua process and fans it out to every browser tab watching that
+// key, tagged with scrollMessagePrefix. Unlike handleUpdate, this does NOT
+// update the room's "last content" (BroadcastEphemeral) — a scroll ping is a
+// transient signal, not something a newly-joined tab should be seeded with
+// in place of the actual document.
+func handleScroll(registry *relay.Registry, token string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		if !relay.ValidToken(token, r.URL.Query().Get("token")) {
+			http.Error(w, "forbidden", http.StatusForbidden)
+			return
+		}
+		key := r.URL.Query().Get("key")
+		if key == "" {
+			http.Error(w, "missing key", http.StatusBadRequest)
+			return
+		}
+		body, err := io.ReadAll(io.LimitReader(r.Body, maxScrollBodyBytes))
+		if err != nil {
+			http.Error(w, "failed to read body", http.StatusBadRequest)
+			return
+		}
+		registry.BroadcastEphemeral(key, append([]byte(scrollMessagePrefix), body...))
 		w.WriteHeader(http.StatusNoContent)
 	}
 }

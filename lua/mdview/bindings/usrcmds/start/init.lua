@@ -20,8 +20,36 @@ local trypush_mod_name = "mdview.bindings.usrcmds.start.server.try_push"
 
 local M = {}
 
+-- Parses :MDViewStart's space-separated args into an optional file path and
+-- an optional cwd override, e.g.:
+--   :MDViewStart file.md
+--   :MDViewStart file.md cwd=C:/Users/bartl/
+--   :MDViewStart cwd="c:/Users/bartl/"
+-- The first non-`cwd=`-prefixed token is taken as the file path; surrounding
+-- quotes on the cwd value (single or double) are stripped.
+---@param fargs string[]
+---@return string|nil file, string|nil cwd
+local function parse_start_args(fargs)
+	local file, cwd
+	for _, token in ipairs(fargs or {}) do
+		local cwd_val = token:match("^cwd=(.+)$")
+		if cwd_val then
+			cwd = cwd_val:gsub('^"(.*)"$', "%1"):gsub("^'(.*)'$", "%1")
+		elseif not file then
+			file = token
+		end
+	end
+	return file, cwd
+end
+
 -- initial_push_async: if an explicit path is provided (arg_path), prefer immediate try_push.
 -- This allows `:MDViewStart /path/to/file.md` to immediately render that file into the preview.
+---@param push_strategy "launcher"|"try_push"
+---@param try_push_opts table|nil
+---@param wait_timeout integer|nil
+---@param browser_opts table # { browser_autostart?: boolean, browser_cmd?: string, browser_args?: table, browser_url?: string }
+---@param arg_path string|nil
+---@return any|nil
 local function initial_push_async(push_strategy, try_push_opts, wait_timeout, browser_opts, arg_path)
 	-- perform push depending on chosen strategy; non-blocking
 
@@ -81,20 +109,29 @@ local function initial_push_async(push_strategy, try_push_opts, wait_timeout, br
 end
 
 --- Register :MDViewStart user command.
---- Accepts optional single file argument to target a specific markdown file.
+--- Accepts an optional file path and an optional `cwd=...` override, in
+--- either order, e.g.:
+---   :MDViewStart
+---   :MDViewStart file.md
+---   :MDViewStart file.md cwd=C:/Users/bartl/
+---   :MDViewStart cwd="c:/Users/bartl/"
 --- Options:
 ---   - opts table may override M.config at runtime.
 ---   - accepted push_strategy values: "launcher" (default) | "try_push"
 function M.attach()
-	-- allow optional file arg; nargs='?' and complete='file' helps UX
 	libusercmd.create("MDViewStart", function(cmdopts)
 		notify("[mdview] MDViewStart invoked", vim.log.levels.DEBUG)
+
+		local file_arg, cwd_arg = parse_start_args(cmdopts.fargs)
 
 		-- If server already present in state, just noop with message
 		if state.get_server() then
 			notify("[mdview] server already running", vim.log.levels.INFO)
+			if cwd_arg then
+				notify("[mdview] cwd=... ignored — server is already running", vim.log.levels.WARN)
+			end
 			-- still allow initial push when server already running and arg provided
-			local arg_path = cmdopts.args and cmdopts.args ~= "" and cmdopts.args or nil
+			local arg_path = file_arg and file_arg ~= "" and file_arg or nil
 			if arg_path then
 				initial_push_async(
 					start_defaults.push_strategy,
@@ -129,16 +166,15 @@ function M.attach()
 			browser_args = browser_defaults.browser_args,
 		}
 
-		-- allow optional file argument: prefer cmdopts.args when provided
+		-- allow optional file argument: prefer the parsed file_arg when provided
 		local initial_target = nil
-		if cmdopts and cmdopts.args and cmdopts.args ~= "" then
-			local raw = cmdopts.args
-			local norm = normalize.path(raw)
-			initial_target = (norm and norm ~= "") and norm or raw
+		if file_arg and file_arg ~= "" then
+			local norm = normalize.path(file_arg)
+			initial_target = (norm and norm ~= "") and norm or file_arg
 		end
 
-		-- Ensure server proc spawned
-		local proc = state.ensure_proc_started()
+		-- Ensure server proc spawned (cwd_arg, if given, overrides mdview.config.defaults.server_cwd for this spawn)
+		local proc = state.ensure_proc_started(cwd_arg)
 		if not proc then
 			notify("[mdview] failed to start server process", vim.log.levels.ERROR)
 			return
@@ -154,8 +190,9 @@ function M.attach()
 		notify("[mdview] started", vim.log.levels.INFO)
 		log.debug("usercmds.start: MDViewStart completed wiring", nil, "usercmds.start", true)
 	end, {
-		desc = "[mdview] Start mdview preview server and attach autocommands (optional file arg)",
-		nargs = "?",
+		desc = "[mdview] Start mdview preview server and attach autocommands "
+			.. "(optional file arg, optional cwd=... override)",
+		nargs = "*",
 		complete = "file",
 	})
 end

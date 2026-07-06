@@ -4,10 +4,28 @@
    - Connects to the relay's WebSocket for this document (key/token from the URL)
    - Renders every incoming raw-markdown message through WASM and injects the
      result (already sanitized inside the WASM module) into the DOM
+   - Scrolls to follow the cursor position when a scroll-sync ping arrives
+     (nvim-to-browser half of bidirectional scrolling; see docs/Roadmap/Roadmap.md)
 */
 
 import { createTransport } from './transport/transportFactory';
 import init, { render_markdown } from './wasm-render/mdview_wasm_render.js';
+
+// Tags a WS message as a scroll-position ping ("<line>/<total>") rather than
+// document content — must match native/server/main.go's scrollMessagePrefix.
+// \x01 is a non-printable control byte that can never appear in typed
+// Markdown text, so there's no ambiguity with real content.
+const SCROLL_MESSAGE_PREFIX = '\x01';
+
+function applyScrollPing(container: HTMLElement, message: string): void {
+  const [lineStr, totalStr] = message.slice(SCROLL_MESSAGE_PREFIX.length).split('/');
+  const line = Number(lineStr);
+  const total = Number(totalStr);
+  if (!Number.isFinite(line) || !Number.isFinite(total) || total <= 0) return;
+
+  const ratio = Math.min(1, Math.max(0, (line - 1) / total));
+  container.scrollTop = ratio * (container.scrollHeight - container.clientHeight);
+}
 
 async function boot() {
   await init();
@@ -27,12 +45,18 @@ async function boot() {
 
   const container = document.getElementById('mdview-root');
 
-  transport.onMessage((rawMarkdown: string) => {
+  transport.onMessage((rawMessage: string) => {
     if (!container) return;
+
+    if (rawMessage.startsWith(SCROLL_MESSAGE_PREFIX)) {
+      applyScrollPing(container, rawMessage);
+      return;
+    }
+
     try {
       // render_markdown returns HTML that has already passed through the
       // sanitizer inside the WASM module — safe to assign directly.
-      container.innerHTML = render_markdown(rawMarkdown);
+      container.innerHTML = render_markdown(rawMessage);
     } catch (err) {
       console.error('[mdview] render failed', err);
     }

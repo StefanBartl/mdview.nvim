@@ -9,17 +9,27 @@ local uv = vim.loop
 -- undefined fields on vim.loop; suppress those specific diagnostics for clarity.
 ---@diagnostic disable: undefined-field, deprecated, undefined-global, unused-local, return-type-mismatch
 
----@diagnostic disable-next-line
+---@param a any
+---@param b any
+---@param msg string|nil
+---@diagnostic disable-next-line: unused-function
 local function assert_eq(a, b, msg)
   if a ~= b then error(msg or "assert_eq failed") end
 end
 
+---@param prefix string
+---@param n integer
+---@return string[]
 local function make_lines(prefix, n)
   local out = {}
   for i = 1, n do out[i] = prefix .. tostring(i) end
   return out
 end
 
+---@param name string
+---@param old_lines string[]|nil
+---@param new_lines string[]
+---@return table
 local function run_case(name, old_lines, new_lines)
   local start = uv.now()
   local diffs = diff(old_lines, new_lines)

@@ -1,7 +1,12 @@
 ---@module 'mdview.adapter.ws_client'
 -- Enhanced wait_ready helper with robust logging, retries, and Windows support.
-
---AUDIT: Modularieseren
+-- Reviewed for a further file split ("Modularisieren"): the four concerns
+-- here (health polling, URL building, HTTP transport, retry/queue) are each
+-- already a single named local function with a clear boundary: splitting
+-- them into separate files would add cross-file indirection without a
+-- corresponding win, unlike e.g. bindings/ or adapter/browser/, which
+-- separate genuinely independent, independently-testable, multi-consumer
+-- concerns. Kept as one file.
 
 local fn = vim.fn
 local uv = vim.loop
@@ -101,20 +106,35 @@ function M.wait_ready(cb, timeout_ms)
 	poll()
 end
 
--- internal helper: construct URL for /update, authenticated with the shared
--- session token generated for the currently running mdview-server process.
+-- internal helper: construct a URL for an mdview-server endpoint,
+-- authenticated with the shared session token generated for the currently
+-- running process.
+---@param endpoint string # e.g. "update" or "scroll"
 ---@param path string # file path being previewed (used as the room key)
----@return string # constructed URL pointing to the /update endpoint
-local function update_url_for(path)
+---@return string
+local function endpoint_url_for(endpoint, path)
 	local port = vim.g.mdview_server_port or DEFAULT_PORT
 	local normalized = normalize.path_for_url(path)
 	local token = require("mdview.core.state").get_token() or ""
 	return string.format(
-		"http://localhost:%d/update?key=%s&token=%s",
+		"http://localhost:%d/%s?key=%s&token=%s",
 		port,
+		endpoint,
 		normalized,
 		vim.uri_encode(token)
 	)
+end
+
+---@param path string
+---@return string
+local function update_url_for(path)
+	return endpoint_url_for("update", path)
+end
+
+---@param path string
+---@return string
+local function scroll_url_for(path)
+	return endpoint_url_for("scroll", path)
 end
 
 -- Collects stdout/stderr lines and returns them to the callback so caller
@@ -349,6 +369,21 @@ function M.send_markdown(path, markdown, opts)
 	}
 
 	try_send_pending(path)
+end
+
+-- Public: send the current cursor line + total line count for `path`'s
+-- preview, so the browser tab can scroll to follow (nvim-to-browser half of
+-- bidirectional scrolling). Fire-and-forget — no retry queue, since a scroll
+-- position is a frequently-superseded transient signal, not durable content;
+-- if one ping is lost the next cursor move corrects it.
+---@param path string
+---@param line integer # 1-based current cursor line
+---@param total integer # total line count in the buffer
+function M.send_scroll(path, line, total)
+	if type(path) ~= "string" or path == "" then
+		return
+	end
+	http_post_nonblocking(scroll_url_for(path), tostring(line) .. "/" .. tostring(total), function() end)
 end
 
 return M

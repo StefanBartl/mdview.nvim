@@ -7,9 +7,6 @@ local vim = vim
 
 local M = {}
 
--- AUDIT: Neben vime_leave und bufenter auch andere autcmds id nach state?
-M._autocmd_ids = {}
-
 ---@type mdview.core.state.web
 local web_state = {
 	attached = false,
@@ -233,7 +230,8 @@ end
 
 -- Runner API  ----------------
 
-function M.ensure_proc_started()
+---@param cwd_override string|nil # forwarded to mdview.adapter.server_args.resolve(), e.g. from `:MDViewStart cwd=...`
+function M.ensure_proc_started(cwd_override)
 	local runner = require("mdview.adapter.runner")
 
 	-- spawn server process if not already running via runner API
@@ -241,7 +239,7 @@ function M.ensure_proc_started()
 		return M.get_proc()
 	end
 
-	local cmd, args, cwd, err = require("mdview.adapter.server_args").resolve()
+	local cmd, args, cwd, err = require("mdview.adapter.server_args").resolve(cwd_override)
 	if not cmd then
 		vim.notify("[mdview] " .. tostring(err), vim.log.levels.ERROR)
 		return nil

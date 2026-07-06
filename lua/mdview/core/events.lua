@@ -1,6 +1,15 @@
 ---@module 'mdview.core.events'
 -- Autocommand management for mdview.nvim.
 -- Handles initial push, BufWritePost, and BufEnter snapshots safely.
+--
+-- Dormant: only reachable through bindings/autocmds/{bufwrite,on_text_change}.lua,
+-- which are themselves intentionally not attached (see bindings/autocmds/init.lua
+-- — live_push.lua supersedes both). This module's line-diff-based push
+-- (M.push_buffer, via utils/diff_granular) predates the current architecture,
+-- where the client WASM renderer needs whole-document context and can't
+-- render from a partial diff chunk — see docs/Roadmap/Roadmap.md's deferred
+-- line-diff-optimization note. Kept for reference/future reactivation, not
+-- an oversight.
 
 local session = require("mdview.core.session")
 local ws_client = require("mdview.adapter.ws_client")
@@ -74,8 +83,8 @@ ws_client.send_markdown(path, payload, { immediate = (force == true) })
 	session.store(path, lines)
 end
 
--- AUDIT: Unused so far
---- Snapshot helper used on BufEnter (no autocmds here).
+--- Snapshot helper used on BufEnter (no autocmds here — see module docstring).
+--- Superseded by bindings/autocmds/bufenter.lua, which is the live BufEnter handler.
 ---@param bufnr integer
 function M.store_snapshot_on_enter(bufnr)
   local ft = safe_buf_get_option(bufnr, "filetype") or ""

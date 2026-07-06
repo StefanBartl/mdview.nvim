@@ -40,13 +40,18 @@ function M.store(path, lines)
 		return
 	end
 
-	-- FIX: simple stable hash using table concat; for large files replace with better hash
+	-- sha256 is fine regardless of file size (not a bottleneck for markdown
+	-- files); table.concat's one-time allocation to build `text` is the only
+	-- cost here and is negligible at realistic markdown file sizes.
 	local text = table.concat(lines, "\n")
 	local h = vim.fn.sha256(text)
 	M.buffers[path] = { hash = h, lines = lines }
 end
 
--- FIX: This is a naive line-diff: it finds first/last differing line. Suitable as a first step.
+-- Naive line-diff (finds first/last differing line only, no LCS). Dormant —
+-- not on the current live-push path (see core/events.lua's module docstring
+-- and docs/Roadmap/Roadmap.md); utils/diff_granular.lua has a proper Myers
+-- LCS-based diff ready to swap in if this transport is reactivated.
 --
 -- Compute a lightweight diff between cached lines and new lines.
 -- Returns a table of change ranges: { { start = n, ["end"] = m, lines = {...} }, ... }

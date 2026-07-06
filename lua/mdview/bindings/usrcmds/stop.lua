@@ -1,19 +1,19 @@
 ---@module 'mdview.bindings.usrcmds.stop'
 -- Side effects:
--- If config.browser.stop_closes_browser is true (default), attempt to close stored browser handle.
---   - detaches autocommands via events.detach()
---   - stops the running server via runner.stop_server and clears state.server
+-- If config.browser.browser_autoclose is true (default), attempt to close the
+-- stored browser handle.
+--   - detaches mdview's autocommands
+--   - stops the running relay process and clears state.server
 --   - shuts down session via session.shutdown()
 --   - optionally closes stored browser handle via browser_adapter.close()
 --   - notifies the user of stop/failure via vim.notify
--- ADD: Annotations noch korrekt?
 
 local browser_cfg = require("mdview.config.browser")
 local runner = require("mdview.adapter.runner")
 local session = require("mdview.core.session")
 local autocmds = require("mdview.bindings.autocmds")
 local browser_adapter = require("mdview.adapter.browser")
-local usercmds_registry = require("mdview.helper.usercmds_registry")
+local libusercmd = require("lib.nvim.usercmd")
 local state = require("mdview.core.state")
 local notify = vim.notify
 
@@ -25,8 +25,8 @@ function M.attach()
 		nargs = 0,
   }
 
-	usercmds_registry.register("MDViewStop", function()
-		pcall(M.stop, browser_cfg.defaults.browser_autoclose)
+	libusercmd.create("MDViewStop", function()
+		M.stop(browser_cfg.defaults.browser_autoclose)
 	end, opts)
 end
 
@@ -60,7 +60,12 @@ function M.stop(close_browser_override)
 		state.set_browser(nil)
 	end
 
-	require("mdview.helper.usercmds_registry").detach_all() -- AUDIT: Derzeit nur `:MDViewStop` registriert
+	-- Only autocommands get torn down here — user commands (:MDViewStart,
+	-- :MDViewStop, :MDViewOpen, :MDViewShowWebLogs) are registered once at
+	-- setup() and stay available for the whole Neovim session; tearing any
+	-- of them down here previously deleted :MDViewStop and :MDViewOpen from
+	-- existence the first time :MDViewStop ran (fixed — see
+	-- docs/Roadmap/Roadmap.md).
 	require("mdview.helper.autocmds_registry").detach_all()
 	notify("[mdview] stopped", vim.log.levels.INFO)
 end
