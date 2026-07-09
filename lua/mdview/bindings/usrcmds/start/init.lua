@@ -124,13 +124,18 @@ function M.attach()
 
 		local file_arg, cwd_arg = parse_start_args(cmdopts.fargs)
 
-		-- If server already present in state, just noop with message
+		-- Server already running: don't re-spawn. Re-open the preview surface
+		-- instead — the common reason to run :MDViewStart again is that the
+		-- browser window was closed (without stopping the session) and the
+		-- user wants it back. Always return from this branch: previously it
+		-- fell through into the full start path, re-running session.init()
+		-- (wiping snapshots) and the whole launcher against the live server.
 		if state.get_server() then
-			notify("[mdview] server already running", vim.log.levels.INFO)
 			if cwd_arg then
 				notify("[mdview] cwd=... ignored — server is already running", vim.log.levels.WARN)
 			end
-			-- still allow initial push when server already running and arg provided
+
+			-- optional explicit file arg: push that file's content first
 			local arg_path = file_arg and file_arg ~= "" and file_arg or nil
 			if arg_path then
 				initial_push_async(
@@ -138,21 +143,21 @@ function M.attach()
 					start_defaults.try_push_opts,
 					start_defaults.wait_timeout_ms,
 					{
-						browser_autostart = (browser_defaults.browser_autostart == nil)
-								and browser_defaults.browser_autostart
-							or browser_defaults.browser_autostart,
+						browser_autostart = false, -- browser is (re)opened explicitly below
 						browser_cmd = browser_defaults.browser_cmd or browser_defaults.resolved_browser_cmd,
 						browser_args = browser_defaults.browser_args,
-						-- set browser_url from browser config dev_server_port if present (preferred in dev_local)
-						browser_url = (browser_defaults.dev_server_port and ("http://localhost:" .. tostring(
-							browser_defaults.dev_server_port
-						) .. "/")) or nil,
 					},
 					arg_path
 				)
-			else
-				return
 			end
+
+			-- re-open the preview surface for the current buffer
+			if require("mdview.config").defaults.open_preview_tab then
+				require("mdview.adapter.preview_tab").open(vim.api.nvim_get_current_buf())
+			else
+				require("mdview").open()
+			end
+			return
 		end
 
 		-- merge runtime config overrides (no mutation of module defaults)
@@ -179,9 +184,13 @@ function M.attach()
 			notify("[mdview] failed to start server process", vim.log.levels.ERROR)
 			return
 		end
-		state.set_server(proc)
+		-- Wire session + autocmds BEFORE marking the server as "running":
+		-- if autocmds.attach() errors, we don't want state.get_server() left
+		-- truthy (which would make every later :MDViewStart say "already
+		-- running" against a never-fully-started session).
 		session.init()
 		autocmds.attach()
+		state.set_server(proc)
 		state.set_attached(true)
 
 		-- perform chosen initial push strategy (non-blocking)

@@ -43,6 +43,10 @@ function M.stop(close_browser_override)
 		state.set_server(nil)
 	end
 
+	-- Server is gone — the next wait_ready must re-verify /health instead of
+	-- short-circuiting on the cached readiness of the stopped instance.
+	require("mdview.adapter.ws_client").reset_ready()
+
 	session.shutdown()
 
 	local should_close

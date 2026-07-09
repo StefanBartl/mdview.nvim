@@ -264,10 +264,19 @@ function M.get_token()
 	return M.runner.token
 end
 
---- Returns whether server is running
+--- Returns whether the server process is running (handle exists and is not
+--- closing). Previously checked the nonexistent `M.proc` field (the handle
+--- lives in `M.runner.proc`, see M.set_proc), so it always returned false.
 ---@return boolean
 function M.proc_is_running()
-	return M.proc ~= nil
+	local proc = M.runner.proc
+	if not proc or not proc.handle then
+		return false
+	end
+	local ok, closing = pcall(function()
+		return proc.handle:is_closing()
+	end)
+	return ok and not closing
 end
 
 --- Get the current proc handle (may be nil).

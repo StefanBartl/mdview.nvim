@@ -6,12 +6,14 @@ local fn = vim.fn
 
 -- A dedicated, persistent profile directory reused across invocations
 -- (instead of a fresh fn.tempname() every time), so repeated :MDViewStart /
--- :MDViewOpen calls reuse the same isolated mdview browser
--- session/window rather than piling up a new orphaned browser process each
--- time (the roadmap's "reuse the current browser session" request). Still
--- fully isolated from the user's real default browser profile — no
--- extensions/cookies/history from their everyday browsing leak in, and
--- vice versa.
+-- :MDViewOpen calls reuse the same mdview browser session/window rather than
+-- piling up a new orphaned browser process each time (the roadmap's "reuse
+-- the current browser session" request). Being a SEPARATE profile from the
+-- user's everyday one is also what makes closing the preview window actually
+-- terminate a distinct browser process — which is what
+-- browser.stop_on_browser_exit / browser_autoclose rely on (launching into
+-- the user's already-running browser would hand off to that process and
+-- exit immediately, so close/exit could never be detected).
 ---@return string profile_dir
 local function make_tmp_profile()
   local base = fn.stdpath("data") .. "/mdview/browser-profile"
@@ -28,13 +30,15 @@ return function (exe, url)
   local tmp = make_tmp_profile()
 
   if name:match("chrome") or name:match("chromium") or name:match("msedge") or name:match("google%-chrome") then
+    -- A normal browser window (taskbar icon, address bar) rather than a
+    -- chromeless --app window: --app was dropped because it produced a
+    -- window with no taskbar entry and no toolbar, which reads as broken.
     local args = {
       "--user-data-dir=" .. tmp,
-      "--app=" .. url,
+      "--new-window",
       "--no-first-run",
       "--no-default-browser-check",
-      "--disable-extensions",
-      "--disable-popup-blocking",
+      url,
     }
     return args, tmp
 
@@ -51,7 +55,8 @@ return function (exe, url)
     -- generic fallback for other executables
     local args = {
       "--user-data-dir=" .. tmp,
-      "--app=" .. url,
+      "--new-window",
+      url,
     }
     return args, tmp
   end

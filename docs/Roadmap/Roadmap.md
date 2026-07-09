@@ -34,6 +34,57 @@
      echten Attach/Detach-Lifecycle, Usercmds nicht). `usercmds_registry.lua`
      dadurch komplett ungenutzt, gelöscht.
 
+  5. ~~`:MDViewStart` startete den Server, aber danach passierte nichts: kein Browser, kein
+     Initial-Push, und jede Buffer-Änderung spammte nur "server ready after X ms, attempt 1"~~ —
+     behoben, eine Kette von fünf Bugs (per E2E-Test gegen das echte Binary verifiziert):
+     - **`ws_client.wait_ready` rief im Erfolgsfall nie `cb(true)` auf** — nur ein Echo.
+       Der komplette On-Ready-Block im Launcher (Initial-Push + Browser-Open) und jeder
+       Live-Push liefen dadurch ins Leere; das Echo pro Tastendruck war der ganze Effekt.
+       Fix: `cb(true)` + Readiness-Cache (`M._ready`, kein curl /health pro Tastendruck mehr;
+       Reset via `reset_ready()` bei Stop/Respawn).
+     - **Launcher-On-Ready crashte an `live_push.attach()` ohne Gruppe** ("Invalid 'group': 0")
+       — direkt VOR Initial-Push und Browser-Open; wurde erst durch den cb-Fix überhaupt
+       erreichbar. Fix: redundanten Aufruf entfernt (Autocmds sind beim Spawn schon
+       registriert) + `live_push.attach(nil)` abgehärtet (kein `group or 0` mehr).
+     - **Token-Mismatch**: `launcher.start` rief `server_args.resolve()` erneut auf (rotiert
+       den Session-Token in state), während `runner.start_server` den BESTEHENDEN Prozess
+       (mit dem alten Token) zurückgab → alle /update- und /ws-Requests liefen als stille
+       403s (curl exit 0 bei HTTP-Fehlern). Fix: laufender Prozess wird wiederverwendet,
+       resolve/Token-Rotation nur beim tatsächlichen Spawn.
+     - **`state.proc_is_running()` prüfte das nichtexistente Feld `M.proc`** statt
+       `M.runner.proc` → immer false. Fix: korrektes Feld + Handle-Validität.
+     - **`resolve_browser_url` bevorzugte `browser.dev_server_port` (43220, Vite)
+       bedingungslos** — in Produktion lauscht dort nichts; selbst ein geöffneter Browser
+       hätte ins Leere gezeigt. Fix: echter Backend-Port (`vim.g.mdview_server_port`);
+       Dev-Port nur noch über `vim.g.mdview_dev_port` (wird ausschließlich gesetzt, wenn der
+       Runner eine echte Vite-Zeile in stdout geparst hat). `browser.dev_server_port` als
+       Config-Feld entfernt.
+     Außerdem: Debug-Defaults (`debug`, `debug_plugin`, `debug_preview`) von true auf false —
+     Server-stdout-Echos und Per-Push-Notifications sind jetzt opt-in statt Dauer-Spam.
+
+  6. ~~Nach dem obigen Fix: `:MDViewStart` → `:MDViewStop` → `:MDViewStart` crashte mit
+     "Invalid 'group': 216", und danach sagte jeder weitere `:MDViewStart` nur noch
+     "server already running" ohne Browser~~ — behoben, drei Folgebugs:
+     - **`autocmds.teardown()` löschte die Augroup per id, aber `lib.nvim`'s `get_augroup`
+       cached diese id** und gab sie beim Neustart erneut zurück — nun eine gelöschte,
+       ungültige id → `nvim_create_autocmd` crashte (`bufenter.lua`). Fix:
+       `autocmds.init` erzeugt die Augroup direkt via `nvim_create_augroup(name, {clear=true})`
+       (immer gültig, kein Stale-Cache); der redundante `_attached_groups`-Dedup in
+       `live_push` entfernt.
+     - **Half-State nach dem Crash**: `state.set_server(proc)` lief VOR `autocmds.attach()`,
+       das dann crashte → `server` blieb gesetzt → "already running" gegen eine nie fertig
+       gestartete Session. Fix: `set_server` erst nach erfolgreichem `attach`.
+     - **`:MDViewStart` bei laufendem Server tat nichts Sinnvolles** (nur "already running").
+       Häufigster Grund für erneutes `:MDViewStart` ist aber ein geschlossenes Browserfenster.
+       Fix: der "already running"-Zweig öffnet jetzt die Preview-Oberfläche neu
+       (`mdview.open()` bzw. Tab-Preview) statt nur zu meckern.
+  7. ~~Chrome öffnete ein "komisches" Fenster ohne Taskleisten-Icon und ohne Toolbar~~ —
+     `--app=`-Modus war schuld (chromeloses App-Fenster). Fix: `build_args_for_browser`
+     nutzt jetzt `--new-window` → normales Browserfenster (Taskleisten-Icon, Adressleiste).
+     Das isolierte Profil bleibt — es ist genau das, was `stop_on_browser_exit`/
+     `browser_autoclose` zuverlässig macht (ein Start in den bereits laufenden Browser des
+     Nutzers würde sofort forken+exiten, Schließen wäre nicht detektierbar).
+
 ## Allgemein
 
   1. `TODO-Comments` lösen

@@ -16,7 +16,6 @@
 ---@field browser_autostart boolean whether to open the browser automatically on start
 ---@field resolved_browser_cmd string|nil internal, populated by config.browser.resolve_and_validate()
 ---@field browser_args string[]|nil extra CLI args for the resolved browser executable
----@field dev_server_port integer Vite dev server port, preferred over server_port when set and > 0
 ---@field open_url string|nil static override URL always used instead of the computed key/token URL
 ---@field require_display boolean don't auto-open a browser without a GUI/DISPLAY available (see mdview-security)
 ---@field stop_on_browser_exit boolean run :MDViewStop when the opened browser process exits (e.g. tab/window closed)
@@ -55,11 +54,15 @@ return {
 	server_cwd = nil,
 
 	dev_local = true,
-	debug = true,
+	-- Debug flags are opt-in: with `debug = true` every relay stdout line is
+	-- echoed into Neovim, and `debug_preview = true` notifies on every push
+	-- (i.e. per keystroke). Enable via setup({ debug = true, ... }) when
+	-- actually debugging.
+	debug = false,
 	log_buffer_name = "mdview://logs",
 
-	debug_plugin = true,
-	debug_preview = true,
+	debug_plugin = false,
+	debug_preview = false,
 
 	dev_server_port = 43220,
 
@@ -76,7 +79,6 @@ return {
 		browser_autostart = true,
 		resolved_browser_cmd = nil,
 		browser_args = nil,
-		dev_server_port = 43220,
 		open_url = nil,
 		require_display = true,
 		stop_on_browser_exit = true,

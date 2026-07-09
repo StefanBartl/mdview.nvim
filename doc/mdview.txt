@@ -115,10 +115,10 @@ Defaults: >lua
     dev_server_port = 43220,  -- Vite dev server port (dev workflow only)
 
     dev_local       = true,
-    debug           = true,   -- print relay stdout/stderr into Neovim
+    debug           = false,  -- echo relay stdout/stderr into Neovim
     log_buffer_name = "mdview://logs",
-    debug_plugin    = true,
-    debug_preview   = true,
+    debug_plugin    = false,  -- plugin-internal debug notifications
+    debug_preview   = false,  -- per-push debug notifications (noisy)
 
     scroll_sync             = true, -- nvim-to-browser cursor-follow scroll
     scroll_sync_throttle_ms = 150,  -- min. time between scroll-position pings
@@ -132,7 +132,9 @@ Defaults: >lua
       browser_autoclose   = true,  -- :MDViewStop closes the browser tab too
       browser_autostart   = true,  -- open the browser on :MDViewStart
       browser_args        = nil,
-      dev_server_port     = 43220,
+      open_url            = nil,   -- static URL override (advanced)
+      require_display     = true,  -- skip browser without GUI/DISPLAY
+      stop_on_browser_exit = true, -- browser closed => :MDViewStop
     },
 
     start = {
