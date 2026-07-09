@@ -19,8 +19,6 @@ local autocmd_registry = require("mdview.helper.autocmds_registry")
 
 local M = {}
 
-M._attached_groups = M._attached_groups or {}
-
 -- Send the full current content of bufnr to the relay server (immediate,
 -- unqueued POST) and store a session snapshot for bookkeeping.
 ---@param bufnr integer
@@ -53,39 +51,47 @@ function M.push_buffer_changes(bufnr)
 	log.debug("full push sent and session stored for " .. path, nil, "livepush", true)
 end
 
---- Setup autocmds for live push and save
---- @param group integer|nil
+--- Setup autocmds for live push and save. Called once per attach cycle from
+--- mdview.bindings.autocmds.attach (whose own augroup_id guard prevents
+--- double-attach); no separate dedup needed here.
+--- @param group integer|nil # augroup id; nil registers without a group
+--- (nvim_create_autocmd rejects group = 0, so nil must NOT be coerced to 0)
 function M.attach(group)
-	group = group or 0
-	if M._attached_groups[group] then
-		return
-	end
-	M._attached_groups[group] = true
 	log.debug("setting up live push autocmds", nil, "livepush", true)
 
 	local opts_a = {
-		group = group,
 		pattern = defaults.ft_pattern,
 		callback = function(args)
-			ws_client.wait_ready(function()
+			ws_client.wait_ready(function(ok)
+				if not ok then
+					return
+				end
 				log.debug("TextChanged fired, buf: " .. args.buf, nil, "livepush", true)
 				M.push_buffer_changes(args.buf)
 			end, ws_client.WAIT_READY_TIMEOUT)
 		end,
 	}
+	if group then
+		opts_a.group = group
+	end
 	local id_a = api.nvim_create_autocmd({ "TextChanged", "TextChangedI" }, opts_a)
 	autocmd_registry.register(group, id_a)
 
 	local opts_b = {
-		group = group,
 		pattern = defaults.ft_pattern,
 		callback = function(args)
-			ws_client.wait_ready(function()
+			ws_client.wait_ready(function(ok)
+				if not ok then
+					return
+				end
 				log.debug("BufWritePost fired, full push, buf: " .. args.buf, nil, "livepush", true)
 				M.push_buffer_changes(args.buf)
 			end, ws_client.WAIT_READY_TIMEOUT)
 		end,
 	}
+	if group then
+		opts_b.group = group
+	end
 	local id_b = api.nvim_create_autocmd("BufWritePost", opts_b)
 	autocmd_registry.register(group, id_b)
 end

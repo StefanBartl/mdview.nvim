@@ -3,7 +3,6 @@
 -- Optional modules (on_text_change, bufwrite) are kept for reference/debug.
 
 local api = vim.api
-local libautocmd = require("lib.nvim.autocmd")
 local live_push = require("mdview.bindings.autocmds.live_push")
 local bufenter = require("mdview.bindings.autocmds.bufenter")
 local vim_leave = require("mdview.bindings.autocmds.vim_leave")
@@ -29,7 +28,13 @@ function M.attach()
     return
   end
 
-  M.augroup_id = libautocmd.get_augroup("MdviewAutocmds", { clear = true })
+  -- Create the augroup directly instead of via lib.nvim's get_augroup:
+  -- that helper caches the augroup id by name and keeps handing back the
+  -- SAME id even after M.teardown() deleted it (nvim_del_augroup_by_id).
+  -- The next attach then passed a stale/deleted id to nvim_create_autocmd
+  -- ("Invalid 'group': N"), aborting the whole start. nvim_create_augroup
+  -- with clear=true always returns a valid, freshly-cleared augroup.
+  M.augroup_id = api.nvim_create_augroup("MdviewAutocmds", { clear = true })
 
 	bufenter.attach(M.augroup_id)  -- BufEnter snapshot
   live_push.attach(M.augroup_id) -- Live Markdown push (diffs + full push on write)

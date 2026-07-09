@@ -58,17 +58,22 @@ local function resolve_browser_url(opts)
 		return open_url
 	end
 
+	-- vim.g.mdview_dev_port is only ever set when the runner actually parsed
+	-- a Vite "Local: http://localhost:PORT" line from server stdout — i.e. a
+	-- dev server is really running. Anything else must use the actual
+	-- detected backend port (vim.g.mdview_server_port, which reflects the
+	-- port the relay really bound, including FindFreePort fallbacks), NOT a
+	-- configured dev port: the old `browser_defaults.dev_server_port`
+	-- fallback here unconditionally pointed the browser at 43220 where
+	-- nothing listens in production.
 	local base
 	if vim.g.mdview_dev_port and vim.g.mdview_dev_port > 0 then
 		base = ("http://localhost:%d/"):format(vim.g.mdview_dev_port)
 	else
-		local browser_defaults = require("mdview.config.browser").defaults
-		if browser_defaults.dev_server_port and browser_defaults.dev_server_port > 0 then
-			base = ("http://localhost:%d/"):format(browser_defaults.dev_server_port)
-		else
-			local server_port = require("mdview.config").defaults.server_port or 43219
-			base = ("http://localhost:%d/"):format(server_port)
-		end
+		local server_port = vim.g.mdview_server_port
+			or require("mdview.config").defaults.server_port
+			or 43219
+		base = ("http://localhost:%d/"):format(server_port)
 	end
 
 	local token = state.get_token()
@@ -93,21 +98,28 @@ function M.start(opts)
 	local browser_cmd = opts.browser_cmd or require("mdview.config.browser").defaults.resolved_browser_cmd
 	local browser_args = opts.browser_args
 
-	-- ensure no previous running instance in runner
-	if state.proc_is_running() then
-		runner.stop_server(state.get_proc())
-	end
+	-- Reuse an already-running relay instead of resolving server_args again:
+	-- server_args.resolve() generates a NEW session token and stores it in
+	-- state, but runner.start_server would return the EXISTING process
+	-- (spawned with the OLD token) — every subsequent /update and /ws request
+	-- would then present a token the server rejects (silent 403s, since curl
+	-- exits 0 on HTTP errors). Only resolve (and thus rotate the token) when
+	-- we actually spawn a fresh process.
+	local proc = state.get_proc()
+	if not state.proc_is_running() then
+		ws_client.reset_ready()
 
-	local cmd, args, cwd, resolve_err = require("mdview.adapter.server_args").resolve()
-	if not cmd then
-		notify("[mdview] " .. tostring(resolve_err), vim.log.levels.ERROR)
-		return nil
-	end
+		local cmd, args, cwd, resolve_err = require("mdview.adapter.server_args").resolve()
+		if not cmd then
+			notify("[mdview] " .. tostring(resolve_err), vim.log.levels.ERROR)
+			return nil
+		end
 
-	local proc = runner.start_server(cmd, args, cwd)
-	if not proc then
-		notify("[mdview] failed to spawn server process", vim.log.levels.ERROR)
-		return nil
+		proc = runner.start_server(cmd, args, cwd)
+		if not proc then
+			notify("[mdview] failed to spawn server process", vim.log.levels.ERROR)
+			return nil
+		end
 	end
 
 	-- attach session & autocmds after successful spawn
@@ -129,7 +141,12 @@ function M.start(opts)
 				log.debug("launcher: server ready — performing initial full push", nil, "launcher", true)
 				local buf = api.nvim_get_current_buf()
 				local key = normalize.path(api.nvim_buf_get_name(buf))
-				live_push.attach() -- ensure live_push autocmds are installed (idempotent)
+				-- live_push autocmds are already registered by autocmds.attach()
+				-- at spawn time (in their augroup); do NOT call
+				-- live_push.attach() here again — the no-arg call used
+				-- group=0, which nvim_create_autocmd rejects ("Invalid
+				-- 'group': 0"), aborting this whole callback right before the
+				-- initial push and browser open.
 				live_push.push_buffer_changes(buf)
 
 				-- open_preview_tab replaces the browser tab with an nvim-tab

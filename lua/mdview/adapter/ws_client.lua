@@ -28,6 +28,16 @@ M.last_request = {}
 M._pending = {} -- pending queue: path -> { markdown=..., tries=0 }
 M._is_waiting = false
 
+-- Once the server has answered /health once, remember it so subsequent
+-- wait_ready calls (live_push wraps EVERY TextChanged in one) short-circuit
+-- instead of doing a curl /health round trip per keystroke. Reset whenever
+-- the server process is (re)spawned or stopped (launcher.start / stop.stop).
+M._ready = false
+
+function M.reset_ready()
+	M._ready = false
+end
+
 -- simple helper to construct /health URL
 ---@param port integer
 ---@return string
@@ -57,12 +67,19 @@ local function http_get(url, cb)
 	end
 end
 
---- Wait until server responds on /health or timeout.
--- Enhanced for Windows/slow startup
+--- Wait until server responds on /health or timeout, then call cb(true) /
+--- cb(false). Once the server has been seen healthy, later calls short-circuit
+--- to cb(true) without another /health round trip (see M.reset_ready).
 ---@param cb fun(ok:boolean)
 ---@param timeout_ms integer|nil
 function M.wait_ready(cb, timeout_ms)
 	cb = cb or function() end
+
+	if M._ready then
+		cb(true)
+		return
+	end
+
 	local timeout = timeout_ms or HEALTH_TIMEOUT_MS
 	---@diagnostic disable-next-line LSP-Problems with lib.uv
 	local start_time = uv.now()
@@ -75,10 +92,15 @@ function M.wait_ready(cb, timeout_ms)
 
 		http_get(url, function(code)
 			if code == 0 then
-				local msg =
+				M._ready = true
+				log.debug(
 					---@diagnostic disable-next-line LSP-Problems with uv.
-					string.format("[mdview] server ready after %d ms, attempt %d\n", uv.now() - start_time, attempt)
-				vim.api.nvim_echo({ { msg, "" } }, false, {})
+					string.format("server ready after %d ms, attempt %d", uv.now() - start_time, attempt),
+					nil,
+					"ws_client",
+					true
+				)
+				cb(true)
 			else
 				---@diagnostic disable-next-line LSP-Problems with uv.
 				if (uv.now() - start_time) < timeout then
@@ -247,37 +269,10 @@ local function try_send_pending(path)
 		if code == 0 then
 			-- success: clear queue
 			M._pending[path] = nil
-			if stdout_lines and #stdout_lines > 0 then
-				-- join and log first 2000 chars for brevity
-				local body = table.concat(stdout_lines, "\n")
-				local truncated = body:sub(1, 2000)
-
-				-- schedule the UI writes to avoid calling UI APIs from a fast callback context
-				vim.schedule(function()
-					-- informational message
-					api.nvim_echo(
-						{ { "[mdview.ws_client] http_post_nonblocking success for " .. tostring(url), nil } },
-						true,
-						{}
-					)
-					-- response body (truncated)
-					api.nvim_echo(
-						{ { "[mdview.ws_client] response body (truncated 2k):\n" .. truncated, nil } },
-						true,
-						{}
-					)
-				end)
-			else
-				-- empty body: schedule the echo as well
-				vim.schedule(function()
-					api.nvim_echo({
-						{
-							"[mdview.ws_client] http_post_nonblocking success for " .. tostring(url) .. " (empty body)",
-							nil,
-						},
-					}, true, {})
-				end)
-			end
+			vim.schedule(function()
+				local body = stdout_lines and table.concat(stdout_lines, "\n"):sub(1, 200) or "(empty body)"
+				log.debug("queued post success for " .. tostring(url) .. " -> " .. body, nil, "ws_client", true)
+			end)
 		else
 			-- failure: retry/backoff as before
 			if stderr_lines and #stderr_lines > 0 then
@@ -326,36 +321,30 @@ function M.send_markdown(path, markdown, opts)
 		return
 	end
 
-	-- In send_markdown, where opts.immediate branch posts directly, add logging of stdout.
 	if opts.immediate then
 		http_post_nonblocking(update_url_for(path), markdown, function(code, stdout_lines, stderr_lines)
 			if code == 0 then
-				if stdout_lines and #stdout_lines > 0 then
-					local body = table.concat(stdout_lines, "\n")
-					api.nvim_echo(
-						{ { "[mdview.ws_client] immediate post success for " .. update_url_for(path), nil } },
-						true,
-						{}
-					)
-					api.nvim_echo(
-						{ { "[mdview.ws_client] immediate response (truncated 2k):\n" .. body:sub(1, 2000), nil } },
-						true,
-						{}
-					)
-				else
-					api.nvim_echo({ { "[mdview.ws_client] immediate post success (empty body)", nil } }, true, {})
-				end
+				vim.schedule(function()
+					local body = stdout_lines and table.concat(stdout_lines, "\n"):sub(1, 200) or "(empty body)"
+					log.debug("immediate post success -> " .. body, nil, "ws_client", true)
+				end)
 			else
-				if stderr_lines and #stderr_lines > 0 then
-					api.nvim_echo({
-						{
-							"[mdview.ws_client] immediate post stderr: " .. table.concat(stderr_lines, "\n"),
-							"ErrorMsg",
-						},
-					}, true, {})
-				else
-					api.nvim_echo({ { "[mdview.ws_client] immediate post failed for " .. path, "ErrorMsg" } }, true, {})
-				end
+				vim.schedule(function()
+					if stderr_lines and #stderr_lines > 0 then
+						api.nvim_echo({
+							{
+								"[mdview.ws_client] immediate post stderr: " .. table.concat(stderr_lines, "\n"),
+								"ErrorMsg",
+							},
+						}, true, {})
+					else
+						api.nvim_echo(
+							{ { "[mdview.ws_client] immediate post failed for " .. path, "ErrorMsg" } },
+							true,
+							{}
+						)
+					end
+				end)
 			end
 		end)
 		return
