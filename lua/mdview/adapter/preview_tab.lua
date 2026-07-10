@@ -19,8 +19,8 @@ local M = {}
 local source_to_preview = {}
 ---@type table<integer, integer> preview bufnr -> source bufnr
 local preview_to_source = {}
-
-local PREVIEW_BUF_NAME_PREFIX = "mdview://preview-tab/"
+---@type table<integer, integer> preview bufnr -> tabpage handle it was opened in
+local preview_tabpage = {}
 
 ---@param source_bufnr integer
 ---@return boolean
@@ -95,12 +95,38 @@ function M.close(bufnr)
 
 	source_to_preview[source_bufnr] = nil
 	preview_to_source[preview_bufnr] = nil
+	preview_tabpage[preview_bufnr] = nil
 
 	for _, winid in ipairs(vim.fn.win_findbuf(preview_bufnr)) do
 		pcall(api.nvim_win_close, winid, true)
 	end
 	if api.nvim_buf_is_valid(preview_bufnr) then
 		pcall(api.nvim_buf_delete, preview_bufnr, { force = true })
+	end
+end
+
+--- Close any preview whose tab has been taken over by something that isn't
+--- the preview buffer itself — a file explorer (neo-tree/NvimTree/oil/netrw)
+--- or a real file opened with `:e`. Called from the preview-tab autocmd
+--- group on buffer changes. This both matches the user expectation ("toggle
+--- the preview away when I open an explorer / a file") and avoids explorers
+--- choking on the preview buffer's synthetic name.
+function M.handle_displacement()
+	local cur_buf = api.nvim_get_current_buf()
+	-- Focus is on a preview buffer itself → nothing to do.
+	if preview_to_source[cur_buf] then
+		return
+	end
+	local cur_tab = api.nvim_get_current_tabpage()
+	for preview_bufnr, source_bufnr in pairs(preview_to_source) do
+		if preview_tabpage[preview_bufnr] == cur_tab then
+			-- Something other than the preview is now active in the preview's
+			-- tab. Defer the close so we don't tear windows down in the middle
+			-- of whatever autocmd (e.g. neo-tree opening) triggered this.
+			vim.schedule(function()
+				M.close(source_bufnr)
+			end)
+		end
 	end
 end
 
@@ -132,10 +158,16 @@ function M.open(source_bufnr)
 	vim.cmd("tabnew")
 	local preview_bufnr = api.nvim_get_current_buf()
 
+	-- Name must NOT start with `word://` or `word:` — on Windows a leading
+	-- `mdview:` reads as a drive letter, so file explorers (neo-tree, oil,
+	-- netrw) try to `tcd` into it and throw ENOENT/E344. A `[mdview preview]`
+	-- prefix can't be mistaken for a drive/scheme; the (bufnr) suffix keeps
+	-- it unique.
+	local basename = source_name ~= "" and vim.fn.fnamemodify(source_name, ":t") or "[no name]"
 	pcall(
 		api.nvim_buf_set_name,
 		preview_bufnr,
-		PREVIEW_BUF_NAME_PREFIX .. (source_name ~= "" and source_name or tostring(source_bufnr))
+		("[mdview preview] %s (%d)"):format(basename, source_bufnr)
 	)
 	vim.bo[preview_bufnr].buftype = "nofile"
 	vim.bo[preview_bufnr].bufhidden = "wipe"
@@ -148,6 +180,7 @@ function M.open(source_bufnr)
 
 	source_to_preview[source_bufnr] = preview_bufnr
 	preview_to_source[preview_bufnr] = source_bufnr
+	preview_tabpage[preview_bufnr] = api.nvim_get_current_tabpage()
 
 	sync_content(source_bufnr, preview_bufnr)
 
@@ -164,6 +197,7 @@ function M.open(source_bufnr)
 		callback = function()
 			source_to_preview[source_bufnr] = nil
 			preview_to_source[preview_bufnr] = nil
+			preview_tabpage[preview_bufnr] = nil
 		end,
 	})
 
