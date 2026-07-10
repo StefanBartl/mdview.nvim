@@ -36,6 +36,18 @@ function M.ensure_attached()
 			on_change(args.buf)
 		end,
 	})
+
+	-- When a file explorer (neo-tree/NvimTree/oil/netrw) or a real file takes
+	-- over a preview's tab, close that preview — both to match the user's
+	-- expectation ("toggle the preview away when I open a file/explorer") and
+	-- so explorers never try to navigate into the preview's synthetic buffer.
+	api.nvim_create_autocmd({ "BufEnter", "BufWinEnter", "FileType" }, {
+		group = group,
+		desc = "[mdview] Close a tab preview when a file/explorer takes over its tab",
+		callback = function()
+			require("mdview.adapter.preview_tab").handle_displacement()
+		end,
+	})
 end
 
 return M
