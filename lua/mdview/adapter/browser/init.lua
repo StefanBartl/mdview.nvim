@@ -1,19 +1,25 @@
 ---@module 'mdview.adapter.browser'
--- Cross-platform helper to open a browser instance (app mode, isolated from
--- the user's real default browser profile) and close it later from Neovim.
--- Minimal, validated implementation that respects explicit user overrides from
--- mdview.config.browser when available. Falls back to best-effort detection.
+-- Cross-platform helper to open the preview browser and (in isolated mode)
+-- close it later from Neovim. Two open modes (see mdview.config.browser.open_mode):
 --
--- The profile directory (see build_args_for_browser.make_tmp_profile) is
--- persistent, not a one-off temp dir — it's intentionally reused across
--- :MDViewStart / :MDViewOpen invocations so mdview reuses its own dedicated
--- browser session/window instead of spawning a fresh isolated instance every
--- time. Nothing here deletes it; treat it like a normal browser profile
--- directory.
+--   "default"  — open the URL in the user's normal default browser as a new
+--                tab (their extensions/theme/profile apply). Uses the OS
+--                opener (vim.ui.open / start / open / xdg-open). Returns a
+--                handle with no job_id: mdview can't programmatically close
+--                it, so browser_autoclose / stop_on_browser_exit are no-ops
+--                in this mode. This is the markdown-preview.nvim-style
+--                approach (see docs/Roadmap/markdown_preview/browser/tab.md).
+--
+--   "isolated" — spawn a dedicated browser process against a persistent
+--                mdview-only profile (see build_args_for_browser). A separate
+--                process, so closing it is detectable (on_exit) and
+--                jobstop-able — which is what makes browser_autoclose /
+--                stop_on_browser_exit work. No access to the user's
+--                extensions/bookmarks.
 
 -- Usage:
 -- local browser = require('mdview.adapter.browser')
--- local handle, err = browser.open(url, { browser_cmd = "/full/path/to/chrome", browser = "chrome" })
+-- local handle, err = browser.open(url, { open_mode = "default", on_exit = fn })
 -- if handle then ... store handle ... end
 -- browser.close(handle)
 
@@ -23,17 +29,44 @@ local build_args_for_browser = require("mdview.adapter.browser.build_args_for_br
 
 local M = {}
 
--- Open a browser window/tab pointing to `url`.
--- Returns a BrowserHandle on success, nil and error string on failure.
+-- Open `url` in the user's default browser via the OS opener, as a new tab.
+-- Returns a handle with no job_id (nothing to close/track).
 ---@param url URL
----@param opts BrowserOptions|nil
 ---@return BrowserHandle|nil, string|nil
-function M.open(url, opts)
-  opts = opts or {}
-  if not url or url == "" then
-    return nil, "empty url"
+local function open_default(url)
+  -- vim.ui.open (Neovim 0.10+) is the cross-platform opener; fall back to
+  -- the platform command on older versions.
+  if vim.ui and type(vim.ui.open) == "function" then
+    local ok, err = pcall(vim.ui.open, url)
+    if not ok then
+      return nil, tostring(err)
+    end
+  else
+    local cmd
+    if fn.has("win32") == 1 then
+      -- `start` is a cmd.exe builtin; the empty "" is the window-title arg so
+      -- a quoted URL isn't consumed as the title.
+      cmd = { "cmd.exe", "/c", "start", "", url }
+    elseif fn.has("mac") == 1 then
+      cmd = { "open", url }
+    else
+      cmd = { "xdg-open", url }
+    end
+    local jid = fn.jobstart(cmd, { detach = true })
+    if not jid or jid <= 0 then
+      return nil, "failed to launch OS opener"
+    end
   end
 
+  return { open_mode = "default" }, nil
+end
+
+-- Open `url` by spawning a dedicated, trackable browser process against the
+-- isolated mdview profile. Returns a handle with a job_id for close().
+---@param url URL
+---@param opts BrowserOptions
+---@return BrowserHandle|nil, string|nil
+local function open_isolated(url, opts)
   local cmd, err = resolve_command(opts.browser_cmd, opts.browser)
   if not cmd then
     return nil, err
@@ -49,7 +82,7 @@ function M.open(url, opts)
 
   -- jobstart opts: keep detach=false so jobstop can be used later
   local jid
-	jid = fn.jobstart(cmd_list, {
+  jid = fn.jobstart(cmd_list, {
     detach = false,
     on_exit = function(_, code, _)
       if opts.on_exit and type(opts.on_exit) == "function" then
@@ -62,15 +95,30 @@ function M.open(url, opts)
     return nil, ("failed to start browser process (jobstart returned %s)"):format(tostring(jid))
   end
 
-  local handle = {
+  return {
     job_id = jid,
     tmp_profile = tmp,
     cmd = cmd,
     args = args,
     platform = (fn.has("win32") == 1 and "win") or (fn.has("mac") == 1 and "mac") or "unix",
-  }
+  }, nil
+end
 
-  return handle, nil
+-- Open a browser tab/window pointing to `url`.
+-- Returns a BrowserHandle on success, nil and error string on failure.
+---@param url URL
+---@param opts BrowserOptions|nil # { open_mode?, browser_cmd?, browser?, on_exit? }
+---@return BrowserHandle|nil, string|nil
+function M.open(url, opts)
+  opts = opts or {}
+  if not url or url == "" then
+    return nil, "empty url"
+  end
+
+  if opts.open_mode == "isolated" then
+    return open_isolated(url, opts)
+  end
+  return open_default(url)
 end
 
 -- Close a previously opened browser handle via jobstop(). The profile

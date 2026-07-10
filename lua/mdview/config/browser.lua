@@ -168,10 +168,17 @@ end
 
 --- Convenience: call at plugin setup to attempt resolution and optionally notify user.
 --- If notify_on_fail is true, a user-facing notification will be shown on errors/warnings.
+--- Skipped entirely in "default" open_mode, which uses the OS opener and
+--- needs no resolved browser executable — resolving/warning there would be a
+--- spurious "no browser found" on systems where autodetection misses.
 ---@param notify_on_fail boolean|nil
 ---@return boolean success, string|nil msg
 function M.setup_and_notify(notify_on_fail)
 	notify_on_fail = notify_on_fail == nil and true or notify_on_fail
+
+	if M.defaults.open_mode ~= "isolated" then
+		return true, nil
+	end
 
 	local err = M.resolve_and_validate()
 	if err then

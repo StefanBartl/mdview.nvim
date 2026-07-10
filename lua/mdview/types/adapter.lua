@@ -18,16 +18,18 @@
 
 -- == browser.init ==
 ---@class BrowserHandle
----@field job_id number jobstart id
----@field tmp_profile string|nil temporary profile path
----@field cmd string the executable launched
----@field args string[] the args used to start the process
----@field platform "win"|"mac"|"unix"
+---@field open_mode string|nil    # "default" | "isolated"
+---@field job_id number|nil       # jobstart id (isolated mode only)
+---@field tmp_profile string|nil  # temporary profile path (isolated mode only)
+---@field cmd string|nil          # the executable launched (isolated mode only)
+---@field args string[]|nil       # the args used to start the process (isolated mode only)
+---@field platform "win"|"mac"|"unix"|nil
 
 ---@class BrowserOptions
----@field browser_cmd string|nil  # explicit absolute path to the browser executable
----@field browser string|nil      # friendly name (e.g. "chrome", "firefox")
----@field on_exit fun(job_id: integer, exit_code: integer)|nil  # optional callback
+---@field open_mode string|nil    # "default" (OS opener, new tab) | "isolated" (spawned profile)
+---@field browser_cmd string|nil  # explicit absolute path to the browser executable (isolated mode)
+---@field browser string|nil      # friendly name (e.g. "chrome", "firefox") (isolated mode)
+---@field on_exit fun(job_id: integer, exit_code: integer)|nil  # optional callback (isolated mode)
 
 -- == browser.resolve_command ==
 ---@class browser_resolver

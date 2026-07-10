@@ -81,7 +81,18 @@ local function resolve_browser_url(opts)
 	if not key or not token then
 		return base
 	end
-	return base .. "?key=" .. normalize.path_for_url(key) .. "&token=" .. vim.uri_encode(token)
+
+	local url = base
+		.. "?key=" .. normalize.path_for_url(key)
+		.. "&token=" .. vim.uri_encode(token)
+
+	-- pass the configured preview theme to the client (main.ts reads ?theme=)
+	local theme = require("mdview.config.browser").defaults.theme
+	if type(theme) == "string" and theme ~= "" then
+		url = url .. "&theme=" .. vim.uri_encode(theme)
+	end
+
+	return url
 end
 M.resolve_browser_url = resolve_browser_url
 
@@ -175,11 +186,16 @@ function M.start(opts)
 					log.debug("Opening browser: " .. browser_url, nil, "launcher", true)
 
 					local opts_table = {
+						open_mode = browser_defaults.open_mode,
 						browser_cmd = browser_cmd,
 						browser_args = browser_args,
+						-- stop_on_browser_exit only applies in isolated mode: in
+						-- "default" mode the OS opener returns no process handle,
+						-- so on_exit never fires (the tab lives in the user's
+						-- own browser, which mdview doesn't own).
 						on_exit = function(_, code)
 							log.debug(("browser exited with code %s"):format(tostring(code)), nil, "launcher", true)
-							if browser_defaults.stop_on_browser_exit then
+							if browser_defaults.open_mode == "isolated" and browser_defaults.stop_on_browser_exit then
 								schedule(function()
 									require("mdview.bindings.usrcmds.stop").stop()
 								end)

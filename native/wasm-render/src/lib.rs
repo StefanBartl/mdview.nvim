@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use comrak::{markdown_to_html, Options};
 use wasm_bindgen::prelude::*;
 
@@ -14,6 +16,25 @@ fn build_options() -> Options<'static> {
     options
 }
 
+/// Build the ammonia sanitizer. Identical to the default allowlist except it
+/// additionally permits the disabled checkbox inputs comrak emits for GFM
+/// task lists (`- [ ]` / `- [x]`), so they render as real checkboxes instead
+/// of being stripped. Inputs cannot execute script; there is no form to
+/// submit; and only checkbox `type` plus `checked`/`disabled` are allowed,
+/// so nothing dangerous (e.g. `formaction`) gets through.
+fn sanitizer() -> ammonia::Builder<'static> {
+    let mut builder = ammonia::Builder::default();
+    builder.add_tags(std::iter::once("input"));
+
+    let mut input_attrs = HashSet::new();
+    input_attrs.insert("type");
+    input_attrs.insert("checked");
+    input_attrs.insert("disabled");
+    builder.add_tag_attributes("input", input_attrs);
+
+    builder
+}
+
 /// Render markdown to sanitized HTML.
 ///
 /// Rendering (comrak) and sanitization (ammonia) happen as a single, inseparable
@@ -23,7 +44,7 @@ fn build_options() -> Options<'static> {
 #[wasm_bindgen]
 pub fn render_markdown(input: &str) -> String {
     let html = markdown_to_html(input, &build_options());
-    ammonia::clean(&html)
+    sanitizer().clean(&html).to_string()
 }
 
 #[cfg(test)]
@@ -76,5 +97,26 @@ mod tests {
         let html = render_markdown("<iframe src=\"https://evil.example\"></iframe><object data=\"x\"></object>");
         assert!(!html.contains("<iframe"));
         assert!(!html.contains("<object"));
+    }
+
+    #[test]
+    fn renders_task_list_checkboxes() {
+        let html = render_markdown("- [ ] todo\n- [x] done\n");
+        // comrak's task-list checkboxes survive sanitization (see sanitizer()).
+        assert!(html.contains("<input"));
+        assert!(html.contains("type=\"checkbox\""));
+        assert!(html.contains("checked"));
+    }
+
+    #[test]
+    fn strips_dangerous_input_attributes() {
+        // A text input with formaction must not keep formaction/onfocus even
+        // though <input> is now allowed for task-list checkboxes.
+        let html = render_markdown(
+            "<input type=\"text\" formaction=\"javascript:alert(1)\" onfocus=\"alert(1)\">",
+        );
+        assert!(!html.contains("formaction"));
+        assert!(!html.contains("onfocus"));
+        assert!(!html.contains("alert(1)"));
     }
 }

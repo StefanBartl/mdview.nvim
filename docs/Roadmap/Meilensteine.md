@@ -1,3 +1,13 @@
+> ⚠️ **VERALTET (Vor-Rewrite).** Dieser Meilensteinplan stammt aus der
+> Node.js/markdown-it/Bun-Ära und beschreibt eine Architektur, die es nicht
+> mehr gibt (server-seitiges Rendering, `src/server/*.ts`, `wasm/`-Ordner,
+> `:MarkdownPreviewStart`, WebTransport-POC). Der aktuelle Stack ist:
+> Go-Relay + Rust/WASM-Client-Rendering, Binaries per GitHub Releases.
+> **Aktuelle Aufgaben: [`TASKS.md`](./TASKS.md); erledigte Punkte + Begründungen:
+> [`Roadmap.md`](./Roadmap.md).** Nur als Historie aufbewahrt.
+
+---
+
 # Roadmap mit Checkliste für Entwicklung, Tests und Integration von mdview.nvim
 
 ## Table of content

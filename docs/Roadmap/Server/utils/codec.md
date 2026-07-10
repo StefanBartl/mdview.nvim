@@ -1,3 +1,10 @@
+> ⚠️ **VERALTET.** TypeScript-Fehler aus dem alten Node-WS-Server
+> (`src/server/index.ts`, `RawData`/`Buffer` — gelöscht beim Rewrite). Der
+> Relay ist jetzt Go (`native/server/`), diese `ws`-Node-Typen existieren nicht
+> mehr. Nur Historie.
+
+---
+
 ## Errormeldung
 
 ```sh
