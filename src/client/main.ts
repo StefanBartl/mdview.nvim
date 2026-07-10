@@ -57,7 +57,13 @@ function applyScrollPing(container: HTMLElement, message: string): void {
 async function boot() {
   const params = new URLSearchParams(window.location.search);
 
-  await applyTheme(params);
+  // Theme is purely cosmetic — load it fire-and-forget so a slow/failing
+  // stylesheet fetch can never block the WASM init or the WebSocket
+  // connection (which is what actually renders the document). Awaiting it
+  // here previously meant a hung theme import left the page stuck on
+  // "mdview loading…" forever.
+  void applyTheme(params);
+
   await init();
 
   const key = params.get('key');
