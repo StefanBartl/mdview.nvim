@@ -1,3 +1,9 @@
+> ⚠️ **VERALTET / verworfen.** Beschreibt eine Transport-Abstraktion mit
+> `dev-config.ts` / `webtransport.transport.ts` (beide gelöscht). WebTransport
+> wurde nicht umgesetzt (siehe `Roadmap.md` BUGS #3). Nur Historie.
+
+---
+
 ## Zustimmung und Architekturvorschlag (Kurz)
 
 Ja — dem Vorschlag zustimmen. Die sauberste, wartbare Lösung ist eine **Transport-Adapter-Abstraktion** mit klar getrennten Implementierungen in separaten Dateien (keine Vermischung von WebSocket und WebTransport in einer Datei). Der Auswahl-Mechanismus ist dev-kontrollierbar (Feature-Flag im Quellcode), der Client macht zusätzlich eine **Feature-Detect** auf `window.WebTransport`. Je nach Flag + Detektion wird genau **eine** Implementierung dynamisch geladen. Dadurch bleibt der Code modular, testbar und das Risiko gering.

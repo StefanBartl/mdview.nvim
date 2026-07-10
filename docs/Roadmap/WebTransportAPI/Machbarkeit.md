@@ -1,3 +1,11 @@
+> ⚠️ **VERALTET / verworfen.** Diese WebTransport-Evaluation bezieht sich auf
+> den alten Node/TS-Stack (`dev-config.ts`, `webtransport.transport.ts` — beide
+> gelöscht). Entscheidung gefallen (siehe `Roadmap.md` BUGS #3): WebTransport
+> bringt für kleine Text-Updates keinen Mehrwert und erzwingt TLS auf
+> localhost. **Nicht weiter verfolgt.** Nur als Recherche-Historie aufbewahrt.
+
+---
+
 # Theoretische Upgrade-Evaluation: Von WebSocket zu WebTransport
 
 ## Table of content

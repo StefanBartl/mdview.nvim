@@ -1,3 +1,12 @@
+> ⚠️ **VERALTET (Vor-Rewrite).** „Nächste Schritte" aus der Zeit, als es
+> noch keinen `lua/`-Ordner gab und der Node-Server nur eine Hello-WS-Message
+> lieferte. Referenziert `/render`, `markdown-it`, `dev-config.ts` (gelöscht),
+> `webtransport.transport.ts` (gelöscht), `:MarkdownPreviewStart`. Alles davon
+> ist längst umgesetzt oder verworfen. **Aktuelle Aufgaben:
+> [`TASKS.md`](./TASKS.md).** Nur als Historie aufbewahrt.
+
+---
+
 # Nächste Schritte & aktualisierte Roadmap für mdview.nvim
 
 ## Kurze Bestandsaufnahme (aktueller Stand)

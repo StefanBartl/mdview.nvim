@@ -1,0 +1,262 @@
+/* GitHub-like Markdown theme for mdview.nvim's preview client.
+   Light + dark are both defined; the active one follows the OS
+   prefers-color-scheme by default. A `theme=github-light` /
+   `theme=github-dark` URL param (see main.ts) pins one explicitly by
+   setting data-theme on <html>, which wins over the media query. */
+
+:root {
+  --md-fg: #1f2328;
+  --md-muted: #59636e;
+  --md-bg: #ffffff;
+  --md-border: #d1d9e0;
+  --md-border-muted: #d1d9e0b3;
+  --md-code-bg: #eff1f3;
+  --md-code-block-bg: #f6f8fa;
+  --md-link: #0969da;
+  --md-quote-fg: #59636e;
+  --md-quote-border: #d1d9e0;
+  --md-table-stripe: #f6f8fa;
+  --md-mark-bg: #fff8c5;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --md-fg: #f0f6fc;
+    --md-muted: #9198a1;
+    --md-bg: #0d1117;
+    --md-border: #3d444d;
+    --md-border-muted: #3d444db3;
+    --md-code-bg: #656c7633;
+    --md-code-block-bg: #151b23;
+    --md-link: #4493f8;
+    --md-quote-fg: #9198a1;
+    --md-quote-border: #3d444d;
+    --md-table-stripe: #151b23;
+    --md-mark-bg: #bb800926;
+  }
+}
+
+/* Explicit overrides win over the media query in both directions. */
+:root[data-theme="light"] {
+  --md-fg: #1f2328;
+  --md-muted: #59636e;
+  --md-bg: #ffffff;
+  --md-border: #d1d9e0;
+  --md-border-muted: #d1d9e0b3;
+  --md-code-bg: #eff1f3;
+  --md-code-block-bg: #f6f8fa;
+  --md-link: #0969da;
+  --md-quote-fg: #59636e;
+  --md-quote-border: #d1d9e0;
+  --md-table-stripe: #f6f8fa;
+  --md-mark-bg: #fff8c5;
+}
+
+:root[data-theme="dark"] {
+  --md-fg: #f0f6fc;
+  --md-muted: #9198a1;
+  --md-bg: #0d1117;
+  --md-border: #3d444d;
+  --md-border-muted: #3d444db3;
+  --md-code-bg: #656c7633;
+  --md-code-block-bg: #151b23;
+  --md-link: #4493f8;
+  --md-quote-fg: #9198a1;
+  --md-quote-border: #3d444d;
+  --md-table-stripe: #151b23;
+  --md-mark-bg: #bb800926;
+}
+
+html,
+body {
+  background: var(--md-bg);
+}
+
+#mdview-root {
+  color: var(--md-fg);
+  background: var(--md-bg);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans",
+    Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
+  font-size: 16px;
+  line-height: 1.5;
+  word-wrap: break-word;
+}
+
+/* Center the content column like GitHub's file view. */
+#mdview-root {
+  max-width: 1012px;
+  margin: 0 auto;
+  padding: 2rem clamp(1rem, 4vw, 3rem) 6rem;
+}
+
+#mdview-root > *:first-child {
+  margin-top: 0 !important;
+}
+#mdview-root > *:last-child {
+  margin-bottom: 0 !important;
+}
+
+#mdview-root h1,
+#mdview-root h2,
+#mdview-root h3,
+#mdview-root h4,
+#mdview-root h5,
+#mdview-root h6 {
+  margin-top: 24px;
+  margin-bottom: 16px;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+#mdview-root h1 {
+  font-size: 2em;
+  padding-bottom: 0.3em;
+  border-bottom: 1px solid var(--md-border-muted);
+}
+#mdview-root h2 {
+  font-size: 1.5em;
+  padding-bottom: 0.3em;
+  border-bottom: 1px solid var(--md-border-muted);
+}
+#mdview-root h3 {
+  font-size: 1.25em;
+}
+#mdview-root h4 {
+  font-size: 1em;
+}
+#mdview-root h5 {
+  font-size: 0.875em;
+}
+#mdview-root h6 {
+  font-size: 0.85em;
+  color: var(--md-muted);
+}
+
+#mdview-root p,
+#mdview-root blockquote,
+#mdview-root ul,
+#mdview-root ol,
+#mdview-root dl,
+#mdview-root table,
+#mdview-root pre,
+#mdview-root details {
+  margin-top: 0;
+  margin-bottom: 16px;
+}
+
+#mdview-root a {
+  color: var(--md-link);
+  text-decoration: none;
+}
+#mdview-root a:hover {
+  text-decoration: underline;
+}
+
+#mdview-root strong {
+  font-weight: 600;
+}
+
+#mdview-root blockquote {
+  padding: 0 1em;
+  color: var(--md-quote-fg);
+  border-left: 0.25em solid var(--md-quote-border);
+}
+#mdview-root blockquote > :first-child {
+  margin-top: 0;
+}
+#mdview-root blockquote > :last-child {
+  margin-bottom: 0;
+}
+
+#mdview-root ul,
+#mdview-root ol {
+  padding-left: 2em;
+}
+#mdview-root li + li {
+  margin-top: 0.25em;
+}
+#mdview-root li > p {
+  margin-top: 16px;
+}
+
+/* Task-list checkboxes (comrak GFM). comrak emits a bare
+   `<li><input type="checkbox" disabled> …</li>` with no marker class, so
+   target the checkbox's parent <li> directly to drop the bullet and pull the
+   checkbox back into the margin like GitHub. */
+#mdview-root li:has(> input[type="checkbox"]) {
+  list-style-type: none;
+}
+#mdview-root li > input[type="checkbox"] {
+  margin: 0 0.2em 0.25em -1.4em;
+  vertical-align: middle;
+}
+
+#mdview-root code,
+#mdview-root tt {
+  padding: 0.2em 0.4em;
+  margin: 0;
+  font-size: 85%;
+  white-space: break-spaces;
+  background-color: var(--md-code-bg);
+  border-radius: 6px;
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+    "Liberation Mono", monospace;
+}
+
+#mdview-root pre {
+  padding: 16px;
+  overflow: auto;
+  font-size: 85%;
+  line-height: 1.45;
+  background-color: var(--md-code-block-bg);
+  border-radius: 6px;
+}
+#mdview-root pre code {
+  padding: 0;
+  margin: 0;
+  font-size: 100%;
+  white-space: pre;
+  background: transparent;
+  border: 0;
+}
+
+#mdview-root table {
+  display: block;
+  width: max-content;
+  max-width: 100%;
+  overflow: auto;
+  border-collapse: collapse;
+}
+#mdview-root table th,
+#mdview-root table td {
+  padding: 6px 13px;
+  border: 1px solid var(--md-border);
+}
+#mdview-root table th {
+  font-weight: 600;
+}
+#mdview-root table tr:nth-child(2n) {
+  background-color: var(--md-table-stripe);
+}
+
+#mdview-root img {
+  max-width: 100%;
+  box-sizing: content-box;
+  background-color: var(--md-bg);
+}
+
+#mdview-root hr {
+  height: 0.25em;
+  padding: 0;
+  margin: 24px 0;
+  background-color: var(--md-border);
+  border: 0;
+}
+
+#mdview-root del {
+  text-decoration: line-through;
+}
+#mdview-root mark {
+  background-color: var(--md-mark-bg);
+  color: inherit;
+}

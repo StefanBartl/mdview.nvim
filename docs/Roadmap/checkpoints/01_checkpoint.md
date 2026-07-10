@@ -1,3 +1,11 @@
+> ⚠️ **VERALTET (Vor-Rewrite).** Test-Checkpoint aus der Node-Ära:
+> referenziert den `/render`-Endpoint (jetzt `/update`), den Vite-Dev-Port
+> 43220 als Preview-Quelle und markdown-it-Rendering. Aktueller Health-/
+> Smoke-Ablauf: `curl http://localhost:43219/health` und `:checkhealth mdview`.
+> Nur Historie. **Aktuelle Aufgaben: [`../TASKS.md`](../TASKS.md).**
+
+---
+
 # Checkpoint 1
 
 ## Table of content

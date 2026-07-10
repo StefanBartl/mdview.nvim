@@ -3,13 +3,17 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1.0" />
-    <title>mdview.nvim - dev</title>
+    <title>mdview.nvim</title>
     <style>
-      /* #mdview-root is the scroll viewport (not the page body) so
-         main.ts's scroll-sync ping (container.scrollTop = ...) has
-         something to actually scroll — without height+overflow here it's a
-         no-op div that just grows with its content. */
-      html, body {
+      /* Only the scroll-viewport mechanics live here; the visual theme
+         (colors, typography, GitHub-like markdown styling) is imported by
+         main.ts from ./themes/<name>.css so it can be swapped per ?theme=.
+         #mdview-root must be the scroll viewport (fixed height + overflow)
+         so main.ts's scroll-sync ping (container.scrollTop = ...) has
+         something to actually scroll — otherwise it's a no-op div that just
+         grows with its content. */
+      html,
+      body {
         margin: 0;
         height: 100%;
       }
@@ -17,8 +21,6 @@
         height: 100vh;
         overflow-y: auto;
         box-sizing: border-box;
-        padding: 1rem 2rem;
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       }
     </style>
   </head>

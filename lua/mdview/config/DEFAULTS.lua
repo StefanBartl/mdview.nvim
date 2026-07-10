@@ -8,17 +8,23 @@
 --- sub-tables here (see those files), so there is exactly one copy of every
 --- default value regardless of which module a caller requires it through.
 
+---@alias mdview.config.BrowserOpenMode
+---| '"default"' # open in your normal default browser as a new tab (your extensions/theme; no programmatic close)
+---| '"isolated"' # spawn a separate mdview browser profile/window (auto-close works; no access to your extensions)
+
 ---@class mdview.config.BrowserDefaults
----@field autodetect_browser boolean try to locate a browser automatically
----@field browser string friendly name e.g. "chrome" or "firefox"
----@field browser_cmd string absolute path to executable to force use
----@field browser_autoclose boolean whether :MDViewStop closes the controlled browser
+---@field open_mode mdview.config.BrowserOpenMode how the preview browser is opened (default "default")
+---@field autodetect_browser boolean try to locate a browser automatically (isolated mode only)
+---@field browser string friendly name e.g. "chrome" or "firefox" (isolated mode only)
+---@field browser_cmd string absolute path to executable to force use (isolated mode only)
+---@field browser_autoclose boolean whether :MDViewStop closes the controlled browser (isolated mode only)
 ---@field browser_autostart boolean whether to open the browser automatically on start
 ---@field resolved_browser_cmd string|nil internal, populated by config.browser.resolve_and_validate()
----@field browser_args string[]|nil extra CLI args for the resolved browser executable
+---@field browser_args string[]|nil extra CLI args for the resolved browser executable (isolated mode only)
 ---@field open_url string|nil static override URL always used instead of the computed key/token URL
 ---@field require_display boolean don't auto-open a browser without a GUI/DISPLAY available (see mdview-security)
----@field stop_on_browser_exit boolean run :MDViewStop when the opened browser process exits (e.g. tab/window closed)
+---@field stop_on_browser_exit boolean run :MDViewStop when the opened browser process exits (isolated mode only)
+---@field theme string preview theme name passed to the client as ?theme= (see src/client/themes/)
 
 ---@class mdview.config.StartDefaults
 ---@field push_strategy "launcher"|"try_push" initial-push strategy used by :MDViewStart
@@ -72,6 +78,7 @@ return {
 	open_preview_tab = false,
 
 	browser = {
+		open_mode = "default",
 		autodetect_browser = true,
 		browser = "",
 		browser_cmd = "",
@@ -82,6 +89,7 @@ return {
 		open_url = nil,
 		require_display = true,
 		stop_on_browser_exit = true,
+		theme = "github",
 	},
 
 	start = {

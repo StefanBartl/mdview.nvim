@@ -1,5 +1,11 @@
 # Roadmap
 
+> **Offene Aufgaben** stehen (nach Aufwand sortiert) in [`TASKS.md`](./TASKS.md).
+> Diese Datei ist das Log der **erledigten** Punkte samt Begründungen.
+> Vor-Rewrite-Dokumente (`Meilensteine*.md`, `WebTransportAPI/*`,
+> `Server/utils/codec.md`, `checkpoints/01_checkpoint.md`) tragen ein
+> OUTDATED-Banner und sind nur noch Historie.
+
 ## BUGS
 
   1. ~~health-Modul: `require("mdview.health").check()` fehlte~~ — behoben.
@@ -244,5 +250,35 @@
      scrollbar (wuchs nur mit dem Inhalt) — `index.html` bekam ein Minimal-Stylesheet
      (`height:100vh; overflow-y:auto`), sonst wäre auch `scrollTop` grundsätzlich wirkungslos
      gewesen. End-to-End mit echtem Browser (Playwright-Preview) verifiziert.
+
+---
+
+## UX: Browser-Modi & Rendering-Look
+
+  1. ~~Preview öffnete in einem separaten Fenster (nicht als Tab im normalen Browser) und ohne
+     die Extensions/das Aussehen des Nutzers~~ — neues `browser.open_mode` (default `"default"`):
+     - `"default"`: öffnet die URL im Standard-Browser des Nutzers als neuer Tab (via
+       `vim.ui.open`, Fallback `start`/`open`/`xdg-open`) — seine Extensions, sein Theme, sein
+       Profil. Trade-off: mdview kann den Tab nicht programmatisch schließen, daher sind
+       `browser_autoclose`/`stop_on_browser_exit` in diesem Modus No-ops (markdown-preview.nvim-
+       Ansatz, siehe `markdown_preview/browser/tab.md`).
+     - `"isolated"`: bisheriges Verhalten (eigenes Profil, eigener Prozess) — Auto-Close
+       funktioniert zuverlässig, aber ohne die Extensions/Lesezeichen des Nutzers.
+     Kooperatives Schließen im default-Modus (WS-`close`-Event → `window.close()`) ist als
+     Mittel-Task in `TASKS.md` erfasst.
+  2. ~~Gerendertes Markdown sah schlecht aus (Client-HTML hatte praktisch kein CSS)~~ — eingebautes
+     GitHub-artiges Theme (`src/client/themes/github.css`, Light/Dark automatisch via
+     `prefers-color-scheme`, plus `data-theme`-Pinning). Theme-Auswahl über `browser.theme`
+     (an den Client als `?theme=` übergeben) + lazy-geladene `THEME_LOADERS` in `main.ts` →
+     weitere Themes sind ein CSS-File + ein Map-Eintrag. End-to-End im echten Browser verifiziert
+     (Headings mit Border, Codeblöcke, Tabellen, Blockquotes, Dark-Mode). Die „externe
+     Renderer-Website"-Idee ist als opt-in-Task in `TASKS.md` festgehalten (mit Privacy-Hinweis:
+     widerspricht dem loopback-only-Modell) — `browser.open_url` ist bereits die Escape-Hatch für
+     eine beliebige URL.
+  3. ~~GFM-Task-Listen (`- [ ]` / `- [x]`) wurden ohne Checkbox gerendert~~ — ammonia strippte die
+     `<input>`-Elemente (nicht in der Default-Allowlist). Sanitizer in
+     `native/wasm-render/src/lib.rs` erlaubt jetzt gezielt `<input>` mit nur `type`/`checked`/
+     `disabled` (Checkboxen können kein JS ausführen, kein Form-Kontext, `formaction`/Event-Handler
+     werden weiterhin entfernt — mit Test `strips_dangerous_input_attributes`).
 
 ---

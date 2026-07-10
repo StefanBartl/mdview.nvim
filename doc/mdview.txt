@@ -126,15 +126,18 @@ Defaults: >lua
     open_preview_tab = false, -- :MDViewStart opens an nvim tab, not a browser
 
     browser = {
-      autodetect_browser  = true,
-      browser             = "",    -- friendly name, e.g. "firefox"
-      browser_cmd         = "",    -- absolute path, forces this executable
-      browser_autoclose   = true,  -- :MDViewStop closes the browser tab too
+      open_mode           = "default", -- "default" (tab in your browser)
+                                       -- | "isolated" (own window, auto-close)
+      theme               = "github",  -- preview theme (?theme= to the client)
+      autodetect_browser  = true,  -- isolated mode only
+      browser             = "",    -- friendly name, e.g. "firefox" (isolated)
+      browser_cmd         = "",    -- absolute path (isolated mode only)
+      browser_autoclose   = true,  -- :MDViewStop closes the tab (isolated only)
       browser_autostart   = true,  -- open the browser on :MDViewStart
-      browser_args        = nil,
+      browser_args        = nil,   -- extra CLI args (isolated mode only)
       open_url            = nil,   -- static URL override (advanced)
       require_display     = true,  -- skip browser without GUI/DISPLAY
-      stop_on_browser_exit = true, -- browser closed => :MDViewStop
+      stop_on_browser_exit = true, -- browser closed => :MDViewStop (isolated)
     },
 
     start = {
@@ -188,9 +191,28 @@ open_preview_tab ~
   runs normally in the background, so |:MDViewOpen| can still open the
   browser afterwards if wanted.
 
+browser.open_mode ~
+  How the preview browser is opened:
+    "default"  — open the URL in your normal default browser as a new tab
+                 (your extensions/theme/profile apply). Uses the OS opener.
+                 mdview cannot programmatically close it, so
+                 `browser_autoclose` and `stop_on_browser_exit` are no-ops in
+                 this mode. This is the default.
+    "isolated" — spawn a dedicated browser process against a separate
+                 mdview-only profile. Auto-close works (a distinct process),
+                 but you don't get your extensions/bookmarks.
+  All other `browser.*` fields except `theme`, `open_url`, `browser_autostart`
+  and `require_display` apply to "isolated" mode only.
+
+browser.theme ~
+  Preview theme name, passed to the client as `?theme=`. Ships `"github"`
+  (light/dark auto via prefers-color-scheme). Add a theme by dropping a CSS
+  file in src/client/themes/ and a matching loader in main.ts.
+
 browser.autodetect_browser ~
   Try to locate an installed browser automatically (chrome, chromium, edge,
   firefox, in that order) when `browser` / `browser_cmd` are unset.
+  Isolated mode only.
 
 browser.browser ~
   Friendly name of a browser to prefer, e.g. `"chrome"` or `"firefox"`.
