@@ -14,6 +14,7 @@ local show_weblogs = require("mdview.bindings.usrcmds.show_weblogs")
 local preview_tab = require("mdview.bindings.usrcmds.preview_tab")
 local diagnose = require("mdview.bindings.usrcmds.diagnose")
 local toggle = require("mdview.bindings.usrcmds.toggle")
+local theme = require("mdview.bindings.usrcmds.theme")
 
 local M = {}
 
@@ -26,6 +27,7 @@ function M.attach()
 	preview_tab.attach()
 	diagnose.attach()
 	toggle.attach()
+	theme.attach()
 end
 
 return M
