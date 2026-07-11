@@ -1,215 +1,137 @@
-# Commands
+# mdview — Test-, Log- & Prüfkonzept
 
-## Generell
+> **Stand: Go-Relay + Rust/WASM-Client.** Serverseitiges Rendering, der
+> Node-Dev-Server (`npm run dev:server`), der Vite-Proxy auf `43220` und der
+> `/render`-Endpoint existieren **nicht mehr**. Dieses Dokument beschreibt, wie
+> man die einzelnen Komponenten testet und wie die Logs/Diagnose an Dritte (oder
+> an einen Assistenten) übergeben werden können.
 
-- Einen folgender Befehle ausführen:
+Die Komponenten:
 
-```sh
-# 1
-Test-NetConnection -ComputerName localhost -Port 43219
-# 2
-$body = Get-Content .\tests\test.md -Raw
-Invoke-RestMethod -Uri 'http://localhost:43219/render?key=test' -Method Post -Headers @{ 'Content-Type' = 'text/markdown' } -Body $body
-# 3&4
-node tests/test-ws.js ws://localhost:43219/ws
-node tests/test-ws.js ws://localhost:43220/ws
+1. **Neovim-Plugin (Lua)** — startet/stoppt den Relay, öffnet den Browser,
+   sendet Buffer-Updates und Scroll-Pings.
+2. **Go-Relay** (`native/server/`) — Transport von Rohtext, token-gated,
+   bindet nur an `127.0.0.1`.
+3. **Rust/WASM-Client** (`src/client/` + `native/wasm-render/`) — rendert und
+   sanitisiert Markdown im Browser.
 
-curl -X POST "http://localhost:43220/render?key=test" -H "Content-Type: text/markdown" --data-binary "$(cat tests/test.md)"
+---
 
-# send file content as text/markdown using PowerShell native cmdlet
-Invoke-RestMethod -Uri 'http://localhost:43219/render?key=test' -Method Post -ContentType 'text/markdown' -Body (Get-Content .\tests\test.md -Raw)
+## 1. Schnellster Weg: `:MDViewDiagnose`
 
-# use --% to stop PowerShell from parsing the remaining arguments
-curl.exe --% -v -X POST "http://localhost:43219/render?key=test" -H "Content-Type: text/markdown" --data-binary @tests/test.md
+Ein einziger Befehl erzeugt einen vollständigen Zustandsbericht **über alle
+Komponenten** und öffnet ihn in einem neuen Tab. Die Datei kann direkt
+weitergegeben / eingelesen werden.
 
-# pipe file content into curl.exe; use --% to stop PowerShell parsing
-Get-Content .\tests\test.md -Raw | curl.exe --% -v -X POST "http://localhost:43219/render?key=test" -H "Content-Type: text/markdown" --data-binary @-
+```vim
+:MDViewDiagnose            " schreibt nach stdpath('log')/mdview-diagnostics.txt
+:MDViewDiagnose C:\tmp\d.txt   " optional: eigener Pfad
 ```
 
-sollte JSON mit `html` zurückgeben.
+Der Bericht enthält:
+
+- **Environment** — nvim-Version, OS, `is_windows`, Display/GUI vorhanden
+- **Dependencies** — `lib.nvim` (hard dependency), `curl`, `tar`, `vim.ui.open`
+- **Install cache** — ob Server-Binary und Client-Bundle gecached sind (+ Pfade)
+- **Config** — `server_port`, `open_preview_tab`, `scroll_sync`,
+  `browser.open_mode/theme/browser_autostart/require_display`
+- **Running session** — läuft der Prozess? attached? Token gesetzt? erkannter
+  Port? **Live-`GET /health`-Probe**
+- **Browser-URL**, die geöffnet würde (inkl. `key`/`token`/`theme`)
+- **Recent internal log** — die letzten Einträge des `mdview.log`-Ring-Buffers
+
+> Der interne Ring läuft über `lib.nvim.logger` (`mdview.log`). `notify`-Level
+> ist per Default aus; Debug-Notifications erscheinen nur bei
+> `config.debug_preview = true`.
 
 ---
 
-### server-Prozess wirklich auf dem Port läuft
+## 2. Browser-Logs ohne DevTools: `/clientlog`
 
-  ```powershell
-  Test-NetConnection -ComputerName localhost -Port 43219
-  ```
-* Wenn `wscat` / `node test-ws.js` anzeigt `Connected` → WS ist erreichbar.
-* Wenn `Invoke-RestMethod` fehlschlägt, prüfe Windows-Firewall / Antivirus evtl. Blockierung.
-* Nutze `curl.exe -v ...` um raw HTTP traffic zu sehen (mehrere Tests oben).
+Der Client meldet seine eigenen Diagnosen (fehlendes key/token,
+Verbindungsfortschritt, Transport-Fehler, erster erfolgreicher Render,
+Render-Fehler) per `POST /clientlog?token=…` an den Relay. Der Relay druckt
+jede Zeile als `[client] …` auf stdout — und die Lua-Runner-Schicht fängt den
+Relay-stdout ein, sodass die Zeilen in **`:MDViewShowWebLogs`** und im
+`:MDViewDiagnose`-Bericht auftauchen. Kein DevTools-Öffnen nötig.
 
----
+```vim
+:MDViewShowWebLogs   " Relay-stdout inkl. [client]-Zeilen
+```
 
+Manueller Smoke-Test des Sinks (Relay muss laufen):
 
-## Browser-Konsole
+```sh
+curl -s -o /dev/null -w "%{http_code}\n" \
+  -X POST "http://localhost:<port>/clientlog?token=<token>" --data "hallo"
+# 204, und im Relay-stdout / :MDViewShowWebLogs:  [client] hallo
+```
 
-- quick manual checks:
-Wenn das readyState === 1 wird, ist WS verbunden. Wenn Connection closed before receiving a handshake response kommt, ist Proxy/Backend nicht erreichbar oder geschlossen — mit obigem Launcher-Patch sollte das nicht mehr vorkommen.
+Optionale manuelle Browser-Konsolen-Checks (nur zur Fehlersuche):
 
 ```js
-console.log("location", location.href);
-new WebSocket((location.protocol === 'https:' ? 'wss' : 'ws') + '://' + location.host + '/ws');
+console.log("location", location.href);          // key/token/theme in der URL?
+new WebSocket(`ws://${location.host}/ws${location.search}`); // readyState === 1 ?
 ```
-- Upgrade Check
-    Öffne DevTools → Network → Reload (F5) → beobachte /ws Upgrade und 101 Switching Protocols.
-    Falls handshake fehlschlägt: prüfe backend logs ([mdview-server] Running on http://localhost:...) und ob runner die Ports in vim.g.mdview_server_port / vim.g.mdview_dev_port schreib
 
 ---
 
-## Websocket
+## 3. Komponenten einzeln testen
 
-### wscat
+### Neovim / Plugin
 
-```sh
-# install wscat globally once (requires npm)
-npm install -g wscat
-
-# from powershell try to open websocket to backend directly:
-wscat -c ws://localhost:43219/ws
-
-# or try via vite port (should proxy)
-wscat -c ws://localhost:43220/ws
+```vim
+:checkhealth mdview   " Runtime-Infos, Dependency-Status
+:MDViewStart          " Relay starten + Browser öffnen
+:MDViewStop           " Relay stoppen
+:MDViewShowWebLogs    " Relay-stdout + [client]-Logs
+:MDViewDiagnose       " Vollbericht (siehe oben)
 ```
 
-Wenn wscat verbindet to 43219 but client can't, proxy problem; if neither connects, backend WebSocket server not bound/accepting upgrades.
+Headless-Smoke-Test (CI-nah), lädt lib.nvim ins rtp:
 
-### node websocket test
+```sh
+# Spec unter tests/lua/smoke_spec.lua (plenary/busted-Stil)
+"/c/Program Files/Neovim/bin/nvim" --headless -u NONE -i NONE \
+  --cmd "set rtp+=.,../lib.nvim" \
+  -c "luafile tests/lua/smoke_spec.lua" -c "qa!"
+```
 
-Node test script for websockets (cross-platform, run with node)
+### Go-Relay
 
-Speichern als `tests/test-ws.js` und mit `node tests/test-ws.js ws://localhost:43219/ws` ausführen.
+Siehe [../server/Testanweisugen.md](../server/Testanweisugen.md) für
+Endpoint-für-Endpoint-Tests. Automatisiert:
+
+```sh
+cd native/server && go vet ./... && go test ./...
+```
+
+### Rust/WASM-Client
+
+```sh
+cd native/wasm-render && cargo test        # Rendering + XSS-Payload-Tests
+# Root: Client-Bundle bauen (Rust -> WASM -> Vite)
+export CARGO="$HOME/.cargo/bin/cargo.exe"; export PATH="$HOME/.cargo/bin:$PATH"
+npm run build
+npx tsc -p tsconfig.json && npx eslint "src/**/*.{ts,tsx,js}"
+```
 
 ---
 
-
-## server
-
-- Ports beenden:
-
-```sh
-# powershell
-netstat -ano | findstr 43219
-taskkill /PID <PID> /F
-Get-NetTCPConnection -LocalPort 43219 -ErrorAction SilentlyContinue | Where-Object { $_.OwningProcess -ne 0 } | Select-Object -ExpandProperty OwningProcess -Unique | ForEach-Object { Stop-Process -Id $_ -Force -ErrorAction SilentlyContinue }
-
-Stop-Process -Name node -Force
-
-# Linux/macOS:
-lsof -i :43219
-kill -9 <PID>
-
-# Server-Health:
-curl -sS http://localhost:43219/health
-# Erwartet: ok
-
-# Server-Index prüfen (liefert HTML / client bootstrap):
-curl -sS http://localhost:43219/ | sed -n '1,40p'
-
-# Kurztest: manueller Render-POST (funktioniert bereits — aus Deinem Output)
-curl -sS -X POST "http://localhost:43219/render?key=test" -H "Content-Type: text/markdown" --data-binary "# Hello"
-# Erwartet: JSON mit html`
-
-# alle node prozesse ausgeben
-tasklist | findstr node
-# und Beenden
-Stop-Process -Name node -Force
-# oder
-taskkill /F /IM node.exe
-```
-
-
-* Server-Health prüfen (lokal):
-  `curl -sS http://localhost:43219/health`
-  Rückgabe `ok` bedeutet: HTTP-Server läuft. (Port ggf. aus `require('mdview.config').defaults.server_port` oder `vim.g.mdview_server_port` anpassen.)
-
-## client
-
-```sh
-# Prüfen, ob Vite dev läuft:
-curl -sS http://localhost:43220/ | head -n 10
-
-# Vite-dev-client prüfen (übliches dev-Setup verwendet Port 43220):
-curl -sS http://localhost:43220/ | sed -n '1,40p'
-```
-
-- Vite läuft auf Port `43220`. `vite.config.ts` leitet `/ws` auf den Server `43219` weiter.
-- `http://localhost:43219/` öffnen funktioniert nur, wenn der Node-Server korrekt läuft.
-- Wenn Vite dev nicht läuft, bleibt `/ws` unverbunden → Browser zeigt „loading…“.
-
----
-
-## Neovim
-
-* In Neovim: `:MDViewShowLogs` (falls `config.debug = true`) um Runner-/Server-Logs zu sehen.
-* `:checkhealth mdview` zeigt Runtime-Infos (Node/Bun, package.json-Status).
-
-## Prozess auf dem Port 43219 beenden
-
-```cmd
-for /f "tokens=5" %a in ('netstat -ano ^| findstr :43219') do taskkill /F /PID %a
-```
-
-* `findstr :43219` sucht nur nach dem Port 43219.
-* `tokens=5` greift auf die PID-Spalte von `netstat` zu.
-* `taskkill /F /PID %a` beendet gezielt diesen Prozess.
-
-In PowerShell geht es ähnlich:
+## 4. Prozess auf einem Port beenden
 
 ```powershell
-Get-Process -Id (Get-NetTCPConnection -LocalPort 43219).OwningProcess | Stop-Process -Force
+# Windows (PowerShell)
+Get-NetTCPConnection -LocalPort 43219 -ErrorAction SilentlyContinue |
+  Select-Object -ExpandProperty OwningProcess -Unique |
+  ForEach-Object { Stop-Process -Id $_ -Force }
 ```
 
-## Alle `node.exe`-Prozesse beenden
-
-**Eingabeaufforderung (CMD):**
-
-```cmd
-taskkill /F /IM node.exe
+```sh
+# Linux/macOS
+lsof -i :43219 && kill -9 <PID>
 ```
 
-**PowerShell:**
-
-```powershell
-Stop-Process -Name node -Force
-```
-
-* `/F` bzw. `-Force` erzwingt das Beenden.
-* Danach kannst du den Server erneut starten, ohne dass `EADDRINUSE` auftritt.
-
-Hinweis: Dadurch werden **alle laufenden Node-Prozesse beendet**, also auch andere laufende Projekte/Server, die Node nutzen.
-
-## `EADDRINUSE: address already in use :::43219`
-
-Der Fehler `EADDRINUSE: address already in use :::43219` bedeutet, dass Node versucht, den Port 43219 zu binden, dieser aber bereits von einem anderen Prozess verwendet wird. Auch wenn `netstat` scheinbar nichts findet, kann es ein paar typische Ursachen geben:
-
-1. **IPv6 vs. IPv4**
-
-   * `::` ist die IPv6-Adresse `any`. Manche Tools wie `netstat` zeigen IPv4-Ports (`0.0.0.0`) standardmäßig an. Der Port kann durch einen IPv6-Listener blockiert sein.
-   * Prüfen mit:
-
-     ```powershell
-     netstat -ano -p tcp | findstr 43219
-     ```
-
-     oder unter PowerShell:
-
-     ```powershell
-     Get-NetTCPConnection -LocalPort 43219
-     ```
-
-2. **Zombie-Node-Prozess**
-
-   * Ein vorheriger `npm run dev:server` Prozess läuft noch im Hintergrund.
-   * Prüfen mit:
-
-     ```powershell
-     tasklist | findstr node
-     ```
-   * Eventuell alte Prozesse killen:
-
-     ```powershell
-     taskkill /F /PID <pid>
-     ```
-
----
+> Es laufen keine `node.exe`-Prozesse mehr — der Relay ist eine einzelne native
+> Binary. `EADDRINUSE`/Zombie-Node-Hinweise aus älteren Doku-Ständen sind
+> obsolet; bei belegtem Port genügt das Beenden der obigen Binary.
