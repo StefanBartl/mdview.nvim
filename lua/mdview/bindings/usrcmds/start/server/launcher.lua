@@ -92,6 +92,14 @@ local function resolve_browser_url(opts)
 		url = url .. "&theme=" .. vim.uri_encode(theme)
 	end
 
+	-- opt-in WebTransport (HTTP/3). The client feature-detects and falls back
+	-- to WebSocket if unsupported or the endpoint doesn't answer, so this is
+	-- always safe to pass (see experimental.webtransport in DEFAULTS).
+	local experimental = require("mdview.config").defaults.experimental
+	if experimental and experimental.webtransport == true then
+		url = url .. "&transport=webtransport"
+	end
+
 	return url
 end
 M.resolve_browser_url = resolve_browser_url
