@@ -15,6 +15,7 @@ import (
 	"log"
 	"mime"
 	"net/http"
+	"strings"
 
 	"nhooyr.io/websocket"
 
@@ -65,6 +66,7 @@ func main() {
 	mux.HandleFunc("/health", handleHealth)
 	mux.HandleFunc("/update", handleUpdate(registry, *token))
 	mux.HandleFunc("/scroll", handleScroll(registry, *token))
+	mux.HandleFunc("/clientlog", handleClientLog(*token))
 	mux.HandleFunc("/ws", handleWS(registry, *token, port))
 	mux.Handle("/", fileServer)
 
@@ -81,6 +83,42 @@ func main() {
 func handleHealth(w http.ResponseWriter, _ *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write([]byte("ok"))
+}
+
+const maxClientLogBytes = 8 << 10 // 8 KiB per client log line
+
+// handleClientLog lets the browser client report its own diagnostics
+// (connection status, render/theme errors) back to the process. The line is
+// printed to stdout with a "[client]" tag; the Lua runner captures the
+// relay's stdout into the mdview log buffer, so browser-side problems show up
+// in :MDViewShowWebLogs / :MDViewDiagnose without opening devtools. Purely a
+// diagnostics sink — it never affects rendering or the room state.
+func handleClientLog(token string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		if !relay.ValidToken(token, r.URL.Query().Get("token")) {
+			http.Error(w, "forbidden", http.StatusForbidden)
+			return
+		}
+		body, err := io.ReadAll(io.LimitReader(r.Body, maxClientLogBytes))
+		if err != nil {
+			http.Error(w, "failed to read body", http.StatusBadRequest)
+			return
+		}
+		// One line, control chars stripped, so a hostile page can't inject
+		// fake log lines into the captured stream.
+		line := strings.Map(func(rr rune) rune {
+			if rr == '\n' || rr == '\r' {
+				return ' '
+			}
+			return rr
+		}, string(body))
+		fmt.Printf("[client] %s\n", line)
+		w.WriteHeader(http.StatusNoContent)
+	}
 }
 
 // handleUpdate accepts the current raw text of a document from the trusted

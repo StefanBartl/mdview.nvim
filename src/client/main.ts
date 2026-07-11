@@ -69,16 +69,46 @@ async function boot() {
   const key = params.get('key');
   const token = params.get('token');
 
+  // Report browser-side diagnostics back to the relay (which prints them to
+  // stdout, captured into :MDViewShowWebLogs / :MDViewDiagnose) so problems
+  // in the page are visible from Neovim without opening devtools. Best-effort
+  // and token-gated; a no-op if key/token are missing.
+  const clientLog = (msg: string): void => {
+    if (!token) return;
+    try {
+      void fetch(`/clientlog?token=${encodeURIComponent(token)}`, {
+        method: 'POST',
+        body: msg,
+        keepalive: true,
+      });
+    } catch {
+      /* diagnostics must never throw */
+    }
+  };
+
   if (!key || !token) {
     console.error('[mdview] missing key/token in URL; refusing to connect');
+    clientLog('missing key/token in URL; refusing to connect');
     return;
   }
 
+  clientLog(`boot: connecting (key=${key}, theme=${params.get('theme') || 'github'})`);
+
   const scheme = location.protocol === 'https:' ? 'wss' : 'ws';
   const url = `${scheme}://${location.host}/ws?key=${encodeURIComponent(key)}&token=${encodeURIComponent(token)}`;
-  const transport = await createTransport(url);
+
+  let transport;
+  try {
+    transport = await createTransport(url);
+  } catch (err) {
+    console.error('[mdview] transport failed', err);
+    clientLog(`transport failed: ${String(err)}`);
+    return;
+  }
+  clientLog('websocket connected');
 
   const container = document.getElementById('mdview-root');
+  let firstRender = true;
 
   transport.onMessage((rawMessage: string) => {
     if (!container) return;
@@ -92,8 +122,13 @@ async function boot() {
       // render_markdown returns HTML that has already passed through the
       // sanitizer inside the WASM module — safe to assign directly.
       container.innerHTML = render_markdown(rawMessage);
+      if (firstRender) {
+        firstRender = false;
+        clientLog(`first render ok (${rawMessage.length} bytes)`);
+      }
     } catch (err) {
       console.error('[mdview] render failed', err);
+      clientLog(`render failed: ${String(err)}`);
     }
   });
 }
