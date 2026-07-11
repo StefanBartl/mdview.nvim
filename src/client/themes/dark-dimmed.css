@@ -1,0 +1,21 @@
+/* GitHub "dark dimmed" palette for mdview.nvim — a softer, lower-contrast
+   dark theme (muted slate background instead of near-black). This is a
+   dark-only theme by design, so it does not follow prefers-color-scheme;
+   selecting it always yields the dimmed look. Structure lives in _base.css. */
+
+@import "./_base.css";
+
+:root {
+  --md-fg: #adbac7;
+  --md-muted: #768390;
+  --md-bg: #22272e;
+  --md-border: #444c56;
+  --md-border-muted: #444c56b3;
+  --md-code-bg: #636e7b33;
+  --md-code-block-bg: #2d333b;
+  --md-link: #539bf5;
+  --md-quote-fg: #768390;
+  --md-quote-border: #444c56;
+  --md-table-stripe: #2d333b;
+  --md-mark-bg: #ae7c1466;
+}

@@ -24,7 +24,7 @@
 ---@field open_url string|nil static override URL always used instead of the computed key/token URL
 ---@field require_display boolean don't auto-open a browser without a GUI/DISPLAY available (see mdview-security)
 ---@field stop_on_browser_exit boolean run :MDViewStop when the opened browser process exits (isolated mode only)
----@field theme string preview theme name passed to the client as ?theme= (see src/client/themes/)
+---@field theme string preview theme passed to the client as ?theme= — one of "github", "dark-dimmed", "plain" (optionally suffixed "-light"/"-dark" to pin the color scheme); see src/client/themes/
 
 ---@class mdview.config.StartDefaults
 ---@field push_strategy "launcher"|"try_push" initial-push strategy used by :MDViewStart
