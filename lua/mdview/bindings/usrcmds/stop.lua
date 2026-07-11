@@ -55,6 +55,10 @@ function M.stop(close_browser_override)
 	-- short-circuiting on the cached readiness of the stopped instance.
 	require("mdview.adapter.ws_client").reset_ready()
 
+	-- Forget which room the (now-closed) tab watched, so a fresh :MDViewStart
+	-- doesn't route "reuse" pushes to a stale key from the previous session.
+	state.set_preview_key(nil)
+
 	session.shutdown()
 
 	local should_close

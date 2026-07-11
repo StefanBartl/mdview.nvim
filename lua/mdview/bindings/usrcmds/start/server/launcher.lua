@@ -193,6 +193,10 @@ function M.start(opts)
 					local browser_url = resolve_browser_url({ browser_url = opts.browser_url, key = key })
 					log.debug("Opening browser: " .. browser_url, nil, "launcher", true)
 
+					-- Record which room the visible tab watches so the "reuse"
+					-- browser_behavior can route later buffers' content here.
+					state.set_preview_key(key)
+
 					local opts_table = {
 						open_mode = browser_defaults.open_mode,
 						browser_cmd = browser_cmd,

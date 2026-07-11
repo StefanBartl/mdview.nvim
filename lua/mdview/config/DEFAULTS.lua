@@ -12,8 +12,14 @@
 ---| '"default"' # open in your normal default browser as a new tab (your extensions/theme; no programmatic close)
 ---| '"isolated"' # spawn a separate mdview browser profile/window (auto-close works; no access to your extensions)
 
+---@alias mdview.config.BrowserBehavior
+---| '"reuse"' # the one preview tab follows the active markdown buffer (default)
+---| '"new_tab"' # each markdown buffer you switch to opens its own preview tab
+---| '"manual"' # switching buffers does nothing; open other files with :MDViewOpen
+
 ---@class mdview.config.BrowserDefaults
 ---@field open_mode mdview.config.BrowserOpenMode how the preview browser is opened (default "default")
+---@field behavior mdview.config.BrowserBehavior what happens to the preview when you switch markdown buffers (default "reuse")
 ---@field autodetect_browser boolean try to locate a browser automatically (isolated mode only)
 ---@field browser string friendly name e.g. "chrome" or "firefox" (isolated mode only)
 ---@field browser_cmd string absolute path to executable to force use (isolated mode only)
@@ -94,6 +100,7 @@ return {
 		require_display = true,
 		stop_on_browser_exit = true,
 		theme = "github",
+		behavior = "reuse",
 	},
 
 	start = {

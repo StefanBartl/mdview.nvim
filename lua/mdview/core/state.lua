@@ -264,6 +264,26 @@ function M.get_token()
 	return M.runner.token
 end
 
+-- The relay room key (normalized path) the currently-visible browser tab is
+-- watching. Set when a browser tab is opened; consulted by the "reuse"
+-- browser_behavior so live pushes for whatever buffer is active are routed to
+-- the one open tab. nil when no browser tab has been opened this session.
+---@type string|nil
+M.runner.preview_key = nil
+
+--- Set the room key the visible browser tab is bound to (see browser.behavior).
+---@param key string|nil
+---@return nil
+function M.set_preview_key(key)
+	M.runner.preview_key = key
+end
+
+--- Get the room key the visible browser tab is bound to, or nil.
+---@return string|nil
+function M.get_preview_key()
+	return M.runner.preview_key
+end
+
 --- Returns whether the server process is running (handle exists and is not
 --- closing). Previously checked the nonexistent `M.proc` field (the handle
 --- lives in `M.runner.proc`, see M.set_proc), so it always returned false.
