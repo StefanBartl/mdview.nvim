@@ -99,9 +99,21 @@ async function boot() {
   const scheme = location.protocol === 'https:' ? 'wss' : 'ws';
   const url = `${scheme}://${location.host}/ws?key=${encodeURIComponent(key)}&token=${encodeURIComponent(token)}`;
 
+  // Opt-in WebTransport (HTTP/3). The Lua side adds ?transport=webtransport
+  // only when experimental.webtransport is enabled; the factory feature-detects
+  // and falls back to WebSocket on any failure, so this never breaks the
+  // preview. The WebTransport URL points at an https /wt endpoint (backend is a
+  // documented future step — see docs/Roadmap/WebTransportAPI/DESIGN.md).
+  const preferWebTransport = params.get('transport') === 'webtransport';
+  const webTransportUrl = `https://${location.host}/wt?key=${encodeURIComponent(key)}&token=${encodeURIComponent(token)}`;
+
   let transport;
   try {
-    transport = await createTransport(url);
+    transport = await createTransport(url, {
+      preferWebTransport,
+      webTransportUrl,
+      log: clientLog,
+    });
   } catch (err) {
     console.error('[mdview] transport failed', err);
     clientLog(`transport failed: ${String(err)}`);

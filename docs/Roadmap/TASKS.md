@@ -82,9 +82,16 @@
 - [ ] **Fokus nach `:MDViewStart` erzwingen** (Browserfenster in den
   Vordergrund). Kein plattformübergreifendes API; nur über fragile OS-Hacks
   (`wmctrl`, PowerShell, AppleScript). Zurückgestellt.
-- [ ] **WebTransport statt WebSocket.** Für kleine Text-Updates kein Mehrwert,
-  erzwingt TLS auch auf localhost. Bewusst verworfen (Roadmap BUGS #3) — hier
-  nur als „nicht verfolgen"-Merker.
+- [~] **WebTransport als opt-in Zukunftstechnologie.** Client-Seite umgesetzt
+  und getestet: `experimental.webtransport` (Config) → `&transport=webtransport`
+  (Browser-URL) → Factory mit Feature-Detection + automatischem WebSocket-
+  Fallback (`src/client/transport/webtransport.transport.ts`,
+  `transportFactory.ts`, Unit-Tests in `tests/client/transportFactory.test.ts`).
+  **Offen (dokumentiert):** der HTTP/3-Relay-Backend (quic-go/webtransport-go,
+  self-signed Cert + Hash-Delivery, `/wt`-Handler auf `relay.Registry`) — bis
+  dahin fällt das Opt-in transparent auf WebSocket zurück. Vollständiges Design:
+  `docs/Roadmap/WebTransportAPI/DESIGN.md`. (Ersetzt den früheren „bewusst
+  verworfen"-Merker — auf ausdrücklichen Wunsch als opt-in wiederaufgenommen.)
 
 ## Testing / Hygiene
 

@@ -35,6 +35,9 @@
 ---@field repo string GitHub "owner/repo" releases are downloaded from — override if you run a fork
 ---@field version string release tag to install (e.g. "v0.1.0") — pin an older release by changing this
 
+---@class mdview.config.ExperimentalDefaults
+---@field webtransport boolean opt in to the WebTransport (HTTP/3) client transport; falls back to WebSocket until an HTTP/3 relay backend exists (future tech)
+
 ---@class mdview.config.Defaults
 ---@field ft_pattern string[] filetype/glob patterns mdview's autocmds attach to
 ---@field server_port integer preferred port the relay server listens on
@@ -51,6 +54,7 @@
 ---@field browser mdview.config.BrowserDefaults
 ---@field start mdview.config.StartDefaults
 ---@field install mdview.config.InstallDefaults
+---@field experimental mdview.config.ExperimentalDefaults
 
 ---@type mdview.config.Defaults
 return {
@@ -101,5 +105,16 @@ return {
 	install = {
 		repo = "StefanBartl/mdview.nvim",
 		version = "v0.1.0",
+	},
+
+	experimental = {
+		-- Opt in to the WebTransport (HTTP/3) client transport instead of
+		-- WebSocket. Future tech: the relay does not serve an HTTP/3 endpoint
+		-- yet (see docs/Roadmap/WebTransportAPI/DESIGN.md), so enabling this
+		-- currently makes the client feature-detect WebTransport, attempt it,
+		-- and fall back to WebSocket transparently — never breaking the
+		-- preview. Kept as an opt-in so the plumbing is ready when the backend
+		-- lands. Default false.
+		webtransport = false,
 	},
 }
