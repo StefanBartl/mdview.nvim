@@ -5,6 +5,7 @@
 local api = vim.api
 local live_push = require("mdview.bindings.autocmds.live_push")
 local bufenter = require("mdview.bindings.autocmds.bufenter")
+local buffer_switch = require("mdview.bindings.autocmds.buffer_switch")
 local vim_leave = require("mdview.bindings.autocmds.vim_leave")
 local scroll_sync = require("mdview.bindings.autocmds.scroll_sync")
 -- local on_text_change = require("mdview.bindings.autocmds.on_text_change")
@@ -37,6 +38,7 @@ function M.attach()
   M.augroup_id = api.nvim_create_augroup("MdviewAutocmds", { clear = true })
 
 	bufenter.attach(M.augroup_id)  -- BufEnter snapshot
+  buffer_switch.attach(M.augroup_id) -- Apply browser.behavior on buffer switch
   live_push.attach(M.augroup_id) -- Live Markdown push (diffs + full push on write)
   scroll_sync.attach(M.augroup_id) -- nvim-to-browser scroll sync (config: scroll_sync)
   vim_leave.attach(M.augroup_id) -- Stop server on VimLeave

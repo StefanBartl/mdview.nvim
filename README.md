@@ -127,7 +127,8 @@ Partial nested overrides merge recursively — `{ browser = { browser = "firefox
 | `server_port` | `43219` | Preferred loopback port; the relay picks the next free one if taken. |
 | `scroll_sync` | `true` | Sync the nvim cursor position to the browser scroll position. |
 | `open_preview_tab` | `false` | Render into a read-only Neovim tab (Treesitter-highlighted) instead of the browser. |
-| `browser.open_mode` | `"default"` | `"default"` opens a tab in your normal browser (your extensions/theme; can't be closed programmatically, so auto-close is a no-op). `"isolated"` spawns a throwaway profile so auto-close works. |
+| `browser.open_mode` | `"default"` | `"default"` opens a tab in your normal browser (your extensions/theme; auto-close via a cooperative `window.close()` on stop). `"isolated"` spawns a throwaway profile so process-handle auto-close works. |
+| `browser.behavior` | `"reuse"` | What happens when you switch markdown buffers: `"reuse"` (the one tab follows the active buffer), `"new_tab"` (each file opens its own tab), or `"manual"` (nothing; use `:MDViewOpen`). |
 | `browser.theme` | `"github"` | Preview theme: `github`, `dark-dimmed`, or `plain` — optionally suffixed `-light`/`-dark` to pin the color scheme. |
 | `browser.browser_autostart` | `true` | Open the browser automatically on `:MDViewStart`. |
 | `browser.stop_on_browser_exit` | `true` | Run `:MDViewStop` when the opened browser process exits (isolated mode only). |

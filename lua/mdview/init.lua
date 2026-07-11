@@ -56,6 +56,10 @@ function M.open(opts)
 		return false
 	end
 
+	-- This tab will watch `key`'s room; record it before seeding so the seed
+	-- (and, in "reuse" behavior, later live pushes) route to this room.
+	state.set_preview_key(key)
+
 	-- best-effort: seed the relay with current content so the new tab isn't empty
 	pcall(require("mdview.bindings.autocmds.live_push").push_buffer_changes, buf)
 

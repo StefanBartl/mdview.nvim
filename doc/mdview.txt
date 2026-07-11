@@ -128,6 +128,8 @@ Defaults: >lua
     browser = {
       open_mode           = "default", -- "default" (tab in your browser)
                                        -- | "isolated" (own window, auto-close)
+      behavior            = "reuse",   -- on buffer switch: "reuse" (one tab
+                                       -- follows) | "new_tab" | "manual"
       theme               = "github",  -- "github" | "dark-dimmed" | "plain"
                                        -- (optionally -light/-dark suffixed)
       autodetect_browser  = true,  -- isolated mode only
@@ -214,6 +216,16 @@ browser.theme ~
   |:MDViewTheme|. Add a theme by dropping a CSS file in src/client/themes/
   (import `_base.css` for the shared structure) and a matching loader in
   main.ts.
+
+browser.behavior ~
+  What happens to the preview when you switch to a different markdown buffer
+  while a session is running:
+    "reuse"   — the one open preview tab follows the active buffer (its
+                content is pushed into that tab's room). Default.
+    "new_tab" — each markdown buffer you switch to opens its own preview tab
+                (once per file; respects `browser_autostart`).
+    "manual"  — switching buffers does nothing; open other files explicitly
+                with |:MDViewOpen|.
 
 browser.autodetect_browser ~
   Try to locate an installed browser automatically (chrome, chromium, edge,

@@ -46,9 +46,23 @@ function M.push_buffer_changes(bufnr)
 	local lines = api.nvim_buf_get_lines(bufnr, 0, -1, false) or {}
 	local payload = table.concat(lines, "\n")
 
-	ws_client.send_markdown(path, payload, { immediate = true })
+	-- In "reuse" browser_behavior the single preview tab follows the active
+	-- buffer, so route this buffer's content to the room the open tab is
+	-- watching (the preview key) rather than this buffer's own path. For
+	-- "new_tab"/"manual" — and whenever no tab has been opened yet — push to
+	-- the buffer's own path, i.e. the original per-document room model.
+	local target = path
+	local behavior = require("mdview.config.browser").defaults.behavior or "reuse"
+	if behavior == "reuse" then
+		local preview_key = require("mdview.core.state").get_preview_key()
+		if type(preview_key) == "string" and preview_key ~= "" then
+			target = preview_key
+		end
+	end
+
+	ws_client.send_markdown(target, payload, { immediate = true })
 	session.store(path, lines)
-	log.debug("full push sent and session stored for " .. path, nil, "livepush", true)
+	log.debug("full push sent (target=" .. target .. ") and session stored for " .. path, nil, "livepush", true)
 end
 
 --- Setup autocmds for live push and save. Called once per attach cycle from

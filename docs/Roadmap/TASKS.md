@@ -64,10 +64,15 @@
   nvim→Browser-Sync). Client sendet Scroll-Position per WS, ein
   Server→Neovim-Kanal bewegt den Cursor/Viewport. Braucht dieselbe Bridge wie
   Click-to-navigate (B).
-- [ ] **Buffer-Wechsel-Verhalten konfigurierbar** (`browser_behavior =
-  "reuse" | "new_tab" | "manual"`, Wunschliste #2): beim Wechsel des aktiven
-  Markdown-Buffers entweder denselben Tab aktualisieren, einen neuen öffnen
-  oder nichts tun.
+- [x] **Buffer-Wechsel-Verhalten konfigurierbar** (`browser.behavior =
+  "reuse" | "new_tab" | "manual"`, default `reuse`; Wunschliste #2): neue
+  Autocmd-Gruppe `bindings/autocmds/buffer_switch.lua` reagiert auf BufEnter.
+  `reuse` routet den aktiven Buffer in den Room des offenen Tabs (State-Feld
+  `preview_key`, gesetzt beim Browser-Open, geleert beim Stop) — der eine Tab
+  folgt dir; `new_tab` öffnet pro Datei einen eigenen Tab (einmalig, respektiert
+  `browser_autostart`); `manual` tut nichts. Kein Regressionsrisiko für den
+  Einzeldatei-Fall (dort `preview_key == path`). Headless verifiziert (alle vier
+  Routing-Fälle).
 
 ## Schwer / Größere Vorhaben
 
