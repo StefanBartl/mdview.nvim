@@ -63,8 +63,8 @@ turned into DOM content without passing through an allowlist-based sanitizer.
   dependencies = { "StefanBartl/lib.nvim" },
   ft = { "markdown" },
   cmd = {
-    "MDViewStart", "MDViewStop", "MDViewOpen",
-    "MDViewShowWebLogs", "MDViewPreviewTab",
+    "MDViewStart", "MDViewStop", "MDViewToggle", "MDViewOpen",
+    "MDViewTheme", "MDViewPreviewTab", "MDViewShowWebLogs", "MDViewDiagnose",
   },
   config = function()
     require("mdview").setup()
@@ -92,8 +92,8 @@ use {
   requires = { "StefanBartl/lib.nvim" },
   ft = { "markdown" },
   cmd = {
-    "MDViewStart", "MDViewStop", "MDViewOpen",
-    "MDViewShowWebLogs", "MDViewPreviewTab",
+    "MDViewStart", "MDViewStop", "MDViewToggle", "MDViewOpen",
+    "MDViewTheme", "MDViewPreviewTab", "MDViewShowWebLogs", "MDViewDiagnose",
   },
   config = function()
     require("mdview").setup()
@@ -119,6 +119,36 @@ require("mdview").setup({
 ```
 
 Partial nested overrides merge recursively — `{ browser = { browser = "firefox" } }` only changes that one key, the rest of `browser`'s defaults stay intact.
+
+### Key options
+
+| Option | Default | Purpose |
+| --- | --- | --- |
+| `server_port` | `43219` | Preferred loopback port; the relay picks the next free one if taken. |
+| `scroll_sync` | `true` | Sync the nvim cursor position to the browser scroll position. |
+| `open_preview_tab` | `false` | Render into a read-only Neovim tab (Treesitter-highlighted) instead of the browser. |
+| `browser.open_mode` | `"default"` | `"default"` opens a tab in your normal browser (your extensions/theme; can't be closed programmatically, so auto-close is a no-op). `"isolated"` spawns a throwaway profile so auto-close works. |
+| `browser.theme` | `"github"` | Preview theme: `github`, `dark-dimmed`, or `plain` — optionally suffixed `-light`/`-dark` to pin the color scheme. |
+| `browser.browser_autostart` | `true` | Open the browser automatically on `:MDViewStart`. |
+| `browser.stop_on_browser_exit` | `true` | Run `:MDViewStop` when the opened browser process exits (isolated mode only). |
+| `browser.require_display` | `true` | Don't try to open a browser without a GUI/`DISPLAY`. |
+
+---
+
+## Commands
+
+| Command | Description |
+| --- | --- |
+| `:MDViewStart [file] [cwd=…]` | Start the relay and open the preview for the current buffer (or the given file). |
+| `:MDViewStop` | Stop the relay, detach autocommands, and (in isolated mode) close the browser. |
+| `:MDViewToggle [file] [cwd=…]` | Start if stopped, stop if running. |
+| `:MDViewOpen` | Re-open a browser tab against the already-running session (does not start a new relay). |
+| `:MDViewTheme [name]` | Switch the preview theme at runtime (`github` \| `dark-dimmed` \| `plain`, optionally `-light`/`-dark`); no argument reports the current theme. |
+| `:MDViewPreviewTab` | Toggle the in-Neovim tab preview (works standalone, no server needed). |
+| `:MDViewShowWebLogs` | Show the relay's captured stdout, including `[client]` browser-side diagnostics. |
+| `:MDViewDiagnose [path]` | Write a full component-state diagnostics report to a file and open it. |
+
+Run `:checkhealth mdview` to verify dependencies (lib.nvim, curl, tar) and whether the relay binary and client bundle are cached.
 
 ---
 

@@ -55,8 +55,8 @@ lazy.nvim, lazy-loaded on markdown files or the plugin's own commands
     dependencies = { "StefanBartl/lib.nvim" },
     ft  = { "markdown" },
     cmd = {
-      "MDViewStart", "MDViewStop", "MDViewOpen",
-      "MDViewShowWebLogs", "MDViewPreviewTab",
+      "MDViewStart", "MDViewStop", "MDViewToggle", "MDViewOpen",
+      "MDViewTheme", "MDViewPreviewTab", "MDViewShowWebLogs", "MDViewDiagnose",
     },
     config = function()
       require("mdview").setup()
@@ -83,8 +83,8 @@ packer.nvim: >lua
     requires = { "StefanBartl/lib.nvim" },
     ft  = { "markdown" },
     cmd = {
-      "MDViewStart", "MDViewStop", "MDViewOpen",
-      "MDViewShowWebLogs", "MDViewPreviewTab",
+      "MDViewStart", "MDViewStop", "MDViewToggle", "MDViewOpen",
+      "MDViewTheme", "MDViewPreviewTab", "MDViewShowWebLogs", "MDViewDiagnose",
     },
     config = function()
       require("mdview").setup()
@@ -128,7 +128,8 @@ Defaults: >lua
     browser = {
       open_mode           = "default", -- "default" (tab in your browser)
                                        -- | "isolated" (own window, auto-close)
-      theme               = "github",  -- preview theme (?theme= to the client)
+      theme               = "github",  -- "github" | "dark-dimmed" | "plain"
+                                       -- (optionally -light/-dark suffixed)
       autodetect_browser  = true,  -- isolated mode only
       browser             = "",    -- friendly name, e.g. "firefox" (isolated)
       browser_cmd         = "",    -- absolute path (isolated mode only)
@@ -205,9 +206,14 @@ browser.open_mode ~
   and `require_display` apply to "isolated" mode only.
 
 browser.theme ~
-  Preview theme name, passed to the client as `?theme=`. Ships `"github"`
-  (light/dark auto via prefers-color-scheme). Add a theme by dropping a CSS
-  file in src/client/themes/ and a matching loader in main.ts.
+  Preview theme name, passed to the client as `?theme=`. Ships three themes:
+  `"github"`, `"dark-dimmed"` (a darker, lower-contrast variant), and
+  `"plain"` (neutral, no branded accents). Each follows the OS
+  prefers-color-scheme where it defines both; append `-light` or `-dark`
+  (e.g. `"github-dark"`) to pin the color scheme. Switch at runtime with
+  |:MDViewTheme|. Add a theme by dropping a CSS file in src/client/themes/
+  (import `_base.css` for the shared structure) and a matching loader in
+  main.ts.
 
 browser.autodetect_browser ~
   Try to locate an installed browser automatically (chrome, chromium, edge,
@@ -259,6 +265,11 @@ install.repo / install.version ~
   session, and — when `browser.browser_autoclose` is true (the default) —
   closes the browser tab |:MDViewStart| opened.
 
+:MDViewToggle [file] [cwd=...]                                 *:MDViewToggle*
+  Starts the preview if no session is running, otherwise stops it. A thin
+  dispatcher over |:MDViewStart| / |:MDViewStop|; start-style args are
+  forwarded when starting and ignored when stopping.
+
 :MDViewOpen                                                      *:MDViewOpen*
   Re-opens a browser tab for the *current* buffer against the
   *already-running* session. It does NOT start a new relay process — run
@@ -267,9 +278,27 @@ install.repo / install.version ~
   |:MDViewStart| uses. If no session is running, or the current buffer has
   no file path, it fails loudly via |vim.notify()| instead of doing nothing.
 
+:MDViewTheme [name]                                            *:MDViewTheme*
+  Switches the preview theme at runtime. `[name]` is one of `github`,
+  `dark-dimmed`, `plain` (optionally `-light`/`-dark` suffixed) and is
+  tab-completed. Sets `browser.theme` in the live config and, if a session is
+  running, re-opens the preview so the change applies now (a fresh tab in
+  "default" |browser.open_mode|, since the old tab can't be closed
+  programmatically). With no argument it reports the current theme.
+
 :MDViewShowWebLogs                                        *:MDViewShowWebLogs*
   Opens a scratch buffer showing the relay server's captured stdout/stderr
-  log (subject to `debug` in |mdview-config|).
+  log, including `[client]` lines the browser client POSTs back for
+  diagnostics (connection status, render/theme errors). Subject to `debug`
+  in |mdview-config|.
+
+:MDViewDiagnose [path]                                       *:MDViewDiagnose*
+  Writes a full component-state diagnostics report to a file (default
+  `stdpath('log')/mdview-diagnostics.txt`, or `[path]` if given) and opens
+  it. Covers environment, dependencies, install cache, effective config, the
+  running session with a live /health probe, the browser URL that would be
+  opened, and the recent internal log ring — everything needed to hand a
+  bug report off for debugging.
 
 :MDViewPreviewTab                                          *:MDViewPreviewTab*
   Toggles an nvim-tab Markdown preview for the current buffer: a read-only
@@ -347,6 +376,7 @@ without any extra integration needed.
 Reports, without downloading or installing anything:
 
   - Neovim >= 0.9
+  - lib.nvim present (a required dependency — reported as an error if missing)
   - `curl` found on PATH
   - `tar` found on PATH
   - Whether the mdview-server binary for the configured
@@ -392,8 +422,9 @@ are downloaded automatically the first time |:MDViewStart| runs.
                                    Treesitter-highlighted mirror buffer (see
                                    |:MDViewPreviewTab|)
     bindings/
-      usrcmds/                     :MDViewStart, :MDViewStop, :MDViewOpen,
-                                   :MDViewShowWebLogs, :MDViewPreviewTab
+      usrcmds/                     :MDViewStart, :MDViewStop, :MDViewToggle,
+                                   :MDViewOpen, :MDViewTheme, :MDViewPreviewTab,
+                                   :MDViewShowWebLogs, :MDViewDiagnose
       autocmds/                    BufEnter, TextChanged*, BufWritePost,
                                    CursorMoved*, VimLeavePre wiring (see
                                    |mdview-autocmds|); preview_tab_sync.lua
