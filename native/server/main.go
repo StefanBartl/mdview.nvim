@@ -32,6 +32,13 @@ const maxScrollBodyBytes = 256      // scroll payload is just "<line>/<total>"
 // ambiguity with real content.
 const scrollMessagePrefix = "\x01"
 
+// closeMessagePrefix tags a WebSocket message as a "close this tab now" signal.
+// The client calls window.close() on receipt. Used to cooperatively close
+// preview tabs in the "default" browser open_mode, where mdview holds no OS
+// process handle for the tab and so can't close it any other way. \x02, like
+// \x01, is a control byte that can never appear in typed Markdown.
+const closeMessagePrefix = "\x02"
+
 // wsConn adapts a *websocket.Conn to relay.Conn so relay.Registry stays
 // decoupled from the WebSocket library and can be tested without a network.
 type wsConn struct {
@@ -66,6 +73,7 @@ func main() {
 	mux.HandleFunc("/health", handleHealth)
 	mux.HandleFunc("/update", handleUpdate(registry, *token))
 	mux.HandleFunc("/scroll", handleScroll(registry, *token))
+	mux.HandleFunc("/close", handleClose(registry, *token))
 	mux.HandleFunc("/clientlog", handleClientLog(*token))
 	mux.HandleFunc("/ws", handleWS(registry, *token, port))
 	mux.Handle("/", fileServer)
@@ -175,6 +183,27 @@ func handleScroll(registry *relay.Registry, token string) http.HandlerFunc {
 			return
 		}
 		registry.BroadcastEphemeral(key, append([]byte(scrollMessagePrefix), body...))
+		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
+// handleClose tells every connected preview tab to close itself (the client
+// calls window.close() on the closeMessagePrefix signal). This is how mdview
+// cooperatively closes tabs in the "default" browser open_mode, where it holds
+// no OS process handle for the browser tab. Token-gated; broadcast to all rooms
+// since a stop applies to the whole session, not one document. Ephemeral, so a
+// tab that connects afterwards is never seeded with a stale close signal.
+func handleClose(registry *relay.Registry, token string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		if !relay.ValidToken(token, r.URL.Query().Get("token")) {
+			http.Error(w, "forbidden", http.StatusForbidden)
+			return
+		}
+		registry.BroadcastAllEphemeral([]byte(closeMessagePrefix))
 		w.WriteHeader(http.StatusNoContent)
 	}
 }

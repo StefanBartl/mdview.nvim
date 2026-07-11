@@ -375,4 +375,25 @@ function M.send_scroll(path, line, total)
 	http_post_nonblocking(scroll_url_for(path), tostring(line) .. "/" .. tostring(total), function() end)
 end
 
+-- Public: ask every connected preview tab to close itself (the relay
+-- broadcasts a close signal to all rooms; the client calls window.close()).
+-- Used by :MDViewStop so tabs opened in the OS default browser — which mdview
+-- can't close via a process handle — close cooperatively.
+--
+-- Intentionally BLOCKING with a short timeout: it runs right before the relay
+-- process is killed, so a fire-and-forget POST would race the shutdown and
+-- usually lose. A brief synchronous curl guarantees the relay broadcasts the
+-- signal before it dies. Best-effort — any failure is swallowed (the tab just
+-- stays open, exactly as it did before this feature).
+---@return nil
+function M.send_close()
+	if fn.executable("curl") ~= 1 then
+		return
+	end
+	local port = vim.g.mdview_server_port or DEFAULT_PORT
+	local token = require("mdview.core.state").get_token() or ""
+	local url = string.format("http://localhost:%d/close?token=%s", port, vim.uri_encode(token))
+	pcall(fn.system, { "curl", "-sS", "--max-time", "1", "-X", "POST", url })
+end
+
 return M

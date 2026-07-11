@@ -46,6 +46,12 @@ async function applyTheme(params: URLSearchParams): Promise<void> {
 // Markdown text, so there's no ambiguity with real content.
 const SCROLL_MESSAGE_PREFIX = '\x01';
 
+// Tags a WS message as a "close this tab now" signal — must match
+// native/server/main.go's closeMessagePrefix. Sent when the session stops so
+// preview tabs opened in the OS default browser (which mdview can't close via a
+// process handle) close themselves cooperatively.
+const CLOSE_MESSAGE_PREFIX = '\x02';
+
 function applyScrollPing(container: HTMLElement, message: string): void {
   const [lineStr, totalStr] = message.slice(SCROLL_MESSAGE_PREFIX.length).split('/');
   const line = Number(lineStr);
@@ -125,6 +131,19 @@ async function boot() {
   let firstRender = true;
 
   transport.onMessage((rawMessage: string) => {
+    if (rawMessage.startsWith(CLOSE_MESSAGE_PREFIX)) {
+      // Session stopped — close this tab. window.close() only works for
+      // script-opened windows in some browsers; if it's blocked, show a note
+      // so the tab isn't left silently stale.
+      clientLog('close signal received; closing tab');
+      window.close();
+      if (container) {
+        container.innerHTML =
+          '<p style="opacity:.6">mdview session stopped — you can close this tab.</p>';
+      }
+      return;
+    }
+
     if (!container) return;
 
     if (rawMessage.startsWith(SCROLL_MESSAGE_PREFIX)) {

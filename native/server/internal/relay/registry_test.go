@@ -132,3 +132,32 @@ func TestRegistry_BroadcastEphemeralOnlyReachesSameRoom(t *testing.T) {
 		t.Fatalf("expected b1 (different room) to receive nothing, got %v", b1.received)
 	}
 }
+
+func TestRegistry_BroadcastAllEphemeralReachesEveryRoomWithoutTouchingLastPayload(t *testing.T) {
+	r := NewRegistry()
+	a1 := &fakeConn{}
+	a2 := &fakeConn{}
+	b1 := &fakeConn{}
+	r.Join("/doc/a.md", a1)
+	r.Join("/doc/a.md", a2)
+	r.Join("/doc/b.md", b1)
+
+	r.Broadcast("/doc/a.md", []byte("content a"))
+	r.Broadcast("/doc/b.md", []byte("content b"))
+
+	r.BroadcastAllEphemeral([]byte("\x02"))
+
+	for name, c := range map[string]*fakeConn{"a1": a1, "a2": a2, "b1": b1} {
+		if string(c.received[len(c.received)-1]) != "\x02" {
+			t.Fatalf("expected %s to receive the global close signal last, got %v", name, c.received)
+		}
+	}
+
+	// The global ephemeral must not overwrite any room's last content.
+	if p, _ := r.LastPayload("/doc/a.md"); string(p) != "content a" {
+		t.Fatalf("BroadcastAllEphemeral must not touch LastPayload; got %q", p)
+	}
+	if p, _ := r.LastPayload("/doc/b.md"); string(p) != "content b" {
+		t.Fatalf("BroadcastAllEphemeral must not touch LastPayload; got %q", p)
+	}
+}
