@@ -33,6 +33,20 @@ function M.check()
 		error_("Neovim >= 0.9 is required")
 	end
 
+	-- lib.nvim is a HARD dependency: mdview requires it for cross-platform
+	-- helpers (is_windows, path separators), user-command registration, and
+	-- structured logging. Missing it is an error, not a warning — the plugin
+	-- cannot function without it. Probe one representative module rather than
+	-- the bare namespace so a half-installed lib.nvim is also caught.
+	if pcall(require, "lib.nvim.cross.platform.is_windows") then
+		ok("lib.nvim found (required cross-platform / logging / usercmd library)")
+	else
+		error_(
+			"lib.nvim not found — it is a required dependency. "
+				.. "Add \"StefanBartl/lib.nvim\" to your plugin manager's dependencies (see README)."
+		)
+	end
+
 	if executable("curl") then
 		ok("curl found (used to download the mdview-server release on first use)")
 	else

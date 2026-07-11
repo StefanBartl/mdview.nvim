@@ -2,6 +2,17 @@
 -- Module entrypoint for mdview.nvim.
 -- Integrates browser autostart handle storage and stop-time cleanup.
 
+-- lib.nvim is a HARD dependency (cross-platform helpers, usercmd registration,
+-- structured logging). Several requires below pull it in transitively, so
+-- probe it first and fail with one actionable line instead of a deep stack
+-- trace from some inner module. :checkhealth mdview reports the same.
+if not pcall(require, "lib.nvim.cross.platform.is_windows") then
+	error(
+		'mdview.nvim requires lib.nvim — add "StefanBartl/lib.nvim" to your plugin '
+			.. "manager's dependencies (see README). Run :checkhealth mdview for details."
+	)
+end
+
 local cfg = require("mdview.config")
 local runner = require("mdview.adapter.runner")
 local events = require("mdview.core.events")
