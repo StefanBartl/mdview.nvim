@@ -80,6 +80,22 @@ func (r *Registry) BroadcastEphemeral(key string, payload []byte) []error {
 	return sendAll(conns, payload)
 }
 
+// BroadcastAllEphemeral sends payload to every connection in every room,
+// without recording it as any room's "last content". Used for global transient
+// signals that aren't tied to one document — e.g. a "close now" ping sent to
+// all preview tabs when the session stops. Like BroadcastEphemeral, a
+// newly-joined connection is never seeded with it.
+func (r *Registry) BroadcastAllEphemeral(payload []byte) []error {
+	r.mu.Lock()
+	var conns []Conn
+	for key := range r.rooms {
+		conns = append(conns, r.connsForLocked(key)...)
+	}
+	r.mu.Unlock()
+
+	return sendAll(conns, payload)
+}
+
 // connsForLocked snapshots the current members of key's room. Caller must
 // hold r.mu.
 func (r *Registry) connsForLocked(key string) []Conn {

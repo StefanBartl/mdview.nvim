@@ -38,6 +38,14 @@ function M.stop(close_browser_override)
     state.set_attached(false)
   end
 
+	-- Ask preview tabs to close themselves BEFORE killing the relay — the
+	-- signal travels over the relay, so it must still be alive. This is the
+	-- only way to close a tab in the "default" browser open_mode (no process
+	-- handle); in "isolated" mode the handle-based close below still applies.
+	if state.get_server() then
+		pcall(require("mdview.adapter.ws_client").send_close)
+	end
+
 	if state.get_server() then
 		pcall(runner.stop_server, state.get_server())
 		state.set_server(nil)

@@ -46,13 +46,14 @@
 
 ## Mittel
 
-- [ ] **Kooperatives Browser-Schließen im „default"-Modus.** Aktuell kann
-  mdview den Tab im normalen Browser nicht schließen (kein Prozess-Handle) →
-  `browser_autoclose`/`stop_on_browser_exit` sind im default-Modus No-ops.
-  Lösung (markdown-preview.nvim-Muster, siehe
-  `markdown_preview/browser/tab.md`): Relay sendet ein `close`-WS-Event an die
-  Room-Clients, Client macht `window.close()`. Dann funktioniert Auto-Close
-  auch ohne isoliertes Profil.
+- [x] **Kooperatives Browser-Schließen im „default"-Modus.** Umgesetzt: neuer
+  token-gated `POST /close`-Endpoint (Go) broadcastet ein `\x02`-getaggtes
+  Close-Signal an alle Rooms (`Registry.BroadcastAllEphemeral`, Test
+  `TestRegistry_BroadcastAllEphemeralReachesEveryRoomWithoutTouchingLastPayload`).
+  Der Client ruft bei `\x02` `window.close()` auf. `:MDViewStop` sendet das
+  Signal (blockierendes curl mit kurzem Timeout) BEVOR der Relay-Prozess
+  gekillt wird — sonst würde die Nachricht mit dem Shutdown rennen. Damit
+  schließt sich der Tab auch im default-Modus (ohne Prozess-Handle).
 - [ ] **Click-to-navigate** (Wunschliste #3): Klick auf einen relativen Link in
   der Preview lädt die Zieldatei. Zwei gangbare Wege: (B) Client schickt per WS
   eine Nachricht an Neovim, das die Datei liest und pusht — braucht eine
