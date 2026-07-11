@@ -20,21 +20,24 @@
   CI-Pipeline (`.github/workflows/ci.yml`, `release`-Job) baut+publisht alles
   automatisch bei Tag-Push: `git tag v0.1.0 && git push origin v0.1.0`.
   Danach funktioniert der Auto-Download für alle Plattformen.
-- [ ] **Weitere Client-Themes** neben `github` hinzufügen (z. B. `dark-dimmed`,
-  ein minimales „plain/text"-Theme). Pro Theme nur: CSS-Datei in
-  `src/client/themes/` + Eintrag in `THEME_LOADERS` (main.ts). Auswahl über
-  `browser.theme` bzw. `?theme=`.
-- [ ] **`:MDViewToggle`**-Command (Start/Stop in einem). Trivialer Wrapper um
-  die bestehenden `stop`/`start`-Pfade.
+- [x] **Weitere Client-Themes** neben `github` hinzugefügt: `dark-dimmed`
+  (GitHubs gedämpftes Dark-Theme) und `plain` (neutral, ohne Akzentfarben).
+  Gemeinsame Struktur in `src/client/themes/_base.css` extrahiert (jedes Theme
+  `@import`iert sie und definiert nur noch seine `--md-*`-Palette); Registrierung
+  in `THEME_LOADERS` (main.ts). Auswahl über `browser.theme` bzw. `?theme=`.
+- [x] **`:MDViewToggle`**-Command (Start/Stop in einem) — dünner Dispatcher über
+  die bestehenden `:MDViewStart`/`:MDViewStop`-Pfade, leitet Start-Args
+  (Datei/`cwd=`) beim Starten weiter.
 
 ## Leicht
 
-- [ ] **`:MDViewTheme <name>`**: Theme zur Laufzeit umschalten (Config setzen +
-  offenen Tabs per WS ein Reload/Theme-Signal schicken, oder einfach neue URL
-  öffnen). Setzt „mehrere Themes" (Quick Win) voraus.
-- [ ] **README + vimdoc** um `browser.open_mode`, `browser.theme` und die
-  Trade-offs (Auto-Close nur im „isolated"-Modus) erweitern. (Teilweise in
-  Arbeit.)
+- [x] **`:MDViewTheme <name>`**: Theme zur Laufzeit umschalten — validiert gegen
+  die bekannten Themes, setzt `browser.theme` in der Live-Config und öffnet die
+  Preview neu (neuer Tab im `default`-Modus). Ohne Argument: aktuelles Theme.
+- [x] **README + vimdoc** um `browser.open_mode`, `browser.theme` und die
+  Trade-offs (Auto-Close nur im „isolated"-Modus) erweitert — plus neue
+  Commands-Tabellen (README, `doc/mdview.txt`, `docs/BINDINGS.md`) und ein
+  lib.nvim-Hard-Dependency-Hinweis in `:checkhealth`.
 - [ ] **Line-Diff-Transport reaktivieren oder final entfernen.** `core/events.lua`,
   `utils/diff*.lua`, `core/session.compute_line_diff` sind dormanter Code aus
   der Vor-WASM-Zeit. Entscheidung: entweder an den Client anschließen (Diffs
