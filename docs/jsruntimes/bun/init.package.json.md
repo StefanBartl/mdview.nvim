@@ -1,3 +1,8 @@
+> **OUTDATED (vor dem Go/Rust-Rewrite).** mdview hat keinen JavaScript-Server
+> mehr — der Relay ist eine native Go-Binary, gerendert wird im Rust/WASM-
+> Client. Es gibt keine `package.json` für einen Server und keine Bun/Node-
+> Runtime-Wahl mehr. Nur noch Historie. Aktuell: README.md, `doc/mdview.txt`.
+
 # Bun-Implementierung — Leitfaden für späteres Feature (Dokumentation)
 
 ## Ziel

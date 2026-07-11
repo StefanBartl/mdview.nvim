@@ -1,5 +1,12 @@
 # Wunschliste / Features (Architektur-Vorschläge)
 
+> **Brainstorm-/Quelldokument.** Die konsolidierte, aktuelle Aufgabenliste steht
+> in [`../TASKS.md`](../TASKS.md); erledigte Punkte samt Begründung in
+> [`../Roadmap.md`](../Roadmap.md). Einige Vorschläge hier stammen aus der Zeit
+> vor dem Go/Rust-Rewrite und nennen alte Endpoints (z. B. `/render?key=`), die
+> es nicht mehr gibt — als Idee bleiben sie gültig, die Umsetzung folgt aber der
+> heutigen Architektur (Go-Relay + Rust/WASM-Client).
+
 1. MDViewStart mit Datei-Argumenten
    * Man kann `:MDViewStart /path/to/file.md` erlauben; der Launcher/initial_push ruft dann eine initiale `render?key=<normalized>` oder startet eine gezielte Push-Action.
    * API: `nvim_create_user_command("MDViewStart", fn, { nargs = "?", complete = "file" })`.

@@ -1,3 +1,8 @@
+> **Hinweis:** Allgemeine Windows-Port-/`netstat`-Notiz aus der Node-Server-Zeit
+> (Bezüge auf `node.exe` sind historisch — der Relay ist heute eine einzelne
+> native Binary, siehe `docs/server/Testanweisugen.md`). Die PowerShell-Technik
+> zum Freigeben eines Ports gilt weiterhin plattform-generisch.
+
 Das Verhalten deutet darauf hin, dass das, was `netstat` zeigt, **keine normalen aktiven Prozesse** sind, die man einfach mit `Stop-Process` killen kann, sondern Kernel-verwaltete TCP-Zustände (z. B. `TIME_WAIT` / „WARTEND“) oder Verbindungen, bei denen `OwningProcess` nicht aufgelöst wird. Kurz: **man kann nicht „alle Einträge“ töten**, weil viele gar keinen Prozess haben, der dafür verantwortlich ist.
 
 Was jetzt systematisch zu prüfen und zu tun ist — Schritt für Schritt (Windows, PowerShell; als Administrator ausführen wenn möglich):
