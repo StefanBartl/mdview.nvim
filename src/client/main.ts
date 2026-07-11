@@ -17,6 +17,8 @@ import init, { render_markdown } from './wasm-render/mdview_wasm_render.js';
 // `render.theme`). The CSS side-effect import applies the stylesheet.
 const THEME_LOADERS: Record<string, () => Promise<unknown>> = {
   github: () => import('./themes/github.css'),
+  'dark-dimmed': () => import('./themes/dark-dimmed.css'),
+  plain: () => import('./themes/plain.css'),
 };
 
 // Apply the theme named by the ?theme= URL param (default "github"). A
