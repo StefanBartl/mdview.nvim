@@ -1,3 +1,8 @@
+> **HISTORISCH (vor dem Go/Rust-Rewrite).** Diese PoC-Beschreibung dokumentiert
+> die ursprüngliche Node.js/markdown-it-Architektur. Serverseitiges Rendering
+> gibt es nicht mehr — der aktuelle Stand ist ein Go-Relay + Rust/WASM-Client.
+> Aktuelle Architektur: README.md und `doc/mdview.txt` (|mdview-architecture|).
+
 # Proof of Concept – Projektbeschreibung
 
  **Projektname: mdview.nvim**

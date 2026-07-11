@@ -1,3 +1,8 @@
+> **OUTDATED (vor dem Go/Rust-Rewrite).** Der Node.js-Server wurde entfernt;
+> der Relay ist jetzt eine native Go-Binary, gerendert wird im Rust/WASM-
+> Client. Die hier beschriebene Server-`package.json` existiert nicht mehr.
+> Nur noch Historie. Aktueller Stand: README.md und `doc/mdview.txt`.
+
 - [ ] `package.json` anlegen (Projekt-Metadaten, Abhängigkeiten, dev-scripts)
 
 Füge die folgende `package.json` als Ausgangspunkt hinzu (JSON darf keine Kommentare enthalten; Beschreibungen unten sind erläuternd auf Deutsch):
