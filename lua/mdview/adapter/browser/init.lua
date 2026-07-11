@@ -34,28 +34,25 @@ local M = {}
 ---@param url URL
 ---@return BrowserHandle|nil, string|nil
 local function open_default(url)
-  -- vim.ui.open (Neovim 0.10+) is the cross-platform opener; fall back to
-  -- the platform command on older versions.
-  if vim.ui and type(vim.ui.open) == "function" then
-    local ok, err = pcall(vim.ui.open, url)
-    if not ok then
-      return nil, tostring(err)
-    end
+  -- IMPORTANT: do NOT use vim.ui.open on Windows. It runs
+  -- `cmd.exe /c start "" <url>`, and cmd.exe treats every `&` in the URL as
+  -- a command separator — so our `?key=…&token=…&theme=…` URL is chopped at
+  -- the first `&`, the browser opens WITHOUT the token, and the client
+  -- refuses to connect (page stuck on "mdview loading…" forever). rundll32's
+  -- FileProtocolHandler takes the URL as a single, non-shell-interpreted
+  -- argument, so `&` is preserved (verified: the full query string arrives).
+  local cmd
+  if fn.has("win32") == 1 then
+    cmd = { "rundll32.exe", "url.dll,FileProtocolHandler", url }
+  elseif fn.has("mac") == 1 then
+    cmd = { "open", url }
   else
-    local cmd
-    if fn.has("win32") == 1 then
-      -- `start` is a cmd.exe builtin; the empty "" is the window-title arg so
-      -- a quoted URL isn't consumed as the title.
-      cmd = { "cmd.exe", "/c", "start", "", url }
-    elseif fn.has("mac") == 1 then
-      cmd = { "open", url }
-    else
-      cmd = { "xdg-open", url }
-    end
-    local jid = fn.jobstart(cmd, { detach = true })
-    if not jid or jid <= 0 then
-      return nil, "failed to launch OS opener"
-    end
+    cmd = { "xdg-open", url }
+  end
+
+  local jid = fn.jobstart(cmd, { detach = true })
+  if not jid or jid <= 0 then
+    return nil, "failed to launch OS browser opener"
   end
 
   return { open_mode = "default" }, nil
