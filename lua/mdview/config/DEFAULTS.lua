@@ -154,8 +154,9 @@ return {
 		-- active) to open the linked document, which then flows back into the
 		-- preview. Resolved relative to the source document; external links,
 		-- in-page anchors and absolute paths are left to the browser. Changes
-		-- how link clicks behave, so it's opt-in. Default false.
-		click_navigate = false,
+		-- how link clicks behave. On by default (relative links to other docs
+		-- should open them); set false to let the browser follow links itself.
+		click_navigate = true,
 
 		-- Opt in to reverse scroll (browser -> Neovim): scrolling the preview
 		-- moves Neovim's cursor to the matching position (the complement of the
