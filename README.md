@@ -63,8 +63,8 @@ turned into DOM content without passing through an allowlist-based sanitizer.
   dependencies = { "StefanBartl/lib.nvim" },
   ft = { "markdown" },
   cmd = {
-    "MDViewStart", "MDViewStop", "MDViewToggle", "MDViewOpen",
-    "MDViewTheme", "MDViewPreviewTab", "MDViewShowWebLogs", "MDViewDiagnose",
+    "MDViewStart", "MDViewStop", "MDViewToggle", "MDViewOpen", "MDViewTheme",
+    "MDViewPreviewTab", "MDViewShowWebLogs", "MDViewLog", "MDViewDiagnose",
   },
   config = function()
     require("mdview").setup()
@@ -92,8 +92,8 @@ use {
   requires = { "StefanBartl/lib.nvim" },
   ft = { "markdown" },
   cmd = {
-    "MDViewStart", "MDViewStop", "MDViewToggle", "MDViewOpen",
-    "MDViewTheme", "MDViewPreviewTab", "MDViewShowWebLogs", "MDViewDiagnose",
+    "MDViewStart", "MDViewStop", "MDViewToggle", "MDViewOpen", "MDViewTheme",
+    "MDViewPreviewTab", "MDViewShowWebLogs", "MDViewLog", "MDViewDiagnose",
   },
   config = function()
     require("mdview").setup()
@@ -150,13 +150,37 @@ Partial nested overrides merge recursively — `{ browser = { browser = "firefox
 | `:MDViewStop` | Stop the relay, detach autocommands, and (in isolated mode) close the browser. |
 | `:MDViewToggle [file] [cwd=…]` | Start if stopped, stop if running. |
 | `:MDViewOpen` | Re-open a browser tab against the already-running session (does not start a new relay). |
-| `:MDViewTheme [name]` | Switch the preview theme at runtime (`github` \| `dark-dimmed` \| `plain`, optionally `-light`/`-dark`); no argument reports the current theme. |
+| `:MDViewTheme [name]` | Switch the preview theme at runtime (`github` \| `dark-dimmed` \| `plain` \| `tokyonight` \| `catppuccin`, optionally `-light`/`-dark`); no argument reports the current theme. |
 | `:MDViewPreviewTab` | Toggle the in-Neovim tab preview (works standalone, no server needed). |
 | `:MDViewShowWebLogs` | Show the relay's captured stdout, including `[client]` browser-side diagnostics. |
 | `:MDViewLog [level\|export [path]]` | Show mdview's internal log ring (optionally filtered to `trace`/`debug`/`info`/`warn`/`error`), or `export` it to a file. |
 | `:MDViewDiagnose [path]` | Write a full component-state diagnostics report to a file and open it. |
 
 Run `:checkhealth mdview` to verify dependencies (lib.nvim, curl, tar) and whether the relay binary and client bundle are cached.
+
+---
+
+## Companion plugins (optional)
+
+mdview.nvim is a **live mirror** of your Markdown buffer: it streams the raw
+buffer text to the browser, which re-renders it. A useful consequence —
+
+> **Any Neovim plugin that edits the buffer *text* is reflected in the preview
+> for free.** You don't implement it in mdview; you just see the result.
+
+- **[markdown.nvim](https://github.com/StefanBartl/markdown.nvim)** — a
+  Markdown toolkit (TOC, reference updater, table formatter, heading shifting,
+  …). Because those all transform the buffer text, running them updates the
+  live preview automatically. Recommended companion, **not** a dependency.
+- **[color_my_ascii.nvim](https://github.com/StefanBartl/color_my_ascii.nvim)** —
+  highlights fenced code / ASCII art **inside the Neovim buffer**. That's a
+  Neovim-side rendering feature (highlight groups, not HTML), so it complements
+  rather than feeds the browser preview — mdview does its own client-side code
+  highlighting (`browser.highlighter`). Use both to get colored code in the
+  editor *and* the browser.
+
+Neither is required, and mdview never loads them; `:checkhealth mdview` just
+notes when they're present.
 
 ---
 
