@@ -25,6 +25,7 @@
     "test:go": "cd native/server && go test ./...",
     "test:rust": "cd native/wasm-render && cargo test",
     "test:lua": "if command -v busted >/dev/null 2>&1; then busted tests/lua || true; else echo 'busted not installed; skipping Lua tests'; fi",
+    "test:lua:nvim": "nvim --headless -u NONE -i NONE --cmd \"set rtp+=.,../lib.nvim\" -c \"luafile tests/nvim/harness.lua\" -c \"qa!\"",
     "check:types": "tsc -p tsconfig.json --noEmit",
     "prepare": "husky install"
   },

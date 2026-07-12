@@ -147,8 +147,13 @@ jobs:
       - name: Run Lua unit tests with busted
         # Only pure-Lua specs (no `vim` global) run here; module paths come from
         # the repo-root .busted config's lpath. Specs that need the Neovim API
-        # belong in a headless-nvim test instead.
+        # belong in the headless-nvim suite below instead.
         run: busted tests/lua
+
+      - name: Run headless-nvim specs (real Neovim API)
+        # Specs under tests/nvim/ exercise vim-dependent modules; the harness
+        # exits non-zero (via :cq) if any assertion fails.
+        run: nvim --headless -u NONE -i NONE --cmd "set rtp+=.,.deps/lib.nvim" -c "luafile tests/nvim/harness.lua" -c "qa!"
 
   release:
     name: Release (tag push only)
