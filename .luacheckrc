@@ -10,5 +10,6 @@ globals = {
 -- don't fail CI on line length alone.
 max_line_length = false
 
--- busted specs get their describe/it/assert globals from the test runner.
-files["tests/lua/**/*_spec.lua"] = { std = "+busted" }
+-- busted (and the headless-nvim harness) provide describe/it/assert globals.
+files["tests/**/*_spec.lua"] = { std = "+busted" }
+files["tests/nvim/harness.lua"] = { std = "+busted" }
