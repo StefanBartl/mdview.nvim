@@ -71,15 +71,31 @@ local function open_default(url, focus)
   local cmd
   if fn.has("win32") == 1 then
     if keep_nvim then
-      cmd = {
-        "powershell",
-        "-NoProfile",
-        "-NonInteractive",
-        "-WindowStyle",
-        "Hidden",
-        "-Command",
-        windows_focus_preserving_ps(url),
-      }
+      -- Pass the script as a temp .ps1 via -File, NOT as -Command: Neovim's
+      -- jobstart builds the Windows command line with its own quoting, which
+      -- mangles a complex inline script (the DllImport quotes/semicolons), so
+      -- -Command silently fails and nothing opens. -File takes a plain path.
+      local tmp = fn.tempname() .. ".ps1"
+      local script = windows_focus_preserving_ps(url)
+        .. (";Remove-Item -LiteralPath '%s' -ErrorAction SilentlyContinue"):format(tmp)
+      local f = io.open(tmp, "w")
+      if f then
+        f:write(script)
+        f:close()
+        cmd = {
+          "powershell",
+          "-NoProfile",
+          "-ExecutionPolicy",
+          "Bypass",
+          "-WindowStyle",
+          "Hidden",
+          "-File",
+          tmp,
+        }
+      else
+        -- couldn't stage the script — fall back to opening normally
+        cmd = { "rundll32.exe", "url.dll,FileProtocolHandler", url }
+      end
     else
       cmd = { "rundll32.exe", "url.dll,FileProtocolHandler", url }
     end
