@@ -222,10 +222,12 @@ jobs:
         # what checksums.txt and the release assets are named.
         run: |
           mkdir -p release-assets
+          # artifacts.json's `path` is relative to the goreleaser workdir
+          # (native/server), but this step runs from the repo root — prefix it.
           jq -r '.[] | select(.extra.Format == "binary") | "\(.path)\t\(.name)"' \
             native/server/.goreleaser-dist/artifacts.json |
           while IFS=$'\t' read -r path name; do
-            cp "$path" "release-assets/$name"
+            cp "native/server/$path" "release-assets/$name"
           done
           cp native/server/.goreleaser-dist/checksums.txt release-assets/checksums.txt
           cp mdview-client.tar.gz release-assets/mdview-client.tar.gz
