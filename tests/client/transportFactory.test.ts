@@ -43,7 +43,7 @@ describe('createTransport', () => {
     const t = await createTransport('ws://localhost:1/ws', { log });
     expect(t).toBeTruthy();
     // No WebTransport-related logging when not opted in.
-    expect(log).not.toHaveBeenCalled();
+    expect(log).toHaveBeenCalledWith('transport active: websocket');
   });
 
   it('falls back to WebSocket when WebTransport is unsupported', async () => {
@@ -99,6 +99,6 @@ describe('createTransport', () => {
       log,
     });
     expect(t).toBeTruthy();
-    expect(log).toHaveBeenCalledWith(expect.stringContaining('using WebTransport'));
+    expect(log).toHaveBeenCalledWith('transport active: webtransport');
   });
 });
