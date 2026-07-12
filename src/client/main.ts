@@ -12,6 +12,7 @@ import { createTransport } from './transport/transportFactory';
 import { DiffDoc, isEnvelope } from './render/diffDoc';
 import { installClickNav } from './render/clickNav';
 import { pickSourceposTarget, hasSourcepos } from './render/scrollSync';
+import { highlight, parseHighlighter } from './highlight';
 import init, { render_markdown } from './wasm-render/mdview_wasm_render.js';
 
 // Available visual themes, each a CSS module under ./themes/. Loaded lazily
@@ -150,6 +151,11 @@ async function boot() {
   const container = document.getElementById('mdview-root');
   let firstRender = true;
 
+  // Code-fence highlighter chosen per session (?hl= from browser.highlighter).
+  // The implementation is lazy-imported inside highlight(), so an unselected
+  // highlighter is never loaded.
+  const highlighter = parseHighlighter(params.get('hl'));
+
   // Opt-in click-to-navigate: hand relative-link clicks to Neovim via /nav
   // (the Lua side adds ?nav=1 when experimental.click_navigate is on). Neovim
   // opens the target document, which flows back into this tab via the push path.
@@ -204,6 +210,10 @@ async function boot() {
     if (!container) return;
     try {
       container.innerHTML = render_markdown(text);
+      // Highlight fenced code after the sanitized HTML is in the DOM. Fire and
+      // forget (the highlighter is async for Shiki) — it only adds/replaces
+      // markup on the trusted, already-rendered DOM and never throws.
+      void highlight(highlighter, container);
       if (firstRender) {
         firstRender = false;
         clientLog(`first render ok (${text.length} bytes)`);

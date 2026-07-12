@@ -87,9 +87,16 @@ local function resolve_browser_url(opts)
 		.. "&token=" .. vim.uri_encode(token)
 
 	-- pass the configured preview theme to the client (main.ts reads ?theme=)
-	local theme = require("mdview.config.browser").defaults.theme
+	local browser_defaults = require("mdview.config.browser").defaults
+	local theme = browser_defaults.theme
 	if type(theme) == "string" and theme ~= "" then
 		url = url .. "&theme=" .. vim.uri_encode(theme)
+	end
+
+	-- pass the code-fence highlighter choice (client reads ?hl=; lazy-loaded)
+	local highlighter = browser_defaults.highlighter
+	if type(highlighter) == "string" and highlighter ~= "" then
+		url = url .. "&hl=" .. vim.uri_encode(highlighter)
 	end
 
 	-- opt-in WebTransport (HTTP/3). The client feature-detects and falls back
