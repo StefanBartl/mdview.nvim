@@ -22,6 +22,20 @@ local function now_ms()
 	return uv.now()
 end
 
+-- When reverse-scroll moves the cursor programmatically, that fires
+-- CursorMoved, which would send an outgoing ping and bounce back to the browser
+-- (feedback loop). inbound_poll calls M.suppress() around such moves so the next
+-- brief window of outgoing pings is skipped.
+local suppress_until = 0
+
+--- Suppress outgoing scroll pings for `ms` (default 250) — used by the
+--- reverse-scroll handler around a programmatic cursor move.
+---@param ms integer|nil
+---@return nil
+function M.suppress(ms)
+	suppress_until = now_ms() + (ms or 250)
+end
+
 ---@param bufnr integer
 local function send_current_position(bufnr)
 	local ft = safe_buf_get_option(bufnr, "filetype") or ""
@@ -52,6 +66,9 @@ function M.attach(group)
 		callback = function(args)
 			local throttle_ms = defaults.scroll_sync_throttle_ms or 150
 			local t = now_ms()
+			if t < suppress_until then
+				return -- cursor moved by reverse-scroll; don't echo it back
+			end
 			if t - last_sent_at < throttle_ms then
 				return
 			end

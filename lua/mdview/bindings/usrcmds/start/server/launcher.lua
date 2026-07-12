@@ -106,6 +106,12 @@ local function resolve_browser_url(opts)
 		url = url .. "&nav=1"
 	end
 
+	-- opt-in reverse scroll: tells the client to POST its scroll position to
+	-- /scrollback (see experimental.reverse_scroll).
+	if experimental and experimental.reverse_scroll == true then
+		url = url .. "&rscroll=1"
+	end
+
 	return url
 end
 M.resolve_browser_url = resolve_browser_url

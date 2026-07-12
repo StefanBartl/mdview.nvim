@@ -16,6 +16,7 @@ import (
 	"log"
 	"mime"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"nhooyr.io/websocket"
@@ -68,6 +69,7 @@ func main() {
 
 	registry := relay.NewRegistry()
 	navQueue := relay.NewNavQueue()
+	scrollBox := relay.NewScrollBox()
 	mime.AddExtensionType(".wasm", "application/wasm")
 	fileServer := http.FileServer(http.Dir(*webRoot))
 
@@ -78,6 +80,7 @@ func main() {
 	mux.HandleFunc("/diff", handleDiff(registry, *token))
 	mux.HandleFunc("/close", handleClose(registry, *token))
 	mux.HandleFunc("/nav", handleNav(navQueue, *token))
+	mux.HandleFunc("/scrollback", handleScrollback(scrollBox, *token))
 	mux.HandleFunc("/clientlog", handleClientLog(*token))
 	mux.HandleFunc("/ws", handleWS(registry, *token, port))
 	mux.Handle("/", fileServer)
@@ -256,6 +259,53 @@ func handleNav(queue *relay.NavQueue, token string) http.HandlerFunc {
 				return
 			}
 			queue.Push(relay.NavRequest{Key: key, Href: href})
+			w.WriteHeader(http.StatusNoContent)
+		default:
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	}
+}
+
+const maxScrollbackBytes = 64 // just a "<ratio>" float
+
+// handleScrollback is the browser->Neovim half of bidirectional scrolling. On
+// POST the browser overwrites the latest scroll position (a 0..1 ratio) for a
+// room; on GET Neovim consumes it (polling while a reverse-scroll session is
+// active) and moves its cursor proportionally. Single-slot and consume-once, so
+// a stale position never re-applies. Token-gated; the relay never interprets
+// the value beyond carrying it.
+func handleScrollback(box *relay.ScrollBox, token string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if !relay.ValidToken(token, r.URL.Query().Get("token")) {
+			http.Error(w, "forbidden", http.StatusForbidden)
+			return
+		}
+		switch r.Method {
+		case http.MethodGet:
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(box.Take())
+		case http.MethodPost:
+			key := r.URL.Query().Get("key")
+			if key == "" {
+				http.Error(w, "missing key", http.StatusBadRequest)
+				return
+			}
+			body, err := io.ReadAll(io.LimitReader(r.Body, maxScrollbackBytes))
+			if err != nil {
+				http.Error(w, "failed to read body", http.StatusBadRequest)
+				return
+			}
+			ratio, err := strconv.ParseFloat(strings.TrimSpace(string(body)), 64)
+			if err != nil {
+				http.Error(w, "invalid ratio", http.StatusBadRequest)
+				return
+			}
+			if ratio < 0 {
+				ratio = 0
+			} else if ratio > 1 {
+				ratio = 1
+			}
+			box.Set(relay.ScrollHint{Key: key, Ratio: ratio})
 			w.WriteHeader(http.StatusNoContent)
 		default:
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)

@@ -150,6 +150,32 @@ async function boot() {
     });
   }
 
+  // Opt-in reverse scroll (browser -> Neovim). While applying an incoming
+  // nvim->browser scroll ping we set scrollSuppressUntil so the resulting
+  // 'scroll' event doesn't bounce back to Neovim and create a feedback loop.
+  let scrollSuppressUntil = 0;
+  const SCROLL_SUPPRESS_MS = 250;
+  if (container && params.get('rscroll') === '1') {
+    let lastSent = 0;
+    container.addEventListener('scroll', () => {
+      const now = Date.now();
+      if (now < scrollSuppressUntil) return; // caused by an incoming ping
+      if (now - lastSent < 120) return; // throttle
+      lastSent = now;
+      const max = container.scrollHeight - container.clientHeight;
+      const ratio = max > 0 ? container.scrollTop / max : 0;
+      try {
+        void fetch(`/scrollback?token=${encodeURIComponent(token)}&key=${encodeURIComponent(key)}`, {
+          method: 'POST',
+          body: String(ratio),
+          keepalive: true,
+        });
+      } catch {
+        /* reverse scroll is best-effort */
+      }
+    });
+  }
+
   // Reassembles full text from the opt-in line-diff transport's envelopes. When
   // line_diff is off, no \x03 envelopes arrive and this stays unused.
   const doc = new DiffDoc();
@@ -188,6 +214,9 @@ async function boot() {
 
     if (rawMessage.startsWith(SCROLL_MESSAGE_PREFIX)) {
       applyScrollPing(container, rawMessage);
+      // The scrollTop we just set fires a 'scroll' event; suppress reverse-scroll
+      // sends briefly so it doesn't echo back to Neovim (feedback loop).
+      scrollSuppressUntil = Date.now() + SCROLL_SUPPRESS_MS;
       return;
     }
 

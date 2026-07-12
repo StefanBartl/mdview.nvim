@@ -69,10 +69,16 @@
   `browser.behavior`. Externe Links/Anker/absolute Pfade bleiben dem Browser
   überlassen. Getestet: Go-Queue-Unit-Test, vitest für die Link-Entscheidung,
   und ein echtes End-to-End (Relay + headless nvim öffnet die verlinkte Datei).
-- [ ] **Browser→nvim-Scrolling** (Rückrichtung des bereits umgesetzten
-  nvim→Browser-Sync). Client sendet Scroll-Position per WS, ein
-  Server→Neovim-Kanal bewegt den Cursor/Viewport. Braucht dieselbe Bridge wie
-  Click-to-navigate (B).
+- [x] **Browser→nvim-Scrolling** (opt-in `experimental.reverse_scroll`,
+  Rückrichtung des nvim→Browser-Sync): Client POSTet seine Scroll-Ratio an den
+  neuen `/scrollback`-Endpoint (single-slot, consume-once); der Inbound-Poller
+  (`inbound_poll.lua`, aus `nav_poll` erweitert) holt sie und bewegt den Cursor
+  proportional im Fenster der Datei. Feedback-Loop auf beiden Seiten unterdrückt
+  (Client: `scrollSuppressUntil` nach eingehendem Ping; nvim:
+  `scroll_sync.suppress()` um den programmatischen Cursor-Move). Bewusst
+  opt-in, weil Polling einen kleinen Lag bedeutet (nvim hat keinen Push-Kanal
+  zurück). Getestet: Go-ScrollBox-Unit-Test, End-to-End (Relay + headless nvim
+  bewegt Cursor), headless-Spec für die Cursor-Mathematik.
 - [x] **Buffer-Wechsel-Verhalten konfigurierbar** (`browser.behavior =
   "reuse" | "new_tab" | "manual"`, default `reuse`; Wunschliste #2): neue
   Autocmd-Gruppe `bindings/autocmds/buffer_switch.lua` reagiert auf BufEnter.
