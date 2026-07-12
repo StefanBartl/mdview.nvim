@@ -75,6 +75,7 @@ function M.open(opts)
 	local browser_defaults = require("mdview.config.browser").defaults
 	local browser_opts = {
 		open_mode = browser_defaults.open_mode,
+		focus = browser_defaults.focus,
 		browser_cmd = opts.browser_cmd or browser_defaults.resolved_browser_cmd,
 		browser_args = opts.browser_args or browser_defaults.browser_args,
 		on_exit = function(_, code)

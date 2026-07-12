@@ -133,6 +133,7 @@ Defaults: >lua
       theme               = "github",  -- github|dark-dimmed|plain|tokyonight|
                                        -- catppuccin (optionally -light/-dark)
       highlighter         = "hljs",    -- code highlighter: hljs|shiki|none
+      focus               = "browser", -- "browser" | "nvim" (keep editor focus)
       autodetect_browser  = true,  -- isolated mode only
       browser             = "",    -- friendly name, e.g. "firefox" (isolated)
       browser_cmd         = "",    -- absolute path (isolated mode only)
@@ -233,6 +234,14 @@ browser.highlighter ~
     "shiki" — exact TextMate/VSCode themes (tokyo-night, catppuccin, dark-plus,
               …) mapped from `browser.theme`; heavier, grammars load on demand.
     "none"  — no highlighting.
+
+browser.focus ~
+  Whether the opened preview tab is allowed to take keyboard focus. `"browser"`
+  (default) opens it in front as usual; `"nvim"` keeps focus in the editor so
+  you can keep typing. `"nvim"` is clean on macOS (`open -g`), best-effort on
+  Windows (captures the foreground window and restores it after opening — a
+  window manager can still override it), and a no-op on Linux (there is no
+  portable way to do it). Applies to the `default` open_mode only.
 
 browser.behavior ~
   What happens to the preview when you switch to a different markdown buffer

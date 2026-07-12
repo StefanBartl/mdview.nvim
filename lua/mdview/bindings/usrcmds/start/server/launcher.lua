@@ -218,6 +218,7 @@ function M.start(opts)
 
 					local opts_table = {
 						open_mode = browser_defaults.open_mode,
+						focus = browser_defaults.focus,
 						browser_cmd = browser_cmd,
 						browser_args = browser_args,
 						-- stop_on_browser_exit only applies in isolated mode: in

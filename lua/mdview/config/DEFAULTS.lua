@@ -32,6 +32,7 @@
 ---@field stop_on_browser_exit boolean run :MDViewStop when the opened browser process exits (isolated mode only)
 ---@field theme string preview theme passed to the client as ?theme= — one of "github", "dark-dimmed", "plain", "tokyonight", "catppuccin" (optionally suffixed "-light"/"-dark" to pin the color scheme); see src/client/themes/
 ---@field highlighter "hljs"|"shiki"|"none" code-fence syntax highlighter (client-side, lazy-loaded): "hljs" (light, default), "shiki" (exact VSCode/TextMate themes, heavier), or "none"
+---@field focus "browser"|"nvim" whether the opened tab may take keyboard focus ("browser", default) or focus stays in Neovim ("nvim" — clean on macOS, best-effort on Windows, no-op on Linux); default open_mode only
 
 ---@class mdview.config.StartDefaults
 ---@field push_strategy "launcher"|"try_push" initial-push strategy used by :MDViewStart
@@ -106,6 +107,7 @@ return {
 		theme = "github",
 		behavior = "reuse",
 		highlighter = "hljs",
+		focus = "browser",
 	},
 
 	start = {
