@@ -91,11 +91,12 @@ function _G.it(name, fn)
 	end
 end
 
--- Set the plugin up once for all specs (user commands can only be registered
--- once per session; specs tweak config fields directly rather than re-setup).
-pcall(function()
-	require("mdview").setup({})
-end)
+-- NB: specs deliberately do NOT call require("mdview").setup() — they require
+-- the modules under test and read/patch config defaults directly. setup() runs
+-- browser detection and registers user commands, which is both unnecessary here
+-- and environment-sensitive (it failed on headless CI runners, cascading into
+-- "loop or previous error" module-load failures). Keeping the harness free of
+-- it makes the specs pure unit tests of the required modules.
 
 -- Discover and run every tests/nvim/*_spec.lua.
 local specs = vim.fn.globpath("tests/nvim", "*_spec.lua", false, true)
