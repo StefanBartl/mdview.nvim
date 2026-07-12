@@ -129,7 +129,8 @@ Partial nested overrides merge recursively — `{ browser = { browser = "firefox
 | `open_preview_tab` | `false` | Render into a read-only Neovim tab (Treesitter-highlighted) instead of the browser. |
 | `browser.open_mode` | `"default"` | `"default"` opens a tab in your normal browser (your extensions/theme; auto-close via a cooperative `window.close()` on stop). `"isolated"` spawns a throwaway profile so process-handle auto-close works. |
 | `browser.behavior` | `"reuse"` | What happens when you switch markdown buffers: `"reuse"` (the one tab follows the active buffer), `"new_tab"` (each file opens its own tab), or `"manual"` (nothing; use `:MDViewOpen`). |
-| `browser.theme` | `"github"` | Preview theme: `github`, `dark-dimmed`, or `plain` — optionally suffixed `-light`/`-dark` to pin the color scheme. |
+| `browser.theme` | `"github"` | Preview theme: `github`, `dark-dimmed`, `plain`, `tokyonight`, or `catppuccin` — optionally suffixed `-light`/`-dark` to pin the color scheme. |
+| `browser.highlighter` | `"hljs"` | Code-fence syntax highlighter (client-side, lazy-loaded): `"hljs"` (highlight.js, light), `"shiki"` (exact TextMate/VSCode themes — tokyo-night, catppuccin, dark-plus — heavier), or `"none"`. |
 | `browser.browser_autostart` | `true` | Open the browser automatically on `:MDViewStart`. |
 | `browser.stop_on_browser_exit` | `true` | Run `:MDViewStop` when the opened browser process exits (isolated mode only). |
 | `browser.require_display` | `true` | Don't try to open a browser without a GUI/`DISPLAY`. |

@@ -17,7 +17,7 @@ local M = {}
 -- src/client/main.ts). A "-light" / "-dark" suffix may be appended to pin the
 -- color scheme, so validation checks the base name only.
 ---@type string[]
-M.known = { "github", "dark-dimmed", "plain" }
+M.known = { "github", "dark-dimmed", "plain", "tokyonight", "catppuccin" }
 
 ---@param name string
 ---@return boolean

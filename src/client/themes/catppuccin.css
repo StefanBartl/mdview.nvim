@@ -1,0 +1,118 @@
+/* Catppuccin theme for mdview: Mocha (dark) + Latte (light), following the OS
+   prefers-color-scheme, with `-light`/`-dark` pinning via data-theme. Overrides
+   the markdown chrome (--md-*) and the highlight.js tokens (--code-*).
+   Structure lives in _base.css. */
+
+@import "./_base.css";
+
+/* Latte (light) — default when the OS is light */
+:root {
+  --md-fg: #4c4f69;
+  --md-muted: #8c8fa1;
+  --md-bg: #eff1f5;
+  --md-border: #ccd0da;
+  --md-border-muted: #ccd0dab3;
+  --md-code-bg: #dce0e8;
+  --md-code-block-bg: #e6e9ef;
+  --md-link: #1e66f5;
+  --md-quote-fg: #6c6f85;
+  --md-quote-border: #bcc0cc;
+  --md-table-stripe: #e6e9ef;
+  --md-mark-bg: #df8e1d33;
+
+  --code-keyword: #8839ef;
+  --code-string: #40a02b;
+  --code-comment: #8c8fa1;
+  --code-number: #fe640b;
+  --code-function: #1e66f5;
+  --code-type: #df8e1d;
+  --code-variable: #4c4f69;
+  --code-builtin: #04a5e5;
+  --code-attr: #04a5e5;
+  --code-tag: #d20f39;
+  --code-meta: #8c8fa1;
+}
+
+/* Mocha (dark) */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --md-fg: #cdd6f4;
+    --md-muted: #6c7086;
+    --md-bg: #1e1e2e;
+    --md-border: #313244;
+    --md-border-muted: #313244b3;
+    --md-code-bg: #313244;
+    --md-code-block-bg: #181825;
+    --md-link: #89b4fa;
+    --md-quote-fg: #9399b2;
+    --md-quote-border: #45475a;
+    --md-table-stripe: #292c3c;
+    --md-mark-bg: #f9e2af33;
+
+    --code-keyword: #cba6f7;
+    --code-string: #a6e3a1;
+    --code-comment: #6c7086;
+    --code-number: #fab387;
+    --code-function: #89b4fa;
+    --code-type: #f9e2af;
+    --code-variable: #cdd6f4;
+    --code-builtin: #89dceb;
+    --code-attr: #89dceb;
+    --code-tag: #f38ba8;
+    --code-meta: #6c7086;
+  }
+}
+
+/* explicit pinning wins over the media query in both directions */
+:root[data-theme='light'] {
+  --md-fg: #4c4f69;
+  --md-muted: #8c8fa1;
+  --md-bg: #eff1f5;
+  --md-border: #ccd0da;
+  --md-border-muted: #ccd0dab3;
+  --md-code-bg: #dce0e8;
+  --md-code-block-bg: #e6e9ef;
+  --md-link: #1e66f5;
+  --md-quote-fg: #6c6f85;
+  --md-quote-border: #bcc0cc;
+  --md-table-stripe: #e6e9ef;
+  --md-mark-bg: #df8e1d33;
+
+  --code-keyword: #8839ef;
+  --code-string: #40a02b;
+  --code-comment: #8c8fa1;
+  --code-number: #fe640b;
+  --code-function: #1e66f5;
+  --code-type: #df8e1d;
+  --code-variable: #4c4f69;
+  --code-builtin: #04a5e5;
+  --code-attr: #04a5e5;
+  --code-tag: #d20f39;
+  --code-meta: #8c8fa1;
+}
+:root[data-theme='dark'] {
+  --md-fg: #cdd6f4;
+  --md-muted: #6c7086;
+  --md-bg: #1e1e2e;
+  --md-border: #313244;
+  --md-border-muted: #313244b3;
+  --md-code-bg: #313244;
+  --md-code-block-bg: #181825;
+  --md-link: #89b4fa;
+  --md-quote-fg: #9399b2;
+  --md-quote-border: #45475a;
+  --md-table-stripe: #292c3c;
+  --md-mark-bg: #f9e2af33;
+
+  --code-keyword: #cba6f7;
+  --code-string: #a6e3a1;
+  --code-comment: #6c7086;
+  --code-number: #fab387;
+  --code-function: #89b4fa;
+  --code-type: #f9e2af;
+  --code-variable: #cdd6f4;
+  --code-builtin: #89dceb;
+  --code-attr: #89dceb;
+  --code-tag: #f38ba8;
+  --code-meta: #6c7086;
+}

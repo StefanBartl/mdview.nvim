@@ -130,8 +130,9 @@ Defaults: >lua
                                        -- | "isolated" (own window, auto-close)
       behavior            = "reuse",   -- on buffer switch: "reuse" (one tab
                                        -- follows) | "new_tab" | "manual"
-      theme               = "github",  -- "github" | "dark-dimmed" | "plain"
-                                       -- (optionally -light/-dark suffixed)
+      theme               = "github",  -- github|dark-dimmed|plain|tokyonight|
+                                       -- catppuccin (optionally -light/-dark)
+      highlighter         = "hljs",    -- code highlighter: hljs|shiki|none
       autodetect_browser  = true,  -- isolated mode only
       browser             = "",    -- friendly name, e.g. "firefox" (isolated)
       browser_cmd         = "",    -- absolute path (isolated mode only)
@@ -215,14 +216,23 @@ browser.open_mode ~
   and `require_display` apply to "isolated" mode only.
 
 browser.theme ~
-  Preview theme name, passed to the client as `?theme=`. Ships three themes:
-  `"github"`, `"dark-dimmed"` (a darker, lower-contrast variant), and
-  `"plain"` (neutral, no branded accents). Each follows the OS
+  Preview theme name, passed to the client as `?theme=`. Ships: `"github"`,
+  `"dark-dimmed"` (darker, lower-contrast), `"plain"` (neutral), `"tokyonight"`
+  (dark), and `"catppuccin"` (Latte/Mocha). Each follows the OS
   prefers-color-scheme where it defines both; append `-light` or `-dark`
-  (e.g. `"github-dark"`) to pin the color scheme. Switch at runtime with
+  (e.g. `"catppuccin-dark"`) to pin the color scheme. Switch at runtime with
   |:MDViewTheme|. Add a theme by dropping a CSS file in src/client/themes/
-  (import `_base.css` for the shared structure) and a matching loader in
-  main.ts.
+  (import `_base.css` for the shared structure; optionally override `--code-*`
+  for code colors) and a matching loader in main.ts.
+
+browser.highlighter ~
+  Code-fence syntax highlighter, applied client-side after each render and
+  lazy-loaded so only the chosen one is fetched:
+    "hljs"  — highlight.js (default). Light; token colors follow the theme's
+              `--code-*` variables.
+    "shiki" — exact TextMate/VSCode themes (tokyo-night, catppuccin, dark-plus,
+              …) mapped from `browser.theme`; heavier, grammars load on demand.
+    "none"  — no highlighting.
 
 browser.behavior ~
   What happens to the preview when you switch to a different markdown buffer
