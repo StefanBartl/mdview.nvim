@@ -11,6 +11,7 @@
 import { createTransport } from './transport/transportFactory';
 import { DiffDoc, isEnvelope } from './render/diffDoc';
 import { installClickNav } from './render/clickNav';
+import { pickSourceposTarget, hasSourcepos } from './render/scrollSync';
 import init, { render_markdown } from './wasm-render/mdview_wasm_render.js';
 
 // Available visual themes, each a CSS module under ./themes/. Loaded lazily
@@ -58,10 +59,27 @@ function applyScrollPing(container: HTMLElement, message: string): void {
   const [lineStr, totalStr] = message.slice(SCROLL_MESSAGE_PREFIX.length).split('/');
   const line = Number(lineStr);
   const total = Number(totalStr);
-  if (!Number.isFinite(line) || !Number.isFinite(total) || total <= 0) return;
+  if (!Number.isFinite(line)) return;
 
-  const ratio = Math.min(1, Math.max(0, (line - 1) / total));
-  container.scrollTop = ratio * (container.scrollHeight - container.clientHeight);
+  // Precise mapping: comrak tags each block with data-sourcepos="startL:col-…".
+  // Align the block the cursor is in just below the container's top. This is
+  // exact regardless of how tall each block renders (headings, code, tables),
+  // unlike the old proportional line/total estimate which drifted badly.
+  const best = pickSourceposTarget(container, line);
+  if (!best) {
+    if (!hasSourcepos(container) && Number.isFinite(total) && total > 0) {
+      // Fallback for a renderer without sourcepos: proportional estimate.
+      const ratio = Math.min(1, Math.max(0, (line - 1) / total));
+      container.scrollTop = ratio * (container.scrollHeight - container.clientHeight);
+    } else {
+      container.scrollTop = 0; // cursor is before the first block
+    }
+    return;
+  }
+
+  const margin = 8; // small breathing room above the target line
+  const delta = best.getBoundingClientRect().top - container.getBoundingClientRect().top;
+  container.scrollTop += delta - margin;
 }
 
 async function boot() {
