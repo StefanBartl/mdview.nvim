@@ -159,7 +159,7 @@ Defaults: >lua
     experimental = {
       webtransport   = false, -- opt-in WebTransport/HTTP3 (falls back to WS)
       line_diff      = false, -- opt-in: send only changed lines per edit
-      click_navigate = false, -- opt-in: relative links open the file in nvim
+      click_navigate = true,  -- default on: relative links open the file in nvim
       reverse_scroll = false, -- opt-in: scrolling the preview moves nvim's cursor
     },
   }
@@ -303,14 +303,14 @@ experimental.line_diff ~
   verified path.
 
 experimental.click_navigate ~
-  Opt in to click-to-navigate. Clicking a relative link in the preview
+  Click-to-navigate (on by default). Clicking a relative link in the preview
   (e.g. `[other](sub/other.md)`) is intercepted by the client and sent to the
   relay's /nav bridge; Neovim polls it while a session is active, resolves the
   href against the source document's directory, and opens the target with
   `:edit`. Opening it makes it the active buffer, so `browser.behavior`
   handles the preview switch. External links (`http:`, `mailto:`), in-page
-  anchors (`#…`) and absolute paths are left to the browser. Off by default
-  because it changes what clicking a link does.
+  anchors (`#…`) and absolute paths are left to the browser. Set `false` to let
+  the browser follow links itself.
 
 experimental.reverse_scroll ~
   Opt in to reverse scroll (browser -> Neovim): scrolling the preview moves

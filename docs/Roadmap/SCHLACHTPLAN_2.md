@@ -2,6 +2,11 @@
 
 > Zweite Feedback-Runde nach P0–P2. Root-Causes untersucht. Priorisiert
 > P0 (Bug) → P1 (wichtig) → P2 (Entscheidung/größer).
+>
+> **Stand:** ✅ P0-1 (focus-Bug, Temp-.ps1) · ✅ P1-2 (Scroll zeilengenau +
+> Modi) · ✅ P1-3 (Transport in :MDViewDiagnose) · ✅ P1-4 (Shiki → JS-Engine,
+> Browser-Verifikation offen) · ✅ P2-6 (Defaults: click_navigate an). Offen:
+> P2-5 (Treesitter-Mirror, nur Doku) und **P2-7 (WebTransport-Backend)**.
 
 ---
 
