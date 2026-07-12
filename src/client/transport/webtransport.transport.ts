@@ -71,9 +71,9 @@ export class WebTransportTransport implements Transport {
   // Read incoming unidirectional streams; each stream, read to completion, is
   // exactly one message (the relay opens one uni-stream per broadcast).
   private async readLoop(wt: WTLike): Promise<void> {
-    const streams = wt.incomingUnidirectionalStreams.getReader();
     const decoder = new TextDecoder();
     try {
+      const streams = wt.incomingUnidirectionalStreams.getReader();
       for (;;) {
         const { value: stream, done } = await streams.read();
         if (done) break;

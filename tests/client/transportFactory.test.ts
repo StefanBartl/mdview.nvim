@@ -83,12 +83,8 @@ describe('createTransport', () => {
     class OkWebTransport {
       ready = Promise.resolve();
       closed = Promise.resolve();
-      async createBidirectionalStream() {
-        return {
-          readable: { getReader: () => ({ read: () => new Promise(() => {}) }) },
-          writable: { getWriter: () => ({ write: async () => {}, close: async () => {} }) },
-        };
-      }
+      // Reader that never resolves — readLoop just waits for messages/streams.
+      incomingUnidirectionalStreams = { getReader: () => ({ read: () => new Promise(() => {}) }) };
       close() {}
     }
     (globalThis as Record<string, unknown>).WebTransport = OkWebTransport;
