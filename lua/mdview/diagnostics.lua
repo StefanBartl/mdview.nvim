@@ -102,6 +102,30 @@ function M.collect()
 		kv(lines, "GET /health", curl_get(("http://127.0.0.1:%d/health"):format(port)))
 	end
 
+	section("Active transport (browser <-> relay)")
+	local exp = defaults.experimental or {}
+	kv(lines, "experimental.webtransport", exp.webtransport == true)
+	-- The browser client reports its actual transport via /clientlog; scan the
+	-- captured relay stdout for the most recent canonical "transport active:"
+	-- line. Honest even when webtransport was requested: with no HTTP/3 backend
+	-- it falls back and reports websocket.
+	local ok_alog, alog = pcall(require, "mdview.adapter.log")
+	local active = "(unknown — open a preview and check :MDViewShowWebLogs)"
+	if ok_alog and type(alog.lines) == "function" then
+		local llines = alog.lines()
+		for i = #llines, 1, -1 do
+			local m = tostring(llines[i]):match("transport active:%s*(%S+)")
+			if m then
+				active = m
+				break
+			end
+		end
+	end
+	kv(lines, "client reports", active)
+	if exp.webtransport == true and active == "websocket" then
+		lines[#lines + 1] = "  note: webtransport is on but fell back to websocket (no HTTP/3 relay backend yet)"
+	end
+
 	section("Browser URL that would be opened")
 	local ok_launcher, launcher = pcall(require, "mdview.bindings.usrcmds.start.server.launcher")
 	if ok_launcher then

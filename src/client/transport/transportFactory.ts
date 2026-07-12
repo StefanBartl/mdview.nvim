@@ -39,7 +39,8 @@ export async function createTransport(
       try {
         const wt = new WebTransportTransport(opts.webTransportUrl);
         await wt.initialize();
-        opts.log?.('transport: using WebTransport (HTTP/3)');
+        // Canonical line (scanned by :MDViewDiagnose) plus a human note.
+        opts.log?.('transport active: webtransport');
         return wt;
       } catch (err) {
         opts.log?.(`transport: WebTransport failed, falling back to WebSocket: ${String(err)}`);
@@ -51,5 +52,6 @@ export async function createTransport(
 
   const ws = new WebSocketTransport(wsUrl);
   await ws.initialize();
+  opts.log?.('transport active: websocket');
   return ws;
 }
