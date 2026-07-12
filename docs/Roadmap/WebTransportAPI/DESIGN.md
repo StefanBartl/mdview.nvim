@@ -1,11 +1,16 @@
 # WebTransport (HTTP/3) — opt-in future transport
 
-> **Status: client plumbing shipped, relay backend not yet implemented.**
-> Enabling `experimental.webtransport = true` today makes the browser client
-> feature-detect WebTransport, attempt it, and **fall back to WebSocket**
-> because the Go relay does not serve an HTTP/3 endpoint yet. This document is
-> the design for that remaining backend piece. The older `Machbarkeit.md` /
-> `Rolluout.md` notes predate the Go/Rust rewrite and are historical.
+> **Status: IMPLEMENTED (end-to-end), pending real-browser verification.**
+> `experimental.webtransport = true` now: the Lua side spawns the relay with
+> `--webtransport`; the relay generates a short-lived self-signed ECDSA cert,
+> serves `/wt` over HTTP/3 (UDP, same port), and prints `wt cert-hash: <hex>`;
+> the runner captures the hash → launcher appends `&transport=webtransport&
+> wtcerthash=<hex>` → the client pins it via `serverCertificateHashes` and reads
+> one message per incoming unidirectional stream. The client still falls back to
+> WebSocket on any failure. The end-to-end handshake needs a real HTTP/3-capable
+> browser to verify (can't run headless in CI); the Go pieces (cert gen, build)
+> are unit-tested. Requires a relay binary built with WebTransport support
+> (v0.2.0+). Design notes below.
 
 ## Why opt-in / why not default
 

@@ -14,6 +14,8 @@ export interface CreateTransportOptions {
   preferWebTransport?: boolean;
   /** HTTPS/HTTP3 URL for the WebTransport endpoint (required to attempt it). */
   webTransportUrl?: string;
+  /** Hex SHA-256 of the relay's self-signed cert, pinned via serverCertificateHashes. */
+  webTransportCertHash?: string;
   /** Optional diagnostics sink (routed to the relay's /clientlog). */
   log?: (message: string) => void;
 }
@@ -37,7 +39,7 @@ export async function createTransport(
   if (opts.preferWebTransport && opts.webTransportUrl) {
     if (supportsWebTransport()) {
       try {
-        const wt = new WebTransportTransport(opts.webTransportUrl);
+        const wt = new WebTransportTransport(opts.webTransportUrl, opts.webTransportCertHash);
         await wt.initialize();
         // Canonical line (scanned by :MDViewDiagnose) plus a human note.
         opts.log?.('transport active: webtransport');

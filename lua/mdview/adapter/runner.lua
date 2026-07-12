@@ -136,6 +136,17 @@ function M.start_server(cmd, args, cwd)
 				log.append(("runner: detected dev server port %d"):format(tonumber(dev_port)), desc_tag)
 			end)
 		end
+
+		-- WebTransport cert hash (only printed when --webtransport is on). The
+		-- browser needs it as serverCertificateHashes to trust the self-signed
+		-- cert; the launcher appends it to the preview URL.
+		local wt_hash = s:match("wt cert%-hash:%s*(%x+)")
+		if wt_hash then
+			vim.schedule(function()
+				vim.g.mdview_wt_cert_hash = wt_hash
+				log.append("runner: detected WebTransport cert hash", desc_tag)
+			end)
+		end
 	end)
 
 	stderr:read_start(function(read_err, data)

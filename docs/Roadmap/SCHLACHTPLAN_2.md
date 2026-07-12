@@ -5,8 +5,9 @@
 >
 > **Stand:** ✅ P0-1 (focus-Bug, Temp-.ps1) · ✅ P1-2 (Scroll zeilengenau +
 > Modi) · ✅ P1-3 (Transport in :MDViewDiagnose) · ✅ P1-4 (Shiki → JS-Engine,
-> Browser-Verifikation offen) · ✅ P2-6 (Defaults: click_navigate an). Offen:
-> P2-5 (Treesitter-Mirror, nur Doku) und **P2-7 (WebTransport-Backend)**.
+> Browser-Verifikation offen) · ✅ P2-6 (Defaults: click_navigate an) ·
+> ✅ P2-7 (WebTransport-Backend implementiert, Browser-E2E offen). Offen:
+> P2-5 (Treesitter-Mirror, nur Doku).
 
 ---
 

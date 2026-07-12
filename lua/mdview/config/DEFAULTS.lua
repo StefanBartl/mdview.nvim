@@ -132,12 +132,12 @@ return {
 
 	experimental = {
 		-- Opt in to the WebTransport (HTTP/3) client transport instead of
-		-- WebSocket. Future tech: the relay does not serve an HTTP/3 endpoint
-		-- yet (see docs/Roadmap/WebTransportAPI/DESIGN.md), so enabling this
-		-- currently makes the client feature-detect WebTransport, attempt it,
-		-- and fall back to WebSocket transparently — never breaking the
-		-- preview. Kept as an opt-in so the plumbing is ready when the backend
-		-- lands. Default false.
+		-- WebSocket. When on, the relay also serves a /wt endpoint (HTTP/3 over
+		-- UDP on the same port, self-signed cert pinned via the printed hash)
+		-- and the client tries WebTransport first, falling back to WebSocket on
+		-- any failure — so it never breaks the preview. On loopback there is no
+		-- real benefit over WebSocket; kept as opt-in "future tech". Requires a
+		-- relay binary built with WebTransport support (v0.2.0+). Default false.
 		webtransport = false,
 
 		-- Opt in to the line-diff transport: send only the changed lines on each
