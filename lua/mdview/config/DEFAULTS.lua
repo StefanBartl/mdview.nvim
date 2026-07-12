@@ -44,6 +44,7 @@
 ---@class mdview.config.ExperimentalDefaults
 ---@field webtransport boolean opt in to the WebTransport (HTTP/3) client transport; falls back to WebSocket until an HTTP/3 relay backend exists (future tech)
 ---@field line_diff boolean opt in to sending only changed lines per edit instead of the whole document (versioned diff transport; client reassembles full text)
+---@field click_navigate boolean opt in to click-to-navigate: clicking a relative link in the preview opens the linked document in Neovim (via the relay's /nav bridge)
 
 ---@class mdview.config.Defaults
 ---@field ft_pattern string[] filetype/glob patterns mdview's autocmds attach to
@@ -133,5 +134,13 @@ return {
 		-- diff desync the client resyncs from the next full snapshot (sent on
 		-- save and every 25 edits). Default false.
 		line_diff = false,
+
+		-- Opt in to click-to-navigate: clicking a relative link in the preview
+		-- tells Neovim (via the relay's /nav bridge, polled while a session is
+		-- active) to open the linked document, which then flows back into the
+		-- preview. Resolved relative to the source document; external links,
+		-- in-page anchors and absolute paths are left to the browser. Changes
+		-- how link clicks behave, so it's opt-in. Default false.
+		click_navigate = false,
 	},
 }

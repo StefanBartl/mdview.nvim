@@ -60,12 +60,15 @@
   Signal (blockierendes curl mit kurzem Timeout) BEVOR der Relay-Prozess
   gekillt wird — sonst würde die Nachricht mit dem Shutdown rennen. Damit
   schließt sich der Tab auch im default-Modus (ohne Prozess-Handle).
-- [ ] **Click-to-navigate** (Wunschliste #3): Klick auf einen relativen Link in
-  der Preview lädt die Zieldatei. Zwei gangbare Wege: (B) Client schickt per WS
-  eine Nachricht an Neovim, das die Datei liest und pusht — braucht eine
-  Server→Neovim-Bridge; (C) Relay serviert Dateien beschränkt auf den
-  Projekt-Root (`/file?path=...` mit Traversal-Schutz). C ist einfacher, wenn
-  der Server im Projekt-CWD läuft.
+- [x] **Click-to-navigate** (Wunschliste #3, opt-in `experimental.click_navigate`):
+  Weg (B) umgesetzt — Server→Neovim-Bridge über eine token-gated `/nav`-Queue
+  (`native/server/internal/relay/nav.go`): der Client fängt Klicks auf relative
+  Links ab (`src/client/render/clickNav.ts`) und POSTet den href; Neovim pollt
+  `GET /nav` (`lua/mdview/adapter/nav_poll.lua`), löst den Pfad relativ zum
+  Quelldokument auf und öffnet ihn per `:edit` — die Preview folgt dann über
+  `browser.behavior`. Externe Links/Anker/absolute Pfade bleiben dem Browser
+  überlassen. Getestet: Go-Queue-Unit-Test, vitest für die Link-Entscheidung,
+  und ein echtes End-to-End (Relay + headless nvim öffnet die verlinkte Datei).
 - [ ] **Browser→nvim-Scrolling** (Rückrichtung des bereits umgesetzten
   nvim→Browser-Sync). Client sendet Scroll-Position per WS, ein
   Server→Neovim-Kanal bewegt den Cursor/Viewport. Braucht dieselbe Bridge wie

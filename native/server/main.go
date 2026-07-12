@@ -9,6 +9,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
@@ -66,6 +67,7 @@ func main() {
 	}
 
 	registry := relay.NewRegistry()
+	navQueue := relay.NewNavQueue()
 	mime.AddExtensionType(".wasm", "application/wasm")
 	fileServer := http.FileServer(http.Dir(*webRoot))
 
@@ -75,6 +77,7 @@ func main() {
 	mux.HandleFunc("/scroll", handleScroll(registry, *token))
 	mux.HandleFunc("/diff", handleDiff(registry, *token))
 	mux.HandleFunc("/close", handleClose(registry, *token))
+	mux.HandleFunc("/nav", handleNav(navQueue, *token))
 	mux.HandleFunc("/clientlog", handleClientLog(*token))
 	mux.HandleFunc("/ws", handleWS(registry, *token, port))
 	mux.Handle("/", fileServer)
@@ -216,6 +219,47 @@ func handleDiff(registry *relay.Registry, token string) http.HandlerFunc {
 		}
 		registry.BroadcastEphemeral(key, body)
 		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
+const maxNavHrefBytes = 4 << 10 // clicked hrefs are short paths, not documents
+
+// handleNav is the browser->Neovim bridge for click-to-navigate. On POST the
+// browser enqueues the room key and the raw clicked href; on GET Neovim drains
+// the queue (it polls while a click-navigate session is active) and resolves
+// each href against the source document itself — the relay never touches the
+// filesystem or interprets the path, it only carries the event. Token-gated.
+func handleNav(queue *relay.NavQueue, token string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if !relay.ValidToken(token, r.URL.Query().Get("token")) {
+			http.Error(w, "forbidden", http.StatusForbidden)
+			return
+		}
+		switch r.Method {
+		case http.MethodGet:
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(queue.Drain())
+		case http.MethodPost:
+			key := r.URL.Query().Get("key")
+			if key == "" {
+				http.Error(w, "missing key", http.StatusBadRequest)
+				return
+			}
+			body, err := io.ReadAll(io.LimitReader(r.Body, maxNavHrefBytes))
+			if err != nil {
+				http.Error(w, "failed to read body", http.StatusBadRequest)
+				return
+			}
+			href := strings.TrimSpace(string(body))
+			if href == "" {
+				http.Error(w, "missing href", http.StatusBadRequest)
+				return
+			}
+			queue.Push(relay.NavRequest{Key: key, Href: href})
+			w.WriteHeader(http.StatusNoContent)
+		default:
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
 	}
 }
 

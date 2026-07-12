@@ -10,6 +10,7 @@
 
 import { createTransport } from './transport/transportFactory';
 import { DiffDoc, isEnvelope } from './render/diffDoc';
+import { installClickNav } from './render/clickNav';
 import init, { render_markdown } from './wasm-render/mdview_wasm_render.js';
 
 // Available visual themes, each a CSS module under ./themes/. Loaded lazily
@@ -130,6 +131,24 @@ async function boot() {
 
   const container = document.getElementById('mdview-root');
   let firstRender = true;
+
+  // Opt-in click-to-navigate: hand relative-link clicks to Neovim via /nav
+  // (the Lua side adds ?nav=1 when experimental.click_navigate is on). Neovim
+  // opens the target document, which flows back into this tab via the push path.
+  if (container && params.get('nav') === '1') {
+    installClickNav(container, (target: string) => {
+      clientLog(`nav: ${target}`);
+      try {
+        void fetch(`/nav?token=${encodeURIComponent(token)}&key=${encodeURIComponent(key)}`, {
+          method: 'POST',
+          body: target,
+          keepalive: true,
+        });
+      } catch {
+        /* navigation is best-effort */
+      }
+    });
+  }
 
   // Reassembles full text from the opt-in line-diff transport's envelopes. When
   // line_diff is off, no \x03 envelopes arrive and this stays unused.

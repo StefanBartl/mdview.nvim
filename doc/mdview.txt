@@ -155,8 +155,9 @@ Defaults: >lua
     },
 
     experimental = {
-      webtransport = false, -- opt-in WebTransport/HTTP3 (falls back to WS)
-      line_diff    = false, -- opt-in: send only changed lines per edit
+      webtransport   = false, -- opt-in WebTransport/HTTP3 (falls back to WS)
+      line_diff      = false, -- opt-in: send only changed lines per edit
+      click_navigate = false, -- opt-in: relative links open the file in nvim
     },
   }
 <
@@ -280,6 +281,16 @@ experimental.line_diff ~
   version, otherwise the client waits for the next full snapshot (sent on save
   and every 25 edits) and resyncs. The default full-text push remains the
   verified path.
+
+experimental.click_navigate ~
+  Opt in to click-to-navigate. Clicking a relative link in the preview
+  (e.g. `[other](sub/other.md)`) is intercepted by the client and sent to the
+  relay's /nav bridge; Neovim polls it while a session is active, resolves the
+  href against the source document's directory, and opens the target with
+  `:edit`. Opening it makes it the active buffer, so `browser.behavior`
+  handles the preview switch. External links (`http:`, `mailto:`), in-page
+  anchors (`#…`) and absolute paths are left to the browser. Off by default
+  because it changes what clicking a link does.
 
 ==============================================================================
 5. COMMANDS                                                   *mdview-commands*
