@@ -50,7 +50,19 @@ local function send_current_position(bufnr)
 
 	local line = api.nvim_win_get_cursor(0)[1]
 	local total = api.nvim_buf_line_count(bufnr)
-	ws_client.send_scroll(path, line, total)
+
+	-- Where the line should sit in the browser viewport (0 = top, 1 = bottom).
+	local viewfrac
+	if defaults.scroll_sync_mode == "cursor" then
+		-- Mirror the cursor's height within the nvim window.
+		local winline = vim.fn.winline() -- 1-based screen row of the cursor
+		local height = api.nvim_win_get_height(0)
+		viewfrac = (winline - 1) / math.max(1, height - 1)
+	else
+		viewfrac = defaults.scroll_sync_top_offset or 0.08
+	end
+
+	ws_client.send_scroll(path, line, total, viewfrac)
 end
 
 --- Setup CursorMoved/CursorMovedI autocmd for scroll sync.

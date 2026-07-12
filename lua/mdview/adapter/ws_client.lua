@@ -374,11 +374,16 @@ end
 ---@param path string
 ---@param line integer # 1-based current cursor line
 ---@param total integer # total line count in the buffer
-function M.send_scroll(path, line, total)
+---@param viewfrac number|nil # desired 0..1 vertical position of the line in the browser viewport
+function M.send_scroll(path, line, total, viewfrac)
 	if type(path) ~= "string" or path == "" then
 		return
 	end
-	http_post_nonblocking(scroll_url_for(path), tostring(line) .. "/" .. tostring(total), function() end)
+	local body = tostring(line) .. "/" .. tostring(total)
+	if type(viewfrac) == "number" then
+		body = body .. "/" .. ("%.4f"):format(viewfrac)
+	end
+	http_post_nonblocking(scroll_url_for(path), body, function() end)
 end
 
 -- ---------------------------------------------------------------------------

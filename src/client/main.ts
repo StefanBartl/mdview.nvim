@@ -11,7 +11,7 @@
 import { createTransport } from './transport/transportFactory';
 import { DiffDoc, isEnvelope } from './render/diffDoc';
 import { installClickNav } from './render/clickNav';
-import { pickSourceposTarget, hasSourcepos } from './render/scrollSync';
+import { pickScrollTarget, fractionInBlock, hasSourcepos } from './render/scrollSync';
 import { highlight, parseHighlighter } from './highlight';
 import init, { render_markdown } from './wasm-render/mdview_wasm_render.js';
 
@@ -59,17 +59,17 @@ const SCROLL_MESSAGE_PREFIX = '\x01';
 const CLOSE_MESSAGE_PREFIX = '\x02';
 
 function applyScrollPing(container: HTMLElement, message: string): void {
-  const [lineStr, totalStr] = message.slice(SCROLL_MESSAGE_PREFIX.length).split('/');
-  const line = Number(lineStr);
-  const total = Number(totalStr);
+  // Payload: "line/total/viewfrac". viewfrac (0..1) is where in the browser
+  // viewport the cursor line should sit — Neovim sends a small value for "top"
+  // mode or its own cursor-in-window fraction for "cursor" (mirror) mode.
+  const parts = message.slice(SCROLL_MESSAGE_PREFIX.length).split('/');
+  const line = Number(parts[0]);
+  const total = Number(parts[1]);
+  const viewfrac = Number(parts[2]);
   if (!Number.isFinite(line)) return;
 
-  // Precise mapping: comrak tags each block with data-sourcepos="startL:col-…".
-  // Align the block the cursor is in just below the container's top. This is
-  // exact regardless of how tall each block renders (headings, code, tables),
-  // unlike the old proportional line/total estimate which drifted badly.
-  const best = pickSourceposTarget(container, line);
-  if (!best) {
+  const target = pickScrollTarget(container, line);
+  if (!target) {
     if (!hasSourcepos(container) && Number.isFinite(total) && total > 0) {
       // Fallback for a renderer without sourcepos: proportional estimate.
       const ratio = Math.min(1, Math.max(0, (line - 1) / total));
@@ -80,9 +80,15 @@ function applyScrollPing(container: HTMLElement, message: string): void {
     return;
   }
 
-  const margin = 8; // small breathing room above the target line
-  const delta = best.getBoundingClientRect().top - container.getBoundingClientRect().top;
-  container.scrollTop += delta - margin;
+  // Line-accurate position: the block's top in content coordinates plus the
+  // cursor's interpolated fraction through the block's line span; then place
+  // that at `viewfrac` of the viewport.
+  const rect = target.el.getBoundingClientRect();
+  const contRect = container.getBoundingClientRect();
+  const blockTopInContent = rect.top - contRect.top + container.scrollTop;
+  const targetY = blockTopInContent + fractionInBlock(target, line) * rect.height;
+  const vf = Number.isFinite(viewfrac) ? Math.min(1, Math.max(0, viewfrac)) : 0;
+  container.scrollTop = targetY - vf * container.clientHeight;
 }
 
 async function boot() {

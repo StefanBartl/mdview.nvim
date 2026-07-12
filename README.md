@@ -125,7 +125,8 @@ Partial nested overrides merge recursively — `{ browser = { browser = "firefox
 | Option | Default | Purpose |
 | --- | --- | --- |
 | `server_port` | `43219` | Preferred loopback port; the relay picks the next free one if taken. |
-| `scroll_sync` | `true` | Sync the nvim cursor position to the browser scroll position. |
+| `scroll_sync` | `true` | Sync the nvim cursor position to the browser scroll position (line-accurate via comrak sourcepos). |
+| `scroll_sync_mode` | `"top"` | Where the cursor line lands in the browser viewport: `"top"` (near the top; `scroll_sync_top_offset` = fraction down, `0` = glued to top) or `"cursor"` (mirror — same relative height as the cursor in the nvim window). |
 | `open_preview_tab` | `false` | Render into a read-only Neovim tab (Treesitter-highlighted) instead of the browser. |
 | `browser.open_mode` | `"default"` | `"default"` opens a tab in your normal browser (your extensions/theme; auto-close via a cooperative `window.close()` on stop). `"isolated"` spawns a throwaway profile so process-handle auto-close works. |
 | `browser.behavior` | `"reuse"` | What happens when you switch markdown buffers: `"reuse"` (the one tab follows the active buffer), `"new_tab"` (each file opens its own tab), or `"manual"` (nothing; use `:MDViewOpen`). |
