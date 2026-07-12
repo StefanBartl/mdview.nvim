@@ -29,11 +29,38 @@ local build_args_for_browser = require("mdview.adapter.browser.build_args_for_br
 
 local M = {}
 
+-- PowerShell that opens `url` in the default browser but restores keyboard
+-- focus to whatever window was in front (i.e. Neovim's terminal): capture the
+-- foreground HWND, launch the browser, briefly wait for it to come up, then
+-- push focus back. Best-effort — window managers can override it.
+---@param url string
+---@return string
+local function windows_focus_preserving_ps(url)
+  -- url is a loopback URL with only %-encoded query chars, so single-quoting is
+  -- safe. Kept on one line to pass cleanly as a single -Command argument.
+  return table.concat({
+    "$s='[DllImport(\"user32.dll\")]public static extern System.IntPtr GetForegroundWindow();",
+    "[DllImport(\"user32.dll\")]public static extern bool SetForegroundWindow(System.IntPtr h);';",
+    "$w=Add-Type -MemberDefinition $s -Name Win -Namespace Mdv -PassThru;",
+    "$h=$w::GetForegroundWindow();",
+    ("Start-Process '%s';"):format(url),
+    "Start-Sleep -Milliseconds 600;",
+    "$w::SetForegroundWindow($h)|Out-Null",
+  }, "")
+end
+
 -- Open `url` in the user's default browser via the OS opener, as a new tab.
 -- Returns a handle with no job_id (nothing to close/track).
+--
+-- `focus` (default "browser") controls whether the browser is allowed to take
+-- keyboard focus. "nvim" keeps focus in the editor: clean on macOS (`open -g`),
+-- best-effort focus-restore on Windows, and a no-op (opens normally) on Linux
+-- where there is no portable way to do it.
 ---@param url URL
+---@param focus "browser"|"nvim"|nil
 ---@return BrowserHandle|nil, string|nil
-local function open_default(url)
+local function open_default(url, focus)
+  local keep_nvim = focus == "nvim"
   -- IMPORTANT: do NOT use vim.ui.open on Windows. It runs
   -- `cmd.exe /c start "" <url>`, and cmd.exe treats every `&` in the URL as
   -- a command separator — so our `?key=…&token=…&theme=…` URL is chopped at
@@ -43,9 +70,22 @@ local function open_default(url)
   -- argument, so `&` is preserved (verified: the full query string arrives).
   local cmd
   if fn.has("win32") == 1 then
-    cmd = { "rundll32.exe", "url.dll,FileProtocolHandler", url }
+    if keep_nvim then
+      cmd = {
+        "powershell",
+        "-NoProfile",
+        "-NonInteractive",
+        "-WindowStyle",
+        "Hidden",
+        "-Command",
+        windows_focus_preserving_ps(url),
+      }
+    else
+      cmd = { "rundll32.exe", "url.dll,FileProtocolHandler", url }
+    end
   elseif fn.has("mac") == 1 then
-    cmd = { "open", url }
+    -- `open -g` opens without bringing the browser to the foreground.
+    cmd = keep_nvim and { "open", "-g", url } or { "open", url }
   else
     cmd = { "xdg-open", url }
   end
@@ -115,7 +155,7 @@ function M.open(url, opts)
   if opts.open_mode == "isolated" then
     return open_isolated(url, opts)
   end
-  return open_default(url)
+  return open_default(url, opts.focus)
 end
 
 -- Close a previously opened browser handle via jobstop(). The profile

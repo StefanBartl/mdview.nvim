@@ -131,6 +131,7 @@ Partial nested overrides merge recursively — `{ browser = { browser = "firefox
 | `browser.behavior` | `"reuse"` | What happens when you switch markdown buffers: `"reuse"` (the one tab follows the active buffer), `"new_tab"` (each file opens its own tab), or `"manual"` (nothing; use `:MDViewOpen`). |
 | `browser.theme` | `"github"` | Preview theme: `github`, `dark-dimmed`, `plain`, `tokyonight`, or `catppuccin` — optionally suffixed `-light`/`-dark` to pin the color scheme. |
 | `browser.highlighter` | `"hljs"` | Code-fence syntax highlighter (client-side, lazy-loaded): `"hljs"` (highlight.js, light), `"shiki"` (exact TextMate/VSCode themes — tokyo-night, catppuccin, dark-plus — heavier), or `"none"`. |
+| `browser.focus` | `"browser"` | Whether the opened tab may take keyboard focus (`"browser"`) or focus stays in Neovim (`"nvim"`). `"nvim"` is clean on macOS (`open -g`), best-effort on Windows, and a no-op on Linux. `default` open_mode only. |
 | `browser.browser_autostart` | `true` | Open the browser automatically on `:MDViewStart`. |
 | `browser.stop_on_browser_exit` | `true` | Run `:MDViewStop` when the opened browser process exits (isolated mode only). |
 | `browser.require_display` | `true` | Don't try to open a browser without a GUI/`DISPLAY`. |

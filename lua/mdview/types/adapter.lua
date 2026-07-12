@@ -27,6 +27,7 @@
 
 ---@class BrowserOptions
 ---@field open_mode string|nil    # "default" (OS opener, new tab) | "isolated" (spawned profile)
+---@field focus string|nil        # "browser" (default) | "nvim" (keep editor focus; default mode)
 ---@field browser_cmd string|nil  # explicit absolute path to the browser executable (isolated mode)
 ---@field browser string|nil      # friendly name (e.g. "chrome", "firefox") (isolated mode)
 ---@field on_exit fun(job_id: integer, exit_code: integer)|nil  # optional callback (isolated mode)
