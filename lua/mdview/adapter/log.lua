@@ -147,6 +147,16 @@ local function ensure_dir(dir)
 	return true, nil
 end
 
+--- Read-only view of the captured relay stdout lines (includes [client] lines).
+---@return string[]
+function M.lines()
+	local out = {}
+	for i = 1, #log_lines do
+		out[i] = log_lines[i]
+	end
+	return out
+end
+
 -- Append a line to the in-memory log store and optionally to a file.
 -- Strips common ANSI escape sequences and splits on line breaks.
 ---@param line string
