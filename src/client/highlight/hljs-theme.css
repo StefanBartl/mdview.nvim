@@ -1,65 +1,9 @@
-/* highlight.js token colors for mdview, driven by CSS variables so a theme can
-   override them. Defaults are a GitHub-like palette (light + dark via
-   prefers-color-scheme, with data-theme pinning). The code block background
-   comes from the active mdview theme's --md-code-block-bg. */
-
-:root {
-  --code-keyword: #cf222e;
-  --code-string: #0a3069;
-  --code-comment: #6e7781;
-  --code-number: #0550ae;
-  --code-function: #8250df;
-  --code-type: #953800;
-  --code-variable: #e36209;
-  --code-builtin: #0550ae;
-  --code-attr: #0550ae;
-  --code-tag: #116329;
-  --code-meta: #6e7781;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --code-keyword: #ff7b72;
-    --code-string: #a5d6ff;
-    --code-comment: #8b949e;
-    --code-number: #79c0ff;
-    --code-function: #d2a8ff;
-    --code-type: #ffa657;
-    --code-variable: #ffa657;
-    --code-builtin: #79c0ff;
-    --code-attr: #79c0ff;
-    --code-tag: #7ee787;
-    --code-meta: #8b949e;
-  }
-}
-
-:root[data-theme='light'] {
-  --code-keyword: #cf222e;
-  --code-string: #0a3069;
-  --code-comment: #6e7781;
-  --code-number: #0550ae;
-  --code-function: #8250df;
-  --code-type: #953800;
-  --code-variable: #e36209;
-  --code-builtin: #0550ae;
-  --code-attr: #0550ae;
-  --code-tag: #116329;
-  --code-meta: #6e7781;
-}
-
-:root[data-theme='dark'] {
-  --code-keyword: #ff7b72;
-  --code-string: #a5d6ff;
-  --code-comment: #8b949e;
-  --code-number: #79c0ff;
-  --code-function: #d2a8ff;
-  --code-type: #ffa657;
-  --code-variable: #ffa657;
-  --code-builtin: #79c0ff;
-  --code-attr: #79c0ff;
-  --code-tag: #7ee787;
-  --code-meta: #8b949e;
-}
+/* highlight.js token → color mapping for mdview. The actual `--code-*` values
+   are defined in themes/_base.css (github-like defaults) and may be overridden
+   per theme (tokyonight, catppuccin, …). This file only maps highlight.js's
+   classes onto those variables, so it can be lazy-loaded with the hljs chunk
+   without fighting the theme's cascade. Code background comes from the active
+   theme's --md-code-block-bg. */
 
 /* map highlight.js classes onto the variables */
 .hljs-comment,

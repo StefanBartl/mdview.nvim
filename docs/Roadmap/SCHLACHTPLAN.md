@@ -47,7 +47,11 @@
 
 ## P1 — wichtig
 
-### 4. Cursor-Sync ungenau (Zeile landet zu weit oben / außerhalb)
+> **Status:** ✅ 4 (Cursor-Sync via sourcepos), ✅ 5 (Highlighting hljs+shiki,
+> lazy), ✅ 6 (Themes tokyonight+catppuccin, code-Farben via `--code-*`),
+> ✅ 7 (checkhealth ausgebaut), ✅ 8 (`:MDViewLog`). Details unten.
+
+### ✅ 4. Cursor-Sync ungenau — ERLEDIGT (comrak sourcepos + Block-Mapping)
 - **Symptom:** Cursor in letzte Zeile → Browser scrollt, Zielzeile ist ganz oben,
   sogar über den sichtbaren Bereich hinaus.
 - **Ursache:** `applyScrollPing` mappt **linear** `ratio=(line-1)/total` auf

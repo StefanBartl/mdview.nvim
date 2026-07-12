@@ -1,0 +1,32 @@
+/* Tokyo Night theme for mdview (dark). Palette mirrors the popular Neovim
+   colorscheme. Dark-only by design; structure in _base.css. Overrides both the
+   markdown chrome (--md-*) and the highlight.js code tokens (--code-*). */
+
+@import "./_base.css";
+
+:root {
+  --md-fg: #c0caf5;
+  --md-muted: #565f89;
+  --md-bg: #1a1b26;
+  --md-border: #292e42;
+  --md-border-muted: #292e42b3;
+  --md-code-bg: #24283b;
+  --md-code-block-bg: #16161e;
+  --md-link: #7aa2f7;
+  --md-quote-fg: #565f89;
+  --md-quote-border: #3b4261;
+  --md-table-stripe: #1f2335;
+  --md-mark-bg: #e0af6833;
+
+  --code-keyword: #bb9af7;
+  --code-string: #9ece6a;
+  --code-comment: #565f89;
+  --code-number: #ff9e64;
+  --code-function: #7aa2f7;
+  --code-type: #2ac3de;
+  --code-variable: #c0caf5;
+  --code-builtin: #7dcfff;
+  --code-attr: #7dcfff;
+  --code-tag: #f7768e;
+  --code-meta: #565f89;
+}
