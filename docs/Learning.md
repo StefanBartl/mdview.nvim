@@ -1,3 +1,0 @@
-# Lernliste
-
-- Github CI
