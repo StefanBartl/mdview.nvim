@@ -59,6 +59,10 @@ function M.stop(close_browser_override)
 	-- doesn't route "reuse" pushes to a stale key from the previous session.
 	state.set_preview_key(nil)
 
+	-- Drop line-diff version/basis state so the next session starts from a full
+	-- snapshot instead of diffing against a dead session's content.
+	require("mdview.adapter.ws_client").reset_diff_state()
+
 	session.shutdown()
 
 	local should_close

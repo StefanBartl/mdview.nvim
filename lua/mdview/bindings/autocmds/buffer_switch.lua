@@ -82,7 +82,10 @@ local function on_switch(bufnr)
 				return
 			end
 			local lines = api.nvim_buf_get_lines(bufnr, 0, -1, false) or {}
-			ws_client.send_markdown(preview_key, table.concat(lines, "\n"), { immediate = true })
+			-- A buffer switch is a whole-document change of the previewed room,
+			-- so force a full snapshot rather than diffing against the previous
+			-- buffer's content (which would be a large, pointless diff).
+			ws_client.send_content(preview_key, lines, { full = true })
 			log.debug("reuse: pushed " .. path .. " to preview room " .. preview_key, nil, "bufswitch", true)
 		end, ws_client.WAIT_READY_TIMEOUT)
 		return

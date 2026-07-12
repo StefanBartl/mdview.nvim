@@ -60,8 +60,10 @@ function M.open(opts)
 	-- (and, in "reuse" behavior, later live pushes) route to this room.
 	state.set_preview_key(key)
 
-	-- best-effort: seed the relay with current content so the new tab isn't empty
-	pcall(require("mdview.bindings.autocmds.live_push").push_buffer_changes, buf)
+	-- best-effort: seed the relay with current content so the new tab isn't
+	-- empty. Force a full snapshot so the new tab's LastPayload is whole text
+	-- (not a diff) when experimental.line_diff is on.
+	pcall(require("mdview.bindings.autocmds.live_push").push_buffer_changes, buf, { full = true })
 
 	local launcher = require("mdview.bindings.usrcmds.start.server.launcher")
 	local browser_url = launcher.resolve_browser_url({ browser_url = opts.browser_url, key = key })

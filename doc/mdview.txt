@@ -153,6 +153,11 @@ Defaults: >lua
       repo    = "StefanBartl/mdview.nvim", -- override to use a fork
       version = "v0.1.0",                  -- pin a specific release tag
     },
+
+    experimental = {
+      webtransport = false, -- opt-in WebTransport/HTTP3 (falls back to WS)
+      line_diff    = false, -- opt-in: send only changed lines per edit
+    },
   }
 <
 
@@ -257,6 +262,24 @@ install.repo / install.version ~
   GitHub `owner/repo` and release tag the relay binary and client bundle are
   downloaded from. Override `repo` if you maintain a fork; override
   `version` to pin an older release.
+
+experimental.webtransport ~
+  Opt in to the WebTransport (HTTP/3) client transport. The client
+  feature-detects it and falls back to WebSocket on any failure, so this is
+  always safe to enable — but there is no HTTP/3 relay backend yet, so today
+  it always falls back. Future tech; see
+  docs/Roadmap/WebTransportAPI/DESIGN.md.
+
+experimental.line_diff ~
+  Opt in to the line-diff transport: on each edit, send only the changed lines
+  (as versioned \x03 envelopes) instead of the whole document, and have the
+  client reassemble the full text. Saves bandwidth on large files; note that
+  the client still re-renders the whole document (comrak needs full context),
+  so on a loopback connection the benefit is modest. Correctness is preserved
+  by versioning: a diff is applied only if its base matches the client's
+  version, otherwise the client waits for the next full snapshot (sent on save
+  and every 25 edits) and resyncs. The default full-text push remains the
+  verified path.
 
 ==============================================================================
 5. COMMANDS                                                   *mdview-commands*
