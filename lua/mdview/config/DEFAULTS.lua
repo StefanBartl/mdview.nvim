@@ -43,6 +43,7 @@
 
 ---@class mdview.config.ExperimentalDefaults
 ---@field webtransport boolean opt in to the WebTransport (HTTP/3) client transport; falls back to WebSocket until an HTTP/3 relay backend exists (future tech)
+---@field line_diff boolean opt in to sending only changed lines per edit instead of the whole document (versioned diff transport; client reassembles full text)
 
 ---@class mdview.config.Defaults
 ---@field ft_pattern string[] filetype/glob patterns mdview's autocmds attach to
@@ -123,5 +124,14 @@ return {
 		-- preview. Kept as an opt-in so the plumbing is ready when the backend
 		-- lands. Default false.
 		webtransport = false,
+
+		-- Opt in to the line-diff transport: send only the changed lines on each
+		-- edit (versioned \x03 envelopes, client reassembles full text) instead
+		-- of the whole document. Saves bandwidth on large files; rendering still
+		-- processes the whole document client-side, so on loopback the win is
+		-- modest. The default full-text push stays the verified path. On any
+		-- diff desync the client resyncs from the next full snapshot (sent on
+		-- save and every 25 edits). Default false.
+		line_diff = false,
 	},
 }

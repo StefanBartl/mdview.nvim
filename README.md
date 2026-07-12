@@ -133,6 +133,8 @@ Partial nested overrides merge recursively — `{ browser = { browser = "firefox
 | `browser.browser_autostart` | `true` | Open the browser automatically on `:MDViewStart`. |
 | `browser.stop_on_browser_exit` | `true` | Run `:MDViewStop` when the opened browser process exits (isolated mode only). |
 | `browser.require_display` | `true` | Don't try to open a browser without a GUI/`DISPLAY`. |
+| `experimental.line_diff` | `false` | Opt in to sending only changed lines per edit (versioned diff transport) instead of the whole document. Saves bandwidth on large files; rendering still processes the whole doc client-side. Self-heals from any desync on the next full snapshot (save / every 25 edits). |
+| `experimental.webtransport` | `false` | Opt in to the WebTransport (HTTP/3) client transport; falls back to WebSocket until an HTTP/3 relay backend exists (future tech). |
 
 ---
 

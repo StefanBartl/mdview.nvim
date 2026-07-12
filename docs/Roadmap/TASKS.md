@@ -38,11 +38,17 @@
   Trade-offs (Auto-Close nur im „isolated"-Modus) erweitert — plus neue
   Commands-Tabellen (README, `doc/mdview.txt`, `docs/BINDINGS.md`) und ein
   lib.nvim-Hard-Dependency-Hinweis in `:checkhealth`.
-- [ ] **Line-Diff-Transport reaktivieren oder final entfernen.** `core/events.lua`,
-  `utils/diff*.lua`, `core/session.compute_line_diff` sind dormanter Code aus
-  der Vor-WASM-Zeit. Entscheidung: entweder an den Client anschließen (Diffs
-  statt Volltext senden — spart Bandbreite bei großen Dateien) oder löschen.
-  Aktuell nur `test/`-Harness nutzt sie.
+- [x] **Line-Diff-Transport reaktiviert** (opt-in `experimental.line_diff`,
+  default false). Der alte `utils/diff_granular.lua` (Myers) war fehlerhaft
+  (verlor echte Änderungen), daher neuer, korrekter Prefix/Suffix-Diff
+  `utils/line_diff.lua` (Round-Trip headless verifiziert). Wire: versionierte
+  `\x03`-JSON-Envelopes — Full-Snapshots über `/update` (LastPayload, Late-Join),
+  Diffs über neuen `/diff`-Endpoint (ephemer). Client (`src/client/render/
+  diffDoc.ts`) baut den Volltext wieder auf und rendert; bei Versions-Mismatch
+  wartet er auf den nächsten Full-Snapshot (Save + alle 25 Edits) → self-healing,
+  Relay bleibt byte-dumm. Vitest deckt Full/Diff/Desync/Recovery/Deletion ab.
+  Hinweis: Rendering bleibt Volldokument (comrak), der Gewinn ist auf Loopback
+  daher moderat (Transport, nicht Render) — deshalb opt-in.
 
 ## Mittel
 

@@ -159,6 +159,12 @@ local function scroll_url_for(path)
 	return endpoint_url_for("scroll", path)
 end
 
+---@param path string
+---@return string
+local function diff_url_for(path)
+	return endpoint_url_for("diff", path)
+end
+
 -- Collects stdout/stderr lines and returns them to the callback so caller
 -- (try_send_pending) can log the server response body (and quickly detect empty replies).
 -- Helper: execute an HTTP POST using curl via jobstart when available.
@@ -373,6 +379,96 @@ function M.send_scroll(path, line, total)
 		return
 	end
 	http_post_nonblocking(scroll_url_for(path), tostring(line) .. "/" .. tostring(total), function() end)
+end
+
+-- ---------------------------------------------------------------------------
+-- Opt-in line-diff transport (experimental.line_diff). Full snapshots go via
+-- /update (stored as the relay's LastPayload so late-joiners get whole text);
+-- incremental diffs go via /diff (ephemeral). Both are \x03-tagged JSON
+-- envelopes carrying a monotonic version so the client (src/client/render/
+-- diffDoc.ts) can apply diffs in order and resync from a full on any mismatch.
+-- ---------------------------------------------------------------------------
+
+-- Force a full snapshot at least this often so a client that dropped/reordered
+-- a diff (and desynced) self-heals within a bounded number of edits.
+local FULL_EVERY = 25
+
+-- Per room-key transport state for the diff path.
+M._diff_ver = {} -- last version number sent for a key
+M._diff_last = {} -- last full line array sent for a key (diff basis)
+M._diff_since = {} -- diffs sent since the last full for a key
+
+--- Reset the diff-transport bookkeeping for one key (or all when key is nil),
+--- so the next send for it starts with a fresh full snapshot. Called on stop
+--- and whenever the previewed document changes rooms.
+---@param key string|nil
+---@return nil
+function M.reset_diff_state(key)
+	if key then
+		M._diff_ver[key] = nil
+		M._diff_last[key] = nil
+		M._diff_since[key] = nil
+	else
+		M._diff_ver = {}
+		M._diff_last = {}
+		M._diff_since = {}
+	end
+end
+
+---@return boolean
+local function line_diff_enabled()
+	local ok, exp = pcall(function()
+		return require("mdview.config").defaults.experimental
+	end)
+	return ok and type(exp) == "table" and exp.line_diff == true
+end
+
+-- Public: send the current content of `key`'s room as `lines`. With
+-- experimental.line_diff off this is a plain full-text push (unchanged wire
+-- format). With it on, sends a versioned full snapshot when needed (first send,
+-- forced, or every FULL_EVERY edits) and a minimal line diff otherwise.
+---@param key string # room key (normalized path)
+---@param lines string[] # current buffer lines
+---@param opts { full?: boolean }|nil
+---@return nil
+function M.send_content(key, lines, opts)
+	opts = opts or {}
+	if type(key) ~= "string" or key == "" then
+		return
+	end
+	lines = lines or {}
+
+	if not line_diff_enabled() then
+		-- legacy path: push the whole document as raw text (unchanged wire format)
+		M.send_markdown(key, table.concat(lines, "\n"), { immediate = true })
+		return
+	end
+
+	local ver = M._diff_ver[key]
+	local last = M._diff_last[key]
+	local since = M._diff_since[key] or 0
+	local force_full = opts.full == true or ver == nil or last == nil or since >= FULL_EVERY
+
+	if force_full then
+		local nv = (ver or 0) + 1
+		local env = "\3" .. vim.json.encode({ t = "f", v = nv, text = table.concat(lines, "\n") })
+		M.send_markdown(key, env, { immediate = true }) -- via /update -> LastPayload
+		M._diff_ver[key] = nv
+		M._diff_last[key] = lines
+		M._diff_since[key] = 0
+		return
+	end
+
+	local edit = require("mdview.utils.line_diff")(last, lines)
+	if not edit then
+		return -- no change
+	end
+	local nv = ver + 1
+	local env = "\3" .. vim.json.encode({ t = "d", v = nv, base = ver, edits = { edit } })
+	http_post_nonblocking(diff_url_for(key), env, function() end) -- via /diff (ephemeral)
+	M._diff_ver[key] = nv
+	M._diff_last[key] = lines
+	M._diff_since[key] = since + 1
 end
 
 -- Public: ask every connected preview tab to close itself (the relay

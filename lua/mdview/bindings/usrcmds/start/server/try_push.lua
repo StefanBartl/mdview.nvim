@@ -48,7 +48,6 @@ function M.try_push(path, lines, opts)
 	}
 
 	local attempt = 0
-	local payload = table.concat(lines, "\n")
 
 	local function attempt_once()
 		attempt = attempt + 1
@@ -59,7 +58,10 @@ function M.try_push(path, lines, opts)
 
 		ws_client.wait_ready(function(ok)
 			if ok then
-				ws_client.send_markdown(path, payload, { immediate = true })
+				-- Full snapshot: this is the initial seed for the room, so it
+				-- must be whole text (or a full \x03 envelope under line_diff),
+				-- never a diff.
+				ws_client.send_content(path, lines, { full = true })
 				session.store(path, lines)
 				log.debug(string.format("try_push: success for %s on attempt %d", path, attempt), nil, "try_push", true)
 			else

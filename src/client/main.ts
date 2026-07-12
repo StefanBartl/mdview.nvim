@@ -9,6 +9,7 @@
 */
 
 import { createTransport } from './transport/transportFactory';
+import { DiffDoc, isEnvelope } from './render/diffDoc';
 import init, { render_markdown } from './wasm-render/mdview_wasm_render.js';
 
 // Available visual themes, each a CSS module under ./themes/. Loaded lazily
@@ -130,6 +131,26 @@ async function boot() {
   const container = document.getElementById('mdview-root');
   let firstRender = true;
 
+  // Reassembles full text from the opt-in line-diff transport's envelopes. When
+  // line_diff is off, no \x03 envelopes arrive and this stays unused.
+  const doc = new DiffDoc();
+
+  // Render markdown text through the WASM module (output already sanitized
+  // inside WASM — safe to assign to innerHTML) into the preview container.
+  const renderMarkdown = (text: string): void => {
+    if (!container) return;
+    try {
+      container.innerHTML = render_markdown(text);
+      if (firstRender) {
+        firstRender = false;
+        clientLog(`first render ok (${text.length} bytes)`);
+      }
+    } catch (err) {
+      console.error('[mdview] render failed', err);
+      clientLog(`render failed: ${String(err)}`);
+    }
+  };
+
   transport.onMessage((rawMessage: string) => {
     if (rawMessage.startsWith(CLOSE_MESSAGE_PREFIX)) {
       // Session stopped — close this tab. window.close() only works for
@@ -151,18 +172,17 @@ async function boot() {
       return;
     }
 
-    try {
-      // render_markdown returns HTML that has already passed through the
-      // sanitizer inside the WASM module — safe to assign directly.
-      container.innerHTML = render_markdown(rawMessage);
-      if (firstRender) {
-        firstRender = false;
-        clientLog(`first render ok (${rawMessage.length} bytes)`);
-      }
-    } catch (err) {
-      console.error('[mdview] render failed', err);
-      clientLog(`render failed: ${String(err)}`);
+    // Opt-in line-diff transport: \x03-prefixed full/diff envelopes. DiffDoc
+    // reassembles the current text; a desynced diff returns null and is skipped
+    // (the next full snapshot resyncs), so we only re-render on real changes.
+    if (isEnvelope(rawMessage)) {
+      const text = doc.apply(rawMessage);
+      if (text !== null) renderMarkdown(text);
+      return;
     }
+
+    // Default transport: the message IS the full markdown document.
+    renderMarkdown(rawMessage);
   });
 }
 

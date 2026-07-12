@@ -19,10 +19,14 @@ local autocmd_registry = require("mdview.helper.autocmds_registry")
 
 local M = {}
 
--- Send the full current content of bufnr to the relay server (immediate,
--- unqueued POST) and store a session snapshot for bookkeeping.
+-- Send the current content of bufnr to the relay for `bufnr`'s room and store a
+-- session snapshot for bookkeeping. Routing (per-path vs the preview key) and
+-- full-vs-diff (when experimental.line_diff is on) are decided here / in
+-- ws_client.send_content. Pass { full = true } to force a full snapshot (e.g.
+-- on save or when seeding a freshly opened tab).
 ---@param bufnr integer
-function M.push_buffer_changes(bufnr)
+---@param opts { full?: boolean }|nil
+function M.push_buffer_changes(bufnr, opts)
 	local ft = safe_buf_get_option(bufnr, "filetype") or ""
 	if ft ~= "markdown" and ft ~= "md" then
 		log.debug("skipping buffer, filetype: " .. ft, nil, "livepush", true)
@@ -44,7 +48,6 @@ function M.push_buffer_changes(bufnr)
 	end
 
 	local lines = api.nvim_buf_get_lines(bufnr, 0, -1, false) or {}
-	local payload = table.concat(lines, "\n")
 
 	-- In "reuse" browser_behavior the single preview tab follows the active
 	-- buffer, so route this buffer's content to the room the open tab is
@@ -60,9 +63,9 @@ function M.push_buffer_changes(bufnr)
 		end
 	end
 
-	ws_client.send_markdown(target, payload, { immediate = true })
+	ws_client.send_content(target, lines, { full = opts and opts.full == true or nil })
 	session.store(path, lines)
-	log.debug("full push sent (target=" .. target .. ") and session stored for " .. path, nil, "livepush", true)
+	log.debug("content push sent (target=" .. target .. ") and session stored for " .. path, nil, "livepush", true)
 end
 
 --- Setup autocmds for live push and save. Called once per attach cycle from
@@ -99,7 +102,9 @@ function M.attach(group)
 					return
 				end
 				log.debug("BufWritePost fired, full push, buf: " .. args.buf, nil, "livepush", true)
-				M.push_buffer_changes(args.buf)
+				-- Force a full snapshot on save: cheap resync point that reseeds
+				-- the relay's LastPayload and heals any diff desync.
+				M.push_buffer_changes(args.buf, { full = true })
 			end, ws_client.WAIT_READY_TIMEOUT)
 		end,
 	}

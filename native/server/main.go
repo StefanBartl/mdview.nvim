@@ -73,6 +73,7 @@ func main() {
 	mux.HandleFunc("/health", handleHealth)
 	mux.HandleFunc("/update", handleUpdate(registry, *token))
 	mux.HandleFunc("/scroll", handleScroll(registry, *token))
+	mux.HandleFunc("/diff", handleDiff(registry, *token))
 	mux.HandleFunc("/close", handleClose(registry, *token))
 	mux.HandleFunc("/clientlog", handleClientLog(*token))
 	mux.HandleFunc("/ws", handleWS(registry, *token, port))
@@ -183,6 +184,37 @@ func handleScroll(registry *relay.Registry, token string) http.HandlerFunc {
 			return
 		}
 		registry.BroadcastEphemeral(key, append([]byte(scrollMessagePrefix), body...))
+		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
+// handleDiff fans an incremental content update (a client-tagged envelope) out
+// to key's room WITHOUT recording it as the room's last content. Full snapshots
+// still flow through /update (LastPayload), so a newly-joined tab is seeded with
+// a full document, then receives subsequent diffs — the relay never inspects or
+// applies the envelope, it only forwards the bytes. Used by the opt-in
+// experimental.line_diff transport; the client reassembles full text from these.
+func handleDiff(registry *relay.Registry, token string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		if !relay.ValidToken(token, r.URL.Query().Get("token")) {
+			http.Error(w, "forbidden", http.StatusForbidden)
+			return
+		}
+		key := r.URL.Query().Get("key")
+		if key == "" {
+			http.Error(w, "missing key", http.StatusBadRequest)
+			return
+		}
+		body, err := io.ReadAll(io.LimitReader(r.Body, maxUpdateBodyBytes))
+		if err != nil {
+			http.Error(w, "failed to read body", http.StatusBadRequest)
+			return
+		}
+		registry.BroadcastEphemeral(key, body)
 		w.WriteHeader(http.StatusNoContent)
 	}
 }
