@@ -100,6 +100,12 @@ local function resolve_browser_url(opts)
 		url = url .. "&transport=webtransport"
 	end
 
+	-- opt-in click-to-navigate: tells the client to intercept relative-link
+	-- clicks and POST them to /nav (see experimental.click_navigate).
+	if experimental and experimental.click_navigate == true then
+		url = url .. "&nav=1"
+	end
+
 	return url
 end
 M.resolve_browser_url = resolve_browser_url
