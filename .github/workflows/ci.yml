@@ -133,8 +133,10 @@ jobs:
           repository: StefanBartl/lib.nvim
           path: .deps/lib.nvim
 
-      - name: Install luacheck via luarocks locally
-        run: luarocks install --lua-version=5.3 --local luacheck
+      - name: Install luacheck and busted via luarocks locally
+        run: |
+          luarocks install --lua-version=5.3 --local luacheck
+          luarocks install --lua-version=5.3 --local busted
 
       - name: Add local luarocks bin to PATH
         run: echo "${HOME}/.luarocks/bin" >> $GITHUB_PATH
@@ -143,12 +145,10 @@ jobs:
         run: luacheck lua/mdview --no-color
 
       - name: Run Lua unit tests with busted
-        run: |
-          if command -v busted >/dev/null 2>&1; then
-            busted -v tests/lua
-          else
-            echo "busted not installed; skipping Lua unit tests"
-          fi
+        # Only pure-Lua specs (no `vim` global) run here; module paths come from
+        # the repo-root .busted config's lpath. Specs that need the Neovim API
+        # belong in a headless-nvim test instead.
+        run: busted tests/lua
 
   release:
     name: Release (tag push only)

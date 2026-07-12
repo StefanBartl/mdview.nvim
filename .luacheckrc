@@ -9,3 +9,6 @@ globals = {
 -- Neovim Lua conventions favor readability over a hard line-length cap;
 -- don't fail CI on line length alone.
 max_line_length = false
+
+-- busted specs get their describe/it/assert globals from the test runner.
+files["tests/lua/**/*_spec.lua"] = { std = "+busted" }

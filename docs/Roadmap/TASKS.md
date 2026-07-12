@@ -110,11 +110,15 @@
 
 ## Testing / Hygiene
 
-- [ ] **Lua-Unit-Tests** (busted/plenary) für Config-Merge, Session, Live-Push,
-  Browser-URL-Bau. Aktuell nur Go- (relay) und Rust- (render) Tests + manuelle
-  headless-E2E-Skripte.
-- [ ] **CI: busted-Job** tatsächlich Specs ausführen lassen (die lib.nvim-
-  Dependency wird schon geklont, aber es gibt noch keine echten Specs).
+- [~] **Lua-Unit-Tests** (busted): erste echte Spec `tests/lua/line_diff_spec.lua`
+  für das reine `utils/line_diff`-Modul (Shape + Round-Trip mit derselben
+  Splice-Semantik wie der Client), plus `.busted`-Config (lpath). Weitere Module
+  (Config-Merge, buffer_switch-Routing) brauchen den `vim`-Global → gehören in
+  einen headless-nvim-Runner statt plain busted; als Muster offen.
+- [x] **CI: busted-Job** führt jetzt echte Specs aus — busted wird via luarocks
+  installiert (fehlte vorher, daher wurde der Schritt immer übersprungen) und
+  `busted tests/lua` läuft die Specs mit dem `.busted`-lpath. `.luacheckrc`
+  kennt jetzt die busted-Globals für Spec-Dateien.
 - [ ] **filetree.nvim-Integration** (fremdes Repo): auf einer Markdown-File-Node
   ein Usrcmd/Keymap anbieten, das die Datei direkt via mdview öffnet. Gehört in
   `filetree.nvim`, nicht hierher — nur als Cross-Repo-Merker.
