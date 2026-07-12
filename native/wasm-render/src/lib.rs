@@ -13,6 +13,11 @@ fn build_options() -> Options<'static> {
     // Parse raw HTML embedded in markdown into the tree (instead of escaping it as text)
     // so it reaches the same sanitization pass as generated markup.
     options.render.unsafe_ = true;
+    // Emit `data-sourcepos="startLine:col-endLine:col"` on block elements so the
+    // client can map a Neovim cursor line to the matching DOM node and scroll it
+    // into view precisely (see src/client/main.ts). Kept through sanitization by
+    // allowing the attribute in sanitizer().
+    options.render.sourcepos = true;
     options
 }
 
@@ -25,6 +30,11 @@ fn build_options() -> Options<'static> {
 fn sanitizer() -> ammonia::Builder<'static> {
     let mut builder = ammonia::Builder::default();
     builder.add_tags(std::iter::once("input"));
+
+    // Keep comrak's source-position hints (data-sourcepos) on every element so
+    // the client can do line-accurate scroll sync. It carries no executable
+    // content — just "L:C-L:C" — and can't be used to inject script.
+    builder.add_generic_attributes(std::iter::once("data-sourcepos"));
 
     let mut input_attrs = HashSet::new();
     input_attrs.insert("type");
@@ -113,6 +123,14 @@ mod tests {
         let html = render_markdown("[testlink](./docs/PoC.md)");
         eprintln!("RENDERED: {html}");
         assert!(html.contains("testlink"));
+    }
+
+    #[test]
+    fn emits_sourcepos_for_scroll_sync() {
+        let html = render_markdown("# One\n\nsecond line\n\nthird\n");
+        eprintln!("SOURCEPOS: {html}");
+        // block elements carry data-sourcepos so the client can map lines to nodes
+        assert!(html.contains("data-sourcepos="));
     }
 
     #[test]
