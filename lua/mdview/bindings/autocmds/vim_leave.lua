@@ -19,6 +19,12 @@ function M.attach(group)
 		desc = "[mdview] Stop mdview server if running before exiting Neovim",
 		callback = function()
 			if state.get_proc() ~= nil then
+				-- Once Neovim exits the preview is frozen (no more sync), so close
+				-- the browser tab too. The close signal travels over the relay, so
+				-- send it BEFORE killing the process — send_close() is a short
+				-- blocking curl, which also guarantees it completes before nvim
+				-- exits (an async post would be lost to the shutdown).
+				pcall(require("mdview.adapter.ws_client").send_close)
 				require("mdview.adapter.runner").stop_server(state.get_proc())
 			end
 		end,

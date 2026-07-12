@@ -22,7 +22,9 @@ export function navTargetFromHref(href: string | null | undefined): string | nul
   if (h.startsWith('/')) return null; // root-absolute — not a doc-relative link
   if (/^[a-z][a-z0-9+.-]*:/i.test(h)) return null; // has a scheme (http:, mailto:, …)
 
-  const clean = h.replace(/[?#].*$/, ''); // drop query/fragment
+  // Normalize Windows-style backslashes to forward slashes (users on Windows
+  // sometimes type `.\docs\file.md`), then drop any query/fragment.
+  const clean = h.replace(/\\/g, '/').replace(/[?#].*$/, '');
   return clean === '' ? null : clean;
 }
 

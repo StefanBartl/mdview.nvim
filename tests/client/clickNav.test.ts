@@ -15,6 +15,11 @@ describe('navTargetFromHref', () => {
     expect(navTargetFromHref('other.md?x=1')).toBe('other.md');
   });
 
+  it('normalizes Windows backslashes', () => {
+    expect(navTargetFromHref('.\\docs\\PoC.md')).toBe('./docs/PoC.md');
+    expect(navTargetFromHref('sub\\a.md')).toBe('sub/a.md');
+  });
+
   it('leaves external and non-navigable links to the browser', () => {
     expect(navTargetFromHref('https://example.com')).toBeNull();
     expect(navTargetFromHref('http://example.com')).toBeNull();

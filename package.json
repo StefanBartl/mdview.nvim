@@ -29,7 +29,6 @@
     "check:types": "tsc -p tsconfig.json --noEmit",
     "prepare": "husky install"
   },
-  "dependencies": {},
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.1",
     "@eslint/js": "^9.39.1",
@@ -41,6 +40,7 @@
     "eslint-config-prettier": "^10.1.8",
     "globals": "^16.5.0",
     "husky": "^8.0.3",
+    "jsdom": "^29.1.1",
     "prettier": "^3.0.0",
     "typescript": "^5.6.2",
     "vite": "^7.1.12",

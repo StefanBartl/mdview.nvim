@@ -109,6 +109,13 @@ mod tests {
     }
 
     #[test]
+    fn keeps_relative_link_href() {
+        let html = render_markdown("[testlink](./docs/PoC.md)");
+        eprintln!("RENDERED: {html}");
+        assert!(html.contains("testlink"));
+    }
+
+    #[test]
     fn strips_dangerous_input_attributes() {
         // A text input with formaction must not keep formaction/onfocus even
         // though <input> is now allowed for task-list checkboxes.

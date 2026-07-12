@@ -28,6 +28,10 @@ M.config = cfg.defaults
 ---@param opts table|nil supports nested overrides, e.g. { browser = { browser = "firefox" } }
 ---@return nil
 function M.setup(opts)
+	-- Warn about unknown/misplaced keys BEFORE merge (merge would fold them into
+	-- defaults and hide them) — catches e.g. a top-level `click_navigate` that
+	-- belongs under `experimental`.
+	cfg.validate(opts)
 	cfg.merge(opts)
 
 	-- Resolve browser at setup time and notify user if resolution failed
