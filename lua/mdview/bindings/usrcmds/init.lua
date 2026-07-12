@@ -15,6 +15,7 @@ local preview_tab = require("mdview.bindings.usrcmds.preview_tab")
 local diagnose = require("mdview.bindings.usrcmds.diagnose")
 local toggle = require("mdview.bindings.usrcmds.toggle")
 local theme = require("mdview.bindings.usrcmds.theme")
+local log = require("mdview.bindings.usrcmds.log")
 
 local M = {}
 
@@ -28,6 +29,7 @@ function M.attach()
 	diagnose.attach()
 	toggle.attach()
 	theme.attach()
+	log.attach()
 end
 
 return M

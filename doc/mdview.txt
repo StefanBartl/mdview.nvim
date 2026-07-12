@@ -347,6 +347,13 @@ experimental.reverse_scroll ~
   diagnostics (connection status, render/theme errors). Subject to `debug`
   in |mdview-config|.
 
+:MDViewLog [level | export [path]]                             *:MDViewLog*
+  Shows mdview's own internal structured log ring (launcher, live-push,
+  ws_client, …) in a scratch buffer — distinct from |:MDViewShowWebLogs|,
+  which shows the *relay's* stdout. Pass a minimum level
+  (`trace`/`debug`/`info`/`warn`/`error`) to filter, or `export [path]` to
+  write the ring to a file (default `stdpath('log')/mdview-log.txt`).
+
 :MDViewDiagnose [path]                                       *:MDViewDiagnose*
   Writes a full component-state diagnostics report to a file (default
   `stdpath('log')/mdview-diagnostics.txt`, or `[path]` if given) and opens
