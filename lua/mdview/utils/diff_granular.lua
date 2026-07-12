@@ -66,11 +66,11 @@ return function(old_lines, new_lines)
     local dx = x - prev_x
     local dy = y - prev_y
 
-    if dx == 1 and dy == 1 then
-      -- matched line, no edit
-    elseif dx == 1 then
+    -- dx == 1 and dy == 1 is a matched line (no edit); only the delete/insert
+    -- cases produce an edit.
+    if dx == 1 and dy ~= 1 then
       table.insert(edits, { op = "delete", start = prev_x, count = 1 })
-    elseif dy == 1 then
+    elseif dy == 1 and dx ~= 1 then
       table.insert(edits, { op = "insert", start = prev_x, count = 1, lines = { new_lines[prev_y + 1] or "" } })
     end
 
