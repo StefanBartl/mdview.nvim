@@ -31,6 +31,7 @@
 ---@field require_display boolean don't auto-open a browser without a GUI/DISPLAY available (see mdview-security)
 ---@field stop_on_browser_exit boolean run :MDViewStop when the opened browser process exits (isolated mode only)
 ---@field theme string preview theme passed to the client as ?theme= — one of "github", "dark-dimmed", "plain" (optionally suffixed "-light"/"-dark" to pin the color scheme); see src/client/themes/
+---@field highlighter "hljs"|"shiki"|"none" code-fence syntax highlighter (client-side, lazy-loaded): "hljs" (light, default), "shiki" (exact VSCode/TextMate themes, heavier), or "none"
 
 ---@class mdview.config.StartDefaults
 ---@field push_strategy "launcher"|"try_push" initial-push strategy used by :MDViewStart
@@ -104,6 +105,7 @@ return {
 		stop_on_browser_exit = true,
 		theme = "github",
 		behavior = "reuse",
+		highlighter = "hljs",
 	},
 
 	start = {
