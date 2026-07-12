@@ -64,7 +64,7 @@ local function initial_push_async(push_strategy, try_push_opts, wait_timeout, br
 
 		-- attempt to read buffer if open, else read file from disk
 		local bufnr = vim.fn.bufnr(norm, false)
-		local lines = nil
+		local lines
 		if bufnr and bufnr ~= -1 then
 			lines = api.nvim_buf_get_lines(bufnr, 0, -1, false) or {}
 		else

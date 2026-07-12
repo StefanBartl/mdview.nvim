@@ -9,14 +9,6 @@ local uv = vim.loop
 -- undefined fields on vim.loop; suppress those specific diagnostics for clarity.
 ---@diagnostic disable: undefined-field, deprecated, undefined-global, unused-local, return-type-mismatch
 
----@param a any
----@param b any
----@param msg string|nil
----@diagnostic disable-next-line: unused-function
-local function assert_eq(a, b, msg)
-  if a ~= b then error(msg or "assert_eq failed") end
-end
-
 ---@param prefix string
 ---@param n integer
 ---@return string[]

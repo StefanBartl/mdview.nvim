@@ -70,6 +70,15 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # The WASM render module (built by the rust job) must be present before
+      # type-checking and unit tests: src/client/main.ts imports it, and it's a
+      # gitignored build artifact, so without it tsc/vitest fail with TS2307.
+      - name: Download WASM render module
+        uses: actions/download-artifact@v4
+        with:
+          name: wasm-render-pkg
+          path: src/client/wasm-render
+
       - name: Lint (TypeScript / JS)
         run: npm run lint
 
@@ -78,12 +87,6 @@ jobs:
 
       - name: Run unit tests
         run: npm test
-
-      - name: Download WASM render module
-        uses: actions/download-artifact@v4
-        with:
-          name: wasm-render-pkg
-          path: src/client/wasm-render
 
       - name: Build client
         run: npm run build:client
@@ -116,10 +119,22 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install system dependencies (Lua 5.3 + headers, luarocks, neovim)
+      - name: Install system dependencies (Lua 5.3 + headers, luarocks)
         run: |
           sudo apt-get update
-          sudo apt-get install -y lua5.3 liblua5.3-dev luarocks git neovim build-essential
+          sudo apt-get install -y lua5.3 liblua5.3-dev luarocks git build-essential
+
+      # Install a recent Neovim from the official release, not apt (which ships
+      # an old version): the headless specs use APIs like nvim_set_option_value
+      # (0.10+), and this also matches what real users run.
+      - name: Install Neovim (stable release)
+        run: |
+          curl -fsSL https://github.com/neovim/neovim/releases/download/stable/nvim-linux-x86_64.tar.gz -o nvim.tar.gz
+          mkdir -p "$HOME/nvim" && tar xzf nvim.tar.gz -C "$HOME/nvim" --strip-components=1
+          echo "$HOME/nvim/bin" >> "$GITHUB_PATH"
+
+      - name: Show Neovim version
+        run: nvim --version | head -1
 
       # mdview.nvim now depends on lib.nvim at runtime (see README's Installation
       # section). luacheck is purely static and doesn't need it resolvable, and

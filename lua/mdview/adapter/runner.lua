@@ -4,7 +4,6 @@
 -- undefined fields on vim.loop; suppress those specific diagnostics for clarity.
 ---@diagnostic disable: undefined-field, deprecated, undefined-global, unused-local, return-type-mismatch
 
-local api = vim.api
 local uv = vim.loop
 local notify = vim.notify
 local log = require("mdview.adapter.log")
@@ -72,7 +71,7 @@ function M.start_server(cmd, args, cwd)
 		stdio = { nil, stdout, stderr },
 		cwd = spawn_cwd,
 		env = nil,
-	}, function(code, signal)
+	}, function(code)
 		if stdout then
 			pcall(stdout.close, stdout)
 		end
@@ -137,12 +136,6 @@ function M.start_server(cmd, args, cwd)
 				log.append(("runner: detected dev server port %d"):format(tonumber(dev_port)), desc_tag)
 			end)
 		end
-
-		if DEBUG then
-			vim.schedule(function()
-				api.nvim_out_write(strip_ansi(s))
-			end)
-		end
 	end)
 
 	stderr:read_start(function(read_err, data)
@@ -154,11 +147,6 @@ function M.start_server(cmd, args, cwd)
 		end
 		if data then
 			log.append(data, "[mdview,runner][err]")
-			if DEBUG then
-				vim.schedule(function()
-					api.nvim_err_writeln(strip_ansi(tostring(data)))
-				end)
-			end
 		end
 	end)
 
