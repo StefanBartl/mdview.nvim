@@ -19,7 +19,7 @@ M.augroup_id = nil
 function M.teardown()
   if not M.augroup_id then return end
 	autocmd_registry.detach_all()
-  pcall(require("mdview.adapter.nav_poll").stop)
+  pcall(require("mdview.adapter.inbound_poll").stop)
   pcall(api.nvim_del_augroup_by_id, M.augroup_id)
   M.augroup_id = nil
 end
@@ -44,9 +44,10 @@ function M.attach()
   scroll_sync.attach(M.augroup_id) -- nvim-to-browser scroll sync (config: scroll_sync)
   vim_leave.attach(M.augroup_id) -- Stop server on VimLeave
 
-  -- Click-to-navigate poller (no-op unless experimental.click_navigate). Not an
-  -- autocmd, but shares the session lifecycle — started here, stopped in teardown.
-  pcall(require("mdview.adapter.nav_poll").start)
+  -- Browser->Neovim inbound poller (click-to-navigate + reverse scroll; no-op
+  -- unless one is enabled). Not an autocmd, but shares the session lifecycle —
+  -- started here, stopped in teardown.
+  pcall(require("mdview.adapter.inbound_poll").start)
 
   -- optional debug/legacy modules
   -- on_text_change.attach(M.augroup_id)

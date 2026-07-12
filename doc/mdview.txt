@@ -158,6 +158,7 @@ Defaults: >lua
       webtransport   = false, -- opt-in WebTransport/HTTP3 (falls back to WS)
       line_diff      = false, -- opt-in: send only changed lines per edit
       click_navigate = false, -- opt-in: relative links open the file in nvim
+      reverse_scroll = false, -- opt-in: scrolling the preview moves nvim's cursor
     },
   }
 <
@@ -291,6 +292,14 @@ experimental.click_navigate ~
   handles the preview switch. External links (`http:`, `mailto:`), in-page
   anchors (`#…`) and absolute paths are left to the browser. Off by default
   because it changes what clicking a link does.
+
+experimental.reverse_scroll ~
+  Opt in to reverse scroll (browser -> Neovim): scrolling the preview moves
+  Neovim's cursor to the matching position — the complement of the always-on
+  nvim -> browser `scroll_sync`. Implemented by polling the relay's
+  /scrollback bridge, so it follows with a small lag rather than instantly
+  (Neovim has no push channel back from the browser). Feedback loops are
+  suppressed on both sides. Off by default.
 
 ==============================================================================
 5. COMMANDS                                                   *mdview-commands*

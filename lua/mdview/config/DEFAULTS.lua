@@ -45,6 +45,7 @@
 ---@field webtransport boolean opt in to the WebTransport (HTTP/3) client transport; falls back to WebSocket until an HTTP/3 relay backend exists (future tech)
 ---@field line_diff boolean opt in to sending only changed lines per edit instead of the whole document (versioned diff transport; client reassembles full text)
 ---@field click_navigate boolean opt in to click-to-navigate: clicking a relative link in the preview opens the linked document in Neovim (via the relay's /nav bridge)
+---@field reverse_scroll boolean opt in to reverse scroll: scrolling the preview moves Neovim's cursor to match (polled, so slightly lagged)
 
 ---@class mdview.config.Defaults
 ---@field ft_pattern string[] filetype/glob patterns mdview's autocmds attach to
@@ -142,5 +143,11 @@ return {
 		-- in-page anchors and absolute paths are left to the browser. Changes
 		-- how link clicks behave, so it's opt-in. Default false.
 		click_navigate = false,
+
+		-- Opt in to reverse scroll (browser -> Neovim): scrolling the preview
+		-- moves Neovim's cursor to the matching position (the complement of the
+		-- always-on nvim -> browser scroll_sync). Implemented by polling, so it
+		-- follows with a small lag rather than instantly. Default false.
+		reverse_scroll = false,
 	},
 }
