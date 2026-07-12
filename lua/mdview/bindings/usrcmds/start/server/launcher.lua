@@ -105,6 +105,12 @@ local function resolve_browser_url(opts)
 	local experimental = require("mdview.config").defaults.experimental
 	if experimental and experimental.webtransport == true then
 		url = url .. "&transport=webtransport"
+		-- The relay printed a cert hash the browser must pin to trust the
+		-- self-signed WebTransport cert (serverCertificateHashes).
+		local wt_hash = vim.g.mdview_wt_cert_hash
+		if type(wt_hash) == "string" and wt_hash ~= "" then
+			url = url .. "&wtcerthash=" .. wt_hash
+		end
 	end
 
 	-- opt-in click-to-navigate: tells the client to intercept relative-link

@@ -40,6 +40,14 @@ function M.resolve(cwd_override)
 		web_root,
 	}
 
+	-- Opt-in WebTransport (HTTP/3): ask the relay to also serve /wt and print its
+	-- cert hash (the runner parses it). Off by default → no UDP listener / no
+	-- cert overhead.
+	local experimental = defaults.experimental or {}
+	if experimental.webtransport == true then
+		args[#args + 1] = "--webtransport"
+	end
+
 	local cwd = cwd_override
 	if not cwd or cwd == "" then
 		cwd = defaults.server_cwd

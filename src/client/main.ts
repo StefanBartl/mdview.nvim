@@ -141,12 +141,14 @@ async function boot() {
   // documented future step — see docs/Roadmap/WebTransportAPI/DESIGN.md).
   const preferWebTransport = params.get('transport') === 'webtransport';
   const webTransportUrl = `https://${location.host}/wt?key=${encodeURIComponent(key)}&token=${encodeURIComponent(token)}`;
+  const webTransportCertHash = params.get('wtcerthash') || undefined;
 
   let transport;
   try {
     transport = await createTransport(url, {
       preferWebTransport,
       webTransportUrl,
+      webTransportCertHash,
       log: clientLog,
     });
   } catch (err) {
