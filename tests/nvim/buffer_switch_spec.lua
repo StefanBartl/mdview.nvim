@@ -10,6 +10,7 @@ local ws = require("mdview.adapter.ws_client")
 local state = require("mdview.core.state")
 local live = require("mdview.bindings.autocmds.live_push")
 local bcfg = require("mdview.config.browser")
+local normalize = require("mdview.helper.normalize")
 
 -- Capture where content is routed. live_push calls send_content; stub it.
 local last_key
@@ -27,29 +28,34 @@ local function make_md_buffer(name)
 end
 
 describe("live_push routing by browser.behavior", function()
-	local buf = make_md_buffer("C:/proj/B.md")
+	-- Use a plain relative name and derive the key nvim actually resolves it to
+	-- (absolute + normalized), so the assertions hold on both Windows and Linux
+	-- (where "C:/…" is not absolute and would get cwd-prefixed).
+	local buf = make_md_buffer("mdview_spec_B.md")
+	local B_key = normalize.path(vim.api.nvim_buf_get_name(buf))
+	local PREVIEW_KEY = "some/other/preview/room.md"
 
 	it("reuse -> targets the open tab's preview key", function()
-		state.set_preview_key("C:/proj/A.md")
+		state.set_preview_key(PREVIEW_KEY)
 		bcfg.defaults.behavior = "reuse"
 		last_key = nil
 		live.push_buffer_changes(buf)
-		assert.are.equal("C:/proj/A.md", last_key)
+		assert.are.equal(PREVIEW_KEY, last_key)
 	end)
 
 	it("new_tab -> targets the buffer's own path", function()
-		state.set_preview_key("C:/proj/A.md")
+		state.set_preview_key(PREVIEW_KEY)
 		bcfg.defaults.behavior = "new_tab"
 		last_key = nil
 		live.push_buffer_changes(buf)
-		assert.are.equal("C:/proj/B.md", last_key)
+		assert.are.equal(B_key, last_key)
 	end)
 
 	it("manual -> targets the buffer's own path", function()
 		bcfg.defaults.behavior = "manual"
 		last_key = nil
 		live.push_buffer_changes(buf)
-		assert.are.equal("C:/proj/B.md", last_key)
+		assert.are.equal(B_key, last_key)
 	end)
 
 	it("reuse with no open tab -> falls back to the buffer's path", function()
@@ -57,7 +63,7 @@ describe("live_push routing by browser.behavior", function()
 		bcfg.defaults.behavior = "reuse"
 		last_key = nil
 		live.push_buffer_changes(buf)
-		assert.are.equal("C:/proj/B.md", last_key)
+		assert.are.equal(B_key, last_key)
 	end)
 
 	-- restore

@@ -7,17 +7,19 @@
 local inbound = require("mdview.adapter.inbound_poll")
 local normalize = require("mdview.helper.normalize")
 
-local KEY = normalize.path("C:/proj/rs.md")
-
--- A 10-line buffer shown in the current window, named to match KEY.
+-- A 10-line buffer shown in the current window. Name it relatively and read
+-- back the key nvim resolves it to (absolute + normalized) so buf_for_key
+-- matches on both Windows and Linux.
 local buf = vim.api.nvim_create_buf(true, false)
-vim.api.nvim_buf_set_name(buf, "C:/proj/rs.md")
+vim.api.nvim_buf_set_name(buf, "mdview_spec_rs.md")
 local lines = {}
 for i = 1, 10 do
 	lines[i] = "line " .. i
 end
 vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
 vim.api.nvim_set_current_buf(buf)
+
+local KEY = normalize.path(vim.api.nvim_buf_get_name(buf))
 
 local function cursor_line_for(ratio)
 	vim.api.nvim_win_set_cursor(0, { 1, 0 })
