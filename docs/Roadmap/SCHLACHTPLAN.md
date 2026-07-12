@@ -109,7 +109,15 @@
 
 ## P2 — größer / optional
 
-### 9. Fokus nach Öffnen im nvim behalten (konfigurierbar)
+> **Status:** ✅ 9 (`browser.focus`), ✅ 10 (Companion-Doku im README),
+> ✅ 11 (cmd-Listen + `:MDViewLog` in README). Details unten.
+
+### ✅ 9. Fokus nach Öffnen im nvim behalten — ERLEDIGT (best-effort)
+> `browser.focus = "browser" (default) | "nvim"`. macOS `open -g` (sauber),
+> Windows HWND-capture/restore via PowerShell (best-effort), Linux no-op.
+> Nur im default-open_mode. Visuell vom Nutzer zu bestätigen (headless nicht testbar).
+
+### (Original) 9. Fokus nach Öffnen im nvim behalten (konfigurierbar)
 - **Wunsch:** default-Browser-Tab öffnen, **ohne** dass der Fokus dorthin springt
   (im nvim bleiben); als `browser.focus = "browser" | "nvim"` einstellbar.
 - **Realität:** OS-spezifisch, kein plattformübergreifendes API. Windows:
