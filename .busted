@@ -1,0 +1,11 @@
+-- busted configuration. Runs specs under tests/lua and puts mdview's Lua
+-- sources on the module path so specs can `require("mdview....")`. Only
+-- pure-Lua modules (no `vim` global) are exercised here; anything that needs
+-- the Neovim API belongs in a headless-nvim test, not plain busted.
+return {
+	default = {
+		verbose = true,
+		lpath = "./lua/?.lua;./lua/?/init.lua",
+		pattern = "_spec",
+	},
+}
