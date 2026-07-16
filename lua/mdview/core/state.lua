@@ -35,12 +35,20 @@ local WebKey = {
 -- expose the enum/table for callers who prefer constants instead of raw strings
 M.WebKey = WebKey
 
--- shallow copy a table (used for defensive getters)
+-- shallow copy a table (used for defensive getters). Delegates to lib.nvim's
+-- lib.lua.tables.dict_clone (mdview.nvim already hard-depends on lib.nvim);
+-- the non-table guard stays local since dict_clone assumes a table input.
+local ok_lib_tables, lib_tables = pcall(require, "lib.lua.tables")
+local has_lib_dict_clone = ok_lib_tables and type(lib_tables.dict_clone) == "function"
+
 ---@param t table
 ---@return table
 local function shallow_copy(t)
 	if type(t) ~= "table" then
 		return t
+	end
+	if has_lib_dict_clone then
+		return lib_tables.dict_clone(t)
 	end
 	local out = {}
 	for k, v in pairs(t) do

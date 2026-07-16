@@ -13,6 +13,12 @@ local M = {}
 -- required config to read debug flag
 local cfg = require("mdview.config")
 
+-- ANSI/control-sequence stripping delegates to lib.nvim (mdview.nvim already
+-- hard-depends on it), which was upgraded from this exact gsub chain to
+-- carry the improvement upstream (lib.nvim commit 156e597) rather than keep
+-- a private duplicate.
+local strip_ansi = require("lib.lua.strings").strip_ansi
+
 -- Read live rather than caching a snapshot at require-time: this module is
 -- required before require('mdview').setup(opts) runs (via adapter.runner),
 -- so a cached snapshot would permanently miss any user override of
@@ -170,8 +176,8 @@ function M.append(line, prefix)
 		line = prefix .. " " .. line
 	end
 
-	-- strip ANSI escape sequences (basic set)
-	line = line:gsub("%z", ""):gsub("\27%[[%d;]*m", ""):gsub("\27%]%d+;.-\7", ""):gsub("\27%[?%d+;?%d*%p?", "")
+	-- strip ANSI escape sequences
+	line = strip_ansi(line)
 
 	for l in line:gmatch("([^\n\r]+)") do
 		-- append to sequential table to avoid reallocations
