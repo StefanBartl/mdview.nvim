@@ -35,6 +35,7 @@
 ---@field focus "browser"|"nvim" whether the opened tab may take keyboard focus ("browser", default) or focus stays in Neovim ("nvim" — clean on macOS, best-effort on Windows, no-op on Linux); default open_mode only
 ---@field external_links "new_tab"|"same_tab" open external links (http/mailto/absolute) in a new tab ("new_tab", default — keeps the preview tab) or in place ("same_tab")
 ---@field cursor_marker "line"|"caret"|"off" show the Neovim cursor in the preview: line marker in the left gutter ("line", default), an exact caret at the cursor column ("caret", uses inline source-position spans), or hidden ("off"); rides the scroll-sync ping, so needs scroll_sync on
+---@field zoom number preview font-size zoom factor (1.0 = 100%, default); adjust at runtime with :MDViewZoom, passed to the client as ?zoom= and pushed live
 
 ---@class mdview.config.StartDefaults
 ---@field push_strategy "launcher"|"try_push" initial-push strategy used by :MDViewStart
@@ -121,6 +122,7 @@ return {
 		focus = "browser",
 		external_links = "new_tab",
 		cursor_marker = "line",
+		zoom = 1.0,
 	},
 
 	start = {

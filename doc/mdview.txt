@@ -135,6 +135,7 @@ Defaults: >lua
       highlighter         = "hljs",    -- code highlighter: hljs|shiki|none
       external_links      = "new_tab", -- external links: "new_tab" | "same_tab"
       cursor_marker       = "line",    -- nvim cursor: "line" | "caret" | "off"
+      zoom                = 1.0,        -- preview font-size zoom (:MDViewZoom)
       focus               = "browser", -- "browser" | "nvim" (keep editor focus)
       autodetect_browser  = true,  -- isolated mode only
       browser             = "",    -- friendly name, e.g. "firefox" (isolated)
@@ -261,7 +262,15 @@ browser.cursor_marker ~
               (whose content is re-tokenized by the highlighter). Documents
               render with the extra spans only in this mode.
     "off"   — no marker.
-  Both ride the scroll-sync ping, so they need |mdview-scroll_sync| on.
+  All ride the scroll-sync ping, so they need |mdview-scroll_sync| on. Switch
+  at runtime with |:MDViewCursor|.
+
+browser.zoom ~
+  Preview font-size zoom factor (`1.0` = 100%, the default). |:MDViewStart|
+  sets `#mdview-root`'s font-size to `16 * zoom` px; the stylesheet sizes
+  everything in em, so the whole document scales proportionally. Adjust at
+  runtime with |:MDViewZoom| (applies live). A non-default value is carried on
+  the browser URL (`?zoom=`) so a reopened tab starts at the same zoom.
 
 browser.focus ~
   Whether the opened preview tab is allowed to take keyboard focus. `"browser"`
@@ -346,7 +355,8 @@ experimental.reverse_scroll ~
   nvim -> browser `scroll_sync`. Implemented by polling the relay's
   /scrollback bridge, so it follows with a small lag rather than instantly
   (Neovim has no push channel back from the browser). Feedback loops are
-  suppressed on both sides. Off by default.
+  suppressed on both sides. Off by default. When on, the preview shows a small
+  "⇅ scroll enabled" hint so a screen-sharing viewer knows they may scroll it.
 
 ==============================================================================
 5. COMMANDS                                                   *mdview-commands*
@@ -387,6 +397,31 @@ experimental.reverse_scroll ~
   running, re-opens the preview so the change applies now (a fresh tab in
   "default" |browser.open_mode|, since the old tab can't be closed
   programmatically). With no argument it reports the current theme.
+
+:MDViewCursor [line | caret | off]                          *:MDViewCursor*
+  Switches the Neovim-cursor marker mode in the preview at runtime (see
+  `browser.cursor_marker`): `line` (blinking bar at the cursor line), `caret`
+  (caret at the exact cursor column), or `off`. Sets `browser.cursor_marker`
+  in the live config and, if a session is running, pushes a live control
+  update so the open tab changes immediately — no reload. With no argument it
+  reports the current mode. Tab-completed.
+
+:MDViewSync [pause | resume | toggle]                         *:MDViewSync*
+  Pauses/resumes the nvim->browser scroll sync at runtime. While paused,
+  moving the cursor in Neovim no longer scrolls the preview or moves its
+  cursor marker — useful to jump to a reference spot without dragging a
+  screen-sharing viewer along. With no argument it reports the state.
+  Tab-completed. (Only affects the outgoing sync; |experimental.reverse_scroll|
+  is independent.)
+
+:MDViewZoom [+ | - | reset | <factor>]                        *:MDViewZoom*
+  Adjusts the preview font-size zoom at runtime (the whole document scales
+  proportionally). `+`/`-` step by 10% (clamped 50%–300%), `reset` returns to
+  100%, and a bare number sets a factor (`1.5`) or a percentage (`150`). Sets
+  `browser.zoom` in the live config and, if a session is running, pushes a
+  live control update so the open tab rescales immediately. With no argument
+  it reports the current zoom. Handy when a video call downsamples the shared
+  screen and the viewer needs larger text.
 
 :MDViewShowWebLogs                                        *:MDViewShowWebLogs*
   Opens a scratch buffer showing the relay server's captured stdout/stderr

@@ -65,6 +65,11 @@ const CLOSE_MESSAGE_PREFIX = '\x02';
 // native/server/main.go's docMessagePrefix. Drives browser Back/Forward.
 const DOC_MESSAGE_PREFIX = '\x04';
 
+// Tags a WS message as a live preview-control update (small JSON, e.g.
+// {"cursor":"caret"} / {"zoom":1.2}) — must match native/server/main.go's
+// controlMessagePrefix. Powers :MDViewCursor / :MDViewZoom without a reload.
+const CONTROL_MESSAGE_PREFIX = '\x05';
+
 function applyScrollPing(container: HTMLElement, message: string): void {
   // Payload: "line/total/viewfrac[/col]". viewfrac (0..1) is where in the browser
   // viewport the cursor line should sit — Neovim sends a small value for "top"
@@ -180,11 +185,24 @@ async function boot() {
   // Neovim cursor marker (?cursor= from browser.cursor_marker). Track the last
   // cursor line/column so the marker can be re-placed after a re-render too.
   // "caret" mode needs the inline source-position spans from the WASM renderer,
-  // so it renders with the source map on; "line"/"off" render without it.
-  const cursorMarkerMode = parseCursorMarkerMode(params.get('cursor'));
-  const wantSourceMap = cursorMarkerMode === 'caret';
+  // so it renders with the source map on; "line"/"off" render without it. Both
+  // are mutable so :MDViewCursor can change them live (see the control channel).
+  let cursorMarkerMode = parseCursorMarkerMode(params.get('cursor'));
+  let wantSourceMap = cursorMarkerMode === 'caret';
   let lastCursorLine = -1;
   let lastCursorCol = -1;
+
+  // Preview zoom (?zoom= from browser.zoom; :MDViewZoom updates it live). Scales
+  // #mdview-root's font-size; the stylesheet sizes everything in em, so the whole
+  // document scales proportionally.
+  const applyZoom = (factor: number): void => {
+    if (!container || !Number.isFinite(factor) || factor <= 0) return;
+    container.style.fontSize = `${16 * factor}px`;
+  };
+  {
+    const z = Number(params.get('zoom'));
+    if (Number.isFinite(z) && z > 0 && z !== 1) applyZoom(z);
+  }
 
   // POST a document path to Neovim's /nav bridge (used by click-to-navigate and
   // by Back/Forward). Neovim resolves relative paths against the source doc and
@@ -223,6 +241,14 @@ async function boot() {
   let scrollSuppressUntil = 0;
   const SCROLL_SUPPRESS_MS = 250;
   if (container && params.get('rscroll') === '1') {
+    // Visible hint that reverse scroll is on, so a viewer knows they may scroll
+    // the preview themselves (otherwise it's an invisible capability).
+    const badge = document.createElement('div');
+    badge.className = 'mdview-rscroll-badge';
+    badge.setAttribute('aria-hidden', 'true');
+    badge.textContent = '⇅ scroll enabled';
+    document.body.appendChild(badge);
+
     let lastSent = 0;
     container.addEventListener('scroll', () => {
       const now = Date.now();
@@ -247,10 +273,16 @@ async function boot() {
   // line_diff is off, no \x03 envelopes arrive and this stays unused.
   const doc = new DiffDoc();
 
+  // Last rendered markdown, so a live control update (e.g. switching cursor mode
+  // to/from "caret", which needs source-map spans) can re-render without waiting
+  // for the next push from Neovim.
+  let lastText = '';
+
   // Render markdown text through the WASM module (output already sanitized
   // inside WASM — safe to assign to innerHTML) into the preview container.
   const renderMarkdown = (text: string): void => {
     if (!container) return;
+    lastText = text;
     try {
       container.innerHTML = render_markdown(text, wantSourceMap);
       // Make external links open in a new tab so a click doesn't navigate the
@@ -274,6 +306,38 @@ async function boot() {
     }
   };
 
+  // Apply a live control update (:MDViewCursor / :MDViewZoom). Best-effort: a
+  // malformed payload is ignored rather than breaking the preview.
+  const applyControl = (json: string): void => {
+    let msg: { cursor?: unknown; zoom?: unknown };
+    try {
+      msg = JSON.parse(json) as typeof msg;
+    } catch {
+      return;
+    }
+    if (typeof msg.cursor === 'string') {
+      const mode = parseCursorMarkerMode(msg.cursor);
+      cursorMarkerMode = mode;
+      const needSourceMap = mode === 'caret';
+      if (needSourceMap !== wantSourceMap) {
+        // Toggling caret changes whether the renderer must emit source-position
+        // spans, so re-render the current document with the new setting.
+        wantSourceMap = needSourceMap;
+        if (container) renderMarkdown(lastText);
+      } else if (container) {
+        updateCursorMarker(
+          container,
+          lastCursorLine,
+          lastCursorCol >= 0 ? lastCursorCol : null,
+          cursorMarkerMode,
+        );
+      }
+    }
+    if (typeof msg.zoom === 'number') {
+      applyZoom(msg.zoom);
+    }
+  };
+
   transport.onMessage((rawMessage: string) => {
     if (rawMessage.startsWith(CLOSE_MESSAGE_PREFIX)) {
       // Session stopped — close this tab. window.close() only works for
@@ -290,6 +354,11 @@ async function boot() {
 
     if (rawMessage.startsWith(DOC_MESSAGE_PREFIX)) {
       onDocChange(rawMessage.slice(DOC_MESSAGE_PREFIX.length));
+      return;
+    }
+
+    if (rawMessage.startsWith(CONTROL_MESSAGE_PREFIX)) {
+      applyControl(rawMessage.slice(CONTROL_MESSAGE_PREFIX.length));
       return;
     }
 

@@ -133,14 +133,15 @@ Partial nested overrides merge recursively — `{ browser = { browser = "firefox
 | `browser.theme` | `"github"` | Preview theme: `github`, `dark-dimmed`, `plain`, `tokyonight`, or `catppuccin` — optionally suffixed `-light`/`-dark` to pin the color scheme. |
 | `browser.highlighter` | `"hljs"` | Code-fence syntax highlighter (client-side, lazy-loaded): `"hljs"` (highlight.js, light), `"shiki"` (exact TextMate/VSCode themes — tokyo-night, catppuccin, dark-plus — heavier), or `"none"`. |
 | `browser.external_links` | `"new_tab"` | Where external links (`http(s):`, other schemes, protocol-relative) open when clicked: `"new_tab"` (open in a new browser tab so the preview tab stays put) or `"same_tab"` (let the browser navigate away). In-project relative links are unaffected — those are handled by `experimental.click_navigate`. |
-| `browser.cursor_marker` | `"line"` | Overlay a marker in the preview at the Neovim cursor: `"line"` (a blinking bar at the cursor line), `"caret"` (a caret at the exact cursor column, via inline source-position spans from the renderer — falls back to the line marker on blank lines and inside code blocks), or `"off"`. Rides the scroll-sync ping, so needs `scroll_sync` on. |
+| `browser.cursor_marker` | `"line"` | Overlay a marker in the preview at the Neovim cursor: `"line"` (a blinking bar at the cursor line), `"caret"` (a caret at the exact cursor column, via inline source-position spans from the renderer — falls back to the line marker on blank lines and inside code blocks), or `"off"`. Rides the scroll-sync ping, so needs `scroll_sync` on. Switch at runtime with `:MDViewCursor`. |
+| `browser.zoom` | `1.0` | Preview font-size zoom factor (`1.0` = 100%). The whole document scales proportionally. Adjust at runtime with `:MDViewZoom`. |
 | `browser.focus` | `"browser"` | Whether the opened tab may take keyboard focus (`"browser"`) or focus stays in Neovim (`"nvim"`). `"nvim"` is clean on macOS (`open -g`), best-effort on Windows, and a no-op on Linux. `default` open_mode only. |
 | `browser.browser_autostart` | `true` | Open the browser automatically on `:MDViewStart`. |
 | `browser.stop_on_browser_exit` | `true` | Run `:MDViewStop` when the opened browser process exits (isolated mode only). |
 | `browser.require_display` | `true` | Don't try to open a browser without a GUI/`DISPLAY`. |
 | `experimental.line_diff` | `false` | Opt in to sending only changed lines per edit (versioned diff transport) instead of the whole document. Saves bandwidth on large files; rendering still processes the whole doc client-side. Self-heals from any desync on the next full snapshot (save / every 25 edits). |
 | `experimental.click_navigate` | `true` | Click-to-navigate: clicking a relative link in the preview opens the linked document in Neovim (resolved against the source doc), which then flows back into the preview. External links, anchors, and absolute paths are left to the browser. Set `false` to let the browser follow links itself. |
-| `experimental.reverse_scroll` | `false` | Opt in to reverse scroll: scrolling the preview moves Neovim's cursor to match (the complement of the always-on nvim→browser scroll sync). Polled, so it follows with a small lag. |
+| `experimental.reverse_scroll` | `false` | Opt in to reverse scroll: scrolling the preview moves Neovim's cursor to match (the complement of the always-on nvim→browser scroll sync). Polled, so it follows with a small lag. When on, the preview shows a small "⇅ scroll enabled" hint so a viewer knows they may scroll it. |
 | `experimental.webtransport` | `false` | Opt in to the WebTransport (HTTP/3) client transport; falls back to WebSocket until an HTTP/3 relay backend exists (future tech). |
 
 ---
@@ -154,6 +155,9 @@ Partial nested overrides merge recursively — `{ browser = { browser = "firefox
 | `:MDViewToggle [file] [cwd=…]` | Start if stopped, stop if running. |
 | `:MDViewOpen` | Re-open a browser tab against the already-running session (does not start a new relay). |
 | `:MDViewTheme [name]` | Switch the preview theme at runtime (`github` \| `dark-dimmed` \| `plain` \| `tokyonight` \| `catppuccin`, optionally `-light`/`-dark`); no argument reports the current theme. |
+| `:MDViewCursor [line\|caret\|off]` | Switch the Neovim-cursor marker mode in the preview at runtime (applies live, no reload); no argument reports the current mode. See `browser.cursor_marker`. |
+| `:MDViewSync [pause\|resume\|toggle]` | Pause/resume the nvim→browser scroll sync. While paused, moving the cursor no longer scrolls the preview or moves its marker — jump to a reference spot without dragging a viewer along. No argument reports the state. |
+| `:MDViewZoom [+\|-\|reset\|<factor>]` | Adjust the preview font-size zoom at runtime (applies live). `+`/`-` step by 10% (clamped 50–300%), `reset` = 100%, a bare number sets a factor (`1.5`) or percent (`150`); no argument reports the current zoom. See `browser.zoom`. |
 | `:MDViewPreviewTab` | Toggle the in-Neovim tab preview (works standalone, no server needed). |
 | `:MDViewShowWebLogs` | Show the relay's captured stdout, including `[client]` browser-side diagnostics. |
 | `:MDViewLog [level\|export [path]]` | Show mdview's internal log ring (optionally filtered to `trace`/`debug`/`info`/`warn`/`error`), or `export` it to a file. |

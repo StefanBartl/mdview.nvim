@@ -171,6 +171,12 @@ local function doc_url_for(path)
 	return endpoint_url_for("doc", path)
 end
 
+---@param path string
+---@return string
+local function control_url_for(path)
+	return endpoint_url_for("control", path)
+end
+
 -- Collects stdout/stderr lines and returns them to the callback so caller
 -- (try_send_pending) can log the server response body (and quickly detect empty replies).
 -- Helper: execute an HTTP POST using curl via jobstart when available.
@@ -501,6 +507,21 @@ function M.send_doc(key, doc_path)
 		return
 	end
 	http_post_nonblocking(doc_url_for(key), doc_path, function() end)
+end
+
+-- Public: push a live preview-control update (a small JSON string, e.g.
+-- '{"cursor":"caret"}' or '{"zoom":1.2}') to `key`'s room, so runtime commands
+-- change the open tab without a reload. Fire-and-forget — a control update is a
+-- transient signal; if one is lost the next command (or a reopen with the URL
+-- params) corrects it.
+---@param key string # room key the tab watches
+---@param json string # a small JSON control object
+---@return nil
+function M.send_control(key, json)
+	if type(key) ~= "string" or key == "" or type(json) ~= "string" or json == "" then
+		return
+	end
+	http_post_nonblocking(control_url_for(key), json, function() end)
 end
 
 -- Public: ask every connected preview tab to close itself (the relay

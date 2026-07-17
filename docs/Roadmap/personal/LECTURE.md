@@ -119,23 +119,27 @@ map("n", "<leader>ml", "<cmd>MDViewShowWebLogs<cr>",{ desc = "mdview: web logs (
 
 Sortiert nach Aufwand, mit Begründung aus genau diesem Szenario.
 
-### Quick Wins
+### Quick Wins — ERLEDIGT
 
-- **`:MDViewCursor [line|caret|off]`** — Laufzeit-Toggle für
-  `browser.cursor_marker`, analog zu `:MDViewTheme`. Aktuell nur über
-  `setup()`/URL-Param einstellbar; im Call will man aber spontan zwischen
-  "zeig genau wo ich bin" (caret) und "lenk nicht ab" (off) wechseln können,
-  ohne die Config neu zu laden.
-- **`:MDViewSync [pause|resume|toggle]`** — Scroll-Sync temporär anhalten.
-  Szenario: du scrollst kurz zu einer Referenzstelle weiter oben, ohne dass
-  der Coach dahin mitgerissen wird, während er gerade den aktuellen Absatz
-  liest.
-- **Sichtbarer Indikator für `reverse_scroll`** — ein kleines Icon/Label im
-  Preview, wenn der Modus aktiv ist, damit der Coach überhaupt weiß, dass er
-  selbst scrollen darf (aktuell unsichtbares Feature).
-- **`:MDViewZoom [+|-|reset]`** — Schriftgröße der Preview zur Laufzeit
-  anpassen. Video-Calls komprimieren/downsamplen; größere Schrift verbessert
-  die Lesbarkeit beim Gegenüber ohne System-Zoom des ganzen Fensters.
+Alle vier über einen neuen Live-Control-Kanal umgesetzt: der Relay bekam einen
+`/control`-Endpoint (`\x05`-Prefix), der ein kleines JSON-Objekt an den offenen
+Tab broadcastet; `lua/mdview/adapter/control.lua` löst die Ziel-Room auf und
+sendet. So ändern Laufzeit-Commands den Tab **ohne Reload**.
+
+- **`:MDViewCursor [line|caret|off]`** — ERLEDIGT. Laufzeit-Toggle für
+  `browser.cursor_marker`, analog zu `:MDViewTheme`, aber per Live-Control (kein
+  Reopen). Wechsel auf/von `caret` re-rendert das Dokument, weil dafür die
+  Source-Position-Spans nötig sind. `lua/mdview/bindings/usrcmds/cursor.lua`.
+- **`:MDViewSync [pause|resume|toggle]`** — ERLEDIGT. Persistenter Pause-Schalter
+  in `scroll_sync.lua`; während Pause sendet `CursorMoved` keine Pings, die
+  Preview bleibt stehen. Rein Neovim-seitig. `usrcmds/sync.lua`.
+- **Sichtbarer Indikator für `reverse_scroll`** — ERLEDIGT. Wenn `?rscroll=1`
+  gesetzt ist, zeigt der Client ein kleines fixiertes „⇅ scroll enabled"-Pill
+  (`.mdview-rscroll-badge`), damit der Coach weiß, dass er selbst scrollen darf.
+- **`:MDViewZoom [+|-|reset|<factor>]`** — ERLEDIGT. Skaliert live die
+  `#mdview-root`-Schriftgröße (`16 * zoom` px; alles in em, skaliert also
+  proportional). Schritte 10%, geclamped 50–300%; `browser.zoom` wird gesetzt
+  und via `?zoom=` an einen wiederöffneten Tab weitergegeben. `usrcmds/zoom.lua`.
 
 ### Mittel
 
