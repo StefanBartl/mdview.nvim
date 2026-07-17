@@ -66,9 +66,10 @@ const CLOSE_MESSAGE_PREFIX = '\x02';
 const DOC_MESSAGE_PREFIX = '\x04';
 
 function applyScrollPing(container: HTMLElement, message: string): void {
-  // Payload: "line/total/viewfrac". viewfrac (0..1) is where in the browser
+  // Payload: "line/total/viewfrac[/col]". viewfrac (0..1) is where in the browser
   // viewport the cursor line should sit — Neovim sends a small value for "top"
-  // mode or its own cursor-in-window fraction for "cursor" (mirror) mode.
+  // mode or its own cursor-in-window fraction for "cursor" (mirror) mode. The
+  // optional trailing col (0-based byte) is used by the cursor caret, not here.
   const parts = message.slice(SCROLL_MESSAGE_PREFIX.length).split('/');
   const line = Number(parts[0]);
   const total = Number(parts[1]);
@@ -177,9 +178,13 @@ async function boot() {
   const externalLinkMode = parseExternalLinkMode(params.get('extlinks'));
 
   // Neovim cursor marker (?cursor= from browser.cursor_marker). Track the last
-  // cursor line so the marker can be re-placed after a re-render too.
+  // cursor line/column so the marker can be re-placed after a re-render too.
+  // "caret" mode needs the inline source-position spans from the WASM renderer,
+  // so it renders with the source map on; "line"/"off" render without it.
   const cursorMarkerMode = parseCursorMarkerMode(params.get('cursor'));
+  const wantSourceMap = cursorMarkerMode === 'caret';
   let lastCursorLine = -1;
+  let lastCursorCol = -1;
 
   // POST a document path to Neovim's /nav bridge (used by click-to-navigate and
   // by Back/Forward). Neovim resolves relative paths against the source doc and
@@ -247,7 +252,7 @@ async function boot() {
   const renderMarkdown = (text: string): void => {
     if (!container) return;
     try {
-      container.innerHTML = render_markdown(text);
+      container.innerHTML = render_markdown(text, wantSourceMap);
       // Make external links open in a new tab so a click doesn't navigate the
       // preview away (default; see browser.external_links).
       markExternalLinks(container, externalLinkMode);
@@ -256,7 +261,9 @@ async function boot() {
       // markup on the trusted, already-rendered DOM and never throws.
       void highlight(highlighter, container);
       // innerHTML above wiped the cursor marker element; re-place it.
-      if (lastCursorLine >= 0) updateCursorMarker(container, lastCursorLine, cursorMarkerMode);
+      if (lastCursorLine >= 0) {
+        updateCursorMarker(container, lastCursorLine, lastCursorCol >= 0 ? lastCursorCol : null, cursorMarkerMode);
+      }
       if (firstRender) {
         firstRender = false;
         clientLog(`first render ok (${text.length} bytes)`);
@@ -290,11 +297,14 @@ async function boot() {
 
     if (rawMessage.startsWith(SCROLL_MESSAGE_PREFIX)) {
       applyScrollPing(container, rawMessage);
-      // The same ping carries the cursor line — update the cursor marker.
-      const cursorLine = Number(rawMessage.slice(SCROLL_MESSAGE_PREFIX.length).split('/')[0]);
+      // The same ping carries the cursor line (and column) — update the marker.
+      const fields = rawMessage.slice(SCROLL_MESSAGE_PREFIX.length).split('/');
+      const cursorLine = Number(fields[0]);
+      const cursorCol = Number(fields[3]);
       if (Number.isFinite(cursorLine)) {
         lastCursorLine = cursorLine;
-        updateCursorMarker(container, cursorLine, cursorMarkerMode);
+        lastCursorCol = Number.isFinite(cursorCol) ? cursorCol : -1;
+        updateCursorMarker(container, cursorLine, lastCursorCol >= 0 ? lastCursorCol : null, cursorMarkerMode);
       }
       // The scrollTop we just set fires a 'scroll' event; suppress reverse-scroll
       // sends briefly so it doesn't echo back to Neovim (feedback loop).

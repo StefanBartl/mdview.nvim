@@ -134,7 +134,7 @@ Defaults: >lua
                                        -- catppuccin (optionally -light/-dark)
       highlighter         = "hljs",    -- code highlighter: hljs|shiki|none
       external_links      = "new_tab", -- external links: "new_tab" | "same_tab"
-      cursor_marker       = "line",    -- nvim cursor marker: "line" | "off"
+      cursor_marker       = "line",    -- nvim cursor: "line" | "caret" | "off"
       focus               = "browser", -- "browser" | "nvim" (keep editor focus)
       autodetect_browser  = true,  -- isolated mode only
       browser             = "",    -- friendly name, e.g. "firefox" (isolated)
@@ -249,13 +249,19 @@ browser.external_links ~
 
 browser.cursor_marker ~
   Show where the Neovim cursor is inside the preview:
-    "line" — a blinking bar in the left gutter at the cursor's line (default),
-             placed with the same sourcepos block + in-block interpolation as
-             the scroll sync, so it is line-accurate even inside multi-line
-             blocks. It is approximate: it marks the line, not the column.
-    "off"  — no marker.
-  Column-accurate placement (a caret at the exact character, via an exact
-  source map from the renderer) is a planned follow-up.
+    "line"  — a blinking bar in the left gutter at the cursor's line (default),
+              placed with the same sourcepos block + in-block interpolation as
+              the scroll sync, so it is line-accurate even inside multi-line
+              blocks. It marks the line, not the column.
+    "caret" — a caret at the exact cursor column. The WASM renderer wraps inline
+              text/code runs in `<span data-sp="…">` carrying their source
+              position (byte columns, matching Neovim's byte-based cursor
+              column); the client maps the cursor there with a DOM Range. Falls
+              back to the line marker on blank lines and inside code blocks
+              (whose content is re-tokenized by the highlighter). Documents
+              render with the extra spans only in this mode.
+    "off"   — no marker.
+  Both ride the scroll-sync ping, so they need |mdview-scroll_sync| on.
 
 browser.focus ~
   Whether the opened preview tab is allowed to take keyboard focus. `"browser"`

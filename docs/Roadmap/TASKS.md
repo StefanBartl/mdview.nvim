@@ -102,17 +102,15 @@
   `docs/Roadmap/WebTransportAPI/DESIGN.md`. (Ersetzt den früheren „bewusst
   verworfen"-Merker — auf ausdrücklichen Wunsch als opt-in wiederaufgenommen.)
 
-- [ ] **Cursor-Marker Stufe C: spaltengenauer Caret via Source-Map.** Der in
-  v0.2.0 gelieferte `browser.cursor_marker = "line"` ist bewusst approximativ
-  (markiert die Zeile, nicht die Spalte). Für einen Caret an der exakten
-  Cursor-Spalte braucht es eine echte Source-Map aus dem Renderer: comrak gibt
-  pro Block schon `data-sourcepos` aus; nötig ist zusätzlich pro Inline-/Text-
-  Knoten der Quell-Offset (oder der WASM-Layer baut aus der comrak-AST eine
-  Zeichen-Offset↔DOM-Node-Tabelle). Der Client bildet dann nvim-`(row,col)`
-  über diese Tabelle auf einen DOM-Textknoten + Character-Offset ab und setzt
-  den Caret per `Range`/`getClientRects()`. Die naive Marker-Konsens-Heuristik
-  (n-tes `a`, Whitespace zählen) löst das *nicht* — auf Zeilen mit Inline-Markup
-  driften Quell- und Render-Zeichen gemeinsam. Design/Begründung:
+- [x] **Cursor-Marker Stufe C: spaltengenauer Caret via Source-Map.** Umgesetzt
+  als `browser.cursor_marker = "caret"`. Der Renderer wickelt inline Text/Code
+  bei `source_map = true` in `<span data-sp="sl:sc:el:ec">` (Byte-Spalten). Es
+  stellte sich heraus: comrak trägt Inline-Source-Positionen schon zuverlässig
+  am AST, und die Spalten sind byte-basiert = genau Neovims Cursor-Einheit, also
+  keine Byte/Char-Umrechnung nötig. Der Scroll-Ping trägt nun die Spalte
+  (`line/total/viewfrac/col`); der Client mappt sie über den `data-sp`-Run auf
+  einen DOM-Textknoten und misst die Caret-Position über eine Ein-Zeichen-Box.
+  Fällt auf den Zeilen-Marker zurück (Leerzeile/Codeblock). Details:
   `docs/Roadmap/KONZEPT_links_und_cursor.md` (Abschnitt „Stufe C").
 
 ## Testing / Hygiene

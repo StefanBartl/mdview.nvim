@@ -95,6 +95,19 @@ body {
   z-index: 5;
   animation: mdview-cursor-blink 1.1s steps(2, start) infinite;
 }
+/* Neovim cursor caret (browser.cursor_marker = "caret"): a thin vertical bar at
+   the exact cursor character. Left/top/height set in content coordinates by JS
+   from a DOM Range over the inline source-position spans. */
+.mdview-cursor-caret {
+  position: absolute;
+  width: 2px;
+  min-height: 1.2em;
+  border-radius: 1px;
+  background: var(--cursor-color, var(--md-link));
+  pointer-events: none;
+  z-index: 5;
+  animation: mdview-cursor-blink 1.1s steps(2, start) infinite;
+}
 @keyframes mdview-cursor-blink {
   to {
     opacity: 0.25;
