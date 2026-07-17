@@ -19,6 +19,11 @@ local autocmd_registry = require("mdview.helper.autocmds_registry")
 
 local M = {}
 
+-- Last document previewed per target room, so a doc-changed ping fires once per
+-- new document (not per keystroke). Reset each attach cycle.
+---@type table<string, string>
+M._last_doc = {}
+
 -- Send the current content of bufnr to the relay for `bufnr`'s room and store a
 -- session snapshot for bookkeeping. Routing (per-path vs the preview key) and
 -- full-vs-diff (when experimental.line_diff is on) are decided here / in
@@ -65,6 +70,15 @@ function M.push_buffer_changes(bufnr, opts)
 
 	ws_client.send_content(target, lines, { full = opts and opts.full == true or nil })
 	session.store(path, lines)
+
+	-- Tell the tab which document it's now showing whenever it changes (initial
+	-- push, or a buffer switch in "reuse" mode) — powers browser Back/Forward.
+	-- Keyed by target room so it fires once per new document, not per keystroke.
+	if M._last_doc[target] ~= path then
+		M._last_doc[target] = path
+		ws_client.send_doc(target, path)
+	end
+
 	log.debug("content push sent (target=" .. target .. ") and session stored for " .. path, nil, "livepush", true)
 end
 
@@ -75,6 +89,7 @@ end
 --- (nvim_create_autocmd rejects group = 0, so nil must NOT be coerced to 0)
 function M.attach(group)
 	log.debug("setting up live push autocmds", nil, "livepush", true)
+	M._last_doc = {} -- fresh session: re-announce the document on the first push
 
 	local opts_a = {
 		pattern = defaults.ft_pattern,

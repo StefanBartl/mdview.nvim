@@ -140,3 +140,43 @@ haben `data-sourcepos="startLine:startCol-endLine:endCol"` — aber nur auf
 - F2: Default für `cursor_marker` — `off`, `line` oder gleich `caret`?
 - F2: reicht dir Stufe A/B (approximativ), oder willst du perspektivisch Stufe C
   (exakt) — das ist deutlich größer.
+
+---
+
+## Status / Umsetzung (2026-07)
+
+Umgesetzt in v0.2.0 (Feature-Commits):
+
+- **F1 externe Links → neuer Tab.** `src/client/render/externalLinks.ts`
+  (`markExternalLinks`) setzt `target=_blank rel=noopener noreferrer` auf
+  externe `<a>`. Konfigurierbar über `browser.external_links` (`"new_tab"`
+  Default | `"same_tab"`), an den Client als `&extlinks=` übergeben. Entscheidung
+  zu „immer fix vs. konfigurierbar": **konfigurierbar**, Default `new_tab`.
+- **F1 Back/Forward.** `src/client/render/history.ts`: Neovim sendet pro
+  Dokumentwechsel einen `\x04`-Doc-Ping (`/doc`-Endpoint → `ws_client.send_doc`),
+  der Client führt `pushState`; `popstate` bittet Neovim via `/nav`, das
+  Zieldokument wieder zu öffnen (braucht `experimental.click_navigate`, default
+  an). `viaPopstate`-Flag verhindert Push-Schleifen.
+- **F2 Stufe A (Zeilen-Marker).** `src/client/render/cursorMarker.ts`
+  (`updateCursorMarker`), blinkende Bar im linken Gutter an der Cursor-Zeile,
+  positioniert mit demselben sourcepos-Block + In-Block-Interpolation wie der
+  Scroll-Sync. Konfigurierbar über `browser.cursor_marker` (`"line"` Default |
+  `"off"`), an den Client als `&cursor=` übergeben. Entscheidung Default:
+  **`line`** — „was gut funktioniert und einfach ist".
+
+### Künftige Task: Stufe C — exakter Spalten-Caret via Source-Map
+
+Der Zeilen-Marker ist bewusst approximativ (markiert die Zeile, nicht die
+Spalte). Ein spaltengenauer Caret braucht eine **exakte Source-Map** vom
+Renderer: comrak liefert bereits `data-sourcepos` pro Block (Start/Ende
+Zeile:Spalte); für Spaltengenauigkeit muss der Renderer zusätzlich pro
+Text-/Inline-Knoten den Quell-Offset ausgeben (oder der WASM-Layer baut aus der
+comrak-AST eine Zeichen-Offset↔DOM-Node-Tabelle). Der Client bindet dann den
+nvim-`(row, col)` über diese Tabelle auf einen exakten DOM-Textknoten +
+Character-Offset ab und setzt den Caret per `Range`/`getClientRects()`.
+
+Die vom Nutzer vorgeschlagene Marker-Konsens-Heuristik (n-tes `a`, Whitespace
+zählen …) hilft hier nicht zuverlässig: auf Zeilen mit Inline-Markup (`**`, `` ` ``,
+`[..](..)`) driften Quell- und Render-Zeichen gemeinsam, alle Marker landen
+gleich falsch. Nur die echte Source-Map löst das exakt. → eigenständige Task,
+größerer Aufwand, zurückgestellt.

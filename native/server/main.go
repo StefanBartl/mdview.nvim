@@ -41,6 +41,12 @@ const scrollMessagePrefix = "\x01"
 // \x01, is a control byte that can never appear in typed Markdown.
 const closeMessagePrefix = "\x02"
 
+// docMessagePrefix tags a WebSocket message as "the previewed document changed
+// to <path>", so the client can maintain browser history (push a history entry
+// per document, so Back/Forward work). \x04 is a control byte that can't appear
+// in typed Markdown.
+const docMessagePrefix = "\x04"
+
 // wsConn adapts a *websocket.Conn to relay.Conn so relay.Registry stays
 // decoupled from the WebSocket library and can be tested without a network.
 type wsConn struct {
@@ -78,6 +84,7 @@ func main() {
 	mux.HandleFunc("/health", handleHealth)
 	mux.HandleFunc("/update", handleUpdate(registry, *token))
 	mux.HandleFunc("/scroll", handleScroll(registry, *token))
+	mux.HandleFunc("/doc", handleDoc(registry, *token))
 	mux.HandleFunc("/diff", handleDiff(registry, *token))
 	mux.HandleFunc("/close", handleClose(registry, *token))
 	mux.HandleFunc("/nav", handleNav(navQueue, *token))
@@ -206,6 +213,37 @@ func handleScroll(registry *relay.Registry, token string) http.HandlerFunc {
 			return
 		}
 		registry.BroadcastEphemeral(key, append([]byte(scrollMessagePrefix), body...))
+		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
+const maxDocBodyBytes = 8 << 10 // a document path
+
+// handleDoc broadcasts a "previewed document changed" signal (the new document
+// path) to key's room, tagged with docMessagePrefix. Ephemeral like /scroll —
+// a transient signal, not the room's content. The client uses it to push a
+// browser-history entry so Back/Forward navigate between documents.
+func handleDoc(registry *relay.Registry, token string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		if !relay.ValidToken(token, r.URL.Query().Get("token")) {
+			http.Error(w, "forbidden", http.StatusForbidden)
+			return
+		}
+		key := r.URL.Query().Get("key")
+		if key == "" {
+			http.Error(w, "missing key", http.StatusBadRequest)
+			return
+		}
+		body, err := io.ReadAll(io.LimitReader(r.Body, maxDocBodyBytes))
+		if err != nil {
+			http.Error(w, "failed to read body", http.StatusBadRequest)
+			return
+		}
+		registry.BroadcastEphemeral(key, append([]byte(docMessagePrefix), body...))
 		w.WriteHeader(http.StatusNoContent)
 	}
 }

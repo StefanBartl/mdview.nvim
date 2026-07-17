@@ -34,12 +34,26 @@ end
 
 ---@param key string
 ---@param href string
+-- Absolute path? (Unix "/…" or Windows "C:/…" / "C:\…"). Back/forward
+-- navigation sends absolute document paths; relative links are resolved against
+-- the source document's directory.
+---@param p string
+---@return boolean
+local function is_absolute(p)
+	return p:match("^/") ~= nil or p:match("^%a:[/\\]") ~= nil
+end
+
 local function handle_nav(key, href)
 	if type(key) ~= "string" or type(href) ~= "string" or href == "" then
 		return
 	end
-	local dir = vim.fn.fnamemodify(key, ":h")
-	local target = vim.fn.simplify(dir .. "/" .. href)
+	local target
+	if is_absolute(href) then
+		target = href
+	else
+		local dir = vim.fn.fnamemodify(key, ":h")
+		target = vim.fn.simplify(dir .. "/" .. href)
+	end
 	local norm = require("mdview.helper.normalize").path(target)
 	if norm then
 		target = norm
