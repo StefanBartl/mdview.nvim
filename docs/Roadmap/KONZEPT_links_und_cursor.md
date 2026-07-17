@@ -164,19 +164,41 @@ Umgesetzt in v0.2.0 (Feature-Commits):
   `"off"`), an den Client als `&cursor=` übergeben. Entscheidung Default:
   **`line`** — „was gut funktioniert und einfach ist".
 
-### Künftige Task: Stufe C — exakter Spalten-Caret via Source-Map
+- **F2 Stufe C (exakter Spalten-Caret via Source-Map).** ERLEDIGT — siehe unten.
 
-Der Zeilen-Marker ist bewusst approximativ (markiert die Zeile, nicht die
-Spalte). Ein spaltengenauer Caret braucht eine **exakte Source-Map** vom
-Renderer: comrak liefert bereits `data-sourcepos` pro Block (Start/Ende
-Zeile:Spalte); für Spaltengenauigkeit muss der Renderer zusätzlich pro
-Text-/Inline-Knoten den Quell-Offset ausgeben (oder der WASM-Layer baut aus der
-comrak-AST eine Zeichen-Offset↔DOM-Node-Tabelle). Der Client bindet dann den
-nvim-`(row, col)` über diese Tabelle auf einen exakten DOM-Textknoten +
-Character-Offset ab und setzt den Caret per `Range`/`getClientRects()`.
+### Stufe C — exakter Spalten-Caret via Source-Map (umgesetzt)
+
+Umgesetzt als `browser.cursor_marker = "caret"`. Der Weg, den wir vorher als
+„teuer" beschrieben haben, hat sich an einer Stelle als deutlich günstiger
+erwiesen als befürchtet: comrak (0.29) trägt **schon jetzt** verlässliche
+Inline-Source-Positionen an den AST-Knoten (per `parse_document` mit
+`render.sourcepos = true`), und diese Spalten sind **byte-basiert** — exakt die
+Einheit, in der Neovim seine Cursor-Spalte liefert (`nvim_win_get_cursor()[2]`,
+0-basiert). Damit entfällt die gefürchtete Byte/Char-Umrechnung zwischen Quelle
+und Editor; es bleibt nur eine Byte→UTF-16-Umrechnung im Client für den
+DOM-`Range`.
+
+Bausteine:
+- **Renderer** (`native/wasm-render/src/lib.rs`): `render_markdown(input, source_map)`.
+  Bei `source_map = true` läuft ein AST-Walk (`annotate_source_positions`), der
+  jeden inline `Text`- und `Code`-Knoten in
+  `<span data-sp="sl:sc:el:ec">…</span>` einwickelt (in-place als `HtmlInline`,
+  keine Arena-Allokation). Ausgenommen: Knoten unter `Image` (deren Text landet
+  im `alt`-Attribut) und Codeblöcke (der Client-Highlighter re-tokenisiert sie).
+  ammonia lässt `span` + `data-sp` durch. Rust-Tests decken Byte-Spalten,
+  Multibyte, Inline-Code, `alt`-Schutz und XSS ab.
+- **Transport**: der Scroll-Ping trägt jetzt die Cursor-Spalte im 4. Feld
+  (`line/total/viewfrac/col`), `col` = 0-basierte Byte-Spalte.
+- **Client** (`src/client/render/cursorMarker.ts`): findet den `data-sp`-Run,
+  der die Spalte enthält, rechnet Byte→UTF-16 um, findet Textknoten + Offset und
+  misst die Caret-Pixelposition über eine **Ein-Zeichen-Box** (nicht über einen
+  collapsed `Range` — dessen `getBoundingClientRect` liefert in mehreren Engines
+  eine degenerierte Box; im Browser-Probe verifiziert). Fällt auf den
+  Zeilen-Marker zurück, wenn kein Run die Position deckt (Leerzeile, Codeblock).
+
+Grenzen (bewusst akzeptiert): innerhalb eines Runs mit Escapes/Entities
+(`\*`, `&amp;`) driften Quell-Bytes und gerenderte Zeichen; der Caret kann dort
+um wenige Zeichen abweichen. Runs sind kurz, daher bleibt die Abweichung klein.
 
 Die vom Nutzer vorgeschlagene Marker-Konsens-Heuristik (n-tes `a`, Whitespace
-zählen …) hilft hier nicht zuverlässig: auf Zeilen mit Inline-Markup (`**`, `` ` ``,
-`[..](..)`) driften Quell- und Render-Zeichen gemeinsam, alle Marker landen
-gleich falsch. Nur die echte Source-Map löst das exakt. → eigenständige Task,
-größerer Aufwand, zurückgestellt.
+zählen …) wurde nicht gebraucht — die echte Source-Map löst das direkt und exakt.

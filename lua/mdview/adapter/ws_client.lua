@@ -381,13 +381,21 @@ end
 ---@param line integer # 1-based current cursor line
 ---@param total integer # total line count in the buffer
 ---@param viewfrac number|nil # desired 0..1 vertical position of the line in the browser viewport
-function M.send_scroll(path, line, total, viewfrac)
+---@param col integer|nil # 0-based byte column of the cursor (for the cursor caret)
+function M.send_scroll(path, line, total, viewfrac, col)
 	if type(path) ~= "string" or path == "" then
 		return
 	end
 	local body = tostring(line) .. "/" .. tostring(total)
+	-- col rides in the 4th field, which requires the 3rd (viewfrac) to be
+	-- present as a placeholder so positions line up on the client.
 	if type(viewfrac) == "number" then
 		body = body .. "/" .. ("%.4f"):format(viewfrac)
+	elseif type(col) == "number" then
+		body = body .. "/0"
+	end
+	if type(col) == "number" then
+		body = body .. "/" .. tostring(col)
 	end
 	http_post_nonblocking(scroll_url_for(path), body, function() end)
 end

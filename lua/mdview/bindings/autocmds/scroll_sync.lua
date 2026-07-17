@@ -48,7 +48,9 @@ local function send_current_position(bufnr)
 		return
 	end
 
-	local line = api.nvim_win_get_cursor(0)[1]
+	local pos = api.nvim_win_get_cursor(0)
+	local line = pos[1]
+	local col = pos[2] -- 0-based byte column, for the cursor caret
 	local total = api.nvim_buf_line_count(bufnr)
 
 	-- Where the line should sit in the browser viewport (0 = top, 1 = bottom).
@@ -62,7 +64,7 @@ local function send_current_position(bufnr)
 		viewfrac = defaults.scroll_sync_top_offset or 0.08
 	end
 
-	ws_client.send_scroll(path, line, total, viewfrac)
+	ws_client.send_scroll(path, line, total, viewfrac, col)
 end
 
 --- Setup CursorMoved/CursorMovedI autocmd for scroll sync.
