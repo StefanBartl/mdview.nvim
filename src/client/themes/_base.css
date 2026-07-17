@@ -68,6 +68,7 @@ body {
 }
 
 #mdview-root {
+  position: relative; /* anchor for the absolute cursor marker */
   color: var(--md-fg);
   background: var(--md-bg);
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans",
@@ -78,6 +79,26 @@ body {
   max-width: 1012px;
   margin: 0 auto;
   padding: 2rem clamp(1rem, 4vw, 3rem) 6rem;
+}
+
+/* Neovim cursor marker (browser.cursor_marker = "line"): a caret in the left
+   gutter at the cursor's line. Positioned in content coordinates by JS. */
+.mdview-cursor-bar {
+  position: absolute;
+  left: 0.25rem;
+  width: 3px;
+  height: 1.4em;
+  margin-top: -0.7em; /* center on the target line */
+  border-radius: 2px;
+  background: var(--cursor-color, var(--md-link));
+  pointer-events: none;
+  z-index: 5;
+  animation: mdview-cursor-blink 1.1s steps(2, start) infinite;
+}
+@keyframes mdview-cursor-blink {
+  to {
+    opacity: 0.25;
+  }
 }
 
 #mdview-root > *:first-child {
