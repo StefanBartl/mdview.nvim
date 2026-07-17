@@ -6,12 +6,64 @@ import { updateCursorMarker, parseCursorMarkerMode } from '../../src/client/rend
 // jsdom has no layout (getBoundingClientRect is 0), so this covers the mode
 // parsing and the element lifecycle, not pixel positions.
 describe('parseCursorMarkerMode', () => {
-  it('defaults to line, and recognizes caret/off', () => {
+  it('defaults to line, and recognizes caret/section/off', () => {
     expect(parseCursorMarkerMode(null)).toBe('line');
     expect(parseCursorMarkerMode('line')).toBe('line');
     expect(parseCursorMarkerMode('caret')).toBe('caret');
+    expect(parseCursorMarkerMode('section')).toBe('section');
     expect(parseCursorMarkerMode('off')).toBe('off');
     expect(parseCursorMarkerMode('garbage')).toBe('line');
+  });
+});
+
+describe('updateCursorMarker section spotlight', () => {
+  // A doc: H2 "A" (l1) + para (l2); H2 "B" (l4) + para (l5) + H3 "B.1" (l6) + para (l7).
+  function doc(): HTMLElement {
+    const el = document.createElement('div');
+    el.innerHTML =
+      '<h2 data-sourcepos="1:1-1:3">A</h2>' +
+      '<p data-sourcepos="2:1-2:3">a1</p>' +
+      '<h2 data-sourcepos="4:1-4:3">B</h2>' +
+      '<p data-sourcepos="5:1-5:3">b1</p>' +
+      '<h3 data-sourcepos="6:1-6:5">B.1</h3>' +
+      '<p data-sourcepos="7:1-7:3">b2</p>';
+    document.body.appendChild(el);
+    return el;
+  }
+  const cls = (el: HTMLElement) =>
+    Array.from(el.querySelectorAll('[data-sourcepos]')).map((c) =>
+      c.classList.contains('mdview-section-active')
+        ? 'A'
+        : c.classList.contains('mdview-section-dim')
+          ? 'd'
+          : '-',
+    );
+
+  it('spotlights section A and dims the rest (cursor in A)', () => {
+    const el = doc();
+    updateCursorMarker(el, 2, null, 'section');
+    expect(cls(el)).toEqual(['A', 'A', 'd', 'd', 'd', 'd']);
+  });
+
+  it('spotlights B including its H3 subsection (cursor in B, before B.1)', () => {
+    const el = doc();
+    updateCursorMarker(el, 5, null, 'section');
+    // section B runs to the next heading of level <= 2 (there is none), so it
+    // includes the deeper H3 subsection.
+    expect(cls(el)).toEqual(['d', 'd', 'A', 'A', 'A', 'A']);
+  });
+
+  it('narrows to the H3 subsection when the cursor is inside it', () => {
+    const el = doc();
+    updateCursorMarker(el, 7, null, 'section');
+    expect(cls(el)).toEqual(['d', 'd', 'd', 'd', 'A', 'A']);
+  });
+
+  it('clears the spotlight when switching to another mode', () => {
+    const el = doc();
+    updateCursorMarker(el, 2, null, 'section');
+    updateCursorMarker(el, 2, null, 'line');
+    expect(cls(el)).toEqual(['-', '-', '-', '-', '-', '-']);
   });
 });
 

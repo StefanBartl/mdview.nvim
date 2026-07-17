@@ -14,7 +14,7 @@ local state = require("mdview.core.state")
 local M = {}
 
 ---@type string[]
-M.modes = { "line", "caret", "off" }
+M.modes = { "line", "caret", "section", "off" }
 
 ---@param v string
 ---@return boolean
