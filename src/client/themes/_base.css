@@ -114,6 +114,33 @@ body {
   }
 }
 
+/* Reverse-scroll hint (experimental.reverse_scroll): a small fixed pill telling
+   the viewer they may scroll the preview themselves. Self-contained colors — it
+   sits on <body>, outside #mdview-root, so theme --md-* vars don't reach it. */
+.mdview-rscroll-badge {
+  position: fixed;
+  right: 0.75rem;
+  bottom: 0.75rem;
+  z-index: 10;
+  padding: 0.25rem 0.6rem;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans",
+    Helvetica, Arial, sans-serif;
+  font-size: 12px;
+  line-height: 1;
+  color: #fff;
+  background: rgba(15, 23, 42, 0.72);
+  border-radius: 999px;
+  pointer-events: none;
+  user-select: none;
+  opacity: 0.85;
+}
+
+/* #mdview-root font-size is scaled live by :MDViewZoom; ease it so a bump reads
+   as a smooth zoom rather than a jump. */
+#mdview-root {
+  transition: font-size 0.12s ease-out;
+}
+
 #mdview-root > *:first-child {
   margin-top: 0 !important;
 }

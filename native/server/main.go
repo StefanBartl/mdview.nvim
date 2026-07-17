@@ -47,6 +47,12 @@ const closeMessagePrefix = "\x02"
 // in typed Markdown.
 const docMessagePrefix = "\x04"
 
+// controlMessagePrefix tags a WebSocket message as a live preview-control update
+// (a small JSON object, e.g. {"cursor":"caret"} or {"zoom":1.2}), so runtime
+// commands like :MDViewCursor and :MDViewZoom can change the open tab without a
+// reload. \x05 is a control byte that can't appear in typed Markdown.
+const controlMessagePrefix = "\x05"
+
 // wsConn adapts a *websocket.Conn to relay.Conn so relay.Registry stays
 // decoupled from the WebSocket library and can be tested without a network.
 type wsConn struct {
@@ -85,6 +91,7 @@ func main() {
 	mux.HandleFunc("/update", handleUpdate(registry, *token))
 	mux.HandleFunc("/scroll", handleScroll(registry, *token))
 	mux.HandleFunc("/doc", handleDoc(registry, *token))
+	mux.HandleFunc("/control", handleControl(registry, *token))
 	mux.HandleFunc("/diff", handleDiff(registry, *token))
 	mux.HandleFunc("/close", handleClose(registry, *token))
 	mux.HandleFunc("/nav", handleNav(navQueue, *token))
@@ -244,6 +251,38 @@ func handleDoc(registry *relay.Registry, token string) http.HandlerFunc {
 			return
 		}
 		registry.BroadcastEphemeral(key, append([]byte(docMessagePrefix), body...))
+		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
+const maxControlBodyBytes = 1 << 10 // a small JSON control object
+
+// handleControl broadcasts a live preview-control update (small JSON body, e.g.
+// {"cursor":"caret"} / {"zoom":1.2}) to key's room, tagged with
+// controlMessagePrefix. Ephemeral like /scroll and /doc — a transient control
+// signal, not the room's content. Powers runtime commands (:MDViewCursor,
+// :MDViewZoom) that change the open tab without a reload.
+func handleControl(registry *relay.Registry, token string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		if !relay.ValidToken(token, r.URL.Query().Get("token")) {
+			http.Error(w, "forbidden", http.StatusForbidden)
+			return
+		}
+		key := r.URL.Query().Get("key")
+		if key == "" {
+			http.Error(w, "missing key", http.StatusBadRequest)
+			return
+		}
+		body, err := io.ReadAll(io.LimitReader(r.Body, maxControlBodyBytes))
+		if err != nil {
+			http.Error(w, "failed to read body", http.StatusBadRequest)
+			return
+		}
+		registry.BroadcastEphemeral(key, append([]byte(controlMessagePrefix), body...))
 		w.WriteHeader(http.StatusNoContent)
 	}
 }

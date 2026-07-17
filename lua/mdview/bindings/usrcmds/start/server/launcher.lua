@@ -111,6 +111,13 @@ local function resolve_browser_url(opts)
 		url = url .. "&cursor=" .. vim.uri_encode(cursor_marker)
 	end
 
+	-- preview zoom factor (client reads ?zoom=); only pass a non-default so a
+	-- freshly reopened tab starts at the zoom :MDViewZoom last set.
+	local zoom = browser_defaults.zoom
+	if type(zoom) == "number" and zoom > 0 and zoom ~= 1.0 then
+		url = url .. "&zoom=" .. vim.uri_encode(("%.3f"):format(zoom))
+	end
+
 	-- opt-in WebTransport (HTTP/3). The client feature-detects and falls back
 	-- to WebSocket if unsupported or the endpoint doesn't answer, so this is
 	-- always safe to pass (see experimental.webtransport in DEFAULTS).

@@ -28,12 +28,37 @@ end
 -- brief window of outgoing pings is skipped.
 local suppress_until = 0
 
+-- Persistent pause switch (:MDViewSync). Unlike suppress (a brief time window
+-- around a programmatic move), this stays on until explicitly resumed, so you
+-- can scroll to a reference spot in Neovim without dragging the preview along.
+local paused = false
+
 --- Suppress outgoing scroll pings for `ms` (default 250) — used by the
 --- reverse-scroll handler around a programmatic cursor move.
 ---@param ms integer|nil
 ---@return nil
 function M.suppress(ms)
 	suppress_until = now_ms() + (ms or 250)
+end
+
+--- Pause/resume outgoing scroll-sync pings (:MDViewSync). While paused, cursor
+--- moves in Neovim no longer scroll the preview or move its cursor marker.
+---@param on boolean
+---@return nil
+function M.set_paused(on)
+	paused = on == true
+end
+
+--- @return boolean
+function M.is_paused()
+	return paused
+end
+
+--- Flip the pause state and return the new value.
+---@return boolean
+function M.toggle_paused()
+	paused = not paused
+	return paused
 end
 
 ---@param bufnr integer
@@ -78,6 +103,9 @@ function M.attach(group)
 		desc = "[mdview] Send cursor position to browser preview (scroll sync)",
 		pattern = defaults.ft_pattern,
 		callback = function(args)
+			if paused then
+				return -- :MDViewSync pause — don't drag the preview along
+			end
 			local throttle_ms = defaults.scroll_sync_throttle_ms or 150
 			local t = now_ms()
 			if t < suppress_until then
