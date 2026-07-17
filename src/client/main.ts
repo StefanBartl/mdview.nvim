@@ -12,6 +12,8 @@ import { createTransport } from './transport/transportFactory';
 import { DiffDoc, isEnvelope } from './render/diffDoc';
 import { installClickNav } from './render/clickNav';
 import { pickScrollTarget, fractionInBlock, hasSourcepos } from './render/scrollSync';
+import { markExternalLinks, parseExternalLinkMode } from './render/externalLinks';
+import { updateCursorMarker, parseCursorMarkerMode } from './render/cursorMarker';
 import { highlight, parseHighlighter } from './highlight';
 import init, { render_markdown } from './wasm-render/mdview_wasm_render.js';
 
@@ -166,6 +168,14 @@ async function boot() {
   // highlighter is never loaded.
   const highlighter = parseHighlighter(params.get('hl'));
 
+  // How external links behave (?extlinks= from browser.external_links).
+  const externalLinkMode = parseExternalLinkMode(params.get('extlinks'));
+
+  // Neovim cursor marker (?cursor= from browser.cursor_marker). Track the last
+  // cursor line so the marker can be re-placed after a re-render too.
+  const cursorMarkerMode = parseCursorMarkerMode(params.get('cursor'));
+  let lastCursorLine = -1;
+
   // Opt-in click-to-navigate: hand relative-link clicks to Neovim via /nav
   // (the Lua side adds ?nav=1 when experimental.click_navigate is on). Neovim
   // opens the target document, which flows back into this tab via the push path.
@@ -220,10 +230,15 @@ async function boot() {
     if (!container) return;
     try {
       container.innerHTML = render_markdown(text);
+      // Make external links open in a new tab so a click doesn't navigate the
+      // preview away (default; see browser.external_links).
+      markExternalLinks(container, externalLinkMode);
       // Highlight fenced code after the sanitized HTML is in the DOM. Fire and
       // forget (the highlighter is async for Shiki) — it only adds/replaces
       // markup on the trusted, already-rendered DOM and never throws.
       void highlight(highlighter, container);
+      // innerHTML above wiped the cursor marker element; re-place it.
+      if (lastCursorLine >= 0) updateCursorMarker(container, lastCursorLine, cursorMarkerMode);
       if (firstRender) {
         firstRender = false;
         clientLog(`first render ok (${text.length} bytes)`);
@@ -252,6 +267,12 @@ async function boot() {
 
     if (rawMessage.startsWith(SCROLL_MESSAGE_PREFIX)) {
       applyScrollPing(container, rawMessage);
+      // The same ping carries the cursor line — update the cursor marker.
+      const cursorLine = Number(rawMessage.slice(SCROLL_MESSAGE_PREFIX.length).split('/')[0]);
+      if (Number.isFinite(cursorLine)) {
+        lastCursorLine = cursorLine;
+        updateCursorMarker(container, cursorLine, cursorMarkerMode);
+      }
       // The scrollTop we just set fires a 'scroll' event; suppress reverse-scroll
       // sends briefly so it doesn't echo back to Neovim (feedback loop).
       scrollSuppressUntil = Date.now() + SCROLL_SUPPRESS_MS;

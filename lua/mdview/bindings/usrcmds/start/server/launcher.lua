@@ -99,6 +99,18 @@ local function resolve_browser_url(opts)
 		url = url .. "&hl=" .. vim.uri_encode(highlighter)
 	end
 
+	-- how external links behave in the preview tab (client reads ?extlinks=)
+	local extlinks = browser_defaults.external_links
+	if type(extlinks) == "string" and extlinks ~= "" then
+		url = url .. "&extlinks=" .. vim.uri_encode(extlinks)
+	end
+
+	-- cursor marker mode (client reads ?cursor=)
+	local cursor_marker = browser_defaults.cursor_marker
+	if type(cursor_marker) == "string" and cursor_marker ~= "" then
+		url = url .. "&cursor=" .. vim.uri_encode(cursor_marker)
+	end
+
 	-- opt-in WebTransport (HTTP/3). The client feature-detects and falls back
 	-- to WebSocket if unsupported or the endpoint doesn't answer, so this is
 	-- always safe to pass (see experimental.webtransport in DEFAULTS).

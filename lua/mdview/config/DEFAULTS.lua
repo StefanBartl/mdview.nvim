@@ -33,6 +33,8 @@
 ---@field theme string preview theme passed to the client as ?theme= — one of "github", "dark-dimmed", "plain", "tokyonight", "catppuccin" (optionally suffixed "-light"/"-dark" to pin the color scheme); see src/client/themes/
 ---@field highlighter "hljs"|"shiki"|"none" code-fence syntax highlighter (client-side, lazy-loaded): "hljs" (light, default), "shiki" (exact VSCode/TextMate themes, heavier), or "none"
 ---@field focus "browser"|"nvim" whether the opened tab may take keyboard focus ("browser", default) or focus stays in Neovim ("nvim" — clean on macOS, best-effort on Windows, no-op on Linux); default open_mode only
+---@field external_links "new_tab"|"same_tab" open external links (http/mailto/absolute) in a new tab ("new_tab", default — keeps the preview tab) or in place ("same_tab")
+---@field cursor_marker "line"|"off" show the Neovim cursor line in the preview as a left-gutter caret ("line", default) or hide it ("off"); rides the scroll-sync ping, so needs scroll_sync on
 
 ---@class mdview.config.StartDefaults
 ---@field push_strategy "launcher"|"try_push" initial-push strategy used by :MDViewStart
@@ -117,6 +119,8 @@ return {
 		behavior = "reuse",
 		highlighter = "hljs",
 		focus = "browser",
+		external_links = "new_tab",
+		cursor_marker = "line",
 	},
 
 	start = {
