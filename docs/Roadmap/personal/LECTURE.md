@@ -149,10 +149,16 @@ sendet. So ändern Laufzeit-Commands den Tab **ohne Reload**.
   regierenden Überschrift bis zur nächsten Überschrift gleichen/höheren Rangs)
   und hebt dessen Blöcke hervor, während der Rest via `.mdview-section-dim`
   abgedunkelt wird. Live umschaltbar mit `:MDViewCursor section`.
-- **Privacy-Blöcke** — ein Marker im Markdown (z. B. Fence ` ```private ` oder
-  `<!--private-->…<!--/private-->`), der im Browser standardmäßig
-  verblurrt/versteckt gerendert wird, mit Klick-zum-Aufdecken oder
-  `:MDViewReveal [on|off|toggle]`. Für Zahlen/Namen Dritter, die im Dokument
+- **Privacy-Blöcke** — ERLEDIGT (Fence-Variante ` ```private `). Der Renderer
+  (`native/wasm-render/src/lib.rs`, `transform_private_blocks`) wandelt einen
+  ` ```private `-Block in `<div data-private>` um und rendert den Inhalt als
+  normales Markdown (nicht als Code); der Client blurrt `[data-private]` per CSS.
+  Aufdecken: einzelner Block per Klick (`data-revealed`), alle auf einmal via
+  `:MDViewReveal [on|off|toggle]` (Live-Control, `.mdview-reveal-all` am Root).
+  Nichts wird persistiert — ein frischer Tab startet immer versteckt. Die
+  Kommentar-Variante `<!--private-->` wurde nicht umgesetzt: comrak/ammonia
+  strippen HTML-Kommentare, sie überleben die Pipeline nicht.
+  <!-- Ursprüngliche Idee: --> Für Zahlen/Namen Dritter, die im Dokument
   stehen, aber während des Calls nicht offen sichtbar sein sollen — ohne dafür
   extra ein anderes Fenster/eine andere Datei pflegen zu müssen.
 - **Session-Breadcrumbs** — während eine Session läuft, mitprotokollieren,

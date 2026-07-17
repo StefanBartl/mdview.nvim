@@ -131,6 +131,27 @@ body {
   background-color: var(--section-spotlight, rgba(84, 174, 255, 0.14));
 }
 
+/* Private blocks (```private): blurred by default so third-party names/numbers
+   aren't visible during a screen share. Click to reveal one, or :MDViewReveal to
+   reveal all (adds .mdview-reveal-all on the root). */
+#mdview-root [data-private] {
+  filter: blur(7px);
+  cursor: pointer;
+  border-radius: 6px;
+  transition: filter 0.12s ease-out;
+  -webkit-user-select: none;
+  user-select: none;
+}
+#mdview-root [data-private]:hover {
+  filter: blur(4px);
+}
+#mdview-root [data-private][data-revealed],
+#mdview-root.mdview-reveal-all [data-private] {
+  filter: none;
+  cursor: auto;
+  user-select: auto;
+}
+
 /* Reverse-scroll hint (experimental.reverse_scroll): a small fixed pill telling
    the viewer they may scroll the preview themselves. Self-contained colors — it
    sits on <body>, outside #mdview-root, so theme --md-* vars don't reach it. */

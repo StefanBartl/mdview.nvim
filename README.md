@@ -158,12 +158,33 @@ Partial nested overrides merge recursively — `{ browser = { browser = "firefox
 | `:MDViewCursor [line\|caret\|section\|off]` | Switch the Neovim-cursor marker mode in the preview at runtime (applies live, no reload); no argument reports the current mode. See `browser.cursor_marker`. |
 | `:MDViewSync [pause\|resume\|toggle]` | Pause/resume the nvim→browser scroll sync. While paused, moving the cursor no longer scrolls the preview or moves its marker — jump to a reference spot without dragging a viewer along. No argument reports the state. |
 | `:MDViewZoom [+\|-\|reset\|<factor>]` | Adjust the preview font-size zoom at runtime (applies live). `+`/`-` step by 10% (clamped 50–300%), `reset` = 100%, a bare number sets a factor (`1.5`) or percent (`150`); no argument reports the current zoom. See `browser.zoom`. |
+| `:MDViewReveal [on\|off\|toggle]` | Reveal/hide all **private blocks** at once (applies live). See "Private blocks" below. |
 | `:MDViewPreviewTab` | Toggle the in-Neovim tab preview (works standalone, no server needed). |
 | `:MDViewShowWebLogs` | Show the relay's captured stdout, including `[client]` browser-side diagnostics. |
 | `:MDViewLog [level\|export [path]]` | Show mdview's internal log ring (optionally filtered to `trace`/`debug`/`info`/`warn`/`error`), or `export` it to a file. |
 | `:MDViewDiagnose [path]` | Write a full component-state diagnostics report to a file and open it. |
 
 Run `:checkhealth mdview` to verify dependencies (lib.nvim, curl, tar) and whether the relay binary and client bundle are cached.
+
+---
+
+## Private blocks
+
+Wrap sensitive content — third-party names, numbers you don't want on a shared
+screen — in a fenced block with the info string `private`:
+
+````markdown
+```private
+Client: Jane Doe — account 1234-5678
+```
+````
+
+Its **contents render as normal Markdown** (bold, links, lists all work), but the
+whole block is **blurred by default** in the preview, so it stays hidden while
+you screen-share without keeping it in a separate file. Reveal a single block by
+**clicking** it (click again to re-hide), or reveal/hide them all at once with
+`:MDViewReveal [on|off|toggle]`. Reveal state is never persisted — a freshly
+opened tab always starts hidden.
 
 ---
 

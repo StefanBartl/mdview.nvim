@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 
-use comrak::nodes::{AstNode, NodeValue};
-use comrak::{format_html, parse_document, Arena, Options};
+use comrak::nodes::{AstNode, NodeHtmlBlock, NodeValue};
+use comrak::{format_html, markdown_to_html, parse_document, Arena, Options};
 use wasm_bindgen::prelude::*;
 
 fn build_options() -> Options<'static> {
@@ -86,6 +86,34 @@ fn annotate_source_positions<'a>(node: &'a AstNode<'a>, in_image: bool) {
     }
 }
 
+/// Turn a fenced block with the info string `private` into a blurred-by-default
+/// container (`<div data-private>`), rendering its contents as normal Markdown
+/// instead of as a code block. For hiding third-party names/numbers during a
+/// screen share without keeping them in a separate file; the client blurs
+/// `[data-private]` and reveals on click or via :MDViewReveal.
+///
+/// The inner Markdown is rendered without sourcepos so its blocks don't carry
+/// `data-sourcepos` (the scroll-sync/section features map against the outer
+/// document, and the whole thing is still sanitized by the final ammonia pass).
+fn transform_private_blocks<'a>(root: &'a AstNode<'a>, inner_options: &Options) {
+    let mut targets: Vec<(&'a AstNode<'a>, String)> = Vec::new();
+    for node in root.descendants() {
+        if let NodeValue::CodeBlock(ref cb) = node.data.borrow().value {
+            if cb.info.trim() == "private" {
+                targets.push((node, cb.literal.clone()));
+            }
+        }
+    }
+    for (node, literal) in targets {
+        let inner = markdown_to_html(&literal, inner_options);
+        let html = format!("<div data-private>{inner}</div>");
+        node.data.borrow_mut().value = NodeValue::HtmlBlock(NodeHtmlBlock {
+            block_type: 6, // raw HTML block: emitted verbatim (unsafe_ is on)
+            literal: html,
+        });
+    }
+}
+
 /// Build the ammonia sanitizer. Identical to the default allowlist except it
 /// additionally permits the disabled checkbox inputs comrak emits for GFM
 /// task lists (`- [ ]` / `- [x]`), so they render as real checkboxes instead
@@ -95,14 +123,16 @@ fn annotate_source_positions<'a>(node: &'a AstNode<'a>, in_image: bool) {
 fn sanitizer() -> ammonia::Builder<'static> {
     let mut builder = ammonia::Builder::default();
     // `input` for task-list checkboxes; `span` for the inline source-position
-    // wrappers (annotate_source_positions). Both carry no executable surface.
-    builder.add_tags(["input", "span"].iter().copied());
+    // wrappers (annotate_source_positions); `div` for private blocks
+    // (transform_private_blocks). None carry any executable surface.
+    builder.add_tags(["input", "span", "div"].iter().copied());
 
     // Keep our source-position hints on every element so the client can do
     // line-accurate scroll sync (data-sourcepos, on blocks) and column-accurate
-    // caret placement (data-sp, on inline spans). Both carry no executable
-    // content — just "L:C…" digits — and can't be used to inject script.
-    builder.add_generic_attributes(["data-sourcepos", "data-sp"].iter().copied());
+    // caret placement (data-sp, on inline spans); data-private marks a blurred
+    // block. All carry no executable content — just digits / a bare flag — and
+    // can't be used to inject script.
+    builder.add_generic_attributes(["data-sourcepos", "data-sp", "data-private"].iter().copied());
 
     let mut input_attrs = HashSet::new();
     input_attrs.insert("type");
@@ -130,6 +160,12 @@ pub fn render_markdown(input: &str, source_map: bool) -> String {
     let arena = Arena::new();
     let options = build_options();
     let root = parse_document(&arena, input, &options);
+    // Private blocks first: this replaces ```private code blocks with rendered
+    // <div data-private> HTML, so the source-map pass then correctly skips them
+    // (they hold no inline Text/Code nodes to wrap).
+    let mut inner_options = build_options();
+    inner_options.render.sourcepos = false; // nested render: no block positions
+    transform_private_blocks(root, &inner_options);
     if source_map {
         annotate_source_positions(root, false);
     }
@@ -282,6 +318,39 @@ mod tests {
         let html = render_markdown("hi <script>alert(1)</script> [x](javascript:alert(1))", true);
         assert!(!html.contains("<script"));
         assert!(!html.contains("javascript:"));
+        assert!(!html.contains("alert(1)"));
+    }
+
+    // ---- private blocks (```private) ---------------------------------------
+
+    #[test]
+    fn private_block_becomes_blurred_container_with_rendered_markdown() {
+        let html = render_markdown("before\n\n```private\nsecret **bold**\n```\n\nafter", false);
+        eprintln!("PRIVATE: {html}");
+        // wrapped in a data-private div, not a code block
+        assert!(html.contains("<div data-private"));
+        assert!(!html.contains("language-private"));
+        // inner markdown is rendered, not shown as escaped code
+        assert!(html.contains("<strong>bold</strong>"));
+        assert!(html.contains("secret"));
+        // surrounding content is untouched
+        assert!(html.contains("before"));
+        assert!(html.contains("after"));
+    }
+
+    #[test]
+    fn non_private_code_block_is_unaffected() {
+        let html = render_markdown("```lua\nlocal x = 1\n```", false);
+        assert!(!html.contains("data-private"));
+        assert!(html.contains("<code"));
+        assert!(html.contains("local x = 1"));
+    }
+
+    #[test]
+    fn private_block_still_sanitizes_inner_xss() {
+        let html = render_markdown("```private\n<script>alert(1)</script> hi\n```", false);
+        assert!(html.contains("<div data-private"));
+        assert!(!html.contains("<script"));
         assert!(!html.contains("alert(1)"));
     }
 }
