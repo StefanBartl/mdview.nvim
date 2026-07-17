@@ -114,6 +114,23 @@ body {
   }
 }
 
+/* Section spotlight (browser.cursor_marker = "section"): dim the blocks outside
+   the cursor's section and lift the ones inside it, so a passive viewer can see
+   at a glance which section is being discussed — more robust under video
+   compression than a thin caret. Applied to top-level blocks by JS. */
+#mdview-root .mdview-section-dim {
+  opacity: 0.32;
+  transition: opacity 0.15s ease-out;
+}
+#mdview-root .mdview-section-active {
+  opacity: 1;
+  transition: opacity 0.15s ease-out, background-color 0.15s ease-out;
+  border-radius: 6px;
+  box-shadow: -0.75rem 0 0 var(--section-spotlight, rgba(84, 174, 255, 0.14)),
+    0.75rem 0 0 var(--section-spotlight, rgba(84, 174, 255, 0.14));
+  background-color: var(--section-spotlight, rgba(84, 174, 255, 0.14));
+}
+
 /* Reverse-scroll hint (experimental.reverse_scroll): a small fixed pill telling
    the viewer they may scroll the preview themselves. Self-contained colors — it
    sits on <body>, outside #mdview-root, so theme --md-* vars don't reach it. */

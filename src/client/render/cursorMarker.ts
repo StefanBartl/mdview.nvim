@@ -18,11 +18,12 @@
 
 import { pickScrollTarget, fractionInBlock } from './scrollSync';
 
-export type CursorMarkerMode = 'off' | 'line' | 'caret';
+export type CursorMarkerMode = 'off' | 'line' | 'caret' | 'section';
 
 export function parseCursorMarkerMode(param: string | null | undefined): CursorMarkerMode {
   if (param === 'off') return 'off';
   if (param === 'caret') return 'caret';
+  if (param === 'section') return 'section';
   return 'line';
 }
 
@@ -62,9 +63,19 @@ export function updateCursorMarker(
   col: number | null,
   mode: CursorMarkerMode,
 ): void {
+  // Section spotlight decorates block elements; clear it whenever we're not in
+  // that mode so switching modes doesn't leave dimmed blocks behind.
+  if (mode !== 'section') clearSection(container);
+
   if (mode === 'off') {
     hide(barEl);
     hide(caretEl);
+    return;
+  }
+  if (mode === 'section') {
+    hide(barEl);
+    hide(caretEl);
+    placeSection(container, line);
     return;
   }
   if (mode === 'caret' && typeof col === 'number' && col >= 0 && placeCaret(container, line, col)) {
@@ -240,4 +251,86 @@ function findTextPosition(el: HTMLElement, u16Offset: number): { node: Text; off
   }
   if (last) return { node: last, offset: last.data.length };
   return null;
+}
+
+// ---- section spotlight (cursor_marker = "section") -------------------------
+
+const SECTION_DIM_CLASS = 'mdview-section-dim';
+const SECTION_ACTIVE_CLASS = 'mdview-section-active';
+
+interface BlockPos {
+  el: HTMLElement;
+  startLine: number;
+  headingLevel: number | null; // 1..6 for H1..H6, else null
+}
+
+/** Top-level blocks of the container that carry data-sourcepos, in doc order. */
+function topLevelBlocks(container: HTMLElement): BlockPos[] {
+  const out: BlockPos[] = [];
+  for (const child of Array.from(container.children)) {
+    if (!(child instanceof HTMLElement)) continue;
+    const sp = child.getAttribute('data-sourcepos');
+    if (!sp) continue;
+    const startLine = Number(sp.split(':')[0]);
+    if (!Number.isFinite(startLine)) continue;
+    const m = /^H([1-6])$/.exec(child.tagName);
+    out.push({ el: child, startLine, headingLevel: m ? Number(m[1]) : null });
+  }
+  return out;
+}
+
+/** Remove any section-spotlight decoration from the container's blocks. */
+function clearSection(container: HTMLElement): void {
+  container
+    .querySelectorAll(`.${SECTION_DIM_CLASS}, .${SECTION_ACTIVE_CLASS}`)
+    .forEach((el) => el.classList.remove(SECTION_DIM_CLASS, SECTION_ACTIVE_CLASS));
+}
+
+/**
+ * Highlight the document section the cursor is in and dim the rest. The section
+ * runs from the governing heading (the last heading at/before the cursor line)
+ * to just before the next heading of the same or higher rank; content before the
+ * first heading is treated as its own section. With no headings at all nothing
+ * is dimmed (there are no sections to distinguish).
+ */
+function placeSection(container: HTMLElement, line: number): void {
+  const blocks = topLevelBlocks(container);
+  clearSection(container);
+  if (blocks.length === 0) return;
+
+  const firstHeadingIdx = blocks.findIndex((b) => b.headingLevel !== null);
+  if (firstHeadingIdx === -1) return; // no headings -> nothing to spotlight
+
+  // Governing heading: last heading whose start line is at/before the cursor.
+  let headingIdx = -1;
+  let headingLvl = 0;
+  for (const [i, b] of blocks.entries()) {
+    if (b.startLine > line) break; // blocks are in increasing line order
+    if (b.headingLevel !== null) {
+      headingIdx = i;
+      headingLvl = b.headingLevel;
+    }
+  }
+
+  let startIdx: number;
+  let endIdx: number;
+  if (headingIdx === -1) {
+    // Cursor is above the first heading — spotlight the preamble.
+    startIdx = 0;
+    endIdx = firstHeadingIdx - 1;
+  } else {
+    startIdx = headingIdx;
+    endIdx = blocks.length - 1;
+    for (let j = headingIdx + 1; j < blocks.length; j++) {
+      const lvl = blocks[j].headingLevel;
+      if (lvl !== null && lvl <= headingLvl) {
+        endIdx = j - 1;
+        break;
+      }
+    }
+  }
+
+  blocks.forEach((b, i) => {
+    b.el.classList.add(i >= startIdx && i <= endIdx ? SECTION_ACTIVE_CLASS : SECTION_DIM_CLASS);
+  });
 }

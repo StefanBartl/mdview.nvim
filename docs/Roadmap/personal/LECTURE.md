@@ -143,12 +143,12 @@ sendet. So ändern Laufzeit-Commands den Tab **ohne Reload**.
 
 ### Mittel
 
-- **Section-Spotlight (`cursor_marker = "section"`)** — statt nur eines
-  dünnen Carets/Bars den *gesamten aktuellen Abschnitt* (H2/H3-Block, Grenzen
-  aus den vorhandenen `data-sourcepos`-Blockgrenzen ableitbar) leicht
-  hervorheben und den Rest dezent abdunkeln. Ein 2–3px-Strich kann in
-  Videokompression untergehen; ein ganzer hervorgehobener Block ist deutlich
-  robuster sichtbar für einen passiven Zuschauer.
+- **Section-Spotlight (`cursor_marker = "section"`)** — ERLEDIGT. Vierter
+  Modus neben `line`/`caret`/`off`: der Client (`cursorMarker.ts`) bestimmt den
+  Abschnitt des Cursors aus den `data-sourcepos`-Blockgrenzen (von der
+  regierenden Überschrift bis zur nächsten Überschrift gleichen/höheren Rangs)
+  und hebt dessen Blöcke hervor, während der Rest via `.mdview-section-dim`
+  abgedunkelt wird. Live umschaltbar mit `:MDViewCursor section`.
 - **Privacy-Blöcke** — ein Marker im Markdown (z. B. Fence ` ```private ` oder
   `<!--private-->…<!--/private-->`), der im Browser standardmäßig
   verblurrt/versteckt gerendert wird, mit Klick-zum-Aufdecken oder

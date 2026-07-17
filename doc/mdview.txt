@@ -134,7 +134,7 @@ Defaults: >lua
                                        -- catppuccin (optionally -light/-dark)
       highlighter         = "hljs",    -- code highlighter: hljs|shiki|none
       external_links      = "new_tab", -- external links: "new_tab" | "same_tab"
-      cursor_marker       = "line",    -- nvim cursor: "line" | "caret" | "off"
+      cursor_marker       = "line",    -- "line"|"caret"|"section"|"off"
       zoom                = 1.0,        -- preview font-size zoom (:MDViewZoom)
       focus               = "browser", -- "browser" | "nvim" (keep editor focus)
       autodetect_browser  = true,  -- isolated mode only
@@ -261,6 +261,13 @@ browser.cursor_marker ~
               back to the line marker on blank lines and inside code blocks
               (whose content is re-tokenized by the highlighter). Documents
               render with the extra spans only in this mode.
+    "section" — spotlight the whole heading section the cursor is in and dim
+              the rest. The section runs from the governing heading (the last
+              heading at/before the cursor) to just before the next heading of
+              the same or higher rank, using the block `data-sourcepos`
+              boundaries. A dimmed/lifted block survives video compression far
+              better than a thin caret, so it's the clearest cue for a passive
+              screen-sharing viewer.
     "off"   — no marker.
   All ride the scroll-sync ping, so they need |mdview-scroll_sync| on. Switch
   at runtime with |:MDViewCursor|.
@@ -398,10 +405,11 @@ experimental.reverse_scroll ~
   "default" |browser.open_mode|, since the old tab can't be closed
   programmatically). With no argument it reports the current theme.
 
-:MDViewCursor [line | caret | off]                          *:MDViewCursor*
+:MDViewCursor [line | caret | section | off]                *:MDViewCursor*
   Switches the Neovim-cursor marker mode in the preview at runtime (see
   `browser.cursor_marker`): `line` (blinking bar at the cursor line), `caret`
-  (caret at the exact cursor column), or `off`. Sets `browser.cursor_marker`
+  (caret at the exact cursor column), `section` (spotlight the current heading
+  section, dim the rest), or `off`. Sets `browser.cursor_marker`
   in the live config and, if a session is running, pushes a live control
   update so the open tab changes immediately — no reload. With no argument it
   reports the current mode. Tab-completed.
