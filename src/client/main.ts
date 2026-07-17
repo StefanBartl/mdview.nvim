@@ -14,6 +14,7 @@ import { installClickNav } from './render/clickNav';
 import { pickScrollTarget, fractionInBlock, hasSourcepos } from './render/scrollSync';
 import { markExternalLinks, parseExternalLinkMode } from './render/externalLinks';
 import { updateCursorMarker, parseCursorMarkerMode } from './render/cursorMarker';
+import { installHistory, onDocChange } from './render/history';
 import { highlight, parseHighlighter } from './highlight';
 import init, { render_markdown } from './wasm-render/mdview_wasm_render.js';
 
@@ -59,6 +60,10 @@ const SCROLL_MESSAGE_PREFIX = '\x01';
 // preview tabs opened in the OS default browser (which mdview can't close via a
 // process handle) close themselves cooperatively.
 const CLOSE_MESSAGE_PREFIX = '\x02';
+
+// Tags a WS message as "the previewed document changed to <path>" — must match
+// native/server/main.go's docMessagePrefix. Drives browser Back/Forward.
+const DOC_MESSAGE_PREFIX = '\x04';
 
 function applyScrollPing(container: HTMLElement, message: string): void {
   // Payload: "line/total/viewfrac". viewfrac (0..1) is where in the browser
@@ -176,23 +181,36 @@ async function boot() {
   const cursorMarkerMode = parseCursorMarkerMode(params.get('cursor'));
   let lastCursorLine = -1;
 
+  // POST a document path to Neovim's /nav bridge (used by click-to-navigate and
+  // by Back/Forward). Neovim resolves relative paths against the source doc and
+  // opens absolute paths directly.
+  const navigateTo = (target: string): void => {
+    try {
+      void fetch(`/nav?token=${encodeURIComponent(token)}&key=${encodeURIComponent(key)}`, {
+        method: 'POST',
+        body: target,
+        keepalive: true,
+      });
+    } catch {
+      /* navigation is best-effort */
+    }
+  };
+
   // Opt-in click-to-navigate: hand relative-link clicks to Neovim via /nav
   // (the Lua side adds ?nav=1 when experimental.click_navigate is on). Neovim
   // opens the target document, which flows back into this tab via the push path.
   if (container && params.get('nav') === '1') {
     installClickNav(container, (target: string) => {
       clientLog(`nav: ${target}`);
-      try {
-        void fetch(`/nav?token=${encodeURIComponent(token)}&key=${encodeURIComponent(key)}`, {
-          method: 'POST',
-          body: target,
-          keepalive: true,
-        });
-      } catch {
-        /* navigation is best-effort */
-      }
+      navigateTo(target);
     });
   }
+
+  // Browser Back/Forward: Neovim announces the current document (\x04 ping) so
+  // we can maintain history; on popstate we ask Neovim to reopen the target.
+  // The reopen goes through /nav, so it needs the inbound poller (click_navigate,
+  // on by default) to be running.
+  installHistory({ navigateTo: (abs: string) => navigateTo(abs) });
 
   // Opt-in reverse scroll (browser -> Neovim). While applying an incoming
   // nvim->browser scroll ping we set scrollSuppressUntil so the resulting
@@ -260,6 +278,11 @@ async function boot() {
         container.innerHTML =
           '<p style="opacity:.6">mdview session stopped — you can close this tab.</p>';
       }
+      return;
+    }
+
+    if (rawMessage.startsWith(DOC_MESSAGE_PREFIX)) {
+      onDocChange(rawMessage.slice(DOC_MESSAGE_PREFIX.length));
       return;
     }
 

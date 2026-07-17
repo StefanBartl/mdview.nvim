@@ -132,6 +132,8 @@ Partial nested overrides merge recursively — `{ browser = { browser = "firefox
 | `browser.behavior` | `"reuse"` | What happens when you switch markdown buffers: `"reuse"` (the one tab follows the active buffer), `"new_tab"` (each file opens its own tab), or `"manual"` (nothing; use `:MDViewOpen`). |
 | `browser.theme` | `"github"` | Preview theme: `github`, `dark-dimmed`, `plain`, `tokyonight`, or `catppuccin` — optionally suffixed `-light`/`-dark` to pin the color scheme. |
 | `browser.highlighter` | `"hljs"` | Code-fence syntax highlighter (client-side, lazy-loaded): `"hljs"` (highlight.js, light), `"shiki"` (exact TextMate/VSCode themes — tokyo-night, catppuccin, dark-plus — heavier), or `"none"`. |
+| `browser.external_links` | `"new_tab"` | Where external links (`http(s):`, other schemes, protocol-relative) open when clicked: `"new_tab"` (open in a new browser tab so the preview tab stays put) or `"same_tab"` (let the browser navigate away). In-project relative links are unaffected — those are handled by `experimental.click_navigate`. |
+| `browser.cursor_marker` | `"line"` | Overlay a marker in the preview at the Neovim cursor's line: `"line"` (a blinking bar at the cursor line, approximate) or `"off"`. Column-accurate placement (via an exact source map) is a planned follow-up. |
 | `browser.focus` | `"browser"` | Whether the opened tab may take keyboard focus (`"browser"`) or focus stays in Neovim (`"nvim"`). `"nvim"` is clean on macOS (`open -g`), best-effort on Windows, and a no-op on Linux. `default` open_mode only. |
 | `browser.browser_autostart` | `true` | Open the browser automatically on `:MDViewStart`. |
 | `browser.stop_on_browser_exit` | `true` | Run `:MDViewStop` when the opened browser process exits (isolated mode only). |

@@ -91,18 +91,6 @@
 
 ## Schwer / Größere Vorhaben
 
-- [ ] **Externe Renderer-Frontends (opt-in).** Wunsch: Dokument an eine externe
-  Website / einen alternativen Renderer schicken (VSCode-Web-artig o. ä.).
-  Realität: eine beliebige Dritt-Site empfängt unseren Live-Content nicht — sie
-  müsste unser WS-Protokoll sprechen. Machbare Varianten: (a) `browser.open_url`
-  öffnet bereits jede URL (Escape-Hatch, bekommt aber keine Live-Updates);
-  (b) pluggable `--web-root` / alternatives Client-Bundle, das sich mit unserem
-  Relay verbindet. **Privacy-Hinweis:** echtes Senden an einen Dritt-Server
-  widerspricht dem „loopback-only, nichts verlässt den Rechner"-Sicherheitsmodell
-  (siehe |mdview-security|) — nur als bewusstes opt-in mit klarer Warnung.
-- [ ] **Fokus nach `:MDViewStart` erzwingen** (Browserfenster in den
-  Vordergrund). Kein plattformübergreifendes API; nur über fragile OS-Hacks
-  (`wmctrl`, PowerShell, AppleScript). Zurückgestellt.
 - [~] **WebTransport als opt-in Zukunftstechnologie.** Client-Seite umgesetzt
   und getestet: `experimental.webtransport` (Config) → `&transport=webtransport`
   (Browser-URL) → Factory mit Feature-Detection + automatischem WebSocket-
@@ -113,6 +101,19 @@
   dahin fällt das Opt-in transparent auf WebSocket zurück. Vollständiges Design:
   `docs/Roadmap/WebTransportAPI/DESIGN.md`. (Ersetzt den früheren „bewusst
   verworfen"-Merker — auf ausdrücklichen Wunsch als opt-in wiederaufgenommen.)
+
+- [ ] **Cursor-Marker Stufe C: spaltengenauer Caret via Source-Map.** Der in
+  v0.2.0 gelieferte `browser.cursor_marker = "line"` ist bewusst approximativ
+  (markiert die Zeile, nicht die Spalte). Für einen Caret an der exakten
+  Cursor-Spalte braucht es eine echte Source-Map aus dem Renderer: comrak gibt
+  pro Block schon `data-sourcepos` aus; nötig ist zusätzlich pro Inline-/Text-
+  Knoten der Quell-Offset (oder der WASM-Layer baut aus der comrak-AST eine
+  Zeichen-Offset↔DOM-Node-Tabelle). Der Client bildet dann nvim-`(row,col)`
+  über diese Tabelle auf einen DOM-Textknoten + Character-Offset ab und setzt
+  den Caret per `Range`/`getClientRects()`. Die naive Marker-Konsens-Heuristik
+  (n-tes `a`, Whitespace zählen) löst das *nicht* — auf Zeilen mit Inline-Markup
+  driften Quell- und Render-Zeichen gemeinsam. Design/Begründung:
+  `docs/Roadmap/KONZEPT_links_und_cursor.md` (Abschnitt „Stufe C").
 
 ## Testing / Hygiene
 
@@ -125,8 +126,6 @@
   installiert (fehlte vorher, daher wurde der Schritt immer übersprungen) und
   `busted tests/lua` läuft die Specs mit dem `.busted`-lpath. `.luacheckrc`
   kennt jetzt die busted-Globals für Spec-Dateien.
-- [ ] **filetree.nvim-Integration** (fremdes Repo): auf einer Markdown-File-Node
-  ein Usrcmd/Keymap anbieten, das die Datei direkt via mdview öffnet. Gehört in
-  `filetree.nvim`, nicht hierher — nur als Cross-Repo-Merker.
+
 
 ---

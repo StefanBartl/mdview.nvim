@@ -165,6 +165,12 @@ local function diff_url_for(path)
 	return endpoint_url_for("diff", path)
 end
 
+---@param path string
+---@return string
+local function doc_url_for(path)
+	return endpoint_url_for("doc", path)
+end
+
 -- Collects stdout/stderr lines and returns them to the callback so caller
 -- (try_send_pending) can log the server response body (and quickly detect empty replies).
 -- Helper: execute an HTTP POST using curl via jobstart when available.
@@ -474,6 +480,19 @@ function M.send_content(key, lines, opts)
 	M._diff_ver[key] = nv
 	M._diff_last[key] = lines
 	M._diff_since[key] = since + 1
+end
+
+-- Public: tell the preview tab(s) of `key`'s room which document is now shown
+-- (`doc_path`), so the client can maintain browser history for Back/Forward.
+-- Fire-and-forget; sent only when the previewed document actually changes.
+---@param key string # room key the tab watches
+---@param doc_path string # absolute path of the now-previewed document
+---@return nil
+function M.send_doc(key, doc_path)
+	if type(key) ~= "string" or key == "" or type(doc_path) ~= "string" or doc_path == "" then
+		return
+	end
+	http_post_nonblocking(doc_url_for(key), doc_path, function() end)
 end
 
 -- Public: ask every connected preview tab to close itself (the relay
