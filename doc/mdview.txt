@@ -431,6 +431,15 @@ experimental.reverse_scroll ~
   it reports the current zoom. Handy when a video call downsamples the shared
   screen and the viewer needs larger text.
 
+:MDViewReveal [on | off | toggle]                           *:MDViewReveal*
+  Reveals/hides every *private block* at once. A fenced block with the info
+  string `private` (```` ```private ````) renders its contents as normal
+  Markdown but is blurred by default in the preview, so third-party
+  names/numbers stay hidden during a screen share without living in a separate
+  file. Reveal one block by clicking it in the browser, or all of them with
+  this command. Live-only (pushes a control update; nothing persisted) — a
+  freshly opened tab always starts hidden. No argument toggles.
+
 :MDViewShowWebLogs                                        *:MDViewShowWebLogs*
   Opens a scratch buffer showing the relay server's captured stdout/stderr
   log, including `[client]` lines the browser client POSTs back for

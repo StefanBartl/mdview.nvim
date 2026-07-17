@@ -19,6 +19,7 @@ local log = require("mdview.bindings.usrcmds.log")
 local cursor = require("mdview.bindings.usrcmds.cursor")
 local sync = require("mdview.bindings.usrcmds.sync")
 local zoom = require("mdview.bindings.usrcmds.zoom")
+local reveal = require("mdview.bindings.usrcmds.reveal")
 
 local M = {}
 
@@ -36,6 +37,7 @@ function M.attach()
 	cursor.attach()
 	sync.attach()
 	zoom.attach()
+	reveal.attach()
 end
 
 return M

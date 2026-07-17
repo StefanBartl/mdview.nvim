@@ -235,6 +235,16 @@ async function boot() {
   // on by default) to be running.
   installHistory({ navigateTo: (abs: string) => navigateTo(abs) });
 
+  // Click-to-reveal for private blocks (```private renders to [data-private],
+  // blurred by default). Clicking one reveals/re-hides it; :MDViewReveal toggles
+  // all at once (see applyControl).
+  if (container) {
+    container.addEventListener('click', (ev) => {
+      const el = (ev.target as HTMLElement | null)?.closest?.('[data-private]') as HTMLElement | null;
+      if (el && container.contains(el)) el.toggleAttribute('data-revealed');
+    });
+  }
+
   // Opt-in reverse scroll (browser -> Neovim). While applying an incoming
   // nvim->browser scroll ping we set scrollSuppressUntil so the resulting
   // 'scroll' event doesn't bounce back to Neovim and create a feedback loop.
@@ -309,11 +319,15 @@ async function boot() {
   // Apply a live control update (:MDViewCursor / :MDViewZoom). Best-effort: a
   // malformed payload is ignored rather than breaking the preview.
   const applyControl = (json: string): void => {
-    let msg: { cursor?: unknown; zoom?: unknown };
+    let msg: { cursor?: unknown; zoom?: unknown; reveal?: unknown };
     try {
       msg = JSON.parse(json) as typeof msg;
     } catch {
       return;
+    }
+    if (typeof msg.reveal === 'boolean' && container) {
+      // Reveal/hide all private blocks at once (:MDViewReveal).
+      container.classList.toggle('mdview-reveal-all', msg.reveal);
     }
     if (typeof msg.cursor === 'string') {
       const mode = parseCursorMarkerMode(msg.cursor);
