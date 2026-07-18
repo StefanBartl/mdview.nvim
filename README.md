@@ -159,6 +159,7 @@ Partial nested overrides merge recursively — `{ browser = { browser = "firefox
 | `:MDViewSync [pause\|resume\|toggle]` | Pause/resume the nvim→browser scroll sync. While paused, moving the cursor no longer scrolls the preview or moves its marker — jump to a reference spot without dragging a viewer along. No argument reports the state. |
 | `:MDViewZoom [+\|-\|reset\|<factor>]` | Adjust the preview font-size zoom at runtime (applies live). `+`/`-` step by 10% (clamped 50–300%), `reset` = 100%, a bare number sets a factor (`1.5`) or percent (`150`); no argument reports the current zoom. See `browser.zoom`. |
 | `:MDViewReveal [on\|off\|toggle]` | Reveal/hide all **private blocks** at once (applies live). See "Private blocks" below. |
+| `:MDViewBreadcrumbs [show\|export [path]\|clear]` | Show/export/clear the session breadcrumbs — a rough Markdown outline of which document + heading section you visited when. `show` (default) opens a scratch buffer; `export [path]` writes a `.md` file. Gated by `breadcrumbs` (default on). |
 | `:MDViewPreviewTab` | Toggle the in-Neovim tab preview (works standalone, no server needed). |
 | `:MDViewShowWebLogs` | Show the relay's captured stdout, including `[client]` browser-side diagnostics. |
 | `:MDViewLog [level\|export [path]]` | Show mdview's internal log ring (optionally filtered to `trace`/`debug`/`info`/`warn`/`error`), or `export` it to a file. |

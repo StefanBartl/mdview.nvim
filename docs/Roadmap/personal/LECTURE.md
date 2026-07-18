@@ -161,11 +161,13 @@ sendet. So ändern Laufzeit-Commands den Tab **ohne Reload**.
   <!-- Ursprüngliche Idee: --> Für Zahlen/Namen Dritter, die im Dokument
   stehen, aber während des Calls nicht offen sichtbar sein sollen — ohne dafür
   extra ein anderes Fenster/eine andere Datei pflegen zu müssen.
-- **Session-Breadcrumbs** — während eine Session läuft, mitprotokollieren,
-  welche Überschriften/Dokumente wann besucht wurden (baut auf der
-  vorhandenen `:MDViewLog`-Infrastruktur auf); exportierbar als grobe
-  "worüber haben wir wann gesprochen"-Gliederung. Direkt nützlich, um nach dem
-  Call schnell Notizen/Follow-ups zu schreiben.
+- **Session-Breadcrumbs** — ERLEDIGT. `core/breadcrumbs.lua` protokolliert
+  während der Session Dokument + nächste Überschrift über die Zeit (dedupt auf
+  Wechsel), gespeist von einem `CursorMoved`/`BufEnter`-Autocmd. Anzeige/Export
+  über `:MDViewBreadcrumbs [show|export [path]|clear]` als Markdown-Gliederung
+  (`# Session breadcrumbs` → `## <datei>` → `- HH:MM:SS — ## Überschrift`).
+  Gegated durch `breadcrumbs` (default an), pro Session zurückgesetzt. Genau für
+  Notizen/Follow-ups nach dem Call.
 
 ### Größer
 

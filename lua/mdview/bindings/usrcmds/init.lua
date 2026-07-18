@@ -20,6 +20,7 @@ local cursor = require("mdview.bindings.usrcmds.cursor")
 local sync = require("mdview.bindings.usrcmds.sync")
 local zoom = require("mdview.bindings.usrcmds.zoom")
 local reveal = require("mdview.bindings.usrcmds.reveal")
+local breadcrumbs = require("mdview.bindings.usrcmds.breadcrumbs")
 
 local M = {}
 
@@ -38,6 +39,7 @@ function M.attach()
 	sync.attach()
 	zoom.attach()
 	reveal.attach()
+	breadcrumbs.attach()
 end
 
 return M
