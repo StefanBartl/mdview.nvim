@@ -123,6 +123,8 @@ Defaults: >lua
     scroll_sync             = true, -- nvim-to-browser cursor-follow scroll
     scroll_sync_throttle_ms = 150,  -- min. time between scroll-position pings
 
+    breadcrumbs             = true, -- record session breadcrumbs (:MDViewBreadcrumbs)
+
     open_preview_tab = false, -- :MDViewStart opens an nvim tab, not a browser
 
     browser = {
@@ -439,6 +441,15 @@ experimental.reverse_scroll ~
   file. Reveal one block by clicking it in the browser, or all of them with
   this command. Live-only (pushes a control update; nothing persisted) — a
   freshly opened tab always starts hidden. No argument toggles.
+
+:MDViewBreadcrumbs [show | export [path] | clear]      *:MDViewBreadcrumbs*
+  Shows/exports/clears the session breadcrumbs: a rough Markdown outline of
+  which document + heading section the cursor was in and when, recorded while
+  the session runs (deduped so a new line appears only on an actual section /
+  document change). `show` (default) opens a scratch buffer; `export [path]`
+  writes a `.md` file (default `stdpath('log')/mdview-breadcrumbs.md`); `clear`
+  discards them. Useful for writing notes/follow-ups after a call. Recording is
+  gated by `breadcrumbs` (|mdview-config|, default true) and reset each session.
 
 :MDViewShowWebLogs                                        *:MDViewShowWebLogs*
   Opens a scratch buffer showing the relay server's captured stdout/stderr

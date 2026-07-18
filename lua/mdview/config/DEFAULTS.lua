@@ -66,6 +66,7 @@
 ---@field scroll_sync_throttle_ms integer minimum time between scroll-position pings
 ---@field scroll_sync_mode "top"|"cursor" where the cursor line lands in the browser viewport: near the top, or mirroring the cursor's height in the nvim window
 ---@field scroll_sync_top_offset number in "top" mode, fraction (0..1) down from the viewport top to place the line (0 = glued to top)
+---@field breadcrumbs boolean record session breadcrumbs (which document + heading section over time) for :MDViewBreadcrumbs (default true)
 ---@field open_preview_tab boolean :MDViewStart opens an nvim-tab preview (Treesitter-highlighted mirror, no browser/relay HTML) instead of the browser
 ---@field browser mdview.config.BrowserDefaults
 ---@field start mdview.config.StartDefaults
@@ -101,6 +102,8 @@ return {
 	--              the cursor sits in the nvim window (middle stays middle).
 	scroll_sync_mode = "top",
 	scroll_sync_top_offset = 0.08,
+
+	breadcrumbs = true,
 
 	open_preview_tab = false,
 
