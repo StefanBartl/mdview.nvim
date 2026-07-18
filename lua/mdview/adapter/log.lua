@@ -50,11 +50,64 @@ local log_lines = {}
 local timestamp = os.date("%Y%m%d-%H%M%S")
 M.LOG_BUF_NAME = string.format("./logs/debug-%s.log", timestamp)
 
+-- Persistent file logging is OPT-IN (cfg.defaults.file_log, default false).
+-- It used to default to "./logs/debuglog", which silently created a `logs/`
+-- directory in whatever the cwd happened to be as soon as a preview started.
+-- Both the enabled flag and the path can be overridden here via M.setup(),
+-- and toggled at runtime through M.set_file_log()/:MDViewFileLog.
+---@type boolean|nil
+local file_log_override = nil
 ---@type string|nil
-local log_file_path = "./logs/debuglog" -- optional file path for persistent logs
+local file_path_override = nil
+-- Resolved eagerly at require-time: file_path() is reached from M.append(),
+-- which runs in the relay's stdout callback (a fast event context where
+-- vim.fn.* raises E5560).
+---@type string
+local default_file_path = ("%s/mdview/relay-%s.log"):format(vim.fn.stdpath("log"), timestamp)
+
+---@return boolean
+local function is_file_log()
+	if file_log_override ~= nil then
+		return file_log_override
+	end
+	return cfg.defaults.file_log == true
+end
+
+-- Path used when file logging is on. Never relative to the cwd: falls back to
+-- Neovim's own log dir so enabling it can't litter a project directory.
+---@return string
+local function file_path()
+	if file_path_override then
+		return file_path_override
+	end
+	if cfg.defaults.file_log_path then
+		return cfg.defaults.file_log_path
+	end
+	return default_file_path
+end
+
+--- Effective file-logging state, for :MDViewFileLog and diagnostics.
+---@return boolean enabled, string path
+function M.file_log_state()
+	return is_file_log(), file_path()
+end
+
+--- Enable/disable persistent file logging at runtime (overrides config).
+---@param enabled boolean
+---@return boolean enabled, string path
+function M.set_file_log(enabled)
+	file_log_override = enabled and true or false
+	return is_file_log(), file_path()
+end
+
+--- Flip persistent file logging.
+---@return boolean enabled, string path
+function M.toggle_file_log()
+	return M.set_file_log(not is_file_log())
+end
 
 -- Configure the logger using an options table. Explicit overrides here take
--- precedence over mdview.config.defaults.debug / .log_buffer_name.
+-- precedence over mdview.config.defaults.debug / .log_buffer_name / .file_log.
 ---@param opts table|nil
 function M.setup(opts)
 	opts = opts or {}
@@ -64,7 +117,12 @@ function M.setup(opts)
 	if opts.buf_name then
 		buf_name_override = opts.buf_name
 	end
-	log_file_path = opts.file_path
+	if opts.file_log ~= nil then
+		file_log_override = opts.file_log
+	end
+	if opts.file_path then
+		file_path_override = opts.file_path
+	end
 end
 
 -- Helper: return dirname of a path, works with both '/' and '\'
@@ -195,8 +253,9 @@ function M.append(line, prefix)
 			end)
 		end
 
-		-- append to persistent file (if configured)
-		if log_file_path then
+		-- append to persistent file (opt-in, see cfg.defaults.file_log)
+		if is_file_log() then
+			local log_file_path = file_path()
 			-- derive directory without vim.fn calls
 			local log_dir = path_dirname(log_file_path)
 			if log_dir and log_dir ~= "" then

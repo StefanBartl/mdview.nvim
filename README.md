@@ -64,7 +64,8 @@ turned into DOM content without passing through an allowlist-based sanitizer.
   ft = { "markdown" },
   cmd = {
     "MDViewStart", "MDViewStop", "MDViewToggle", "MDViewOpen", "MDViewTheme",
-    "MDViewPreviewTab", "MDViewShowWebLogs", "MDViewLog", "MDViewDiagnose",
+    "MDViewPreviewTab", "MDViewShowWebLogs", "MDViewLog", "MDViewFileLog",
+    "MDViewDiagnose",
   },
   config = function()
     require("mdview").setup()
@@ -93,7 +94,8 @@ use {
   ft = { "markdown" },
   cmd = {
     "MDViewStart", "MDViewStop", "MDViewToggle", "MDViewOpen", "MDViewTheme",
-    "MDViewPreviewTab", "MDViewShowWebLogs", "MDViewLog", "MDViewDiagnose",
+    "MDViewPreviewTab", "MDViewShowWebLogs", "MDViewLog", "MDViewFileLog",
+    "MDViewDiagnose",
   },
   config = function()
     require("mdview").setup()
@@ -157,6 +159,7 @@ Partial nested overrides merge recursively — `{ browser = { browser = "firefox
 | `:MDViewPreviewTab` | Toggle the in-Neovim tab preview (works standalone, no server needed). |
 | `:MDViewShowWebLogs` | Show the relay's captured stdout, including `[client]` browser-side diagnostics. |
 | `:MDViewLog [level\|export [path]]` | Show mdview's internal log ring (optionally filtered to `trace`/`debug`/`info`/`warn`/`error`), or `export` it to a file. |
+| `:MDViewFileLog [on\|off\|toggle\|status]` | Toggle persistent file logging of the relay's stdout. Off by default — nothing is written to disk until you turn it on. |
 | `:MDViewDiagnose [path]` | Write a full component-state diagnostics report to a file and open it. |
 
 Run `:checkhealth mdview` to verify dependencies (lib.nvim, curl, tar) and whether the relay binary and client bundle are cached.

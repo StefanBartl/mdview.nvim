@@ -117,6 +117,8 @@ Defaults: >lua
     dev_local       = true,
     debug           = false,  -- echo relay stdout/stderr into Neovim
     log_buffer_name = "mdview://logs",
+    file_log        = false,  -- opt in to writing the relay log to a file
+    file_log_path   = nil,    -- default: stdpath('log')/mdview/relay-<ts>.log
     debug_plugin    = false,  -- plugin-internal debug notifications
     debug_preview   = false,  -- per-push debug notifications (noisy)
 
@@ -394,6 +396,14 @@ experimental.reverse_scroll ~
   which shows the *relay's* stdout. Pass a minimum level
   (`trace`/`debug`/`info`/`warn`/`error`) to filter, or `export [path]` to
   write the ring to a file (default `stdpath('log')/mdview-log.txt`).
+
+:MDViewFileLog [on|off|toggle|status]                        *:MDViewFileLog*
+  Toggles persistent *file* logging of the relay's stdout at runtime. It is
+  opt-in and off by default, so a plain |:MDViewStart| writes nothing to
+  disk. When on, output is appended to `file_log_path` — by default
+  `stdpath('log')/mdview/relay-<timestamp>.log`, never a `logs/` directory
+  in the current working directory. With no argument the state is flipped;
+  `status` reports without changing it. See `file_log` in |mdview-config|.
 
 :MDViewDiagnose [path]                                       *:MDViewDiagnose*
   Writes a full component-state diagnostics report to a file (default
