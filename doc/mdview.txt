@@ -397,13 +397,21 @@ experimental.reverse_scroll ~
   (`trace`/`debug`/`info`/`warn`/`error`) to filter, or `export [path]` to
   write the ring to a file (default `stdpath('log')/mdview-log.txt`).
 
-:MDViewFileLog [on|off|toggle|status]                        *:MDViewFileLog*
+:MDViewFileLog [on|off|toggle|status|path [<path>]]          *:MDViewFileLog*
   Toggles persistent *file* logging of the relay's stdout at runtime. It is
   opt-in and off by default, so a plain |:MDViewStart| writes nothing to
   disk. When on, output is appended to `file_log_path` — by default
   `stdpath('log')/mdview/relay-<timestamp>.log`, never a `logs/` directory
   in the current working directory. With no argument the state is flipped;
   `status` reports without changing it. See `file_log` in |mdview-config|.
+
+  The destination can be set from the command line too: >
+      :MDViewFileLog on ~/mdview.log   enable and write there
+      :MDViewFileLog path ~/mdview.log set the path, leave on/off as-is
+      :MDViewFileLog path              report the current path
+      :MDViewFileLog path default      fall back to the configured default
+<  `~` and relative paths are expanded to an absolute path when the command
+  runs, so a later |:cd| doesn't move the log file.
 
 :MDViewDiagnose [path]                                       *:MDViewDiagnose*
   Writes a full component-state diagnostics report to a file (default

@@ -100,6 +100,19 @@ function M.set_file_log(enabled)
 	return is_file_log(), file_path()
 end
 
+--- Point persistent file logging at `path` (overrides `file_log_path`), or
+--- pass nil to fall back to the config / built-in default again.
+---
+--- The path is stored as given: expanding `~`/relative paths needs vim.fn.*,
+--- which file_path()'s caller (M.append, a fast event context) can't do — so
+--- callers such as :MDViewFileLog expand before handing the path over.
+---@param path string|nil
+---@return boolean enabled, string path
+function M.set_file_log_path(path)
+	file_path_override = (path ~= "" and path) or nil
+	return is_file_log(), file_path()
+end
+
 --- Flip persistent file logging.
 ---@return boolean enabled, string path
 function M.toggle_file_log()
