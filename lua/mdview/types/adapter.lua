@@ -4,6 +4,7 @@
 ---@class LoggerOptions
 ---@field debug boolean?         # enable debug output to Neovim stdout
 ---@field buf_name string?       # override buffer name for the log scratch buffer
+---@field file_log boolean?      # enable persistent file logging (default off, see config `file_log`)
 ---@field file_path string?      # optional file path to append persistent logs
 
 
