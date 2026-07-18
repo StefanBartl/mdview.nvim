@@ -239,3 +239,6 @@ tags
 # Persistent undo
 [._]*.un~
 doc/tags
+
+# Local checkout of the lib.nvim test dependency (never commit)
+.deps/
