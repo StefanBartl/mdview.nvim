@@ -124,6 +124,7 @@ end
 function M.resolve_and_validate()
 	-- explicit absolute command override
 	if M.defaults.browser_cmd and M.defaults.browser_cmd ~= "" then
+		M.defaults.browser_cmd = require("lib.nvim.cross.fs.expand_path")(M.defaults.browser_cmd)
 		if is_executable(M.defaults.browser_cmd) then
 			M.defaults.resolved_browser_cmd = M.defaults.browser_cmd
 			return nil

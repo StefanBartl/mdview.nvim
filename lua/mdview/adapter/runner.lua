@@ -8,6 +8,7 @@ local uv = vim.loop
 local notify = vim.notify
 local log = require("mdview.adapter.log")
 local defaults = require("mdview.config").defaults
+local expand_path = require("lib.nvim.cross.fs.expand_path")
 
 local M = {}
 
@@ -16,15 +17,16 @@ local desc_tag = "[mdview.runner] "
 -- Resolve spawn cwd precedence: explicit argument -> config.server_cwd ->
 -- current working dir. The mdview-server binary doesn't read anything
 -- relative to its cwd (it takes --web-root explicitly), so no project-root
--- detection is needed here.
+-- detection is needed here. Both sources may contain ~/$VAR/%VAR% (e.g.
+-- `:MDView start cwd=$REPOS_DIR/proj`), so both are expanded here.
 ---@param optional_cwd string|nil  # optional working directory override
 ---@return string # resolved path to use as cwd for spawning processes
 local function resolve_spawn_cwd(optional_cwd)
 	if optional_cwd and optional_cwd ~= "" then
-		return optional_cwd
+		return expand_path(optional_cwd)
 	end
 	if defaults.server_cwd and defaults.server_cwd ~= "" then
-		return defaults.server_cwd
+		return expand_path(defaults.server_cwd)
 	end
 	return vim.fn.getcwd()
 end
