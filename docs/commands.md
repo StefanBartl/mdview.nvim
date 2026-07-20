@@ -10,6 +10,8 @@ mdview.nvim registers a single `:MDView <subcommand>` command (built via
 | `:MDView stop` | Stop the relay, detach autocommands, and (in isolated mode) close the browser. |
 | `:MDView toggle [file] [cwd=…]` | Start if stopped, stop if running. |
 | `:MDView open` | Re-open a browser tab against the already-running session (does not start a new relay). |
+| `:MDView detach [file] [--no-browser]` | Preview in a detached, minimal-config Neovim that outlives this instance. See [standalone.md](standalone.md). |
+| `:MDView standalone [file] [--no-browser]` | Preview via the relay's own file watcher, with no Neovim in the chain (file on disk only; needs a relay with `--watch`, v0.3.0+). |
 | `:MDView theme [name]` | Switch the preview theme at runtime (`github` \| `dark-dimmed` \| `plain` \| `tokyonight` \| `catppuccin`, optionally `-light`/`-dark`); no argument reports the current theme. |
 | `:MDView preview-tab` | Toggle the in-Neovim tab preview (works standalone, no server needed). |
 | `:MDView weblogs` | Show the relay's captured stdout, including `[client]` browser-side diagnostics. |
@@ -24,6 +26,12 @@ mdview.nvim registers a single `:MDView <subcommand>` command (built via
 
 File logging is opt-in and off by default — nothing is written to disk until
 you run `:MDView file-log on`.
+
+`:MDView detach` and `:MDView standalone` both start a preview that survives
+closing this Neovim; `detach` keeps a (minimal, isolated) Neovim in the chain so
+live buffer push and scroll sync still work, `standalone` drops Neovim entirely
+and follows the file on disk. [standalone.md](standalone.md) compares the two,
+and covers the `scripts/mdview-bg.*` terminal wrappers.
 
 Run `:checkhealth mdview` to verify dependencies (lib.nvim, curl, tar) and
 whether the relay binary and client bundle are cached.

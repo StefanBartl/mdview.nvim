@@ -47,6 +47,9 @@
 ---@field repo string GitHub "owner/repo" releases are downloaded from — override if you run a fork
 ---@field version string release tag to install (e.g. "v0.1.0") — pin an older release by changing this
 
+---@class mdview.config.StandaloneDefaults
+---@field binary_path string|nil relay binary used by `:MDView standalone`; nil = the one `install` manages. Set this to run a locally built or newer relay than `install.version` pins (standalone needs --watch support, v0.3.0+)
+
 ---@class mdview.config.ExperimentalDefaults
 ---@field webtransport boolean opt in to the WebTransport (HTTP/3) client transport; falls back to WebSocket until an HTTP/3 relay backend exists (future tech)
 ---@field line_diff boolean opt in to sending only changed lines per edit instead of the whole document (versioned diff transport; client reassembles full text)
@@ -74,6 +77,7 @@
 ---@field browser mdview.config.BrowserDefaults
 ---@field start mdview.config.StartDefaults
 ---@field install mdview.config.InstallDefaults
+---@field standalone mdview.config.StandaloneDefaults
 ---@field experimental mdview.config.ExperimentalDefaults
 
 ---@type mdview.config.Defaults
@@ -154,6 +158,17 @@ return {
 	install = {
 		repo = "StefanBartl/mdview.nvim",
 		version = "v0.2.0",
+	},
+
+	standalone = {
+		-- Relay binary `:MDView standalone` spawns. nil = whatever `install`
+		-- resolved. Standalone mode needs a relay with --watch support
+		-- (v0.3.0+); until `install.version` points at such a release, set this
+		-- to a locally built one, e.g.
+		--   standalone = { binary_path = "~/repos/mdview.nvim/native/server/mdview-server.exe" }
+		-- :MDView standalone probes the binary and says so if it's too old,
+		-- rather than spawning a process that dies silently.
+		binary_path = nil,
 	},
 
 	experimental = {

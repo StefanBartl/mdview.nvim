@@ -1,6 +1,17 @@
 # Konzept: Preview ohne Server, Hintergrund-Instanz und Standalone-Binary
 
-> Konzept, noch nicht umgesetzt. Beantwortet drei zusammenhängende Fragen:
+> **Status: umgesetzt** (Abschnitte 2, 3/Stufe A und 4). Nutzerdoku:
+> [`docs/standalone.md`](../standalone.md). Konkret gebaut wurden:
+> `scripts/minimal_init.lua`, `scripts/mdview-bg.{sh,ps1}`,
+> `native/server/internal/source` (`--watch`/`--open`), `:MDView detach`,
+> `:MDView standalone` und `standalone.binary_path`.
+> Offen geblieben: Abschnitt 1 Option A (statischer HTML-Export) und
+> Abschnitt 3.4/Stufe B (eigenes Single-Binary mit `go:embed`).
+>
+> Dieses Dokument bleibt als Entscheidungsgrundlage bestehen — es begründet,
+> *warum* es so gebaut wurde. Der Text unten ist der ursprüngliche Konzeptstand.
+
+> Beantwortet drei zusammenhängende Fragen:
 > (1) Lässt sich das Hauptfeature ohne Serverstart anbieten? (2) Lässt sich
 > mdview als Hintergrundprozess aus einem Terminal starten
 > (`nvim --headless ... file.md`), wahlweise mit Browser-Tab oder als

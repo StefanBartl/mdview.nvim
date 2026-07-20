@@ -69,6 +69,7 @@ Then open a markdown file and run `:MDView start`. No external toolchain is requ
 - [Installation](docs/installation.md) — lazy.nvim/packer setup variants and when to use each.
 - [Configuration](docs/configuration.md) — all available `setup()` options and their defaults.
 - [Commands](docs/commands.md) — full `:MDView <subcommand>` command reference and `:checkhealth mdview`.
+- [Background & standalone](docs/standalone.md) — previews that outlive your Neovim instance, and running mdview with no Neovim at all.
 - [Companion plugins](docs/companion-plugins.md) — optional plugins that pair well with the live preview.
 - [Development](docs/development.md) — building mdview.nvim from source and running its test suites.
 - [Architecture](docs/architecture.md) — the Lua/Go/TypeScript/Rust components and how they communicate.

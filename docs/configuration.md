@@ -31,6 +31,7 @@ Partial nested overrides merge recursively — `{ browser = { browser = "firefox
 | `browser.browser_autostart` | `true` | Open the browser automatically on `:MDView start`. |
 | `browser.stop_on_browser_exit` | `true` | Run `:MDView stop` when the opened browser process exits (isolated mode only). |
 | `browser.require_display` | `true` | Don't try to open a browser without a GUI/`DISPLAY`. |
+| `standalone.binary_path` | `nil` | Relay binary `:MDView standalone` spawns; `nil` uses the one `install` manages. Standalone mode needs a relay with `--watch` support (v0.3.0+) — set this to run a locally built or newer one. See [standalone.md](standalone.md). |
 | `experimental.line_diff` | `false` | Opt in to sending only changed lines per edit (versioned diff transport) instead of the whole document. Saves bandwidth on large files; rendering still processes the whole doc client-side. Self-heals from any desync on the next full snapshot (save / every 25 edits). |
 | `experimental.click_navigate` | `true` | Click-to-navigate: clicking a relative link in the preview opens the linked document in Neovim (resolved against the source doc), which then flows back into the preview. External links, anchors, and absolute paths are left to the browser. Set `false` to let the browser follow links itself. |
 | `experimental.reverse_scroll` | `false` | Opt in to reverse scroll: scrolling the preview moves Neovim's cursor to match (the complement of the always-on nvim→browser scroll sync). Polled, so it follows with a small lag. |
