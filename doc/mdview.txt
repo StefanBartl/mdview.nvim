@@ -119,13 +119,10 @@ Defaults: >lua
     scroll_sync             = true, -- nvim-to-browser cursor-follow scroll
     scroll_sync_throttle_ms = 150,  -- min. time between scroll-position pings
 
-<<<<<<< HEAD
-    breadcrumbs             = true, -- record session breadcrumbs (:MDViewBreadcrumbs)
+    breadcrumbs             = true, -- record session breadcrumbs
+                                    -- (:MDView breadcrumbs)
 
-    open_preview_tab = false, -- :MDViewStart opens an nvim tab, not a browser
-=======
     open_preview_tab = false, -- :MDView start opens an nvim tab, not a browser
->>>>>>> feat/opt-in-file-logging
 
     browser = {
       open_mode           = "default", -- "default" (tab in your browser)
@@ -137,7 +134,10 @@ Defaults: >lua
       highlighter         = "hljs",    -- code highlighter: hljs|shiki|none
       external_links      = "new_tab", -- external links: "new_tab" | "same_tab"
       cursor_marker       = "line",    -- "line"|"caret"|"section"|"off"
-      zoom                = 1.0,        -- preview font-size zoom (:MDViewZoom)
+      zoom                = 1.0,       -- preview font-size zoom (:MDView zoom)
+      overlays            = {          -- preview overlays (:MDView overlay)
+        toc = false,                   -- floating outline, current section lit
+      },
       focus               = "browser", -- "browser" | "nvim" (keep editor focus)
       autodetect_browser  = true,  -- isolated mode only
       browser             = "",    -- friendly name, e.g. "firefox" (isolated)
@@ -272,13 +272,13 @@ browser.cursor_marker ~
               screen-sharing viewer.
     "off"   — no marker.
   All ride the scroll-sync ping, so they need |mdview-scroll_sync| on. Switch
-  at runtime with |:MDViewCursor|.
+  at runtime with |:MDView-cursor|.
 
 browser.zoom ~
   Preview font-size zoom factor (`1.0` = 100%, the default). |:MDViewStart|
   sets `#mdview-root`'s font-size to `16 * zoom` px; the stylesheet sizes
   everything in em, so the whole document scales proportionally. Adjust at
-  runtime with |:MDViewZoom| (applies live). A non-default value is carried on
+  runtime with |:MDView-zoom| (applies live). A non-default value is carried on
   the browser URL (`?zoom=`) so a reopened tab starts at the same zoom.
 
 browser.focus ~
@@ -411,55 +411,7 @@ composer (`lib.nvim.usercmd.composer`): every subcommand below completes on
   "default" |browser.open_mode|, since the old tab can't be closed
   programmatically). With no argument it reports the current theme.
 
-<<<<<<< HEAD
-:MDViewCursor [line | caret | section | off]                *:MDViewCursor*
-  Switches the Neovim-cursor marker mode in the preview at runtime (see
-  `browser.cursor_marker`): `line` (blinking bar at the cursor line), `caret`
-  (caret at the exact cursor column), `section` (spotlight the current heading
-  section, dim the rest), or `off`. Sets `browser.cursor_marker`
-  in the live config and, if a session is running, pushes a live control
-  update so the open tab changes immediately — no reload. With no argument it
-  reports the current mode. Tab-completed.
-
-:MDViewSync [pause | resume | toggle]                         *:MDViewSync*
-  Pauses/resumes the nvim->browser scroll sync at runtime. While paused,
-  moving the cursor in Neovim no longer scrolls the preview or moves its
-  cursor marker — useful to jump to a reference spot without dragging a
-  screen-sharing viewer along. With no argument it reports the state.
-  Tab-completed. (Only affects the outgoing sync; |experimental.reverse_scroll|
-  is independent.)
-
-:MDViewZoom [+ | - | reset | <factor>]                        *:MDViewZoom*
-  Adjusts the preview font-size zoom at runtime (the whole document scales
-  proportionally). `+`/`-` step by 10% (clamped 50%–300%), `reset` returns to
-  100%, and a bare number sets a factor (`1.5`) or a percentage (`150`). Sets
-  `browser.zoom` in the live config and, if a session is running, pushes a
-  live control update so the open tab rescales immediately. With no argument
-  it reports the current zoom. Handy when a video call downsamples the shared
-  screen and the viewer needs larger text.
-
-:MDViewReveal [on | off | toggle]                           *:MDViewReveal*
-  Reveals/hides every *private block* at once. A fenced block with the info
-  string `private` (```` ```private ````) renders its contents as normal
-  Markdown but is blurred by default in the preview, so third-party
-  names/numbers stay hidden during a screen share without living in a separate
-  file. Reveal one block by clicking it in the browser, or all of them with
-  this command. Live-only (pushes a control update; nothing persisted) — a
-  freshly opened tab always starts hidden. No argument toggles.
-
-:MDViewBreadcrumbs [show | export [path] | clear]      *:MDViewBreadcrumbs*
-  Shows/exports/clears the session breadcrumbs: a rough Markdown outline of
-  which document + heading section the cursor was in and when, recorded while
-  the session runs (deduped so a new line appears only on an actual section /
-  document change). `show` (default) opens a scratch buffer; `export [path]`
-  writes a `.md` file (default `stdpath('log')/mdview-breadcrumbs.md`); `clear`
-  discards them. Useful for writing notes/follow-ups after a call. Recording is
-  gated by `breadcrumbs` (|mdview-config|, default true) and reset each session.
-
-:MDViewShowWebLogs                                        *:MDViewShowWebLogs*
-=======
 :MDView weblogs                                               *:MDView-weblogs*
->>>>>>> feat/opt-in-file-logging
   Opens a scratch buffer showing the relay server's captured stdout/stderr
   log, including `[client]` lines the browser client POSTs back for
   diagnostics (connection status, render/theme errors). Subject to `debug`
@@ -513,6 +465,56 @@ composer (`lib.nvim.usercmd.composer`): every subcommand below completes on
   with or without `:MDView start` ever having run. See |mdview-architecture|
   and `open_preview_tab` in |mdview-config| to make `:MDView start` open this
   instead of the browser.
+
+Live preview controls ~
+
+These change the *open* preview tab without a reload: each sets the matching
+`browser.*` option (so a re-opened tab keeps it) and, while a session runs,
+pushes a control update over the socket.
+
+:MDView cursor [mode]                                        *:MDView-cursor*
+  Sets the Neovim-cursor marker in the preview (`browser.cursor_marker`):
+  `line` (blinking bar at the cursor line), `caret` (caret at the exact cursor
+  column), `section` (spotlight the current heading section, dim the rest), or
+  `off`. No argument reports the current mode. Tab-completed.
+
+:MDView sync [action]                                          *:MDView-sync*
+  Pauses/resumes the nvim->browser scroll sync (`pause`|`resume`|`toggle`).
+  While paused, moving the cursor no longer scrolls the preview or moves its
+  cursor marker — useful to jump to a reference spot without dragging a
+  screen-sharing viewer along. No argument reports the state.
+
+:MDView zoom [step]                                            *:MDView-zoom*
+  Adjusts the preview font-size zoom (`browser.zoom`). `+`/`-` step by 10%
+  (clamped 50%-300%), `reset` returns to 100%, and a bare number sets a factor
+  (`1.5`) or a percentage (`150`). No argument reports the current zoom. Handy
+  when a video call downsamples the shared screen.
+
+:MDView reveal [action]                                      *:MDView-reveal*
+  Reveals/hides every *private block* at once (`on`|`off`|`toggle`). A fenced
+  block with the info string `private` renders its contents as normal Markdown
+  but is blurred by default, so third-party names/numbers stay hidden during a
+  screen share. Reveal one block by clicking it, or all with this command.
+  Live-only — a freshly opened tab always starts hidden.
+
+:MDView overlay [name] [action]                             *:MDView-overlay*
+:MDView overlay list                                   *:MDView-overlay-list*
+  Toggles a preview overlay (`browser.overlays`): an independent, toggleable
+  layer drawn over the document. Currently `toc` — a floating outline that
+  highlights the section the cursor is in and shows how far along you are.
+  Without a name (or with `list`) it reports the known overlays and their
+  state. Both arguments are tab-completed.
+
+:MDView breadcrumbs                                     *:MDView-breadcrumbs*
+:MDView breadcrumbs export [path]                *:MDView-breadcrumbs-export*
+:MDView breadcrumbs clear                         *:MDView-breadcrumbs-clear*
+  Shows/exports/clears the session breadcrumbs: a rough Markdown outline of
+  which document + heading section the cursor was in and when, recorded while
+  the session runs (deduped so a new line appears only on an actual section or
+  document change). `export` writes a `.md` file (default
+  `stdpath('log')/mdview-breadcrumbs.md`). Useful for writing notes and
+  follow-ups after a call. Recording is gated by `breadcrumbs`
+  (|mdview-config|, default true) and reset each session.
 
 Lua API ~
 

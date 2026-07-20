@@ -23,15 +23,13 @@ local preview_tab = require("mdview.bindings.usrcmds.preview_tab")
 local diagnose = require("mdview.bindings.usrcmds.diagnose")
 local theme = require("mdview.bindings.usrcmds.theme")
 local log = require("mdview.bindings.usrcmds.log")
-<<<<<<< HEAD
+local file_log = require("mdview.bindings.usrcmds.file_log")
 local cursor = require("mdview.bindings.usrcmds.cursor")
 local sync = require("mdview.bindings.usrcmds.sync")
 local zoom = require("mdview.bindings.usrcmds.zoom")
 local reveal = require("mdview.bindings.usrcmds.reveal")
 local breadcrumbs = require("mdview.bindings.usrcmds.breadcrumbs")
-=======
-local file_log = require("mdview.bindings.usrcmds.file_log")
->>>>>>> feat/opt-in-file-logging
+local overlay = require("mdview.bindings.usrcmds.overlay")
 
 local M = {}
 
@@ -54,22 +52,6 @@ end
 
 ---@return nil
 function M.attach()
-<<<<<<< HEAD
-	start.attach()
-	stop.attach()
-	open.attach()
-	show_weblogs.attach()
-	preview_tab.attach()
-	diagnose.attach()
-	toggle.attach()
-	theme.attach()
-	log.attach()
-	cursor.attach()
-	sync.attach()
-	zoom.attach()
-	reveal.attach()
-	breadcrumbs.attach()
-=======
 	local routes = {
 		{ path = { "start" },
 			desc = "Start the relay and open the preview for the current buffer (or the given file)",
@@ -133,6 +115,50 @@ function M.attach()
 			args = { { name = "value", type = "PATH", optional = true } },
 			desc = "Set the file log path (or `default` to reset it); omit to report the current path",
 			run  = function(ctx) file_log.path(ctx.args.value) end },
+
+		-- Live preview controls: each pushes a control update to the open tab
+		-- (no reload) and records the choice for the next start.
+		{ path = { "cursor" },
+			args = { { name = "mode", type = "STRING", optional = true, values = cursor.modes } },
+			desc = "Set the Neovim-cursor marker in the preview (line|caret|section|off)",
+			run  = function(ctx) cursor.run(ctx.args.mode) end },
+
+		{ path = { "sync" },
+			args = { { name = "action", type = "STRING", optional = true, values = sync.actions } },
+			desc = "Pause/resume the nvim->browser scroll sync; no argument reports the state",
+			run  = function(ctx) sync.run(ctx.args.action) end },
+
+		{ path = { "zoom" },
+			args = { { name = "step", type = "STRING", optional = true, values = zoom.actions } },
+			desc = "Adjust the preview font-size zoom (+ | - | reset | <factor>)",
+			run  = function(ctx) zoom.run(ctx.args.step) end },
+
+		{ path = { "reveal" },
+			args = { { name = "action", type = "STRING", optional = true, values = reveal.actions } },
+			desc = "Reveal/hide all private (```private) blocks in the preview",
+			run  = function(ctx) reveal.run(ctx.args.action) end },
+
+		{ path = { "overlay" },
+			args = {
+				{ name = "name", type = "STRING", optional = true, values = overlay.names() },
+				{ name = "action", type = "STRING", optional = true, values = { "on", "off", "toggle" } },
+			},
+			desc = "Toggle a preview overlay (floating TOC, …); no name lists them",
+			run  = function(ctx) overlay.run(ctx.args.name, ctx.args.action) end },
+		{ path = { "overlay", "list" },
+			desc = "List the known preview overlays and whether each is on",
+			run  = function() overlay.list() end },
+
+		{ path = { "breadcrumbs" },
+			desc = "Show the session breadcrumbs (document + heading over time)",
+			run  = function() breadcrumbs.show() end },
+		{ path = { "breadcrumbs", "export" },
+			args = { { name = "path", type = "PATH", optional = true } },
+			desc = "Write the session breadcrumbs outline to a file (default: stdpath log)",
+			run  = function(ctx) breadcrumbs.export(ctx.args.path) end },
+		{ path = { "breadcrumbs", "clear" },
+			desc = "Discard the recorded session breadcrumbs",
+			run  = function() breadcrumbs.clear() end },
 	}
 
 	vim.list_extend(routes, log_level_routes())
@@ -141,7 +167,6 @@ function M.attach()
 		desc   = "mdview.nvim commands",
 		routes = routes,
 	})
->>>>>>> feat/opt-in-file-logging
 end
 
 return M

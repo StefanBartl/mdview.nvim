@@ -152,6 +152,88 @@ body {
   user-select: auto;
 }
 
+/* Shared overlay layer (browser.overlays / :MDViewOverlay). One fixed layer above
+   the document; individual overlays opt back into pointer events. Z-index order:
+   in-document markers (5) < overlay layer (20) < badges/pills (10 stay inside
+   their own stacking context on <body>). */
+#mdview-overlays {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  pointer-events: none;
+}
+
+/* Floating TOC overlay: mini-outline with the current section highlighted. */
+.mdview-toc {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  width: 15rem;
+  max-height: 60vh;
+  display: flex;
+  flex-direction: column;
+  pointer-events: auto;
+  padding: 0.6rem 0.7rem;
+  border: 1px solid var(--md-border, rgba(128, 128, 128, 0.3));
+  border-radius: 10px;
+  background: var(--md-bg, #fff);
+  color: var(--md-fg, inherit);
+  font-size: 13px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.12);
+}
+.mdview-toc-head {
+  font-size: 11px;
+  opacity: 0.6;
+  margin-bottom: 0.4rem;
+}
+.mdview-toc-list {
+  overflow-y: auto;
+  min-height: 0;
+}
+.mdview-toc-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  opacity: 0.65;
+  padding: 0.16rem 0.25rem;
+  border-radius: 5px;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mdview-toc-item:hover {
+  opacity: 1;
+  background: var(--md-code-bg, rgba(128, 128, 128, 0.12));
+}
+.mdview-toc-item-active {
+  opacity: 1;
+  font-weight: 600;
+  color: var(--md-link);
+  background: var(--section-spotlight, rgba(84, 174, 255, 0.14));
+}
+.mdview-toc-empty {
+  opacity: 0.5;
+  padding: 0.16rem 0.25rem;
+}
+.mdview-toc-track {
+  height: 3px;
+  margin-top: 0.5rem;
+  border-radius: 2px;
+  background: var(--md-border-muted, rgba(128, 128, 128, 0.25));
+  overflow: hidden;
+}
+.mdview-toc-bar {
+  height: 100%;
+  width: 0;
+  background: var(--md-link);
+  transition: width 0.15s ease-out;
+}
+
 /* Reverse-scroll hint (experimental.reverse_scroll): a small fixed pill telling
    the viewer they may scroll the preview themselves. Self-contained colors — it
    sits on <body>, outside #mdview-root, so theme --md-* vars don't reach it. */

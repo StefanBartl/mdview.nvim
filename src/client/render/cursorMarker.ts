@@ -17,6 +17,7 @@
 // See docs/Roadmap/KONZEPT_links_und_cursor.md.
 
 import { pickScrollTarget, fractionInBlock } from './scrollSync';
+import { topLevelBlocks, sectionRange } from './docModel';
 
 export type CursorMarkerMode = 'off' | 'line' | 'caret' | 'section';
 
@@ -130,12 +131,35 @@ function runsOnLine(container: HTMLElement, line: number): SpanRange[] {
 }
 
 /**
- * Place the caret at the 0-based byte column `col` on `line`. Returns false when
- * no run covers the position (caller falls back to the line bar).
+ * Pixel position of the Neovim cursor in the container's **content** coordinates
+ * (so it scrolls with the document), derived from the inline source-position
+ * runs. Null when no run covers the line (blank line, code block) or there is no
+ * layout. Exported for overlays that need to point at the cursor (magnifier,
+ * attention ping) — see render/overlays.
  */
-function placeCaret(container: HTMLElement, line: number, col: number): boolean {
+export function caretContentPos(
+  container: HTMLElement,
+  line: number,
+  col: number,
+): { x: number; y: number; h: number } | null {
+  const box = caretViewportBox(container, line, col);
+  if (!box) return null;
+  const contRect = container.getBoundingClientRect();
+  return {
+    x: box.left - contRect.left + container.scrollLeft,
+    y: box.top - contRect.top + container.scrollTop,
+    h: box.height,
+  };
+}
+
+/** Viewport-space caret box for `line`/`col`, or null. */
+function caretViewportBox(
+  container: HTMLElement,
+  line: number,
+  col: number,
+): { left: number; top: number; height: number } | null {
   const runs = runsOnLine(container, line);
-  if (runs.length === 0) return false;
+  if (runs.length === 0) return null;
 
   const byteCol = col + 1; // Neovim 0-based byte col -> comrak 1-based byte col
 
@@ -160,17 +184,24 @@ function placeCaret(container: HTMLElement, line: number, col: number): boolean 
   const text = run.el.textContent ?? '';
   const u16 = byteOffsetToUtf16(text, byteInRun);
   const pos = findTextPosition(run.el, u16);
-  if (!pos) return false;
+  if (!pos) return null;
 
-  const caret = caretPixelBox(pos.node, pos.offset);
-  if (!caret) return false; // no layout (jsdom) — nothing to place
+  return caretPixelBox(pos.node, pos.offset);
+}
 
-  const contRect = container.getBoundingClientRect();
+/**
+ * Place the caret at the 0-based byte column `col` on `line`. Returns false when
+ * no run covers the position (caller falls back to the line bar).
+ */
+function placeCaret(container: HTMLElement, line: number, col: number): boolean {
+  const p = caretContentPos(container, line, col);
+  if (!p) return false; // no run / no layout (jsdom) — nothing to place
+
   caretEl = ensureEl(caretEl, container, 'mdview-cursor-caret');
   caretEl.style.display = 'block';
-  caretEl.style.left = `${caret.left - contRect.left + container.scrollLeft}px`;
-  caretEl.style.top = `${caret.top - contRect.top + container.scrollTop}px`;
-  caretEl.style.height = `${caret.height}px`;
+  caretEl.style.left = `${p.x}px`;
+  caretEl.style.top = `${p.y}px`;
+  caretEl.style.height = `${p.h}px`;
   return true;
 }
 
@@ -258,27 +289,6 @@ function findTextPosition(el: HTMLElement, u16Offset: number): { node: Text; off
 const SECTION_DIM_CLASS = 'mdview-section-dim';
 const SECTION_ACTIVE_CLASS = 'mdview-section-active';
 
-interface BlockPos {
-  el: HTMLElement;
-  startLine: number;
-  headingLevel: number | null; // 1..6 for H1..H6, else null
-}
-
-/** Top-level blocks of the container that carry data-sourcepos, in doc order. */
-function topLevelBlocks(container: HTMLElement): BlockPos[] {
-  const out: BlockPos[] = [];
-  for (const child of Array.from(container.children)) {
-    if (!(child instanceof HTMLElement)) continue;
-    const sp = child.getAttribute('data-sourcepos');
-    if (!sp) continue;
-    const startLine = Number(sp.split(':')[0]);
-    if (!Number.isFinite(startLine)) continue;
-    const m = /^H([1-6])$/.exec(child.tagName);
-    out.push({ el: child, startLine, headingLevel: m ? Number(m[1]) : null });
-  }
-  return out;
-}
-
 /** Remove any section-spotlight decoration from the container's blocks. */
 function clearSection(container: HTMLElement): void {
   container
@@ -296,41 +306,12 @@ function clearSection(container: HTMLElement): void {
 function placeSection(container: HTMLElement, line: number): void {
   const blocks = topLevelBlocks(container);
   clearSection(container);
-  if (blocks.length === 0) return;
-
-  const firstHeadingIdx = blocks.findIndex((b) => b.headingLevel !== null);
-  if (firstHeadingIdx === -1) return; // no headings -> nothing to spotlight
-
-  // Governing heading: last heading whose start line is at/before the cursor.
-  let headingIdx = -1;
-  let headingLvl = 0;
-  for (const [i, b] of blocks.entries()) {
-    if (b.startLine > line) break; // blocks are in increasing line order
-    if (b.headingLevel !== null) {
-      headingIdx = i;
-      headingLvl = b.headingLevel;
-    }
-  }
-
-  let startIdx: number;
-  let endIdx: number;
-  if (headingIdx === -1) {
-    // Cursor is above the first heading — spotlight the preamble.
-    startIdx = 0;
-    endIdx = firstHeadingIdx - 1;
-  } else {
-    startIdx = headingIdx;
-    endIdx = blocks.length - 1;
-    for (let j = headingIdx + 1; j < blocks.length; j++) {
-      const lvl = blocks[j].headingLevel;
-      if (lvl !== null && lvl <= headingLvl) {
-        endIdx = j - 1;
-        break;
-      }
-    }
-  }
+  const range = sectionRange(blocks, line);
+  if (!range) return; // no blocks / no headings -> nothing to spotlight
 
   blocks.forEach((b, i) => {
-    b.el.classList.add(i >= startIdx && i <= endIdx ? SECTION_ACTIVE_CLASS : SECTION_DIM_CLASS);
+    b.el.classList.add(
+      i >= range.start && i <= range.end ? SECTION_ACTIVE_CLASS : SECTION_DIM_CLASS,
+    );
   });
 }
