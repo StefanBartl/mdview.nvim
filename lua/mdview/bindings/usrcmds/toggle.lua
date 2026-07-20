@@ -1,31 +1,26 @@
 ---@module 'mdview.bindings.usrcmds.toggle'
--- Registers :MDViewToggle — start the preview if no relay session is running,
--- otherwise stop it. A thin dispatcher over the existing :MDViewStart /
--- :MDViewStop commands so all their arg-parsing and lifecycle guards are
--- reused unchanged; this command adds no independent start/stop logic.
+-- Action behind :MDView toggle [file] [cwd=...] — start the preview if no
+-- relay session is running, otherwise stop it. A thin dispatcher calling the
+-- start/stop actions directly so their arg-parsing and lifecycle guards are
+-- reused unchanged; this adds no independent start/stop logic of its own.
 
-local libusercmd = require("lib.nvim.usercmd")
 local state = require("mdview.core.state")
+local start = require("mdview.bindings.usrcmds.start")
+local stop = require("mdview.bindings.usrcmds.stop")
 
 local M = {}
 
-function M.attach()
-	libusercmd.create("MDViewToggle", function(cmdopts)
-		if state.get_server() then
-			-- A session is live — stop it. Any start-style args are irrelevant
-			-- when stopping, so they're ignored (mirrors :MDViewStop, nargs=0).
-			vim.cmd("MDViewStop")
-			return
-		end
-		-- No session — start one, forwarding any file/cwd args verbatim so
-		-- `:MDViewToggle file.md cwd=...` behaves exactly like :MDViewStart.
-		local args = cmdopts.args and cmdopts.args ~= "" and (" " .. cmdopts.args) or ""
-		vim.cmd("MDViewStart" .. args)
-	end, {
-		desc = "[mdview] Toggle the preview session on/off (start if stopped, stop if running)",
-		nargs = "*",
-		complete = "file",
-	})
+--- @param fargs string[]  # tokens after the "toggle" subcommand (same shape start.run expects)
+function M.run(fargs)
+	if state.get_server() then
+		-- A session is live — stop it. Any start-style args are irrelevant
+		-- when stopping, so they're ignored (mirrors :MDView stop).
+		stop.run()
+		return
+	end
+	-- No session — start one, forwarding any file/cwd args verbatim so
+	-- `:MDView toggle file.md cwd=...` behaves exactly like :MDView start.
+	start.run(fargs)
 end
 
 return M
