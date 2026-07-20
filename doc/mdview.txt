@@ -13,6 +13,7 @@ CONTENTS                                                     *mdview-contents*
   8. Health check ............................................ |mdview-health|
   9. Architecture ...................................... |mdview-architecture|
  10. Security model ........................................ |mdview-security|
+ 11. Background & standalone ........................... |mdview-standalone|
 
 ==============================================================================
 1. INTRODUCTION                                                 *mdview-intro*
@@ -161,6 +162,10 @@ Defaults: >lua
       version = "v0.2.0",                  -- pin a specific release tag
     },
 
+    standalone = {
+      binary_path = nil, -- relay used by :MDView standalone (nil = installed one)
+    },
+
     experimental = {
       webtransport   = false, -- opt-in WebTransport/HTTP3 (falls back to WS)
       line_diff      = false, -- opt-in: send only changed lines per edit
@@ -275,7 +280,7 @@ browser.cursor_marker ~
   at runtime with |:MDView-cursor|.
 
 browser.zoom ~
-  Preview font-size zoom factor (`1.0` = 100%, the default). |:MDViewStart|
+  Preview font-size zoom factor (`1.0` = 100%, the default). |:MDView-start|
   sets `#mdview-root`'s font-size to `16 * zoom` px; the stylesheet sizes
   everything in em, so the whole document scales proportionally. Adjust at
   runtime with |:MDView-zoom| (applies live). A non-default value is carried on
@@ -329,6 +334,21 @@ install.repo / install.version ~
   GitHub `owner/repo` and release tag the relay binary and client bundle are
   downloaded from. Override `repo` if you maintain a fork; override
   `version` to pin an older release.
+
+standalone.binary_path ~
+  Relay binary |:MDView-standalone| spawns. `nil` (default) uses whichever one
+  `install` resolved. Standalone mode needs a relay built with `--watch`
+  support (v0.3.0+), so until `install.version` points at such a release,
+  set this to a locally built one: >lua
+
+    require("mdview").setup({
+      standalone = {
+        binary_path = "~/repos/mdview.nvim/native/server/mdview-server",
+      },
+    })
+<
+  |:MDView-standalone| probes the binary first and reports a clear error if
+  it's too old, rather than spawning a process that dies silently.
 
 experimental.webtransport ~
   Opt in to the WebTransport (HTTP/3) client transport. The client
@@ -394,6 +414,31 @@ composer (`lib.nvim.usercmd.composer`): every subcommand below completes on
   Starts the preview if no session is running, otherwise stops it. A thin
   dispatcher over |:MDView-start| / |:MDView-stop|; start-style args are
   forwarded when starting and ignored when stopping.
+
+:MDView detach [file] [--no-browser]                          *:MDView-detach*
+  Starts the preview in a SEPARATE, detached Neovim process, so it outlives
+  this instance (and `:qa`). The detached instance is headless and loads only
+  mdview.nvim and lib.nvim (via `scripts/minimal_init.lua`), never your own
+  config — so a background preview can't be broken by an unrelated plugin.
+  Because a real Neovim still drives it, live buffer push, scroll sync and
+  the cursor marker all keep working, exactly as with |:MDView-start|.
+  `[file]` defaults to the current buffer's file; `--no-browser` starts the
+  relay without opening a tab. The detached instance quits itself when the
+  preview session ends. See |mdview-standalone|.
+
+:MDView standalone [file] [--no-browser]                  *:MDView-standalone*
+  Starts the preview with NO Neovim in the chain at all: the relay binary
+  watches the file on disk itself and pushes changes straight to the browser.
+  Cheapest and most robust option — but it previews the file as SAVED, so
+  unsaved buffer changes don't appear until you |:write|, and there is no
+  scroll sync or cursor marker (nothing tracks a cursor). Runs on
+  `server_port` + 100 so it can sit alongside a normal session. With
+  `--no-browser` the preview URL is reported in the notification, since a
+  detached process's output goes nowhere.
+  Requires a relay binary with `--watch` support (v0.3.0+); if the installed
+  one is older, mdview says so instead of spawning a process that dies
+  silently — see `standalone.binary_path` in |mdview-config|.
+  See |mdview-standalone|.
 
 :MDView open                                                    *:MDView-open*
   Re-opens a browser tab for the *current* buffer against the
@@ -670,9 +715,71 @@ Markdown, and no unsanitized HTML ever reaches the DOM:
     rejecting cross-site/DNS-rebinding attempts against the local server.
   - Every request (WebSocket and HTTP) must present a per-session token,
     generated fresh each time |:MDView-start| runs and known only to the
-    Neovim process and the browser tab it opens.
+    Neovim process and the browser tab it opens. In standalone mode
+    (|:MDView-standalone|) the token is generated the same way, by whichever
+    side started the relay; nothing about the check itself changes.
   - The downloaded relay binary and client bundle are checksum-verified
     against the release's published checksums.txt before first execution.
+
+==============================================================================
+11. BACKGROUND & STANDALONE                                  *mdview-standalone*
+
+By default a preview lives and dies with your Neovim instance. Two commands
+give you one that stays, differing in how much of mdview comes along:
+
+  Command              Survives :qa   Unsaved buffer   Scroll sync / cursor
+  ------------------   ------------   --------------   --------------------
+  |:MDView-start|          no             yes                 yes
+  |:MDView-detach|         yes            yes                 yes
+  |:MDView-standalone|     yes            no (on disk)        no
+
+Rule of thumb: |:MDView-detach| when you still want mdview's editor features,
+|:MDView-standalone| when you just want the document rendered.
+
+Typical uses ~
+
+  - Closing the editor but keeping the doc open in a browser tab: `detach`.
+  - Deciding whether a problem is mdview's or your config's: `detach` loads
+    none of your config, so it answers that immediately.
+  - A reference doc (spec, API notes, cheat sheet) beside your work, running
+    for days regardless of what you do to your editor: `standalone`.
+  - Previewing a file that some other tool generates: `standalone`.
+
+From the terminal ~
+
+`nvim +MDView --background file.md` is NOT valid Neovim syntax — `+cmd` takes
+no trailing flags. The supported spelling is the wrapper script: >
+
+  scripts/mdview-bg.sh README.md               # preview, return the prompt
+  scripts/mdview-bg.sh --no-browser notes.md   # relay only
+  scripts/mdview-bg.sh --fg docs/spec.md       # foreground, Ctrl-C to stop
+<
+On Windows, `scripts\mdview-bg.ps1` takes `-NoBrowser` / `-Foreground`. Both
+do what |:MDView-detach| does, entered from a shell. Symlink one onto your
+PATH for a general-purpose "render this Markdown" command.
+
+Environment: `MDVIEW_PATH` (mdview.nvim checkout; derived from the script by
+default), `LIB_NVIM_PATH` (if lib.nvim isn't next to it), `NVIM` (binary).
+
+Without a browser at all ~
+
+|:MDView-preview-tab| renders the buffer as a read-only, Treesitter-
+highlighted mirror in a Neovim tab — no relay, no WebSocket, no browser. Not
+a full preview (no CSS, themes or rendered tables), but it needs nothing but
+Neovim, which makes it the answer on a machine with no GUI.
+
+Events ~
+
+                                                    *MDViewSessionEnded*
+mdview fires `User MDViewSessionEnded` once a preview session is fully torn
+down. Detached instances use it to quit themselves; you can hook it too: >lua
+
+  vim.api.nvim_create_autocmd("User", {
+    pattern  = "MDViewSessionEnded",
+    callback = function() print("preview stopped") end,
+  })
+<
+Full guide with examples: docs/standalone.md in the repository.
 
 ==============================================================================
 vim:tw=78:ts=8:noet:ft=help:norl:

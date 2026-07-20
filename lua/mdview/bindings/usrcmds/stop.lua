@@ -80,6 +80,14 @@ function M.stop(close_browser_override)
 	-- :MDViewOpen (this plugin's now-retired flat commands) from existence
 	-- the first time :MDViewStop ran (fixed — see docs/Roadmap/Roadmap.md).
 	require("mdview.helper.autocmds_registry").detach_all()
+
+	-- Public hook: fires once the session is fully torn down. Detached
+	-- background instances (scripts/minimal_init.lua) use it to quit Neovim
+	-- when the preview ends, since a headless instance has no UI whose close
+	-- would otherwise end the process. Also available to users who want to run
+	-- something of their own when a preview stops.
+	pcall(vim.api.nvim_exec_autocmds, "User", { pattern = "MDViewSessionEnded", modeline = false })
+
 	notify("[mdview] stopped", vim.log.levels.INFO)
 end
 

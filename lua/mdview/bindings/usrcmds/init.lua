@@ -16,6 +16,8 @@ local composer = require("lib.nvim.usercmd.composer")
 
 local start = require("mdview.bindings.usrcmds.start")
 local stop = require("mdview.bindings.usrcmds.stop")
+local detach = require("mdview.bindings.usrcmds.detach")
+local standalone = require("mdview.bindings.usrcmds.standalone")
 local open = require("mdview.bindings.usrcmds.open")
 local toggle = require("mdview.bindings.usrcmds.toggle")
 local show_weblogs = require("mdview.bindings.usrcmds.show_weblogs")
@@ -64,6 +66,22 @@ function M.attach()
 		{ path = { "toggle" },
 			desc = "Start if stopped, stop if running",
 			run  = function(ctx) toggle.run(ctx.rest) end },
+
+		-- Both start a preview that OUTLIVES this instance. `detach` keeps a
+		-- (minimal, isolated) Neovim in the chain so live buffer push and
+		-- scroll sync still work; `standalone` drops Neovim entirely and
+		-- follows the file on disk. See docs/standalone.md.
+		{ path  = { "detach" },
+			args  = { { name = "file", type = "PATH", optional = true } },
+			flags = { { name = "no-browser", bool = true } },
+			desc  = "Preview in a detached, minimal-config Neovim that outlives this instance",
+			run   = function(ctx) detach.run(ctx.args.file, ctx.flags["no-browser"]) end },
+
+		{ path  = { "standalone" },
+			args  = { { name = "file", type = "PATH", optional = true } },
+			flags = { { name = "no-browser", bool = true } },
+			desc  = "Preview via the relay's own file watcher, with no Neovim in the chain",
+			run   = function(ctx) standalone.run(ctx.args.file, ctx.flags["no-browser"]) end },
 
 		{ path = { "open" },
 			desc = "Re-open a browser tab against the already-running session",
