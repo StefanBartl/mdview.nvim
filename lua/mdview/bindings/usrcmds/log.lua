@@ -1,20 +1,18 @@
 ---@module 'mdview.bindings.usrcmds.log'
--- Registers :MDViewLog — shows mdview's internal structured log ring
+-- Action behind :MDView log — shows mdview's internal structured log ring
 -- (mdview.log, built on lib.nvim.logger) in a scratch buffer, with optional
--- level filtering and file export. Complements :MDViewShowWebLogs, which shows
+-- level filtering and file export. Complements :MDView weblogs, which shows
 -- the *relay's* stdout (including [client] browser diagnostics); this shows the
 -- *plugin's* own log (launcher, live-push, ws_client, …).
 --
 -- Usage:
---   :MDViewLog                 show the whole ring
---   :MDViewLog warn            show only WARN and above (trace|debug|info|warn|error)
---   :MDViewLog export [path]   write the ring to a file (default: stdpath log)
-
-local libusercmd = require("lib.nvim.usercmd")
+--   :MDView log                       show the whole ring
+--   :MDView log warn                  show only WARN and above (trace|debug|info|warn|error)
+--   :MDView log export [path]         write the ring to a file (default: stdpath log)
 
 local M = {}
 
-local LEVELS = { trace = 0, debug = 1, info = 2, warn = 3, error = 4 }
+M.LEVELS = { trace = 0, debug = 1, info = 2, warn = 3, error = 4 }
 
 -- Format the ring (optionally filtered to level >= min_level) into lines.
 ---@param min_level integer|nil
@@ -40,8 +38,29 @@ local function format_ring(min_level)
 	return lines
 end
 
+local SCRATCH_NAME = "mdview://log"
+
+-- Reuse the single dedicated log-view buffer across repeat invocations rather
+-- than creating a new one each time — nvim_buf_set_name throws E95 on a name
+-- collision, which happens whenever the previous log window is still open (its
+-- bufhidden = "wipe" only fires once the buffer is no longer displayed).
 ---@param lines string[]
 local function show_in_scratch(lines)
+	local existing = vim.fn.bufnr(SCRATCH_NAME)
+	if existing ~= -1 then
+		local win = vim.fn.bufwinid(existing)
+		if win == -1 then
+			vim.cmd("botright new")
+			vim.api.nvim_win_set_buf(0, existing)
+		else
+			vim.api.nvim_set_current_win(win)
+		end
+		vim.bo[existing].modifiable = true
+		vim.api.nvim_buf_set_lines(existing, 0, -1, false, lines)
+		vim.bo[existing].modifiable = false
+		return
+	end
+
 	vim.cmd("botright new")
 	local buf = vim.api.nvim_get_current_buf()
 	vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
@@ -49,48 +68,31 @@ local function show_in_scratch(lines)
 	vim.bo[buf].bufhidden = "wipe"
 	vim.bo[buf].swapfile = false
 	vim.bo[buf].modifiable = false
-	vim.api.nvim_buf_set_name(buf, "mdview://log")
+	vim.api.nvim_buf_set_name(buf, SCRATCH_NAME)
 end
 
-function M.attach()
-	libusercmd.create("MDViewLog", function(cmdopts)
-		local args = cmdopts.fargs or {}
-		local sub = (args[1] or ""):lower()
+--- Show the ring, optionally filtered to `min_level` and above.
+---@param min_level integer|nil
+function M.show_ring(min_level)
+	show_in_scratch(format_ring(min_level))
+end
 
-		if sub == "export" then
-			local path = args[2]
-			if not path or path == "" then
-				local dir = vim.fn.stdpath("log")
-				pcall(vim.fn.mkdir, dir, "p")
-				path = dir .. "/mdview-log.txt"
-			end
-			local f = io.open(path, "w")
-			if f then
-				f:write(table.concat(format_ring(nil), "\n") .. "\n")
-				f:close()
-				vim.notify("[mdview] log written to " .. path, vim.log.levels.INFO)
-			else
-				vim.notify("[mdview] failed to write log to " .. path, vim.log.levels.ERROR)
-			end
-			return
-		end
-
-		local min_level = LEVELS[sub] -- nil when no/unknown filter -> show all
-		show_in_scratch(format_ring(min_level))
-	end, {
-		desc = "[mdview] Show the internal log ring (optional level filter, or `export [path]`)",
-		nargs = "*",
-		complete = function(arglead)
-			local cands = { "trace", "debug", "info", "warn", "error", "export" }
-			local out = {}
-			for _, c in ipairs(cands) do
-				if c:find(arglead, 1, true) == 1 then
-					out[#out + 1] = c
-				end
-			end
-			return out
-		end,
-	})
+--- Write the whole (unfiltered) ring to a file.
+---@param path string|nil  # default: stdpath("log") .. "/mdview-log.txt"
+function M.export_ring(path)
+	if not path or path == "" then
+		local dir = vim.fn.stdpath("log")
+		pcall(vim.fn.mkdir, dir, "p")
+		path = dir .. "/mdview-log.txt"
+	end
+	local f = io.open(path, "w")
+	if f then
+		f:write(table.concat(format_ring(nil), "\n") .. "\n")
+		f:close()
+		vim.notify("[mdview] log written to " .. path, vim.log.levels.INFO)
+	else
+		vim.notify("[mdview] failed to write log to " .. path, vim.log.levels.ERROR)
+	end
 end
 
 return M

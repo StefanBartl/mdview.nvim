@@ -1,5 +1,10 @@
 ---@module 'mdview.bindings.usrcmds'
---- Registers mdview user commands: start, stop, open, show logs.
+--- Registers the unified :MDView <subcommand> user command via
+--- lib.nvim.usercmd.composer — one route tree drives dispatch, <Tab>
+--- completion, and (via composer.document()) a Markdown command reference, so
+--- the ten formerly-separate :MDViewX commands can't drift out of sync with
+--- their own docs. See docs/commands.md for the generated-by-hand reference
+--- and docs/ROADMAP (lib.nvim) for the composer's design.
 ---
 --- All user commands are registered once at setup() and never torn down —
 --- they are the plugin's permanent command surface (like every other Neovim
@@ -7,25 +12,49 @@
 --- Only autocommands (mdview.bindings.autocmds) have a real attach/detach
 --- lifecycle, since those genuinely need to stop firing once a session ends.
 
-local open = require("mdview.bindings.usrcmds.open")
+local composer = require("lib.nvim.usercmd.composer")
+
 local start = require("mdview.bindings.usrcmds.start")
 local stop = require("mdview.bindings.usrcmds.stop")
+local open = require("mdview.bindings.usrcmds.open")
+local toggle = require("mdview.bindings.usrcmds.toggle")
 local show_weblogs = require("mdview.bindings.usrcmds.show_weblogs")
 local preview_tab = require("mdview.bindings.usrcmds.preview_tab")
 local diagnose = require("mdview.bindings.usrcmds.diagnose")
-local toggle = require("mdview.bindings.usrcmds.toggle")
 local theme = require("mdview.bindings.usrcmds.theme")
 local log = require("mdview.bindings.usrcmds.log")
+<<<<<<< HEAD
 local cursor = require("mdview.bindings.usrcmds.cursor")
 local sync = require("mdview.bindings.usrcmds.sync")
 local zoom = require("mdview.bindings.usrcmds.zoom")
 local reveal = require("mdview.bindings.usrcmds.reveal")
 local breadcrumbs = require("mdview.bindings.usrcmds.breadcrumbs")
+=======
+local file_log = require("mdview.bindings.usrcmds.file_log")
+>>>>>>> feat/opt-in-file-logging
 
 local M = {}
 
+--- `log <level>` routes, one per known level (trace|debug|info|warn|error),
+--- generated from log.LEVELS so the route list can't drift from the filter it
+--- drives.
+---@return Lib.UserCmd.Composer.Route[]
+local function log_level_routes()
+	local routes = {}
+	for name, level in pairs(log.LEVELS) do
+		routes[#routes + 1] = {
+			path = { "log", name },
+			desc = ("Show the internal log ring, filtered to %s and above"):format(name:upper()),
+			run = function() log.show_ring(level) end,
+		}
+	end
+	table.sort(routes, function(a, b) return a.path[2] < b.path[2] end)
+	return routes
+end
+
 ---@return nil
 function M.attach()
+<<<<<<< HEAD
 	start.attach()
 	stop.attach()
 	open.attach()
@@ -40,6 +69,79 @@ function M.attach()
 	zoom.attach()
 	reveal.attach()
 	breadcrumbs.attach()
+=======
+	local routes = {
+		{ path = { "start" },
+			desc = "Start the relay and open the preview for the current buffer (or the given file)",
+			run  = function(ctx) start.run(ctx.rest) end },
+
+		{ path = { "stop" },
+			desc = "Stop the relay, detach autocommands, and (in isolated mode) close the browser",
+			run  = function() stop.run() end },
+
+		{ path = { "toggle" },
+			desc = "Start if stopped, stop if running",
+			run  = function(ctx) toggle.run(ctx.rest) end },
+
+		{ path = { "open" },
+			desc = "Re-open a browser tab against the already-running session",
+			run  = function() open.run() end },
+
+		{ path = { "weblogs" },
+			desc = "Show the relay's captured stdout, including [client] browser-side diagnostics",
+			run  = function() show_weblogs.run() end },
+
+		{ path = { "preview-tab" },
+			desc = "Toggle the in-Neovim tab preview (works standalone, no server needed)",
+			run  = function() preview_tab.run() end },
+
+		{ path = { "diagnose" },
+			args = { { name = "path", type = "PATH", optional = true } },
+			desc = "Write a full component-state diagnostics report to a file and open it",
+			run  = function(ctx) diagnose.run(ctx.args.path) end },
+
+		{ path = { "theme" },
+			args = { { name = "name", type = "STRING", optional = true, values = theme.known } },
+			desc = "Switch the preview theme (optionally -light/-dark); no argument reports the current theme",
+			run  = function(ctx) theme.run(ctx.args.name) end },
+
+		{ path = { "log" },
+			desc = "Show the internal log ring",
+			run  = function() log.show_ring(nil) end },
+		{ path = { "log", "export" },
+			args = { { name = "path", type = "PATH", optional = true } },
+			desc = "Write the internal log ring to a file (default: stdpath log)",
+			run  = function(ctx) log.export_ring(ctx.args.path) end },
+
+		{ path = { "file-log" },
+			desc = "Toggle persistent file logging, then report the state",
+			run  = function() file_log.toggle() end },
+		{ path = { "file-log", "on" },
+			args = { { name = "path", type = "PATH", optional = true } },
+			desc = "Enable persistent file logging (optionally set its path)",
+			run  = function(ctx) file_log.on(ctx.args.path) end },
+		{ path = { "file-log", "off" },
+			desc = "Disable persistent file logging",
+			run  = function() file_log.off() end },
+		{ path = { "file-log", "toggle" },
+			desc = "Toggle persistent file logging, then report the state",
+			run  = function() file_log.toggle() end },
+		{ path = { "file-log", "status" },
+			desc = "Report persistent file logging state without changing anything",
+			run  = function() file_log.status() end },
+		{ path = { "file-log", "path" },
+			args = { { name = "value", type = "PATH", optional = true } },
+			desc = "Set the file log path (or `default` to reset it); omit to report the current path",
+			run  = function(ctx) file_log.path(ctx.args.value) end },
+	}
+
+	vim.list_extend(routes, log_level_routes())
+
+	composer.verb("MDView", {
+		desc   = "mdview.nvim commands",
+		routes = routes,
+	})
+>>>>>>> feat/opt-in-file-logging
 end
 
 return M

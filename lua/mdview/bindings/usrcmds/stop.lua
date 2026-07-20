@@ -13,21 +13,15 @@ local runner = require("mdview.adapter.runner")
 local session = require("mdview.core.session")
 local autocmds = require("mdview.bindings.autocmds")
 local browser_adapter = require("mdview.adapter.browser")
-local libusercmd = require("lib.nvim.usercmd")
 local state = require("mdview.core.state")
 local notify = vim.notify
 
 local M = {}
 
-function M.attach()
-  local opts = {
-		desc = "[mdview] Stop mdview preview server and detach autocommands",
-		nargs = 0,
-  }
-
-	libusercmd.create("MDViewStop", function()
-		M.stop(browser_cfg.defaults.browser_autoclose)
-	end, opts)
+--- Run the stop action (the composer route calls this with no override, same
+--- as the old bare :MDViewStop; mdview/init.lua also calls M.stop directly).
+function M.run()
+	M.stop(browser_cfg.defaults.browser_autoclose)
 end
 
 ---@param close_browser_override boolean?  # when provided, explicitly control whether to close the browser handle; if nil, use browser_cfg.defaults.browser_autoclose
@@ -55,7 +49,7 @@ function M.stop(close_browser_override)
 	-- short-circuiting on the cached readiness of the stopped instance.
 	require("mdview.adapter.ws_client").reset_ready()
 
-	-- Forget which room the (now-closed) tab watched, so a fresh :MDViewStart
+	-- Forget which room the (now-closed) tab watched, so a fresh :MDView start
 	-- doesn't route "reuse" pushes to a stale key from the previous session.
 	state.set_preview_key(nil)
 
@@ -80,12 +74,11 @@ function M.stop(close_browser_override)
 		state.set_browser(nil)
 	end
 
-	-- Only autocommands get torn down here — user commands (:MDViewStart,
-	-- :MDViewStop, :MDViewOpen, :MDViewShowWebLogs) are registered once at
-	-- setup() and stay available for the whole Neovim session; tearing any
-	-- of them down here previously deleted :MDViewStop and :MDViewOpen from
-	-- existence the first time :MDViewStop ran (fixed — see
-	-- docs/Roadmap/Roadmap.md).
+	-- Only autocommands get torn down here — the :MDView user command is
+	-- registered once at setup() and stays available for the whole Neovim
+	-- session; tearing it down here previously deleted :MDViewStop and
+	-- :MDViewOpen (this plugin's now-retired flat commands) from existence
+	-- the first time :MDViewStop ran (fixed — see docs/Roadmap/Roadmap.md).
 	require("mdview.helper.autocmds_registry").detach_all()
 	notify("[mdview] stopped", vim.log.levels.INFO)
 end

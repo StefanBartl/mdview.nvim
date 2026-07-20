@@ -4,13 +4,50 @@
 -- surface — describe/it and a luassert-ish assert — to run *_spec.lua files
 -- headlessly:
 --
---   nvim --headless -u NONE -i NONE --cmd "set rtp+=.,../lib.nvim" \
+--   nvim --headless -u NONE -i NONE --cmd "set rtp+=." \
 --     -c "luafile tests/nvim/harness.lua" -c "qa!"
 --
 -- Discovers tests/nvim/*_spec.lua, runs them, prints a summary, and exits
 -- non-zero (via :cq) if anything failed so CI catches it.
+--
+-- mdview.nvim hard-requires lib.nvim (adapter/log.lua, bindings/usrcmds/
+-- init.lua, diagnostics.lua, helper/*.lua, log.lua, utils/line_diff.lua), so
+-- this harness resolves it itself below rather than relying on the caller to
+-- pass "../lib.nvim" on rtp (see lib.nvim/nvim/templates/resolve_lib_nvim.lua
+-- for the canonical copy of this function and the other caller patterns).
 
 local M = { pass = 0, fail = 0, failures = {} }
+
+---@return string|nil lib_nvim_root
+local function add_lib_nvim()
+	local candidates = {}
+	if vim.env.LIB_NVIM_PATH then
+		candidates[#candidates + 1] = vim.env.LIB_NVIM_PATH
+	end
+	candidates[#candidates + 1] = vim.fn.getcwd() .. "/../lib.nvim"
+	candidates[#candidates + 1] = vim.fn.stdpath("data") .. "/lazy/lib.nvim"
+
+	for _, path in ipairs(candidates) do
+		local norm = vim.fs.normalize(path)
+		if vim.fn.isdirectory(norm .. "/lua/lib") == 1 then
+			vim.opt.rtp:append(norm)
+			package.path = table.concat({
+				norm .. "/lua/?.lua",
+				norm .. "/lua/?/init.lua",
+				package.path,
+			}, ";")
+			return norm
+		end
+	end
+	return nil
+end
+
+if not add_lib_nvim() then
+	print("FAIL  cannot locate lib.nvim (a runtime dependency of mdview.nvim).")
+	print("      Set $LIB_NVIM_PATH, or check it out next to this repo.")
+	vim.cmd("cq")
+	return
+end
 
 local function deep_eq(a, b)
 	if type(a) ~= type(b) then
