@@ -1,8 +1,9 @@
 ---@module 'mdview.bindings.usrcmds.start'
---- User command entrypoint for :MDViewStart.
---- Exposes configurable push strategy and wires runner/session/autocmds/state.
+--- Action behind :MDView start. Exposes configurable push strategy and wires
+--- runner/session/autocmds/state. Registered as a composer route by
+--- mdview.bindings.usrcmds (M.run takes the tokens after the "start" literal,
+--- same shape :MDViewStart's raw fargs used to have).
 
-local libusercmd = require("lib.nvim.usercmd")
 local notify = vim.notify
 local log = require("mdview.helper.log")
 local state = require("mdview.core.state")
@@ -20,11 +21,11 @@ local trypush_mod_name = "mdview.bindings.usrcmds.start.server.try_push"
 
 local M = {}
 
--- Parses :MDViewStart's space-separated args into an optional file path and
+-- Parses :MDView start's space-separated args into an optional file path and
 -- an optional cwd override, e.g.:
---   :MDViewStart file.md
---   :MDViewStart file.md cwd=C:/Users/bartl/
---   :MDViewStart cwd="c:/Users/bartl/"
+--   :MDView start file.md
+--   :MDView start file.md cwd=C:/Users/bartl/
+--   :MDView start cwd="c:/Users/bartl/"
 -- The first non-`cwd=`-prefixed token is taken as the file path; surrounding
 -- quotes on the cwd value (single or double) are stripped.
 ---@param fargs string[]
@@ -108,102 +109,95 @@ local function initial_push_async(push_strategy, try_push_opts, wait_timeout, br
 	return ok_browser
 end
 
---- Register :MDViewStart user command.
---- Accepts an optional file path and an optional `cwd=...` override, in
---- either order, e.g.:
----   :MDViewStart
----   :MDViewStart file.md
----   :MDViewStart file.md cwd=C:/Users/bartl/
----   :MDViewStart cwd="c:/Users/bartl/"
---- Options:
----   - opts table may override M.config at runtime.
----   - accepted push_strategy values: "launcher" (default) | "try_push"
-function M.attach()
-	libusercmd.create("MDViewStart", function(cmdopts)
-		notify("[mdview] MDViewStart invoked", vim.log.levels.DEBUG)
+--- Run the start action. Accepts an optional file path and an optional
+--- `cwd=...` override, in either order, e.g.:
+---   :MDView start
+---   :MDView start file.md
+---   :MDView start file.md cwd=C:/Users/bartl/
+---   :MDView start cwd="c:/Users/bartl/"
+--- (`fargs` is the token list after the "start" subcommand — composer's
+--- `ctx.rest` — deliberately left as a free-form tail rather than a fixed
+--- positional schema, since `cwd=` may appear before or after the file arg.)
+---@param fargs string[]
+function M.run(fargs)
+	notify("[mdview] start invoked", vim.log.levels.DEBUG)
 
-		local file_arg, cwd_arg = parse_start_args(cmdopts.fargs)
+	local file_arg, cwd_arg = parse_start_args(fargs)
 
-		-- Server already running: don't re-spawn. Re-open the preview surface
-		-- instead — the common reason to run :MDViewStart again is that the
-		-- browser window was closed (without stopping the session) and the
-		-- user wants it back. Always return from this branch: previously it
-		-- fell through into the full start path, re-running session.init()
-		-- (wiping snapshots) and the whole launcher against the live server.
-		if state.get_server() then
-			if cwd_arg then
-				notify("[mdview] cwd=... ignored — server is already running", vim.log.levels.WARN)
-			end
-
-			-- optional explicit file arg: push that file's content first
-			local arg_path = file_arg and file_arg ~= "" and file_arg or nil
-			if arg_path then
-				initial_push_async(
-					start_defaults.push_strategy,
-					start_defaults.try_push_opts,
-					start_defaults.wait_timeout_ms,
-					{
-						browser_autostart = false, -- browser is (re)opened explicitly below
-						browser_cmd = browser_defaults.browser_cmd or browser_defaults.resolved_browser_cmd,
-						browser_args = browser_defaults.browser_args,
-					},
-					arg_path
-				)
-			end
-
-			-- re-open the preview surface for the current buffer
-			if require("mdview.config").defaults.open_preview_tab then
-				require("mdview.adapter.preview_tab").open(vim.api.nvim_get_current_buf())
-			else
-				require("mdview").open()
-			end
-			return
+	-- Server already running: don't re-spawn. Re-open the preview surface
+	-- instead — the common reason to run :MDViewStart again is that the
+	-- browser window was closed (without stopping the session) and the
+	-- user wants it back. Always return from this branch: previously it
+	-- fell through into the full start path, re-running session.init()
+	-- (wiping snapshots) and the whole launcher against the live server.
+	if state.get_server() then
+		if cwd_arg then
+			notify("[mdview] cwd=... ignored — server is already running", vim.log.levels.WARN)
 		end
 
-		-- merge runtime config overrides (no mutation of module defaults)
-		local push_strategy = start_defaults.push_strategy
-		local try_push_opts = start_defaults.try_push_opts
-		local wait_timeout = start_defaults.wait_timeout_ms
-		local browser_opts = {
-			browser_autostart = (browser_defaults.browser_autostart == nil) and browser_defaults.browser_autostart
-				or browser_defaults.browser_autostart,
-			browser_cmd = browser_defaults.browser_cmd or browser_defaults.resolved_browser_cmd,
-			browser_args = browser_defaults.browser_args,
-		}
-
-		-- allow optional file argument: prefer the parsed file_arg when provided
-		local initial_target = nil
-		if file_arg and file_arg ~= "" then
-			local norm = normalize.path(file_arg)
-			initial_target = (norm and norm ~= "") and norm or file_arg
+		-- optional explicit file arg: push that file's content first
+		local arg_path = file_arg and file_arg ~= "" and file_arg or nil
+		if arg_path then
+			initial_push_async(
+				start_defaults.push_strategy,
+				start_defaults.try_push_opts,
+				start_defaults.wait_timeout_ms,
+				{
+					browser_autostart = false, -- browser is (re)opened explicitly below
+					browser_cmd = browser_defaults.browser_cmd or browser_defaults.resolved_browser_cmd,
+					browser_args = browser_defaults.browser_args,
+				},
+				arg_path
+			)
 		end
 
-		-- Ensure server proc spawned (cwd_arg, if given, overrides mdview.config.defaults.server_cwd for this spawn)
-		local proc = state.ensure_proc_started(cwd_arg)
-		if not proc then
-			notify("[mdview] failed to start server process", vim.log.levels.ERROR)
-			return
+		-- re-open the preview surface for the current buffer
+		if require("mdview.config").defaults.open_preview_tab then
+			require("mdview.adapter.preview_tab").open(vim.api.nvim_get_current_buf())
+		else
+			require("mdview").open()
 		end
-		-- Wire session + autocmds BEFORE marking the server as "running":
-		-- if autocmds.attach() errors, we don't want state.get_server() left
-		-- truthy (which would make every later :MDViewStart say "already
-		-- running" against a never-fully-started session).
-		session.init()
-		autocmds.attach()
-		state.set_server(proc)
-		state.set_attached(true)
+		return
+	end
 
-		-- perform chosen initial push strategy (non-blocking)
-		initial_push_async(push_strategy, try_push_opts, wait_timeout, browser_opts, initial_target)
+	-- merge runtime config overrides (no mutation of module defaults)
+	local push_strategy = start_defaults.push_strategy
+	local try_push_opts = start_defaults.try_push_opts
+	local wait_timeout = start_defaults.wait_timeout_ms
+	local browser_opts = {
+		browser_autostart = (browser_defaults.browser_autostart == nil) and browser_defaults.browser_autostart
+			or browser_defaults.browser_autostart,
+		browser_cmd = browser_defaults.browser_cmd or browser_defaults.resolved_browser_cmd,
+		browser_args = browser_defaults.browser_args,
+	}
 
-		notify("[mdview] started", vim.log.levels.INFO)
-		log.debug("usercmds.start: MDViewStart completed wiring", nil, "usercmds.start", true)
-	end, {
-		desc = "[mdview] Start mdview preview server and attach autocommands "
-			.. "(optional file arg, optional cwd=... override)",
-		nargs = "*",
-		complete = "file",
-	})
+	-- allow optional file argument: prefer the parsed file_arg when provided
+	local initial_target = nil
+	if file_arg and file_arg ~= "" then
+		local norm = normalize.path(file_arg)
+		initial_target = (norm and norm ~= "") and norm or file_arg
+	end
+
+	-- Ensure server proc spawned (cwd_arg, if given, overrides mdview.config.defaults.server_cwd for this spawn)
+	local proc = state.ensure_proc_started(cwd_arg)
+	if not proc then
+		notify("[mdview] failed to start server process", vim.log.levels.ERROR)
+		return
+	end
+	-- Wire session + autocmds BEFORE marking the server as "running":
+	-- if autocmds.attach() errors, we don't want state.get_server() left
+	-- truthy (which would make every later :MDViewStart say "already
+	-- running" against a never-fully-started session).
+	session.init()
+	autocmds.attach()
+	state.set_server(proc)
+	state.set_attached(true)
+
+	-- perform chosen initial push strategy (non-blocking)
+	initial_push_async(push_strategy, try_push_opts, wait_timeout, browser_opts, initial_target)
+
+	notify("[mdview] started", vim.log.levels.INFO)
+	log.debug("usercmds.start: MDView start completed wiring", nil, "usercmds.start", true)
 end
 
 return M

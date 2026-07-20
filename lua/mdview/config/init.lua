@@ -30,7 +30,7 @@ end
 -- Keys that legitimately default to nil, so they're absent from the DEFAULTS
 -- table and can't be discovered by iterating it. Keyed by dotted table path.
 local KNOWN_NIL_KEYS = {
-	[""] = { server_cwd = true },
+	[""] = { server_cwd = true, file_log_path = true },
 	browser = { open_url = true, resolved_browser_cmd = true, browser_args = true },
 	start = { try_push_opts = true, wait_timeout_ms = true },
 }

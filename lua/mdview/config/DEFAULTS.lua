@@ -59,6 +59,8 @@
 ---@field dev_local boolean developer-only flag
 ---@field debug boolean when true, print server stdout/stderr into Neovim (dev only)
 ---@field log_buffer_name string scratch buffer name used to show logs when debug=true
+---@field file_log boolean opt in to writing the relay's stdout to a persistent log file (default false — nothing is written to disk); toggle at runtime with :MDViewFileLog
+---@field file_log_path string|nil where the persistent log is written when file_log=true; defaults to `stdpath("log")/mdview/relay-<timestamp>.log` (never the cwd)
 ---@field debug_plugin boolean enable plugin-internal debug notifications
 ---@field debug_preview boolean enable live-push debug notifications
 ---@field dev_server_port integer Vite dev server port for client (dev workflow only)
@@ -87,6 +89,15 @@ return {
 	-- actually debugging.
 	debug = false,
 	log_buffer_name = "mdview://logs",
+
+	-- Persistent file logging is opt-in: with `file_log = false` (the default)
+	-- mdview never touches the disk, so starting a preview no longer creates a
+	-- `logs/` directory in whatever the cwd happens to be. Turn it on via
+	-- setup({ file_log = true }) or at runtime with :MDViewFileLog on.
+	file_log = false,
+	-- nil -> stdpath("log")/mdview/relay-<timestamp>.log (resolved lazily, so
+	-- the file is only created once file logging is actually enabled).
+	file_log_path = nil,
 
 	debug_plugin = false,
 	debug_preview = false,

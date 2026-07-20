@@ -67,7 +67,7 @@ function M.check()
 	if status.binary_installed then
 		ok("mdview-server binary cached at " .. status.binary_path)
 	else
-		warn("mdview-server binary not yet installed — will be downloaded on first `:MDViewStart`")
+		warn("mdview-server binary not yet installed — will be downloaded on first `:MDView start`")
 	end
 
 	if status.client_installed then
@@ -86,11 +86,11 @@ function M.check()
 					.. " is incomplete ("
 					.. (has_index and "" or "index.html missing; ")
 					.. (#wasm > 0 and "" or "no .wasm in assets/; ")
-					.. "delete the cache dir and re-run :MDViewStart to re-download)"
+					.. "delete the cache dir and re-run :MDView start to re-download)"
 			)
 		end
 	else
-		warn("client bundle not yet installed — will be downloaded on first `:MDViewStart`")
+		warn("client bundle not yet installed — will be downloaded on first `:MDView start`")
 	end
 
 	-- Config & opt-in features ------------------------------------------------
@@ -161,7 +161,7 @@ function M.check()
 		end
 		ok("attached = " .. tostring(state.is_attached()) .. ", session token set = " .. tostring(state.get_token() ~= nil))
 	else
-		ok("no relay session running (start one with :MDViewStart)")
+		ok("no relay session running (start one with :MDView start)")
 	end
 
 	-- Companion plugins (optional, not dependencies) --------------------------

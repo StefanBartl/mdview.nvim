@@ -54,10 +54,7 @@ lazy.nvim, lazy-loaded on markdown files or the plugin's own commands
     "StefanBartl/mdview.nvim",
     dependencies = { "StefanBartl/lib.nvim" },
     ft  = { "markdown" },
-    cmd = {
-      "MDViewStart", "MDViewStop", "MDViewToggle", "MDViewOpen",
-      "MDViewTheme", "MDViewPreviewTab", "MDViewShowWebLogs", "MDViewDiagnose",
-    },
+    cmd = { "MDView" },
     config = function()
       require("mdview").setup()
     end,
@@ -82,10 +79,7 @@ packer.nvim: >lua
     "StefanBartl/mdview.nvim",
     requires = { "StefanBartl/lib.nvim" },
     ft  = { "markdown" },
-    cmd = {
-      "MDViewStart", "MDViewStop", "MDViewToggle", "MDViewOpen",
-      "MDViewTheme", "MDViewPreviewTab", "MDViewShowWebLogs", "MDViewDiagnose",
-    },
+    cmd = { "MDView" },
     config = function()
       require("mdview").setup()
     end,
@@ -93,7 +87,7 @@ packer.nvim: >lua
 <
 
 No external toolchain is required by end users — the relay binary and client
-bundle download automatically the first time |:MDViewStart| runs.
+bundle download automatically the first time |:MDView-start| runs.
 
 ==============================================================================
 4. CONFIGURATION                                               *mdview-config*
@@ -117,15 +111,21 @@ Defaults: >lua
     dev_local       = true,
     debug           = false,  -- echo relay stdout/stderr into Neovim
     log_buffer_name = "mdview://logs",
+    file_log        = false,  -- opt in to writing the relay log to a file
+    file_log_path   = nil,    -- default: stdpath('log')/mdview/relay-<ts>.log
     debug_plugin    = false,  -- plugin-internal debug notifications
     debug_preview   = false,  -- per-push debug notifications (noisy)
 
     scroll_sync             = true, -- nvim-to-browser cursor-follow scroll
     scroll_sync_throttle_ms = 150,  -- min. time between scroll-position pings
 
+<<<<<<< HEAD
     breadcrumbs             = true, -- record session breadcrumbs (:MDViewBreadcrumbs)
 
     open_preview_tab = false, -- :MDViewStart opens an nvim tab, not a browser
+=======
+    open_preview_tab = false, -- :MDView start opens an nvim tab, not a browser
+>>>>>>> feat/opt-in-file-logging
 
     browser = {
       open_mode           = "default", -- "default" (tab in your browser)
@@ -142,12 +142,12 @@ Defaults: >lua
       autodetect_browser  = true,  -- isolated mode only
       browser             = "",    -- friendly name, e.g. "firefox" (isolated)
       browser_cmd         = "",    -- absolute path (isolated mode only)
-      browser_autoclose   = true,  -- :MDViewStop closes the tab (isolated only)
-      browser_autostart   = true,  -- open the browser on :MDViewStart
+      browser_autoclose   = true,  -- :MDView stop closes the tab (isolated only)
+      browser_autostart   = true,  -- open the browser on :MDView start
       browser_args        = nil,   -- extra CLI args (isolated mode only)
       open_url            = nil,   -- static URL override (advanced)
       require_display     = true,  -- skip browser without GUI/DISPLAY
-      stop_on_browser_exit = true, -- browser closed => :MDViewStop (isolated)
+      stop_on_browser_exit = true, -- browser closed => :MDView stop (isolated)
     },
 
     start = {
@@ -203,9 +203,9 @@ scroll_sync_throttle_ms ~
   Minimum time between scroll-position pings sent to the relay.
 
 open_preview_tab ~
-  When `true`, |:MDViewStart| opens an nvim-tab preview (see
-  |:MDViewPreviewTab|) instead of the browser. The relay/WASM pipeline still
-  runs normally in the background, so |:MDViewOpen| can still open the
+  When `true`, |:MDView-start| opens an nvim-tab preview (see
+  |:MDView-preview-tab|) instead of the browser. The relay/WASM pipeline still
+  runs normally in the background, so |:MDView-open| can still open the
   browser afterwards if wanted.
 
 browser.open_mode ~
@@ -227,7 +227,7 @@ browser.theme ~
   (dark), and `"catppuccin"` (Latte/Mocha). Each follows the OS
   prefers-color-scheme where it defines both; append `-light` or `-dark`
   (e.g. `"catppuccin-dark"`) to pin the color scheme. Switch at runtime with
-  |:MDViewTheme|. Add a theme by dropping a CSS file in src/client/themes/
+  |:MDView-theme|. Add a theme by dropping a CSS file in src/client/themes/
   (import `_base.css` for the shared structure; optionally override `--code-*`
   for code colors) and a matching loader in main.ts.
 
@@ -297,7 +297,7 @@ browser.behavior ~
     "new_tab" — each markdown buffer you switch to opens its own preview tab
                 (once per file; respects `browser_autostart`).
     "manual"  — switching buffers does nothing; open other files explicitly
-                with |:MDViewOpen|.
+                with |:MDView-open|.
 
 browser.autodetect_browser ~
   Try to locate an installed browser automatically (chrome, chromium, edge,
@@ -312,10 +312,10 @@ browser.browser_cmd ~
   `browser` / autodetection when set.
 
 browser.browser_autoclose ~
-  Whether |:MDViewStop| also closes the browser tab it opened.
+  Whether |:MDView-stop| also closes the browser tab it opened.
 
 browser.browser_autostart ~
-  Whether |:MDViewStart| opens a browser tab automatically.
+  Whether |:MDView-start| opens a browser tab automatically.
 
 browser.browser_args ~
   Extra CLI arguments passed to the resolved browser executable.
@@ -370,7 +370,11 @@ experimental.reverse_scroll ~
 ==============================================================================
 5. COMMANDS                                                   *mdview-commands*
 
-:MDViewStart [file] [cwd=...]                                   *:MDViewStart*
+mdview.nvim registers one command, :MDView, built via lib.nvim's subcommand
+composer (`lib.nvim.usercmd.composer`): every subcommand below completes on
+<Tab>, including the typed arguments.                              *:MDView*
+
+:MDView start [file] [cwd=...]                                *:MDView-start*
   Ensures the mdview-server relay binary and client bundle are installed
   (downloading them from GitHub Releases on first use, checksum-verified),
   spawns the relay process, attaches the buffer-change autocommands (see
@@ -381,25 +385,25 @@ experimental.reverse_scroll ~
   Calling it again while already running is a no-op that still allows
   pushing a newly given `[file]` (`cwd=...` is ignored once running).
 
-:MDViewStop                                                      *:MDViewStop*
+:MDView stop                                                    *:MDView-stop*
   Stops the relay process, detaches all mdview autocommands, shuts down the
   session, and — when `browser.browser_autoclose` is true (the default) —
-  closes the browser tab |:MDViewStart| opened.
+  closes the browser tab |:MDView-start| opened.
 
-:MDViewToggle [file] [cwd=...]                                 *:MDViewToggle*
+:MDView toggle [file] [cwd=...]                                *:MDView-toggle*
   Starts the preview if no session is running, otherwise stops it. A thin
-  dispatcher over |:MDViewStart| / |:MDViewStop|; start-style args are
+  dispatcher over |:MDView-start| / |:MDView-stop|; start-style args are
   forwarded when starting and ignored when stopping.
 
-:MDViewOpen                                                      *:MDViewOpen*
+:MDView open                                                    *:MDView-open*
   Re-opens a browser tab for the *current* buffer against the
   *already-running* session. It does NOT start a new relay process — run
-  |:MDViewStart| first. Pushes the current buffer's content once so the new
+  |:MDView-start| first. Pushes the current buffer's content once so the new
   tab isn't empty, then opens the browser using the same key/token URL logic
-  |:MDViewStart| uses. If no session is running, or the current buffer has
+  |:MDView-start| uses. If no session is running, or the current buffer has
   no file path, it fails loudly via |vim.notify()| instead of doing nothing.
 
-:MDViewTheme [name]                                            *:MDViewTheme*
+:MDView theme [name]                                            *:MDView-theme*
   Switches the preview theme at runtime. `[name]` is one of `github`,
   `dark-dimmed`, `plain` (optionally `-light`/`-dark` suffixed) and is
   tab-completed. Sets `browser.theme` in the live config and, if a session is
@@ -407,6 +411,7 @@ experimental.reverse_scroll ~
   "default" |browser.open_mode|, since the old tab can't be closed
   programmatically). With no argument it reports the current theme.
 
+<<<<<<< HEAD
 :MDViewCursor [line | caret | section | off]                *:MDViewCursor*
   Switches the Neovim-cursor marker mode in the preview at runtime (see
   `browser.cursor_marker`): `line` (blinking bar at the cursor line), `caret`
@@ -452,19 +457,43 @@ experimental.reverse_scroll ~
   gated by `breadcrumbs` (|mdview-config|, default true) and reset each session.
 
 :MDViewShowWebLogs                                        *:MDViewShowWebLogs*
+=======
+:MDView weblogs                                               *:MDView-weblogs*
+>>>>>>> feat/opt-in-file-logging
   Opens a scratch buffer showing the relay server's captured stdout/stderr
   log, including `[client]` lines the browser client POSTs back for
   diagnostics (connection status, render/theme errors). Subject to `debug`
   in |mdview-config|.
 
-:MDViewLog [level | export [path]]                             *:MDViewLog*
+:MDView log [level]                                                *:MDView-log*
+:MDView log export [path]                                   *:MDView-log-export*
   Shows mdview's own internal structured log ring (launcher, live-push,
-  ws_client, …) in a scratch buffer — distinct from |:MDViewShowWebLogs|,
-  which shows the *relay's* stdout. Pass a minimum level
-  (`trace`/`debug`/`info`/`warn`/`error`) to filter, or `export [path]` to
-  write the ring to a file (default `stdpath('log')/mdview-log.txt`).
+  ws_client, …) in a scratch buffer — distinct from |:MDView-weblogs|,
+  which shows the *relay's* stdout. `[level]` (`trace`/`debug`/`info`/`warn`/
+  `error`, tab-completed) filters to that level and above; `export [path]`
+  writes the ring to a file instead (default `stdpath('log')/mdview-log.txt`).
 
-:MDViewDiagnose [path]                                       *:MDViewDiagnose*
+:MDView file-log                                              *:MDView-file-log*
+:MDView file-log on [path]                                 *:MDView-file-log-on*
+:MDView file-log off                                      *:MDView-file-log-off*
+:MDView file-log status                                *:MDView-file-log-status*
+:MDView file-log path [value]                            *:MDView-file-log-path*
+  Toggles persistent *file* logging of the relay's stdout at runtime. It is
+  opt-in and off by default, so a plain |:MDView-start| writes nothing to
+  disk. When on, output is appended to `file_log_path` — by default
+  `stdpath('log')/mdview/relay-<timestamp>.log`, never a `logs/` directory
+  in the current working directory. The bare form flips the state; `status`
+  reports without changing it. See `file_log` in |mdview-config|.
+
+  The destination can be set from the command line too: >
+      :MDView file-log on ~/mdview.log     enable and write there
+      :MDView file-log path ~/mdview.log   set the path, leave on/off as-is
+      :MDView file-log path                report the current path
+      :MDView file-log path default        fall back to the configured default
+<  `~` and relative paths are expanded to an absolute path when the command
+  runs, so a later |:cd| doesn't move the log file.
+
+:MDView diagnose [path]                                      *:MDView-diagnose*
   Writes a full component-state diagnostics report to a file (default
   `stdpath('log')/mdview-diagnostics.txt`, or `[path]` if given) and opens
   it. Covers environment, dependencies, install cache, effective config, the
@@ -472,7 +501,7 @@ experimental.reverse_scroll ~
   opened, and the recent internal log ring — everything needed to hand a
   bug report off for debugging.
 
-:MDViewPreviewTab                                          *:MDViewPreviewTab*
+:MDView preview-tab                                        *:MDView-preview-tab*
   Toggles an nvim-tab Markdown preview for the current buffer: a read-only
   mirror buffer in its own tab, highlighted via Neovim's markdown Treesitter
   parser (falls back to Vim's bundled `syntax=markdown` if the parser isn't
@@ -481,14 +510,14 @@ experimental.reverse_scroll ~
   Deliberately decoupled from the browser/WASM rendering pipeline: no HTML
   is ever produced, no relay server or WebSocket is involved, and no
   external tool (e.g. `glow`) is shelled out to — this works standalone,
-  with or without `:MDViewStart` ever having run. See |mdview-architecture|
-  and `open_preview_tab` in |mdview-config| to make `:MDViewStart` open this
+  with or without `:MDView start` ever having run. See |mdview-architecture|
+  and `open_preview_tab` in |mdview-config| to make `:MDView start` open this
   instead of the browser.
 
 Lua API ~
 
                                                                *mdview.open()*
-`require("mdview").open({opts})` is the function behind |:MDViewOpen|.
+`require("mdview").open({opts})` is the function behind |:MDView-open|.
 {opts} (all optional): `browser_url` (explicit URL override), `browser_cmd`,
 `browser_args`. Returns `true` on success, `false` on failure (after
 notifying why).
@@ -497,8 +526,8 @@ notifying why).
 6. AUTOCOMMANDS                                               *mdview-autocmds*
 
 All registered in a single augroup (`MdviewAutocmds`) by
-`mdview.bindings.autocmds.attach()` when |:MDViewStart| runs, and torn down
-together by |:MDViewStop|.
+`mdview.bindings.autocmds.attach()` when |:MDView-start| runs, and torn down
+together by |:MDView-stop|.
 
   Event                           Purpose ~
   BufEnter                        Take a session snapshot of the entered
@@ -527,9 +556,9 @@ reference; `live_push.lua` supersedes both.
 mdview.nvim does not define any keymaps of its own — only the user commands
 in |mdview-commands|. Map them yourself if you want keymaps: >lua
 
-  vim.keymap.set("n", "<leader>mp", "<cmd>MDViewStart<cr>",
+  vim.keymap.set("n", "<leader>mp", "<cmd>MDView start<cr>",
     { desc = "mdview: start preview" })
-  vim.keymap.set("n", "<leader>mq", "<cmd>MDViewStop<cr>",
+  vim.keymap.set("n", "<leader>mq", "<cmd>MDView stop<cr>",
     { desc = "mdview: stop preview" })
 <
 
@@ -557,7 +586,7 @@ Reports, without downloading or installing anything:
     already cached, and where
 
 A missing binary/client bundle is reported as a warning, not an error — both
-are downloaded automatically the first time |:MDViewStart| runs.
+are downloaded automatically the first time |:MDView-start| runs.
 
 ==============================================================================
 9. ARCHITECTURE                                            *mdview-architecture*
@@ -571,7 +600,7 @@ are downloaded automatically the first time |:MDViewStart| runs.
       init.lua                     Deep-merge setup() over DEFAULTS
       DEFAULTS.lua                 Single typed source of truth for defaults
       browser.lua                  Browser resolution config + validation
-      usrcmd_start.lua             :MDViewStart strategy config
+      usrcmd_start.lua             :MDView start strategy config
     core/
       state.lua                    Runtime handles (server proc, browser,
                                    session token)
@@ -592,16 +621,17 @@ are downloaded automatically the first time |:MDViewStart| runs.
       preview_tab.lua               Standalone nvim-tab preview: no HTML, no
                                    relay/WebSocket, no external tool — a
                                    Treesitter-highlighted mirror buffer (see
-                                   |:MDViewPreviewTab|)
+                                   |:MDView-preview-tab|)
     bindings/
-      usrcmds/                     :MDViewStart, :MDViewStop, :MDViewToggle,
-                                   :MDViewOpen, :MDViewTheme, :MDViewPreviewTab,
-                                   :MDViewShowWebLogs, :MDViewDiagnose
+      usrcmds/                     :MDView <subcommand>, built via
+                                   lib.nvim.usercmd.composer — one action
+                                   module per subcommand (start, stop, open,
+                                   toggle, theme, log, file_log, diagnose, …)
       autocmds/                    BufEnter, TextChanged*, BufWritePost,
                                    CursorMoved*, VimLeavePre wiring (see
                                    |mdview-autocmds|); preview_tab_sync.lua
                                    is separate, self-managing, and
-                                   independent of :MDViewStart/:MDViewStop
+                                   independent of :MDView start/stop
       keymaps/                     Reserved; mdview.nvim ships no keymaps (see
                                    |mdview-keymaps|)
     helper/                        Small cross-platform utilities; several
@@ -637,7 +667,7 @@ Markdown, and no unsanitized HTML ever reaches the DOM:
   - Every WebSocket upgrade is checked against the request's Origin header,
     rejecting cross-site/DNS-rebinding attempts against the local server.
   - Every request (WebSocket and HTTP) must present a per-session token,
-    generated fresh each time |:MDViewStart| runs and known only to the
+    generated fresh each time |:MDView-start| runs and known only to the
     Neovim process and the browser tab it opens.
   - The downloaded relay binary and client bundle are checksum-verified
     against the release's published checksums.txt before first execution.

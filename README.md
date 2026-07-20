@@ -45,68 +45,28 @@ turned into DOM content without passing through an allowlist-based sanitizer.
 
 ---
 
-## Installation
+## Quickstart
 
-**When to use which:**
-
-| Variant | Startup impact | Commands available | When to use |
-|---|---|---|---|
-| **`ft`/`cmd` (Recommended)** | Minimal | On `:MDView*` or when opening a markdown file | Default — true lazy-loading |
-| **`lazy = false`** | Loads immediately | Right from the start | Only if you want the plugin fully initialized before any command |
-
-### lazy.nvim
-
-*Lazy-load on markdown files or the plugin's own commands (recommended):*
+*lazy.nvim, lazy-loaded on markdown files or the plugin's own commands (recommended):*
 ```lua
 {
   "StefanBartl/mdview.nvim",
   dependencies = { "StefanBartl/lib.nvim" },
   ft = { "markdown" },
-  cmd = {
-    "MDViewStart", "MDViewStop", "MDViewToggle", "MDViewOpen", "MDViewTheme",
-    "MDViewPreviewTab", "MDViewShowWebLogs", "MDViewLog", "MDViewDiagnose",
-  },
+  cmd = { "MDView" },
   config = function()
     require("mdview").setup()
   end,
 }
 ```
 
-*Load at startup (eager):*
-```lua
-{
-  "StefanBartl/mdview.nvim",
-  dependencies = { "StefanBartl/lib.nvim" },
-  lazy = false,
-  config = function()
-    require("mdview").setup()
-  end,
-}
-```
-
-### packer
-
-```lua
-use {
-  "StefanBartl/mdview.nvim",
-  requires = { "StefanBartl/lib.nvim" },
-  ft = { "markdown" },
-  cmd = {
-    "MDViewStart", "MDViewStop", "MDViewToggle", "MDViewOpen", "MDViewTheme",
-    "MDViewPreviewTab", "MDViewShowWebLogs", "MDViewLog", "MDViewDiagnose",
-  },
-  config = function()
-    require("mdview").setup()
-  end,
-}
-```
-
-No external toolchain is required to run the plugin — see [Development](#development) below only if you want to build mdview.nvim itself from source.
+Then open a markdown file and run `:MDView start`. No external toolchain is required to run the plugin. See [Installation](docs/installation.md) for packer and eager-loading variants.
 
 ---
 
-## Configuration
+## Documentation
 
+<<<<<<< HEAD
 All defaults live in [`lua/mdview/config/DEFAULTS.lua`](lua/mdview/config/DEFAULTS.lua) — every key is typed via EmmyLua annotations there. Override any subset (including nested `browser`/`start`/`install` tables) through `setup()`:
 
 ```lua
@@ -254,6 +214,14 @@ npm run dev     # runs the Go relay + Vite dev server together
 | **Client**        | TypeScript              | Thin WebSocket glue + DOM injection of already-sanitized HTML        |
 | **Communication** | WebSocket               | Buffer text in, sanitized HTML never leaves the browser               |
 | **Rendering**     | Rust → WASM (comrak + ammonia) | Markdown → HTML + allowlist sanitization, both in the browser  |
+=======
+- [Installation](docs/installation.md) — lazy.nvim/packer setup variants and when to use each.
+- [Configuration](docs/configuration.md) — all available `setup()` options and their defaults.
+- [Commands](docs/commands.md) — full `:MDView <subcommand>` command reference and `:checkhealth mdview`.
+- [Companion plugins](docs/companion-plugins.md) — optional plugins that pair well with the live preview.
+- [Development](docs/development.md) — building mdview.nvim from source and running its test suites.
+- [Architecture](docs/architecture.md) — the Lua/Go/TypeScript/Rust components and how they communicate.
+>>>>>>> feat/opt-in-file-logging
 
 ---
 
@@ -279,5 +247,3 @@ For open discussion, visit the
 [GitHub Discussions](https://github.com/StefanBartl/mdview.nvim/discussions).
 
 If you find this plugin useful, please give it a ⭐ on GitHub to support its development.
-
----
