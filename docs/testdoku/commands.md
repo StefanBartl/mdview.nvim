@@ -17,15 +17,15 @@ Die Komponenten:
 
 ---
 
-## 1. Schnellster Weg: `:MDViewDiagnose`
+## 1. Schnellster Weg: `:MDView diagnose`
 
 Ein einziger Befehl erzeugt einen vollständigen Zustandsbericht **über alle
 Komponenten** und öffnet ihn in einem neuen Tab. Die Datei kann direkt
 weitergegeben / eingelesen werden.
 
 ```vim
-:MDViewDiagnose            " schreibt nach stdpath('log')/mdview-diagnostics.txt
-:MDViewDiagnose C:\tmp\d.txt   " optional: eigener Pfad
+:MDView diagnose               " schreibt nach stdpath('log')/mdview-diagnostics.txt
+:MDView diagnose C:\tmp\d.txt  " optional: eigener Pfad
 ```
 
 Der Bericht enthält:
@@ -52,11 +52,11 @@ Der Client meldet seine eigenen Diagnosen (fehlendes key/token,
 Verbindungsfortschritt, Transport-Fehler, erster erfolgreicher Render,
 Render-Fehler) per `POST /clientlog?token=…` an den Relay. Der Relay druckt
 jede Zeile als `[client] …` auf stdout — und die Lua-Runner-Schicht fängt den
-Relay-stdout ein, sodass die Zeilen in **`:MDViewShowWebLogs`** und im
-`:MDViewDiagnose`-Bericht auftauchen. Kein DevTools-Öffnen nötig.
+Relay-stdout ein, sodass die Zeilen in **`:MDView weblogs`** und im
+`:MDView diagnose`-Bericht auftauchen. Kein DevTools-Öffnen nötig.
 
 ```vim
-:MDViewShowWebLogs   " Relay-stdout inkl. [client]-Zeilen
+:MDView weblogs   " Relay-stdout inkl. [client]-Zeilen
 ```
 
 Manueller Smoke-Test des Sinks (Relay muss laufen):
@@ -64,7 +64,7 @@ Manueller Smoke-Test des Sinks (Relay muss laufen):
 ```sh
 curl -s -o /dev/null -w "%{http_code}\n" \
   -X POST "http://localhost:<port>/clientlog?token=<token>" --data "hallo"
-# 204, und im Relay-stdout / :MDViewShowWebLogs:  [client] hallo
+# 204, und im Relay-stdout / :MDView weblogs:  [client] hallo
 ```
 
 Optionale manuelle Browser-Konsolen-Checks (nur zur Fehlersuche):
@@ -82,10 +82,10 @@ new WebSocket(`ws://${location.host}/ws${location.search}`); // readyState === 1
 
 ```vim
 :checkhealth mdview   " Runtime-Infos, Dependency-Status
-:MDViewStart          " Relay starten + Browser öffnen
-:MDViewStop           " Relay stoppen
-:MDViewShowWebLogs    " Relay-stdout + [client]-Logs
-:MDViewDiagnose       " Vollbericht (siehe oben)
+:MDView start         " Relay starten + Browser öffnen
+:MDView stop          " Relay stoppen
+:MDView weblogs       " Relay-stdout + [client]-Logs
+:MDView diagnose      " Vollbericht (siehe oben)
 ```
 
 Headless-Smoke-Test (CI-nah), lädt lib.nvim ins rtp:

@@ -1,21 +1,20 @@
 ---@module 'mdview.bindings.usrcmds.file_log'
--- Registers :MDViewFileLog — toggles mdview's *persistent* log file (the relay
--- stdout capture in mdview.adapter.log) at runtime, and points it at a path.
+-- Action behind :MDView file-log — toggles mdview's *persistent* log file (the
+-- relay stdout capture in mdview.adapter.log) at runtime, and points it at a
+-- path.
 --
 -- File logging is opt-in and off by default (config `file_log`), so a plain
--- :MDViewStart never writes anything to disk. When enabled, output goes to
+-- :MDView start never writes anything to disk. When enabled, output goes to
 -- `file_log_path` — by default `stdpath("log")/mdview/relay-<timestamp>.log`,
 -- never a `logs/` directory in the current working directory.
 --
 -- Usage:
---   :MDViewFileLog                 toggle, then report the state
---   :MDViewFileLog on|off          set explicitly
---   :MDViewFileLog on <path>       enable and write to <path>
---   :MDViewFileLog path <path>     set the path (leaves on/off untouched)
---   :MDViewFileLog path default    fall back to config / the built-in default
---   :MDViewFileLog status          report without changing anything
-
-local libusercmd = require("lib.nvim.usercmd")
+--   :MDView file-log                 toggle, then report the state
+--   :MDView file-log on|off          set explicitly
+--   :MDView file-log on <path>       enable and write to <path>
+--   :MDView file-log path <path>     set the path (leaves on/off untouched)
+--   :MDView file-log path default    fall back to config / the built-in default
+--   :MDView file-log status          report without changing anything
 
 local M = {}
 
@@ -40,53 +39,43 @@ local function absolute(path)
 	return vim.fn.fnamemodify(vim.fn.expand(path), ":p")
 end
 
-function M.attach()
-	libusercmd.create("MDViewFileLog", function(cmdopts)
-		local log = require("mdview.adapter.log")
-		local args = cmdopts.fargs or {}
-		local sub = (args[1] or ""):lower()
-		local arg = args[2]
+--- :MDView file-log on [path]
+---@param path string|nil
+function M.on(path)
+	local log = require("mdview.adapter.log")
+	if path and path ~= "" then
+		log.set_file_log_path(absolute(path))
+	end
+	report(log.set_file_log(true))
+end
 
-		if sub == "on" or sub == "enable" then
-			if arg and arg ~= "" then
-				log.set_file_log_path(absolute(arg))
-			end
-			report(log.set_file_log(true))
-		elseif sub == "off" or sub == "disable" then
-			report(log.set_file_log(false))
-		elseif sub == "path" then
-			if not arg or arg == "" then
-				local _, current = log.file_log_state()
-				vim.notify("[mdview] file log path: " .. current, vim.log.levels.INFO)
-			elseif arg == "default" then
-				report(log.set_file_log_path(nil))
-			else
-				report(log.set_file_log_path(absolute(arg)))
-			end
-		elseif sub == "status" then
-			report(log.file_log_state())
-		elseif sub == "" or sub == "toggle" then
-			report(log.toggle_file_log())
-		else
-			vim.notify("[mdview] :MDViewFileLog expects on|off|toggle|status|path [<path>]", vim.log.levels.WARN)
-		end
-	end, {
-		desc = "[mdview] Toggle persistent file logging / set its path (on|off|toggle|status|path)",
-		nargs = "*",
-		complete = function(arglead, cmdline)
-			-- Second argument of `on`/`path` is a filename -> complete files.
-			if cmdline:match("^%s*%S+%s+%S+%s") then
-				return vim.fn.getcompletion(arglead, "file")
-			end
-			local out = {}
-			for _, c in ipairs({ "on", "off", "toggle", "status", "path" }) do
-				if c:find(arglead, 1, true) == 1 then
-					out[#out + 1] = c
-				end
-			end
-			return out
-		end,
-	})
+--- :MDView file-log off
+function M.off()
+	report(require("mdview.adapter.log").set_file_log(false))
+end
+
+--- :MDView file-log toggle (also the bare :MDView file-log default)
+function M.toggle()
+	report(require("mdview.adapter.log").toggle_file_log())
+end
+
+--- :MDView file-log status
+function M.status()
+	report(require("mdview.adapter.log").file_log_state())
+end
+
+--- :MDView file-log path [value]  — `value` is a path, "default", or omitted.
+---@param value string|nil
+function M.path(value)
+	local log = require("mdview.adapter.log")
+	if not value or value == "" then
+		local _, current = log.file_log_state()
+		vim.notify("[mdview] file log path: " .. current, vim.log.levels.INFO)
+	elseif value == "default" then
+		report(log.set_file_log_path(nil))
+	else
+		report(log.set_file_log_path(absolute(value)))
+	end
 end
 
 return M

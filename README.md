@@ -53,18 +53,14 @@ turned into DOM content without passing through an allowlist-based sanitizer.
   "StefanBartl/mdview.nvim",
   dependencies = { "StefanBartl/lib.nvim" },
   ft = { "markdown" },
-  cmd = {
-    "MDViewStart", "MDViewStop", "MDViewToggle", "MDViewOpen", "MDViewTheme",
-    "MDViewPreviewTab", "MDViewShowWebLogs", "MDViewLog", "MDViewFileLog",
-    "MDViewDiagnose",
-  },
+  cmd = { "MDView" },
   config = function()
     require("mdview").setup()
   end,
 }
 ```
 
-Then open a markdown file and run `:MDViewStart`. No external toolchain is required to run the plugin. See [Installation](docs/installation.md) for packer and eager-loading variants.
+Then open a markdown file and run `:MDView start`. No external toolchain is required to run the plugin. See [Installation](docs/installation.md) for packer and eager-loading variants.
 
 ---
 
@@ -72,7 +68,7 @@ Then open a markdown file and run `:MDViewStart`. No external toolchain is requi
 
 - [Installation](docs/installation.md) — lazy.nvim/packer setup variants and when to use each.
 - [Configuration](docs/configuration.md) — all available `setup()` options and their defaults.
-- [Commands](docs/commands.md) — full `:MDView*` command reference and `:checkhealth mdview`.
+- [Commands](docs/commands.md) — full `:MDView <subcommand>` command reference and `:checkhealth mdview`.
 - [Companion plugins](docs/companion-plugins.md) — optional plugins that pair well with the live preview.
 - [Development](docs/development.md) — building mdview.nvim from source and running its test suites.
 - [Architecture](docs/architecture.md) — the Lua/Go/TypeScript/Rust components and how they communicate.
