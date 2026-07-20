@@ -13,7 +13,7 @@
 -- mdview.nvim hard-requires lib.nvim (adapter/log.lua, bindings/usrcmds/
 -- init.lua, diagnostics.lua, helper/*.lua, log.lua, utils/line_diff.lua), so
 -- this harness resolves it itself below rather than relying on the caller to
--- pass "../lib.nvim" on rtp (see lib.nvim/nvim/templates/resolve_lib_nvim.lua
+-- pass "../lib.nvim" on rtp (see lib.nvim/templates/resolve_lib_nvim.lua
 -- for the canonical copy of this function and the other caller patterns).
 
 local M = { pass = 0, fail = 0, failures = {} }
