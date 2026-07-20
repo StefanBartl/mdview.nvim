@@ -1,11 +1,10 @@
 ---@module 'mdview.bindings.usrcmds.reveal'
--- Registers :MDViewReveal [on|off|toggle] — reveal/hide all private blocks
+-- Action behind :MDView reveal [on|off|toggle] — reveal/hide all private blocks
 -- (```private, rendered blurred by default) in the preview at once. Purely a
 -- live preview action (no persistent config): pushes a control update so the
 -- open tab toggles the blur without a reload. Individual blocks can also be
 -- revealed by clicking them in the browser.
 
-local libusercmd = require("lib.nvim.usercmd")
 local control = require("mdview.adapter.control")
 local state = require("mdview.core.state")
 
@@ -19,48 +18,36 @@ M._revealed = false
 ---@type string[]
 M.actions = { "on", "off", "toggle" }
 
-function M.attach()
-	libusercmd.create("MDViewReveal", function(cmdopts)
-		if not state.get_server() then
-			vim.notify("[mdview] no preview session running", vim.log.levels.WARN)
-			return
-		end
+---@param action string|nil
+---@return nil
+function M.run(action)
+	if not state.get_server() then
+		vim.notify("[mdview] no preview session running", vim.log.levels.WARN)
+		return
+	end
 
-		local action = cmdopts.args and vim.trim(cmdopts.args):lower() or "toggle"
-		local reveal
-		if action == "on" then
-			reveal = true
-		elseif action == "off" then
-			reveal = false
-		elseif action == "toggle" or action == "" then
-			reveal = not M._revealed
-		else
-			vim.notify(
-				("[mdview] MDViewReveal: expected one of: %s"):format(table.concat(M.actions, ", ")),
-				vim.log.levels.WARN
-			)
-			return
-		end
+	action = action and vim.trim(action):lower() or ""
+	local reveal
+	if action == "on" then
+		reveal = true
+	elseif action == "off" then
+		reveal = false
+	elseif action == "toggle" or action == "" then
+		reveal = not M._revealed
+	else
+		vim.notify(
+			("[mdview] reveal: expected one of: %s"):format(table.concat(M.actions, ", ")),
+			vim.log.levels.WARN
+		)
+		return
+	end
 
-		if control.send({ reveal = reveal }) then
-			M._revealed = reveal
-			vim.notify("[mdview] private blocks " .. (reveal and "revealed" or "hidden"), vim.log.levels.INFO)
-		else
-			vim.notify("[mdview] could not reach the preview tab", vim.log.levels.WARN)
-		end
-	end, {
-		desc = "[mdview] Reveal/hide all private (```private) blocks in the preview (on | off | toggle)",
-		nargs = "?",
-		complete = function(arglead)
-			local out = {}
-			for _, a in ipairs(M.actions) do
-				if a:find(arglead, 1, true) == 1 then
-					out[#out + 1] = a
-				end
-			end
-			return out
-		end,
-	})
+	if control.send({ reveal = reveal }) then
+		M._revealed = reveal
+		vim.notify("[mdview] private blocks " .. (reveal and "revealed" or "hidden"), vim.log.levels.INFO)
+	else
+		vim.notify("[mdview] could not reach the preview tab", vim.log.levels.WARN)
+	end
 end
 
 return M

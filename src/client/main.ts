@@ -14,6 +14,14 @@ import { installClickNav } from './render/clickNav';
 import { pickScrollTarget, fractionInBlock, hasSourcepos } from './render/scrollSync';
 import { markExternalLinks, parseExternalLinkMode } from './render/externalLinks';
 import { updateCursorMarker, parseCursorMarkerMode } from './render/cursorMarker';
+import {
+  initOverlays,
+  setOverlay,
+  setOverlays,
+  notifyCursor as notifyOverlayCursor,
+  notifyRender as notifyOverlayRender,
+  dispatchOverlayControl,
+} from './render/overlays';
 import { installHistory, onDocChange } from './render/history';
 import { highlight, parseHighlighter } from './highlight';
 import init, { render_markdown } from './wasm-render/mdview_wasm_render.js';
@@ -192,6 +200,17 @@ async function boot() {
   let lastCursorLine = -1;
   let lastCursorCol = -1;
 
+  // Overlays (?overlays=a,b from browser.overlays; :MDViewOverlay toggles them
+  // live). Independent, toggleable layers drawn over the document — see
+  // docs/Roadmap/KONZEPT_overlays.md.
+  if (container) {
+    initOverlays(container);
+    for (const name of (params.get('overlays') ?? '').split(',')) {
+      const n = name.trim();
+      if (n) setOverlay(n, true);
+    }
+  }
+
   // Preview zoom (?zoom= from browser.zoom; :MDViewZoom updates it live). Scales
   // #mdview-root's font-size; the stylesheet sizes everything in em, so the whole
   // document scales proportionally.
@@ -306,6 +325,9 @@ async function boot() {
       if (lastCursorLine >= 0) {
         updateCursorMarker(container, lastCursorLine, lastCursorCol >= 0 ? lastCursorCol : null, cursorMarkerMode);
       }
+      // Overlays derive from the document (headings, positions) — let them
+      // refresh against the new content.
+      notifyOverlayRender();
       if (firstRender) {
         firstRender = false;
         clientLog(`first render ok (${text.length} bytes)`);
@@ -319,11 +341,31 @@ async function boot() {
   // Apply a live control update (:MDViewCursor / :MDViewZoom). Best-effort: a
   // malformed payload is ignored rather than breaking the preview.
   const applyControl = (json: string): void => {
-    let msg: { cursor?: unknown; zoom?: unknown; reveal?: unknown };
+    let msg: {
+      cursor?: unknown;
+      zoom?: unknown;
+      reveal?: unknown;
+      overlay?: unknown;
+      overlays?: unknown;
+      overlayData?: unknown;
+    };
     try {
       msg = JSON.parse(json) as typeof msg;
     } catch {
       return;
+    }
+    // Overlay toggles: a single {name, on} or a batch {name: bool, …}.
+    if (msg.overlay && typeof msg.overlay === 'object') {
+      const o = msg.overlay as { name?: unknown; on?: unknown };
+      if (typeof o.name === 'string' && typeof o.on === 'boolean') setOverlay(o.name, o.on);
+    }
+    if (msg.overlays && typeof msg.overlays === 'object') {
+      setOverlays(msg.overlays as Record<string, boolean>);
+    }
+    // Overlay-addressed payload: {overlayData: {name, data}}.
+    if (msg.overlayData && typeof msg.overlayData === 'object') {
+      const d = msg.overlayData as { name?: unknown; data?: unknown };
+      if (typeof d.name === 'string') dispatchOverlayControl(d.name, d.data);
     }
     if (typeof msg.reveal === 'boolean' && container) {
       // Reveal/hide all private blocks at once (:MDViewReveal).
@@ -388,6 +430,7 @@ async function boot() {
         lastCursorLine = cursorLine;
         lastCursorCol = Number.isFinite(cursorCol) ? cursorCol : -1;
         updateCursorMarker(container, cursorLine, lastCursorCol >= 0 ? lastCursorCol : null, cursorMarkerMode);
+        notifyOverlayCursor(cursorLine, lastCursorCol >= 0 ? lastCursorCol : 0);
       }
       // The scrollTop we just set fires a 'scroll' event; suppress reverse-scroll
       // sends briefly so it doesn't echo back to Neovim (feedback loop).

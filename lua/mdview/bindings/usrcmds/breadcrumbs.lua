@@ -1,11 +1,9 @@
 ---@module 'mdview.bindings.usrcmds.breadcrumbs'
--- Registers :MDViewBreadcrumbs [show|export [path]|clear] — show/export/clear the
--- session breadcrumbs (mdview.core.breadcrumbs): a rough Markdown outline of
+-- Actions behind :MDView breadcrumbs [export [path] | clear] — show/export/clear
+-- the session breadcrumbs (mdview.core.breadcrumbs): a rough Markdown outline of
 -- which document + heading section was visited when, useful for writing notes
--- and follow-ups after a call. Complements :MDViewLog (which shows the internal
--- log ring); this is a human-facing session summary.
-
-local libusercmd = require("lib.nvim.usercmd")
+-- and follow-ups after a call. Complements :MDView log (the internal log ring);
+-- this is a human-facing session summary.
 
 local M = {}
 
@@ -22,55 +20,37 @@ local function show_in_scratch(lines)
 	pcall(vim.api.nvim_buf_set_name, buf, "mdview://breadcrumbs")
 end
 
-function M.attach()
-	libusercmd.create("MDViewBreadcrumbs", function(cmdopts)
-		local crumbs = require("mdview.core.breadcrumbs")
-		local args = cmdopts.fargs or {}
-		local sub = (args[1] or "show"):lower()
+--- Show the breadcrumbs outline in a scratch buffer.
+---@return nil
+function M.show()
+	show_in_scratch(require("mdview.core.breadcrumbs").format())
+end
 
-		if sub == "clear" then
-			crumbs.clear()
-			vim.notify("[mdview] breadcrumbs cleared", vim.log.levels.INFO)
-			return
-		end
+--- Write the breadcrumbs outline to `path` (default: stdpath log).
+---@param path string|nil
+---@return nil
+function M.export(path)
+	local crumbs = require("mdview.core.breadcrumbs")
+	if not path or path == "" then
+		local dir = vim.fn.stdpath("log")
+		pcall(vim.fn.mkdir, dir, "p")
+		path = dir .. "/mdview-breadcrumbs.md"
+	end
+	local f = io.open(path, "w")
+	if f then
+		f:write(table.concat(crumbs.format(), "\n") .. "\n")
+		f:close()
+		vim.notify("[mdview] breadcrumbs written to " .. path, vim.log.levels.INFO)
+	else
+		vim.notify("[mdview] failed to write breadcrumbs to " .. path, vim.log.levels.ERROR)
+	end
+end
 
-		if sub == "export" then
-			local path = args[2]
-			if not path or path == "" then
-				local dir = vim.fn.stdpath("log")
-				pcall(vim.fn.mkdir, dir, "p")
-				path = dir .. "/mdview-breadcrumbs.md"
-			end
-			local f = io.open(path, "w")
-			if f then
-				f:write(table.concat(crumbs.format(), "\n") .. "\n")
-				f:close()
-				vim.notify("[mdview] breadcrumbs written to " .. path, vim.log.levels.INFO)
-			else
-				vim.notify("[mdview] failed to write breadcrumbs to " .. path, vim.log.levels.ERROR)
-			end
-			return
-		end
-
-		if sub ~= "show" then
-			vim.notify("[mdview] MDViewBreadcrumbs: expected show | export [path] | clear", vim.log.levels.WARN)
-			return
-		end
-
-		show_in_scratch(crumbs.format())
-	end, {
-		desc = "[mdview] Show/export/clear session breadcrumbs (document + heading over time)",
-		nargs = "*",
-		complete = function(arglead)
-			local out = {}
-			for _, c in ipairs({ "show", "export", "clear" }) do
-				if c:find(arglead, 1, true) == 1 then
-					out[#out + 1] = c
-				end
-			end
-			return out
-		end,
-	})
+--- Drop all recorded breadcrumbs.
+---@return nil
+function M.clear()
+	require("mdview.core.breadcrumbs").clear()
+	vim.notify("[mdview] breadcrumbs cleared", vim.log.levels.INFO)
 end
 
 return M
