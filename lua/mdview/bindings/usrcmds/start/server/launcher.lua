@@ -17,7 +17,7 @@ local normalize = require("mdview.helper.normalize")
 local log = require("mdview.helper.log")
 
 local api = vim.api
-local notify = vim.notify
+local notify = require("lib.nvim.notify").create("").notify
 local schedule = vim.schedule
 
 local M = {}
@@ -198,7 +198,7 @@ function M.start(opts)
 		if ok then
 			local port = vim.g.mdview_server_port or 43219
 			vim.g.mdview_server_port = port
-			vim.notify("[mdview] detected server port: " .. tostring(port), 2)
+			notify("[mdview] detected server port: " .. tostring(port), 2)
 
 			schedule(function()
 				log.debug("launcher: server ready — performing initial full push", nil, "launcher", true)

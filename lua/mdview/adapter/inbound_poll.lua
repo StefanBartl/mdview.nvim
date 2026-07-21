@@ -10,6 +10,8 @@
 
 local uv = vim.uv or vim.loop
 
+local notify = require("lib.nvim.notify").create("").notify
+
 local M = {}
 
 local INTERVAL_MS = 250
@@ -59,7 +61,7 @@ local function handle_nav(key, href)
 		target = norm
 	end
 	if vim.fn.filereadable(target) ~= 1 then
-		vim.notify("[mdview] click-navigate: file not found: " .. target, vim.log.levels.WARN)
+		notify("[mdview] click-navigate: file not found: " .. target, vim.log.levels.WARN)
 		return
 	end
 	pcall(vim.cmd.edit, vim.fn.fnameescape(target))

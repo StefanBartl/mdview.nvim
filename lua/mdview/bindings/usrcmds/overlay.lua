@@ -12,6 +12,8 @@
 local control = require("mdview.adapter.control")
 local state = require("mdview.core.state")
 
+local notify = require("lib.nvim.notify").create("").notify
+
 local M = {}
 
 ---@class mdview.OverlaySpec
@@ -54,7 +56,7 @@ function M.list()
 			M.known[name].desc
 		)
 	end
-	vim.notify("[mdview] overlays:\n" .. table.concat(lines, "\n"), vim.log.levels.INFO)
+	notify("[mdview] overlays:\n" .. table.concat(lines, "\n"), vim.log.levels.INFO)
 end
 
 --- Turn overlay `name` on/off/toggle. No name (or "list") reports the list.
@@ -69,7 +71,7 @@ function M.run(name, action)
 	end
 
 	if not M.known[name] then
-		vim.notify(
+		notify(
 			("[mdview] unknown overlay %q — known: %s"):format(name, table.concat(M.names(), ", ")),
 			vim.log.levels.WARN
 		)
@@ -86,16 +88,16 @@ function M.run(name, action)
 	elseif action == "toggle" then
 		on = states[name] ~= true
 	else
-		vim.notify("[mdview] overlay: expected on | off | toggle", vim.log.levels.WARN)
+		notify("[mdview] overlay: expected on | off | toggle", vim.log.levels.WARN)
 		return
 	end
 
 	states[name] = on
 
 	if state.get_server() and control.send({ overlay = { name = name, on = on } }) then
-		vim.notify(("[mdview] overlay %s: %s"):format(name, on and "on" or "off"), vim.log.levels.INFO)
+		notify(("[mdview] overlay %s: %s"):format(name, on and "on" or "off"), vim.log.levels.INFO)
 	else
-		vim.notify(
+		notify(
 			("[mdview] overlay %s: %s (applies on next :MDView start)"):format(name, on and "on" or "off"),
 			vim.log.levels.INFO
 		)

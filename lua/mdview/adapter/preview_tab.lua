@@ -13,6 +13,8 @@
 local api = vim.api
 local safe_buf_get_option = require("mdview.helper.safe_buf_get_option")
 
+local notify = require("lib.nvim.notify").create("").notify
+
 local M = {}
 
 ---@type table<integer, integer> source bufnr -> preview bufnr
@@ -137,7 +139,7 @@ function M.open(source_bufnr)
 	source_bufnr = source_bufnr or api.nvim_get_current_buf()
 
 	if not is_markdown(source_bufnr) then
-		vim.notify("[mdview] current buffer is not a markdown file", vim.log.levels.WARN)
+		notify("[mdview] current buffer is not a markdown file", vim.log.levels.WARN)
 		return false
 	end
 

@@ -10,6 +10,8 @@
 --   :MDView log warn                  show only WARN and above (trace|debug|info|warn|error)
 --   :MDView log export [path]         write the ring to a file (default: stdpath log)
 
+local notify = require("lib.nvim.notify").create("").notify
+
 local M = {}
 
 M.LEVELS = { trace = 0, debug = 1, info = 2, warn = 3, error = 4 }
@@ -89,9 +91,9 @@ function M.export_ring(path)
 	if f then
 		f:write(table.concat(format_ring(nil), "\n") .. "\n")
 		f:close()
-		vim.notify("[mdview] log written to " .. path, vim.log.levels.INFO)
+		notify("[mdview] log written to " .. path, vim.log.levels.INFO)
 	else
-		vim.notify("[mdview] failed to write log to " .. path, vim.log.levels.ERROR)
+		notify("[mdview] failed to write log to " .. path, vim.log.levels.ERROR)
 	end
 end
 

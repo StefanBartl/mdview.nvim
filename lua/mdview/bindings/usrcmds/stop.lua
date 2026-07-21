@@ -14,7 +14,7 @@ local session = require("mdview.core.session")
 local autocmds = require("mdview.bindings.autocmds")
 local browser_adapter = require("mdview.adapter.browser")
 local state = require("mdview.core.state")
-local notify = vim.notify
+local notify = require("lib.nvim.notify").create("").notify
 
 local M = {}
 

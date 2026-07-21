@@ -8,6 +8,8 @@
 local control = require("mdview.adapter.control")
 local state = require("mdview.core.state")
 
+local notify = require("lib.nvim.notify").create("").notify
+
 local M = {}
 
 -- Best-effort mirror of the reveal state so `toggle` has something to flip.
@@ -22,7 +24,7 @@ M.actions = { "on", "off", "toggle" }
 ---@return nil
 function M.run(action)
 	if not state.get_server() then
-		vim.notify("[mdview] no preview session running", vim.log.levels.WARN)
+		notify("[mdview] no preview session running", vim.log.levels.WARN)
 		return
 	end
 
@@ -35,7 +37,7 @@ function M.run(action)
 	elseif action == "toggle" or action == "" then
 		reveal = not M._revealed
 	else
-		vim.notify(
+		notify(
 			("[mdview] reveal: expected one of: %s"):format(table.concat(M.actions, ", ")),
 			vim.log.levels.WARN
 		)
@@ -44,9 +46,9 @@ function M.run(action)
 
 	if control.send({ reveal = reveal }) then
 		M._revealed = reveal
-		vim.notify("[mdview] private blocks " .. (reveal and "revealed" or "hidden"), vim.log.levels.INFO)
+		notify("[mdview] private blocks " .. (reveal and "revealed" or "hidden"), vim.log.levels.INFO)
 	else
-		vim.notify("[mdview] could not reach the preview tab", vim.log.levels.WARN)
+		notify("[mdview] could not reach the preview tab", vim.log.levels.WARN)
 	end
 end
 

@@ -5,6 +5,8 @@
 
 local vim = vim
 
+local notify = require("lib.nvim.notify").create("").notify
+
 local M = {}
 
 ---@type mdview.core.state.web
@@ -154,7 +156,7 @@ function M.update_web(fn)
 	local snapshot = shallow_copy(web_state)
 	local ok, res = pcall(fn, snapshot)
 	if not ok then
-		vim.notify("update_web callback failed: " .. tostring(res), vim.log.levels.ERROR)
+		notify("update_web callback failed: " .. tostring(res), vim.log.levels.ERROR)
 		return shallow_copy(web_state)
 	end
 	if type(res) == "table" then
@@ -249,7 +251,7 @@ function M.ensure_proc_started(cwd_override)
 
 	local cmd, args, cwd, err = require("mdview.adapter.server_args").resolve(cwd_override)
 	if not cmd then
-		vim.notify("[mdview] " .. tostring(err), vim.log.levels.ERROR)
+		notify("[mdview] " .. tostring(err), vim.log.levels.ERROR)
 		return nil
 	end
 

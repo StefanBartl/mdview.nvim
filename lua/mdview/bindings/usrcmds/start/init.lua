@@ -4,7 +4,7 @@
 --- mdview.bindings.usrcmds (M.run takes the tokens after the "start" literal,
 --- same shape :MDViewStart's raw fargs used to have).
 
-local notify = vim.notify
+local notify = require("lib.nvim.notify").create("").notify
 local log = require("mdview.helper.log")
 local state = require("mdview.core.state")
 local session = require("mdview.core.session")

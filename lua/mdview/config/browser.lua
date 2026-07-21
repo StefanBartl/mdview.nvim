@@ -9,7 +9,7 @@
 local fn = vim.fn
 local executable = fn.executable
 local filereadable = fn.filereadable
-local notify = vim.notify
+local notify = require("lib.nvim.notify").create("").notify
 local normalize = require("mdview.helper.normalize")
 local log = require("mdview.helper.log")
 

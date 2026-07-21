@@ -10,6 +10,8 @@
 
 local state = require("mdview.core.state")
 
+local notify = require("lib.nvim.notify").create("").notify
+
 local M = {}
 
 -- Base theme names that ship with the client (must match THEME_LOADERS in
@@ -35,7 +37,7 @@ function M.run(name)
 	name = name and vim.trim(name) or ""
 	if name == "" then
 		local current = require("mdview.config.browser").defaults.theme
-		vim.notify(
+		notify(
 			("[mdview] current theme: %s (known: %s)"):format(tostring(current), table.concat(M.known, ", ")),
 			vim.log.levels.INFO
 		)
@@ -43,7 +45,7 @@ function M.run(name)
 	end
 
 	if not is_known(name) then
-		vim.notify(
+		notify(
 			("[mdview] unknown theme %q — known: %s (optionally suffixed -light/-dark)"):format(
 				name,
 				table.concat(M.known, ", ")
@@ -63,9 +65,9 @@ function M.run(name)
 		if not require("mdview.config").defaults.open_preview_tab then
 			require("mdview").open()
 		end
-		vim.notify("[mdview] theme set to " .. name .. " (re-opened preview)", vim.log.levels.INFO)
+		notify("[mdview] theme set to " .. name .. " (re-opened preview)", vim.log.levels.INFO)
 	else
-		vim.notify("[mdview] theme set to " .. name .. " (applies on next :MDView start)", vim.log.levels.INFO)
+		notify("[mdview] theme set to " .. name .. " (applies on next :MDView start)", vim.log.levels.INFO)
 	end
 end
 

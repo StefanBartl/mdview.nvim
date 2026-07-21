@@ -5,7 +5,7 @@
 ---@diagnostic disable: undefined-field, deprecated, undefined-global, unused-local, return-type-mismatch
 
 local uv = vim.loop
-local notify = vim.notify
+local notify = require("lib.nvim.notify").create("").notify
 local log = require("mdview.adapter.log")
 local defaults = require("mdview.config").defaults
 local expand_path = require("lib.nvim.cross.fs.expand_path")

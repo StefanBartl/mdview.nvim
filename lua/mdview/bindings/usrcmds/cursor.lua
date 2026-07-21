@@ -10,6 +10,8 @@
 local control = require("mdview.adapter.control")
 local state = require("mdview.core.state")
 
+local notify = require("lib.nvim.notify").create("").notify
+
 local M = {}
 
 ---@type string[]
@@ -33,7 +35,7 @@ function M.run(mode)
 	mode = mode and vim.trim(mode) or ""
 
 	if mode == "" then
-		vim.notify(
+		notify(
 			("[mdview] cursor marker: %s (choices: %s)"):format(
 				tostring(browser.cursor_marker),
 				table.concat(M.modes, ", ")
@@ -44,7 +46,7 @@ function M.run(mode)
 	end
 
 	if not is_valid(mode) then
-		vim.notify(
+		notify(
 			("[mdview] unknown cursor mode %q — choose one of: %s"):format(mode, table.concat(M.modes, ", ")),
 			vim.log.levels.WARN
 		)
@@ -55,9 +57,9 @@ function M.run(mode)
 	browser.cursor_marker = mode
 
 	if state.get_server() and control.send({ cursor = mode }) then
-		vim.notify("[mdview] cursor marker: " .. mode, vim.log.levels.INFO)
+		notify("[mdview] cursor marker: " .. mode, vim.log.levels.INFO)
 	else
-		vim.notify("[mdview] cursor marker: " .. mode .. " (applies on next :MDView start)", vim.log.levels.INFO)
+		notify("[mdview] cursor marker: " .. mode .. " (applies on next :MDView start)", vim.log.levels.INFO)
 	end
 end
 
