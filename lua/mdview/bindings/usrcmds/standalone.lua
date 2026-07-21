@@ -20,7 +20,7 @@ local detached = require("mdview.adapter.detached")
 local install = require("mdview.adapter.install")
 local log = require("mdview.helper.log")
 
-local notify = vim.notify
+local notify = require("lib.nvim.notify").create("").notify
 
 local M = {}
 

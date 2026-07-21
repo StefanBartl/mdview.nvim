@@ -11,6 +11,8 @@
 local control = require("mdview.adapter.control")
 local state = require("mdview.core.state")
 
+local notify = require("lib.nvim.notify").create("").notify
+
 local M = {}
 
 local STEP = 0.1
@@ -40,7 +42,7 @@ function M.run(arg)
 	arg = arg and vim.trim(arg) or ""
 
 	if arg == "" then
-		vim.notify(("[mdview] preview zoom: %d%%"):format(math.floor(cur * 100 + 0.5)), vim.log.levels.INFO)
+		notify(("[mdview] preview zoom: %d%%"):format(math.floor(cur * 100 + 0.5)), vim.log.levels.INFO)
 		return
 	end
 
@@ -54,7 +56,7 @@ function M.run(arg)
 	else
 		local n = tonumber(arg)
 		if not n then
-			vim.notify("[mdview] zoom: expected +, -, reset, or a number", vim.log.levels.WARN)
+			notify("[mdview] zoom: expected +, -, reset, or a number", vim.log.levels.WARN)
 			return
 		end
 		-- accept either a factor (1.5) or a percentage (150)
@@ -65,9 +67,9 @@ function M.run(arg)
 
 	local label = ("%d%%"):format(math.floor(next_zoom * 100 + 0.5))
 	if state.get_server() and control.send({ zoom = next_zoom }) then
-		vim.notify("[mdview] preview zoom: " .. label, vim.log.levels.INFO)
+		notify("[mdview] preview zoom: " .. label, vim.log.levels.INFO)
 	else
-		vim.notify("[mdview] preview zoom: " .. label .. " (applies on next :MDView start)", vim.log.levels.INFO)
+		notify("[mdview] preview zoom: " .. label .. " (applies on next :MDView start)", vim.log.levels.INFO)
 	end
 end
 

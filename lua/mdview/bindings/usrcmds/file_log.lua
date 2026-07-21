@@ -16,15 +16,17 @@
 --   :MDView file-log path default    fall back to config / the built-in default
 --   :MDView file-log status          report without changing anything
 
+local notify = require("lib.nvim.notify").create("").notify
+
 local M = {}
 
 ---@param enabled boolean
 ---@param path string
 local function report(enabled, path)
 	if enabled then
-		vim.notify("[mdview] file logging ON -> " .. path, vim.log.levels.INFO)
+		notify("[mdview] file logging ON -> " .. path, vim.log.levels.INFO)
 	else
-		vim.notify("[mdview] file logging OFF (path: " .. path .. ")", vim.log.levels.INFO)
+		notify("[mdview] file logging OFF (path: " .. path .. ")", vim.log.levels.INFO)
 	end
 end
 
@@ -70,7 +72,7 @@ function M.path(value)
 	local log = require("mdview.adapter.log")
 	if not value or value == "" then
 		local _, current = log.file_log_state()
-		vim.notify("[mdview] file log path: " .. current, vim.log.levels.INFO)
+		notify("[mdview] file log path: " .. current, vim.log.levels.INFO)
 	elseif value == "default" then
 		report(log.set_file_log_path(nil))
 	else

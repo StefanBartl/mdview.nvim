@@ -10,6 +10,8 @@
 
 local DEFAULTS = require("mdview.config.DEFAULTS")
 
+local notify = require("lib.nvim.notify").create("").notify
+
 local M = {}
 
 ---@type mdview.config.Defaults
@@ -89,7 +91,7 @@ function M.validate(opts)
 	check(opts, M.defaults, "", KNOWN_NIL_KEYS[""])
 
 	if #unknown > 0 then
-		vim.notify(
+		notify(
 			"[mdview] unknown setup() config key(s):\n  - " .. table.concat(unknown, "\n  - "),
 			vim.log.levels.WARN
 		)

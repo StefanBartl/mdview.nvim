@@ -5,6 +5,8 @@
 -- and follow-ups after a call. Complements :MDView log (the internal log ring);
 -- this is a human-facing session summary.
 
+local notify = require("lib.nvim.notify").create("").notify
+
 local M = {}
 
 ---@param lines string[]
@@ -40,9 +42,9 @@ function M.export(path)
 	if f then
 		f:write(table.concat(crumbs.format(), "\n") .. "\n")
 		f:close()
-		vim.notify("[mdview] breadcrumbs written to " .. path, vim.log.levels.INFO)
+		notify("[mdview] breadcrumbs written to " .. path, vim.log.levels.INFO)
 	else
-		vim.notify("[mdview] failed to write breadcrumbs to " .. path, vim.log.levels.ERROR)
+		notify("[mdview] failed to write breadcrumbs to " .. path, vim.log.levels.ERROR)
 	end
 end
 
@@ -50,7 +52,7 @@ end
 ---@return nil
 function M.clear()
 	require("mdview.core.breadcrumbs").clear()
-	vim.notify("[mdview] breadcrumbs cleared", vim.log.levels.INFO)
+	notify("[mdview] breadcrumbs cleared", vim.log.levels.INFO)
 end
 
 return M

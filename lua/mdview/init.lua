@@ -21,6 +21,8 @@ local browser_adapter = require("mdview.adapter.browser")
 local state = require("mdview.core.state")
 local normalize = require("mdview.helper.normalize")
 
+local notify = require("lib.nvim.notify").create("").notify
+
 local M = {}
 
 M.config = cfg.defaults
@@ -49,14 +51,14 @@ function M.open(opts)
 	opts = opts or {}
 
 	if not state.is_attached() or not state.get_server() then
-		vim.notify("[mdview] no mdview session running — start one first with :MDViewStart", vim.log.levels.WARN)
+		notify("[mdview] no mdview session running — start one first with :MDViewStart", vim.log.levels.WARN)
 		return false
 	end
 
 	local buf = vim.api.nvim_get_current_buf()
 	local key = normalize.path(vim.api.nvim_buf_get_name(buf))
 	if not key or key == "" then
-		vim.notify("[mdview] current buffer has no file path to preview", vim.log.levels.WARN)
+		notify("[mdview] current buffer has no file path to preview", vim.log.levels.WARN)
 		return false
 	end
 
@@ -96,11 +98,11 @@ function M.open(opts)
 	local ok, handle_or_err = pcall(browser_adapter.open, browser_url, browser_opts)
 	if ok and handle_or_err then
 		state.set_browser(handle_or_err)
-		vim.notify("[mdview] opened preview: " .. browser_url, vim.log.levels.INFO)
+		notify("[mdview] opened preview: " .. browser_url, vim.log.levels.INFO)
 		return true
 	end
 
-	vim.notify(("[mdview] failed to open browser: %s"):format(tostring(handle_or_err)), vim.log.levels.ERROR)
+	notify(("[mdview] failed to open browser: %s"):format(tostring(handle_or_err)), vim.log.levels.ERROR)
 	return false
 end
 
