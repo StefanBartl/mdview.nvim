@@ -102,8 +102,12 @@ local function on_switch(bufnr)
 		end
 		M._opened[path] = true
 		-- open() previews the *current* buffer; BufEnter has already made this
-		-- buffer current, so this opens a tab for `path`.
+		-- buffer current, so this opens a tab for `path` — but only if it's
+		-- still current by the time the scheduled callback runs.
 		vim.schedule(function()
+			if not api.nvim_buf_is_valid(bufnr) or api.nvim_get_current_buf() ~= bufnr then
+				return
+			end
 			require("mdview").open()
 		end)
 	end
