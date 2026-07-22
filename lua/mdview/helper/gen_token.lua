@@ -4,14 +4,14 @@
 -- from any other local process or page (DNS-rebinding / stray localhost
 -- clients). Not a long-lived credential — regenerated on every server start.
 
-math.randomseed(vim.loop.hrtime())
+math.randomseed(vim.uv.hrtime())
 
 ---@return string
 return function()
 	local parts = {
 		tostring(math.random(0, 0x7fffffff)),
 		tostring(math.random(0, 0x7fffffff)),
-		tostring(vim.loop.hrtime()),
+		tostring(vim.uv.hrtime()),
 	}
 	return vim.fn.sha256(table.concat(parts, "-"))
 end

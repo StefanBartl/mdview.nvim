@@ -159,7 +159,7 @@ local function path_dirname(path)
 	return dir
 end
 
--- Helper: ensure directory exists by creating missing segments using luv (vim.loop)
+-- Helper: ensure directory exists by creating missing segments using luv (vim.uv)
 -- English comments:
 -- Avoid calling vim.fn.mkdir to prevent E5560 in fast event contexts.
 ---@param dir string
@@ -169,7 +169,7 @@ local function ensure_dir(dir)
 		return false, "empty directory"
 	end
 			---@diagnostic disable-next-line LSP-problems with uv.loop
-	local stat = vim.loop.fs_stat(dir)
+	local stat = vim.uv.fs_stat(dir)
 	if stat then
 		-- already exists
 		return true, nil
@@ -209,14 +209,14 @@ local function ensure_dir(dir)
 			cur = cur .. "/"
 		end
 			---@diagnostic disable-next-line  LSP-Problems with uuv.loop
-		local st = vim.loop.fs_stat(cur)
+		local st = vim.uv.fs_stat(cur)
 		if not st then
 			---@diagnostic disable-next-line  LSP_Problems with uv.loop
-			local ok, _ = pcall(vim.loop.fs_mkdir, cur, tonumber("755", 8))
+			local ok, _ = pcall(vim.uv.fs_mkdir, cur, tonumber("755", 8))
 			if not ok then
 				-- fs_mkdir may return nil and set errno; attempt non-pcall call for message
 			---@diagnostic disable-next-line  lsp problemsuuv.loop
-				local _, e = vim.loop.fs_mkdir(cur, tonumber("755", 8))
+				local _, e = vim.uv.fs_mkdir(cur, tonumber("755", 8))
 				return false, e
 			end
 		end
