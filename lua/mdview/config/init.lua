@@ -36,6 +36,7 @@ local KNOWN_NIL_KEYS = {
 	browser = { open_url = true, resolved_browser_cmd = true, browser_args = true },
 	start = { try_push_opts = true, wait_timeout_ms = true },
 	standalone = { binary_path = true },
+	dev = { binary_path = true, web_root = true },
 }
 
 -- Collect every valid leaf key name across all levels (for "did you mean").

@@ -42,6 +42,12 @@ function M.run(action)
 		return
 	end
 
+	-- Tell the open tab so it can show/hide a "sync paused" badge — a passive
+	-- viewer during a screen share then sees that the preview is intentionally
+	-- frozen (you're looking something up in Neovim) rather than stuck. Live
+	-- control update; a no-op when no session/tab is running.
+	require("mdview.adapter.control").send({ sync = paused and "paused" or "active" })
+
 	notify("[mdview] scroll sync " .. (paused and "paused" or "resumed"), vim.log.levels.INFO)
 end
 

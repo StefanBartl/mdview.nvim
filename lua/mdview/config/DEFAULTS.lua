@@ -36,6 +36,7 @@
 ---@field external_links "new_tab"|"same_tab" open external links (http/mailto/absolute) in a new tab ("new_tab", default — keeps the preview tab) or in place ("same_tab")
 ---@field cursor_marker "line"|"caret"|"section"|"off" show the Neovim cursor in the preview: line marker in the left gutter ("line", default), an exact caret at the cursor column ("caret", uses inline source-position spans), a spotlight on the current heading section with the rest dimmed ("section"), or hidden ("off"); rides the scroll-sync ping, so needs scroll_sync on
 ---@field zoom number preview font-size zoom factor (1.0 = 100%, default); adjust at runtime with :MDViewZoom, passed to the client as ?zoom= and pushed live
+---@field preserve_blank_lines boolean render runs of >= 2 consecutive blank lines as visible vertical space instead of collapsing them (CommonMark default); passed to the client as ?blanklines=1. Sourcepos-safe; blank lines inside fenced code are always kept
 ---@field overlays table<string, boolean> which preview overlays start enabled, e.g. { toc = false }; toggle at runtime with :MDViewOverlay, passed to the client as ?overlays= and pushed live
 
 ---@class mdview.config.StartDefaults
@@ -46,6 +47,10 @@
 ---@class mdview.config.InstallDefaults
 ---@field repo string GitHub "owner/repo" releases are downloaded from — override if you run a fork
 ---@field version string release tag to install (e.g. "v0.1.0") — pin an older release by changing this
+
+---@class mdview.config.DevDefaults
+---@field binary_path string|nil developer-only: absolute path to a locally built mdview-server used by :MDViewStart instead of the downloaded install.version release (falls back to $MDVIEW_DEV_BINARY). Lets features newer than the pinned release run
+---@field web_root string|nil developer-only: path to a locally built client bundle (e.g. dist/client) passed to the relay as --web-root instead of the downloaded one (falls back to $MDVIEW_DEV_WEB_ROOT)
 
 ---@class mdview.config.StandaloneDefaults
 ---@field binary_path string|nil relay binary used by `:MDView standalone`; nil = the one `install` manages. Set this to run a locally built or newer relay than `install.version` pins (standalone needs --watch support, v0.3.0+)
@@ -77,6 +82,7 @@
 ---@field browser mdview.config.BrowserDefaults
 ---@field start mdview.config.StartDefaults
 ---@field install mdview.config.InstallDefaults
+---@field dev mdview.config.DevDefaults
 ---@field standalone mdview.config.StandaloneDefaults
 ---@field experimental mdview.config.ExperimentalDefaults
 
@@ -142,6 +148,14 @@ return {
 		external_links = "new_tab",
 		cursor_marker = "line",
 		zoom = 1.0,
+		-- Preserve runs of consecutive blank lines as visible vertical space.
+		-- CommonMark collapses any number of blank lines between blocks into a
+		-- single paragraph break; with this on, a run of N (>= 2) blank lines in
+		-- the source renders as N lines of spacing. Purely visual, opt-in, and
+		-- sourcepos-safe (spacers are derived from the original line gaps, so
+		-- scroll sync / the cursor caret still map to the right lines). Blank
+		-- lines inside fenced code blocks are always preserved regardless.
+		preserve_blank_lines = false,
 		-- Preview overlays (see :MDViewOverlay). Off by default — they're for
 		-- presenting/screen-sharing, not for everyday editing.
 		overlays = {
@@ -158,6 +172,23 @@ return {
 	install = {
 		repo = "StefanBartl/mdview.nvim",
 		version = "v0.2.0",
+	},
+
+	-- Developer-only: run a locally built relay + client bundle instead of the
+	-- downloaded `install.version` release, so features that aren't in a tagged
+	-- release yet (e.g. the /control channel behind :MDViewOverlay / :MDViewZoom
+	-- / :MDViewCursor, added after v0.2.0) actually run. When unset, mdview uses
+	-- the release it manages (the normal end-user path). Both fall back to the
+	-- MDVIEW_DEV_BINARY / MDVIEW_DEV_WEB_ROOT environment variables, so you can
+	-- point at your build without editing setup(). Paths are expanded (~, $VAR).
+	--   dev = {
+	--     binary_path = "E:/repos/mdview.nvim/native/server/mdview-server.exe",
+	--     web_root    = "E:/repos/mdview.nvim/dist/client",
+	--   }
+	-- Build both first: `npm run build` (wasm + client) and `npm run build:go`.
+	dev = {
+		binary_path = nil,
+		web_root = nil,
 	},
 
 	standalone = {

@@ -200,6 +200,10 @@ async function boot() {
   let lastCursorLine = -1;
   let lastCursorCol = -1;
 
+  // Preserve runs of consecutive blank lines as vertical space instead of
+  // collapsing them (?blanklines=1 from browser.preserve_blank_lines).
+  const preserveBlanks = params.get('blanklines') === '1';
+
   // Overlays (?overlays=a,b from browser.overlays; :MDViewOverlay toggles them
   // live). Independent, toggleable layers drawn over the document — see
   // docs/Roadmap/KONZEPT_overlays.md.
@@ -222,6 +226,24 @@ async function boot() {
     const z = Number(params.get('zoom'));
     if (Number.isFinite(z) && z > 0 && z !== 1) applyZoom(z);
   }
+
+  // Show/hide a small "scroll sync paused" badge (:MDViewSync). Created lazily
+  // and toggled by presence so it costs nothing until first used.
+  let syncBadge: HTMLElement | null = null;
+  const setSyncPausedBadge = (paused: boolean): void => {
+    if (paused) {
+      if (!syncBadge) {
+        syncBadge = document.createElement('div');
+        syncBadge.className = 'mdview-sync-badge';
+        syncBadge.setAttribute('aria-hidden', 'true');
+        syncBadge.textContent = '⏸ scroll sync paused';
+        document.body.appendChild(syncBadge);
+      }
+    } else if (syncBadge) {
+      syncBadge.remove();
+      syncBadge = null;
+    }
+  };
 
   // POST a document path to Neovim's /nav bridge (used by click-to-navigate and
   // by Back/Forward). Neovim resolves relative paths against the source doc and
@@ -313,7 +335,7 @@ async function boot() {
     if (!container) return;
     lastText = text;
     try {
-      container.innerHTML = render_markdown(text, wantSourceMap);
+      container.innerHTML = render_markdown(text, wantSourceMap, preserveBlanks);
       // Make external links open in a new tab so a click doesn't navigate the
       // preview away (default; see browser.external_links).
       markExternalLinks(container, externalLinkMode);
@@ -348,6 +370,7 @@ async function boot() {
       overlay?: unknown;
       overlays?: unknown;
       overlayData?: unknown;
+      sync?: unknown;
     };
     try {
       msg = JSON.parse(json) as typeof msg;
@@ -391,6 +414,12 @@ async function boot() {
     }
     if (typeof msg.zoom === 'number') {
       applyZoom(msg.zoom);
+    }
+    if (typeof msg.sync === 'string') {
+      // :MDViewSync pause/resume — show a "sync paused" badge so a viewer knows
+      // the preview is intentionally frozen while you look something up in
+      // Neovim (the preview simply stops receiving scroll pings while paused).
+      setSyncPausedBadge(msg.sync === 'paused');
     }
   };
 

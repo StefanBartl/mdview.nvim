@@ -1,6 +1,7 @@
+use std::cell::RefCell;
 use std::collections::HashSet;
 
-use comrak::nodes::{AstNode, NodeHtmlBlock, NodeValue};
+use comrak::nodes::{Ast, AstNode, LineColumn, NodeHtmlBlock, NodeValue, Sourcepos};
 use comrak::{format_html, markdown_to_html, parse_document, Arena, Options};
 use wasm_bindgen::prelude::*;
 
@@ -114,6 +115,53 @@ fn transform_private_blocks<'a>(root: &'a AstNode<'a>, inner_options: &Options) 
     }
 }
 
+/// Preserve runs of consecutive blank lines as visible vertical space
+/// (browser.preserve_blank_lines). CommonMark collapses any number of blank
+/// lines between two blocks into a single paragraph break; here we look at the
+/// original source-position gap between adjacent top-level blocks and, when it
+/// spans more than one blank line, splice in that many `<div data-blank>` spacer
+/// lines between them (the client styles each as one line tall).
+///
+/// This runs off the ORIGINAL sourcepos of the real blocks and never rewrites
+/// the source text, so every real block keeps its true `data-sourcepos` and
+/// scroll sync / the cursor caret stay line-accurate. The raw spacer div carries
+/// no `data-sourcepos`, so the scroll-sync mapping ignores it entirely. Blank
+/// lines inside fenced code blocks are part of a single CodeBlock node (no gap
+/// between siblings), so they are untouched and render verbatim as before.
+fn insert_blank_spacers<'a>(arena: &'a Arena<AstNode<'a>>, root: &'a AstNode<'a>) {
+    // Snapshot the sibling list first so inserting spacers doesn't disturb the
+    // walk (we only read positions from the original blocks).
+    let children: Vec<&'a AstNode<'a>> = root.children().collect();
+    for pair in children.windows(2) {
+        let (a, b) = (pair[0], pair[1]);
+        let a_end = a.data.borrow().sourcepos.end.line;
+        let b_start = b.data.borrow().sourcepos.start.line;
+        // 0 or 1 blank line between the blocks is the ordinary separator.
+        if b_start <= a_end + 1 {
+            continue;
+        }
+        let blanks = b_start - a_end - 1;
+        // One blank line is already the normal paragraph gap; render the rest as
+        // explicit spacer lines. Clamp so a pathological gap can't emit a huge DOM.
+        let extra = (blanks - 1).min(30);
+        if extra == 0 {
+            continue;
+        }
+        let literal = "<div data-blank></div>".repeat(extra);
+        let sp = Sourcepos {
+            start: LineColumn { line: a_end + 1, column: 1 },
+            end: LineColumn { line: b_start - 1, column: 1 },
+        };
+        let mut ast = Ast::new(
+            NodeValue::HtmlBlock(NodeHtmlBlock { block_type: 6, literal }),
+            sp.start,
+        );
+        ast.sourcepos = sp; // widen from the single start line Ast::new set
+        let node = arena.alloc(AstNode::new(RefCell::new(ast)));
+        a.insert_after(node);
+    }
+}
+
 /// Build the ammonia sanitizer. Identical to the default allowlist except it
 /// additionally permits the disabled checkbox inputs comrak emits for GFM
 /// task lists (`- [ ]` / `- [x]`), so they render as real checkboxes instead
@@ -132,7 +180,9 @@ fn sanitizer() -> ammonia::Builder<'static> {
     // caret placement (data-sp, on inline spans); data-private marks a blurred
     // block. All carry no executable content — just digits / a bare flag — and
     // can't be used to inject script.
-    builder.add_generic_attributes(["data-sourcepos", "data-sp", "data-private"].iter().copied());
+    builder.add_generic_attributes(
+        ["data-sourcepos", "data-sp", "data-private", "data-blank"].iter().copied(),
+    );
 
     let mut input_attrs = HashSet::new();
     input_attrs.insert("type");
@@ -151,12 +201,16 @@ fn sanitizer() -> ammonia::Builder<'static> {
 /// browser.cursor_marker = "caret") so documents aren't bloated with spans
 /// otherwise.
 ///
+/// When `preserve_blanks` is true, runs of >= 2 consecutive blank lines between
+/// blocks render as visible vertical space instead of collapsing to one gap
+/// (browser.preserve_blank_lines); off by default.
+///
 /// Rendering (comrak) and sanitization (ammonia) happen as a single, inseparable
 /// step: no caller can obtain rendered HTML that has not passed through the
 /// sanitizer, since raw HTML embedded in markdown is intentionally parsed
 /// (not escaped) so it is subject to the same allowlist-based cleaning.
 #[wasm_bindgen]
-pub fn render_markdown(input: &str, source_map: bool) -> String {
+pub fn render_markdown(input: &str, source_map: bool, preserve_blanks: bool) -> String {
     let arena = Arena::new();
     let options = build_options();
     let root = parse_document(&arena, input, &options);
@@ -166,6 +220,11 @@ pub fn render_markdown(input: &str, source_map: bool) -> String {
     let mut inner_options = build_options();
     inner_options.render.sourcepos = false; // nested render: no block positions
     transform_private_blocks(root, &inner_options);
+    // Spacers derive from the real blocks' original sourcepos, so run before the
+    // source-map pass (which only touches inline Text/Code, not our raw divs).
+    if preserve_blanks {
+        insert_blank_spacers(&arena, root);
+    }
     if source_map {
         annotate_source_positions(root, false);
     }
@@ -178,7 +237,14 @@ pub fn render_markdown(input: &str, source_map: bool) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::render_markdown;
+    use super::render_markdown as render_markdown_raw;
+
+    // Thin wrapper so the existing tests keep their two-argument form; the
+    // third `preserve_blanks` flag defaults off here and is exercised directly
+    // via render_markdown_raw in the blank-line tests below.
+    fn render_markdown(input: &str, source_map: bool) -> String {
+        render_markdown_raw(input, source_map, false)
+    }
 
     #[test]
     fn renders_headings_and_paragraphs() {
@@ -352,5 +418,42 @@ mod tests {
         assert!(html.contains("<div data-private"));
         assert!(!html.contains("<script"));
         assert!(!html.contains("alert(1)"));
+    }
+
+    // ---- preserve blank lines (browser.preserve_blank_lines) ----------------
+
+    #[test]
+    fn blank_lines_collapse_by_default() {
+        // Five blank lines between two paragraphs — feature off, no spacer.
+        let html = render_markdown_raw("first\n\n\n\n\n\nsecond", false, false);
+        assert!(!html.contains("data-blank"));
+    }
+
+    #[test]
+    fn preserve_blank_lines_emits_spacers() {
+        // "first" ends line 1; "second" starts line 7 → 5 blank lines → 4 spacers.
+        let html = render_markdown_raw("first\n\n\n\n\n\nsecond", false, true);
+        eprintln!("BLANKS: {html}");
+        let count = html.matches("data-blank").count();
+        assert_eq!(count, 4);
+        // real content and its sourcepos are untouched
+        assert!(html.contains("first"));
+        assert!(html.contains("second"));
+        assert!(html.contains("data-sourcepos="));
+    }
+
+    #[test]
+    fn preserve_blank_lines_single_gap_unchanged() {
+        // A single blank line is the normal separator — no spacer.
+        let html = render_markdown_raw("first\n\nsecond", false, true);
+        assert!(!html.contains("data-blank"));
+    }
+
+    #[test]
+    fn preserve_blank_lines_ignores_blanks_in_code_fence() {
+        // Blank lines inside a fenced block are one CodeBlock node, not a gap
+        // between siblings, so they must not spawn spacers.
+        let html = render_markdown_raw("```\na\n\n\n\nb\n```", false, true);
+        assert!(!html.contains("data-blank"));
     }
 }

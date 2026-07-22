@@ -136,6 +136,7 @@ Defaults: >lua
       external_links      = "new_tab", -- external links: "new_tab" | "same_tab"
       cursor_marker       = "line",    -- "line"|"caret"|"section"|"off"
       zoom                = 1.0,       -- preview font-size zoom (:MDView zoom)
+      preserve_blank_lines = false,    -- keep >=2 blank lines as visible space
       overlays            = {          -- preview overlays (:MDView overlay)
         toc = false,                   -- floating outline, current section lit
       },
@@ -164,6 +165,11 @@ Defaults: >lua
 
     standalone = {
       binary_path = nil, -- relay used by :MDView standalone (nil = installed one)
+    },
+
+    dev = {              -- developer-only: run a locally built relay + client
+      binary_path = nil, -- mdview-server used by :MDView start ($MDVIEW_DEV_BINARY)
+      web_root    = nil, -- client bundle dir, e.g. dist/client ($MDVIEW_DEV_WEB_ROOT)
     },
 
     experimental = {
@@ -286,6 +292,16 @@ browser.zoom ~
   runtime with |:MDView-zoom| (applies live). A non-default value is carried on
   the browser URL (`?zoom=`) so a reopened tab starts at the same zoom.
 
+browser.preserve_blank_lines ~
+  Render runs of two or more consecutive blank lines as visible vertical space
+  instead of collapsing them into a single paragraph break (CommonMark's
+  default). A run of N blank lines renders as N lines of spacing. Purely
+  visual and opt-in. Sourcepos-safe: the spacers are derived from the original
+  line gaps between blocks, not by rewriting the source, so |mdview-scroll_sync|
+  and the cursor caret still map to the right lines. Blank lines inside fenced
+  code blocks are always preserved regardless of this option. Carried on the
+  browser URL as `?blanklines=1`.
+
 browser.focus ~
   Whether the opened preview tab is allowed to take keyboard focus. `"browser"`
   (default) opens it in front as usual; `"nvim"` keeps focus in the editor so
@@ -349,6 +365,27 @@ standalone.binary_path ~
 <
   |:MDView-standalone| probes the binary first and reports a clear error if
   it's too old, rather than spawning a process that dies silently.
+
+dev.binary_path / dev.web_root ~
+  Developer-only. By default |:MDView-start| runs the downloaded
+  `install.version` release, not your working tree — so a feature that isn't in
+  that tagged release yet does nothing (the command posts to a route the old
+  relay lacks; the POST is fire-and-forget, so there is no error and no effect,
+  while older features like scroll sync keep working). Point mdview at a locally
+  built relay + client bundle to run them: >lua
+
+    require("mdview").setup({
+      dev = {
+        binary_path = "~/repos/mdview.nvim/native/server/mdview-server",
+        web_root    = "~/repos/mdview.nvim/dist/client",
+      },
+    })
+<
+  Build both first with `npm run build` (WASM + client) and `npm run build:go`
+  (relay). Each falls back to the `$MDVIEW_DEV_BINARY` / `$MDVIEW_DEV_WEB_ROOT`
+  environment variable when its config field is unset. Paths are expanded; a
+  path that does not exist fails loudly instead of silently using the release.
+  Unrelated to `standalone.binary_path`, which only affects |:MDView-standalone|.
 
 experimental.webtransport ~
   Opt in to the WebTransport (HTTP/3) client transport. The client
@@ -526,8 +563,11 @@ pushes a control update over the socket.
 :MDView sync [action]                                          *:MDView-sync*
   Pauses/resumes the nvim->browser scroll sync (`pause`|`resume`|`toggle`).
   While paused, moving the cursor no longer scrolls the preview or moves its
-  cursor marker — useful to jump to a reference spot without dragging a
-  screen-sharing viewer along. No argument reports the state.
+  cursor marker — useful to jump to a reference spot in Neovim without dragging
+  a screen-sharing viewer along. While paused, the open tab shows a small
+  "scroll sync paused" pill so the frozen preview reads as intentional, not
+  stuck. No argument reports the state. Bind `toggle` for a quick freeze/unfreeze
+  (see |mdview-keymaps|).
 
 :MDView zoom [step]                                            *:MDView-zoom*
   Adjusts the preview font-size zoom (`browser.zoom`). `+`/`-` step by 10%
@@ -607,7 +647,13 @@ in |mdview-commands|. Map them yourself if you want keymaps: >lua
     { desc = "mdview: start preview" })
   vim.keymap.set("n", "<leader>mq", "<cmd>MDView stop<cr>",
     { desc = "mdview: stop preview" })
+  vim.keymap.set("n", "<leader>ms", "<cmd>MDView sync toggle<cr>",
+    { desc = "mdview: freeze/unfreeze scroll sync" })
 <
+The last one is handy while screen-sharing: freeze the preview, scroll around
+in Neovim to look something up, then unfreeze — the viewer never sees the jump
+(see |:MDView-sync|).
+
 
 Since these are plain |vim.keymap.set()| calls with a `desc`, they show up
 correctly in which-key.nvim (https://github.com/folke/which-key.nvim)

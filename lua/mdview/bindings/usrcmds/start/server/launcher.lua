@@ -118,6 +118,27 @@ local function resolve_browser_url(opts)
 		url = url .. "&zoom=" .. vim.uri_encode(("%.3f"):format(zoom))
 	end
 
+	-- preserve consecutive blank lines (client reads ?blanklines=1); only pass
+	-- when enabled so the default URL stays unchanged.
+	if browser_defaults.preserve_blank_lines == true then
+		url = url .. "&blanklines=1"
+	end
+
+	-- overlays that start enabled (client reads ?overlays=a,b); so a freshly
+	-- opened tab mounts the same overlays :MDViewOverlay would toggle live.
+	if type(browser_defaults.overlays) == "table" then
+		local on = {}
+		for name, enabled in pairs(browser_defaults.overlays) do
+			if enabled == true then
+				on[#on + 1] = name
+			end
+		end
+		table.sort(on)
+		if #on > 0 then
+			url = url .. "&overlays=" .. vim.uri_encode(table.concat(on, ","))
+		end
+	end
+
 	-- opt-in WebTransport (HTTP/3). The client feature-detects and falls back
 	-- to WebSocket if unsupported or the endpoint doesn't answer, so this is
 	-- always safe to pass (see experimental.webtransport in DEFAULTS).

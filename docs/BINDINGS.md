@@ -33,7 +33,7 @@ pushes a `\x05` control update over the socket.
 | Command | Args | Description |
 | --- | --- | --- |
 | `:MDView cursor [mode]` | optional `line`\|`caret`\|`section`\|`off`, completed | Sets the Neovim-cursor marker in the preview (`browser.cursor_marker`): `line` (bar at the cursor line), `caret` (exact cursor column, via inline source-position spans), `section` (spotlight the current heading section, dim the rest), `off`. No argument reports the current mode. |
-| `:MDView sync [action]` | optional `pause`\|`resume`\|`toggle`, completed | Pauses/resumes the outgoing nvim→browser scroll sync. While paused, `CursorMoved` sends no pings, so you can jump to a reference spot without dragging a viewer along. Neovim-side only. No argument reports the state. |
+| `:MDView sync [action]` | optional `pause`\|`resume`\|`toggle`, completed | Pauses/resumes the outgoing nvim→browser scroll sync. While paused, `CursorMoved` sends no pings, so you can jump to a reference spot without dragging a viewer along, and the open tab shows a "⏸ scroll sync paused" pill. No argument reports the state. |
 | `:MDView zoom [step]` | optional `+`\|`-`\|`reset`\|`<factor>`, completed | Adjusts the preview font-size zoom (`browser.zoom`). `+`/`-` step 10% (clamped 50–300%), `reset` = 100%, a bare number is a factor (`1.5`) or percent (`150`). No argument reports the current zoom. |
 | `:MDView reveal [action]` | optional `on`\|`off`\|`toggle`, completed | Reveals/hides all private blocks (```` ```private ````, rendered blurred by default) by toggling `.mdview-reveal-all` on the preview root. Live-only, nothing persisted; individual blocks also reveal on click. No argument toggles. |
 | `:MDView overlay [name] [action]` | optional overlay name + `on`\|`off`\|`toggle`, both completed | Toggles a preview overlay (`browser.overlays`) — currently `toc`, a floating outline with the current section highlighted. No name lists the known overlays and their state. |
@@ -70,6 +70,9 @@ mdview.nvim does not define any keymaps itself — only the `:MDView` command ab
 ```lua
 vim.keymap.set("n", "<leader>mp", "<cmd>MDView start<cr>", { desc = "mdview: start preview" })
 vim.keymap.set("n", "<leader>mq", "<cmd>MDView stop<cr>", { desc = "mdview: stop preview" })
+vim.keymap.set("n", "<leader>ms", "<cmd>MDView sync toggle<cr>", { desc = "mdview: freeze/unfreeze scroll sync" })
 ```
+
+The `sync toggle` map is handy while screen-sharing: freeze the preview, scroll around in Neovim to look something up, then unfreeze — the viewer never sees the jump.
 
 Since these are plain `vim.keymap.set` calls with a `desc`, they show up correctly in [which-key.nvim](https://github.com/folke/which-key.nvim) without any extra integration needed.
