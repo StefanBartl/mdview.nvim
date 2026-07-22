@@ -582,6 +582,13 @@ pushes a control update over the socket.
   screen share. Reveal one block by clicking it, or all with this command.
   Live-only — a freshly opened tab always starts hidden.
 
+:MDView blanklines [action]                              *:MDView-blanklines*
+  Toggles whether runs of two or more consecutive blank lines render as visible
+  vertical space (`browser.preserve_blank_lines`): `on`|`off`|`toggle`, no
+  argument toggles. Sets the config value (so a reopened tab keeps it) and, while
+  a session runs, re-renders the open tab live. See `browser.preserve_blank_lines`
+  in |mdview-config| for the details and caveats.
+
 :MDView overlay [name] [action]                             *:MDView-overlay*
 :MDView overlay list                                   *:MDView-overlay-list*
   Toggles a preview overlay (`browser.overlays`): an independent, toggleable

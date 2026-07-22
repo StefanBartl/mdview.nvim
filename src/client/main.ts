@@ -201,8 +201,9 @@ async function boot() {
   let lastCursorCol = -1;
 
   // Preserve runs of consecutive blank lines as vertical space instead of
-  // collapsing them (?blanklines=1 from browser.preserve_blank_lines).
-  const preserveBlanks = params.get('blanklines') === '1';
+  // collapsing them (?blanklines=1 from browser.preserve_blank_lines). Mutable
+  // so :MDViewBlanklines can flip it live (see the control channel).
+  let preserveBlanks = params.get('blanklines') === '1';
 
   // Overlays (?overlays=a,b from browser.overlays; :MDViewOverlay toggles them
   // live). Independent, toggleable layers drawn over the document — see
@@ -371,6 +372,7 @@ async function boot() {
       overlays?: unknown;
       overlayData?: unknown;
       sync?: unknown;
+      blanklines?: unknown;
     };
     try {
       msg = JSON.parse(json) as typeof msg;
@@ -420,6 +422,14 @@ async function boot() {
       // the preview is intentionally frozen while you look something up in
       // Neovim (the preview simply stops receiving scroll pings while paused).
       setSyncPausedBadge(msg.sync === 'paused');
+    }
+    if (typeof msg.blanklines === 'boolean') {
+      // :MDViewBlanklines — toggling blank-line preservation changes the render
+      // output, so re-render the current document with the new setting.
+      if (msg.blanklines !== preserveBlanks) {
+        preserveBlanks = msg.blanklines;
+        if (container) renderMarkdown(lastText);
+      }
     }
   };
 

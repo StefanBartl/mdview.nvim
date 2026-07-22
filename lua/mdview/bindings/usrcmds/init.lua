@@ -30,6 +30,7 @@ local cursor = require("mdview.bindings.usrcmds.cursor")
 local sync = require("mdview.bindings.usrcmds.sync")
 local zoom = require("mdview.bindings.usrcmds.zoom")
 local reveal = require("mdview.bindings.usrcmds.reveal")
+local blanklines = require("mdview.bindings.usrcmds.blanklines")
 local breadcrumbs = require("mdview.bindings.usrcmds.breadcrumbs")
 local overlay = require("mdview.bindings.usrcmds.overlay")
 
@@ -155,6 +156,11 @@ function M.attach()
 			args = { { name = "action", type = "STRING", optional = true, values = reveal.actions } },
 			desc = "Reveal/hide all private (```private) blocks in the preview",
 			run  = function(ctx) reveal.run(ctx.args.action) end },
+
+		{ path = { "blanklines" },
+			args = { { name = "action", type = "STRING", optional = true, values = blanklines.actions } },
+			desc = "Toggle rendering consecutive blank lines as vertical space (on|off|toggle)",
+			run  = function(ctx) blanklines.run(ctx.args.action) end },
 
 		{ path = { "overlay" },
 			args = {
