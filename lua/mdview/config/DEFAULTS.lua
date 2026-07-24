@@ -37,6 +37,7 @@
 ---@field cursor_marker "line"|"caret"|"section"|"off" show the Neovim cursor in the preview: line marker in the left gutter ("line", default), an exact caret at the cursor column ("caret", uses inline source-position spans), a spotlight on the current heading section with the rest dimmed ("section"), or hidden ("off"); rides the scroll-sync ping, so needs scroll_sync on
 ---@field zoom number preview font-size zoom factor (1.0 = 100%, default); adjust at runtime with :MDViewZoom, passed to the client as ?zoom= and pushed live
 ---@field overlays table<string, boolean> which preview overlays start enabled, e.g. { toc = false }; toggle at runtime with :MDViewOverlay, passed to the client as ?overlays= and pushed live
+---@field preserve_blank_lines boolean show every blank line between blocks as extra vertical space instead of CommonMark's default (any run of blank lines collapses to one paragraph gap); off by default, toggle at runtime with `:MDView blanklines`, passed to the client as ?blanklines=1 and pushed live
 
 ---@class mdview.config.StartDefaults
 ---@field push_strategy "launcher"|"try_push" initial-push strategy used by :MDViewStart
@@ -49,6 +50,10 @@
 
 ---@class mdview.config.StandaloneDefaults
 ---@field binary_path string|nil relay binary used by `:MDView standalone`; nil = the one `install` manages. Set this to run a locally built or newer relay than `install.version` pins (standalone needs --watch support, v0.3.0+)
+
+---@class mdview.config.DevDefaults
+---@field binary_path string|nil relay binary used by the normal `:MDView start` path; nil = the one `install` manages. Set this to run a locally built or newer relay than `install.version` pins — needed for e.g. overlay/zoom/cursor live-control (`/control` route), which postdates `install.version`'s default pin. Falls back to `$MDVIEW_DEV_BINARY` if unset (honored by `scripts/minimal_init.lua`'s detached instances, which don't load this Lua config).
+---@field web_root string|nil prebuilt client bundle (HTML/JS/WASM) directory used by the normal `:MDView start` path; nil = the one `install` manages. Set this alongside `binary_path` when testing local relay+client changes together (e.g. `dist/client` from `npm run build`). Falls back to `$MDVIEW_DEV_WEB_ROOT` if unset.
 
 ---@class mdview.config.ExperimentalDefaults
 ---@field webtransport boolean opt in to the WebTransport (HTTP/3) client transport; falls back to WebSocket until an HTTP/3 relay backend exists (future tech)
@@ -77,6 +82,7 @@
 ---@field browser mdview.config.BrowserDefaults
 ---@field start mdview.config.StartDefaults
 ---@field install mdview.config.InstallDefaults
+---@field dev mdview.config.DevDefaults
 ---@field standalone mdview.config.StandaloneDefaults
 ---@field experimental mdview.config.ExperimentalDefaults
 
@@ -147,6 +153,10 @@ return {
 		overlays = {
 			toc = false,
 		},
+		-- Off by default: CommonMark's own behavior (any run of blank lines
+		-- collapses to one paragraph gap) is what most people expect. See
+		-- :MDView blanklines.
+		preserve_blank_lines = false,
 	},
 
 	start = {
@@ -158,6 +168,22 @@ return {
 	install = {
 		repo = "StefanBartl/mdview.nvim",
 		version = "v0.2.0",
+	},
+
+	dev = {
+		-- Relay binary + client bundle `:MDView start` uses. nil = whatever
+		-- `install` resolves (downloaded/cached from GitHub Releases). Set both
+		-- to test a locally built relay/client, e.g.
+		--   dev = {
+		--     binary_path = "~/repos/mdview.nvim/native/server/mdview-server.exe",
+		--     web_root    = "~/repos/mdview.nvim/dist/client",
+		--   }
+		-- Falls back to $MDVIEW_DEV_BINARY / $MDVIEW_DEV_WEB_ROOT when unset —
+		-- the only way to reach a detached instance (scripts/minimal_init.lua
+		-- loads none of this Lua config), since those are real OS env vars
+		-- inherited by the spawned child rather than Lua-level state.
+		binary_path = nil,
+		web_root = nil,
 	},
 
 	standalone = {

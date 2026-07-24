@@ -14,6 +14,7 @@ import { installClickNav } from './render/clickNav';
 import { pickScrollTarget, fractionInBlock, hasSourcepos } from './render/scrollSync';
 import { markExternalLinks, parseExternalLinkMode } from './render/externalLinks';
 import { updateCursorMarker, parseCursorMarkerMode } from './render/cursorMarker';
+import { applyBlankLineSpacing, parseBlankLines } from './render/blankLines';
 import {
   initOverlays,
   setOverlay,
@@ -200,6 +201,11 @@ async function boot() {
   let lastCursorLine = -1;
   let lastCursorCol = -1;
 
+  // Show-all-blank-lines mode (?blanklines=1 from browser.preserve_blank_lines;
+  // :MDView blanklines toggles it live). Off (CommonMark default: runs of
+  // blank lines collapse to one paragraph gap) unless requested.
+  let blankLinesEnabled = parseBlankLines(params.get('blanklines'));
+
   // Overlays (?overlays=a,b from browser.overlays; :MDViewOverlay toggles them
   // live). Independent, toggleable layers drawn over the document — see
   // docs/Roadmap/KONZEPT_overlays.md.
@@ -328,6 +334,8 @@ async function boot() {
       // Overlays derive from the document (headings, positions) — let them
       // refresh against the new content.
       notifyOverlayRender();
+      // innerHTML above also wiped any blank-line spacers — reinsert them.
+      applyBlankLineSpacing(container, blankLinesEnabled);
       if (firstRender) {
         firstRender = false;
         clientLog(`first render ok (${text.length} bytes)`);
@@ -348,6 +356,7 @@ async function boot() {
       overlay?: unknown;
       overlays?: unknown;
       overlayData?: unknown;
+      blankLines?: unknown;
     };
     try {
       msg = JSON.parse(json) as typeof msg;
@@ -391,6 +400,11 @@ async function boot() {
     }
     if (typeof msg.zoom === 'number') {
       applyZoom(msg.zoom);
+    }
+    if (typeof msg.blankLines === 'boolean' && container) {
+      blankLinesEnabled = msg.blankLines;
+      // Blocks are already in the DOM — just add/remove spacers, no re-render.
+      applyBlankLineSpacing(container, blankLinesEnabled);
     }
   };
 

@@ -32,6 +32,7 @@ local zoom = require("mdview.bindings.usrcmds.zoom")
 local reveal = require("mdview.bindings.usrcmds.reveal")
 local breadcrumbs = require("mdview.bindings.usrcmds.breadcrumbs")
 local overlay = require("mdview.bindings.usrcmds.overlay")
+local blanklines = require("mdview.bindings.usrcmds.blanklines")
 
 local M = {}
 
@@ -166,6 +167,11 @@ function M.attach()
 		{ path = { "overlay", "list" },
 			desc = "List the known preview overlays and whether each is on",
 			run  = function() overlay.list() end },
+
+		{ path = { "blanklines" },
+			args = { { name = "action", type = "STRING", optional = true, values = blanklines.actions } },
+			desc = "Show every blank line as extra space, or collapse them (CommonMark default); no argument toggles",
+			run  = function(ctx) blanklines.run(ctx.args.action) end },
 
 		{ path = { "breadcrumbs" },
 			desc = "Show the session breadcrumbs (document + heading over time)",
