@@ -9,6 +9,7 @@
 export interface BlockPos {
   el: HTMLElement;
   startLine: number;
+  endLine: number;
   headingLevel: number | null; // 1..6 for H1..H6, else null
 }
 
@@ -27,10 +28,13 @@ export function topLevelBlocks(container: HTMLElement): BlockPos[] {
     if (!(child instanceof HTMLElement)) continue;
     const sp = child.getAttribute('data-sourcepos');
     if (!sp) continue;
-    const startLine = Number(sp.split(':')[0]);
-    if (!Number.isFinite(startLine)) continue;
+    // comrak sourcepos: "startLine:startCol-endLine:endCol".
+    const [startPart, endPart] = sp.split('-');
+    const startLine = Number(startPart?.split(':')[0]);
+    const endLine = Number(endPart?.split(':')[0]);
+    if (!Number.isFinite(startLine) || !Number.isFinite(endLine)) continue;
     const m = /^H([1-6])$/.exec(child.tagName);
-    out.push({ el: child, startLine, headingLevel: m ? Number(m[1]) : null });
+    out.push({ el: child, startLine, endLine, headingLevel: m ? Number(m[1]) : null });
   }
   return out;
 }

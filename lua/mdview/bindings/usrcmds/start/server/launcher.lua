@@ -118,6 +118,12 @@ local function resolve_browser_url(opts)
 		url = url .. "&zoom=" .. vim.uri_encode(("%.3f"):format(zoom))
 	end
 
+	-- show-all-blank-lines mode (client reads ?blanklines=1); only pass when on
+	-- so a freshly reopened tab starts at what :MDView blanklines last set.
+	if browser_defaults.preserve_blank_lines == true then
+		url = url .. "&blanklines=1"
+	end
+
 	-- opt-in WebTransport (HTTP/3). The client feature-detects and falls back
 	-- to WebSocket if unsupported or the endpoint doesn't answer, so this is
 	-- always safe to pass (see experimental.webtransport in DEFAULTS).
