@@ -90,8 +90,81 @@
      Das isolierte Profil bleibt — es ist genau das, was `stop_on_browser_exit`/
      `browser_autoclose` zuverlässig macht (ein Start in den bereits laufenden Browser des
      Nutzers würde sofort forken+exiten, Schließen wäre nicht detektierbar).
-
-## Allgemein
+  8. **`:MDView detach` / `scripts/mdview-bg.ps1`: Browser-Tab öffnet sich gar nicht oder erst
+     mit mehreren Minuten Verzögerung** (beobachtet unter Windows), obwohl der Relay selbst
+     sauber hochkommt (Health-Check ok, initialer Push kommt an). Noch offen — nächster
+     Ansatzpunkt beim Wiederaufnehmen:
+     - Unterschied zu `:MDView standalone` (öffnet dort zuverlässig sofort): `standalone`s
+       Browser-Open läuft direkt im Go-Relay-Binary (`native/server/open.go`, einzelner
+       `rundll32.exe url.dll,FileProtocolHandler`-Aufruf, kein Neovim beteiligt). `detach`
+       und `mdview-bg.ps1` laufen beide über eine **headless, komplett stdio-lose, detachte**
+       Neovim-Instanz (`nvim --headless -u scripts/minimal_init.lua -c "MDView start"`), in
+       der sowohl der `/health`-Poll (`ws_client.lua`'s `http_get`, curl per
+       `vim.fn.jobstart`, alle 200ms bis zu 10s) als auch das eigentliche Öffnen
+       (`mdview.adapter.browser`'s `open_default`, ebenfalls `vim.fn.jobstart`) verkettet
+       über Neovims Job-Control laufen statt über einen einzelnen direkten Prozess-Spawn.
+     - Manuelle Nachstellung des exakten `detached.spawn`-Aufrufs (`uv.spawn` mit
+       `stdio = {nil,nil,nil}`, `detached = true`) hat in einem Testlauf funktioniert
+       (Health-Check, WebSocket-Connect, Render kamen durch) — der Code ist also nicht
+       grundsätzlich falsch, das Timing ist nur unzuverlässig.
+     - Verdacht: `vim.fn.jobstart()`-Aufrufe aus einer headless+detachten (kein Stdio,
+       keine Konsole) Neovim-Instanz auf Windows sind unter bestimmten Bedingungen deutlich
+       langsamer als aus einer normalen interaktiven Instanz — und `detach`/`mdview-bg.ps1`
+       verketten davon gleich drei (Health-Poll → Initial-Push → Browser-Open), statt wie
+       `standalone` mit einem einzigen nativen Spawn auszukommen. Noch nicht isoliert, woran
+       es genau liegt (auf der ursprünglichen Testmaschine so beobachtet, in einer anderen
+       Umgebung nicht reproduziert — also eher Neovim-Job-Control/Windows-spezifisch als ein
+       Logikfehler im Plugin-Code selbst).
+     - Möglicher Fix, falls sich das bestätigt: den Browser-Open-Schritt im `detach`-Pfad
+       genauso wie bei `standalone` direkt nativ spawnen (z.B. über ein kleines Go-Hilfsmittel
+       oder einen direkten `uv.spawn`-Aufruf aus Lua) statt über `vim.fn.jobstart` aus der
+       headless Instanz heraus.
+  9. **`:MDView detach`: Live-Push/Scroll-Sync erreichen die detachte Preview nicht, wenn die
+     Datei aus einer separaten/neuen Neovim-Instanz bearbeitet wird** — per Test verifiziert
+     (README.md von einer zweiten, unabhängigen headless-nvim-Instanz aus editiert+gespeichert;
+     im Relay-Log der detachten Session kam danach keinerlei neue Aktivität an). Ursache: die
+     detachte Instanz hält ihren eigenen Buffer-Stand ab dem Spawn-Zeitpunkt; es gibt keinen
+     Datei-Watcher (kein `vim.loop.new_fs_event`, kein `checktime`/`autoread`-Timer — geprüft,
+     nichts davon existiert im Code) und `detach.lua` startet den Kindprozess ohne `--listen`,
+     man kann sich also auch nicht nachträglich per `nvim --server`/`--remote` an genau diese
+     Instanz anhängen, um "in ihr" weiterzuschreiben. Damit ist der in der Modul-Doku
+     (`bindings/usrcmds/detach.lua`) beschriebene Kernunterschied zu `standalone` ("live buffer
+     push … weil ein echtes Neovim es treibt") im derzeit einzig erreichbaren Nutzungsmuster
+     (Datei extern weiterbearbeiten) faktisch nicht gegeben. Möglicher Fix: `detach.lua` einen
+     `--listen`-Socket mitgeben (Adresse in der Start-Notify ausgeben), damit man sich per
+     `nvim --server <addr> --remote` wieder anhängen kann — oder einen Datei-Watcher ergänzen,
+     der bei externer Änderung neu liest und pusht.
+  10. **`:MDView detach`: Schließen des Preview-Tabs beendet die detachte Neovim-Instanz NICHT
+      von selbst**, obwohl die Start-Notify genau das verspricht ("stop it by closing the
+      preview tab, or kill the pid"). Per Code-Analyse verifiziert: `User MDViewSessionEnded`
+      wird im gesamten Code nur an genau einer Stelle gefeuert (`bindings/usrcmds/stop.lua`,
+      innerhalb von `:MDViewStop`) — nichts beobachtet ein Tab-Close und feuert das Event
+      automatisch. Der Default-`browser.open_mode` ("default", von `minimal_init.lua` nicht
+      überschrieben) liefert laut `adapter/browser/init.lua` explizit "a handle with no
+      job_id: mdview can't programmatically close it" — `on_exit`/`stop_on_browser_exit`
+      sind dort No-Ops. Und selbst wenn man `:MDViewStop` manuell auslösen wollte: die
+      detachte Instanz hat keinen `--listen`-Socket, ist also von außen gar nicht erreichbar.
+      Fazit: aktuell bleibt als einziger funktionierender Weg, eine `:MDView detach`-Instanz
+      zu beenden, tatsächlich nur `Stop-Process`/`taskkill` auf die PID — der "Tab schließen"-
+      Teil der Notify-Message ist derzeit irreführend. Hängt mit Punkt 9 zusammen (`--listen`
+      wäre auch hier die Voraussetzung für einen sauberen Fix, z.B. per periodischem
+      Health-Poll gegen den Relay: wenn keine Clients mehr verbunden sind, selbst `:MDViewStop`
+      auslösen).
+  11. ~~`:MDView start` (der normale, nicht-standalone/detach-Pfad) hatte keine Möglichkeit,
+      eine lokal gebaute Relay/Client-Version zu verwenden~~ — behoben. `server_args.resolve()`
+      rief bislang immer `install.ensure_binary()`/`install.ensure_client_bundle()` auf (feste
+      Bindung an `install.version`, Default `v0.2.0`); es gab **keinen** Override, weder als
+      Config-Feld noch als Env-Var — obwohl genau das schon in einer früheren Doku-Notiz als
+      `dev = { binary_path, web_root }` beschrieben war (dieses Feld existierte nirgends im
+      Code). Da `install.version`s Pin älter ist als die `/control`-Route (Overlay/Zoom/Cursor
+      Live-Control), liefen diese Live-Befehle über den normalen Start-Pfad ins Leere — fire-
+      and-forget POST gegen eine Route, die die gepinnte Release-Binary noch nicht kennt, ohne
+      Fehler oder Effekt. Fix: neues `dev.binary_path` / `dev.web_root` (mit Fallback auf
+      `$MDVIEW_DEV_BINARY` / `$MDVIEW_DEV_WEB_ROOT`, aus demselben Grund wie bei `standalone`
+      — ein detachter Prozess lädt keine Lua-Config) in `lua/mdview/adapter/server_args.lua`;
+      dokumentiert in `docs/configuration.md`. End-to-End verifiziert: lokal gebaute Relay
+      (aktueller `main`-Branch) über `:MDView start` gestartet, `/control` mit Zoom-/Overlay-/
+      Cursor-Payloads direkt gepostet → alle drei `204`.
 
   1. `TODO-Comments` lösen
   3. ~~Es muss sichergestellt sein, dass `npm` installiert und im Pfad verfügbar ist~~ — obsolet seit dem Go/Rust-Rewrite:
@@ -250,6 +323,28 @@
      scrollbar (wuchs nur mit dem Inhalt) — `index.html` bekam ein Minimal-Stylesheet
      (`height:100vh; overflow-y:auto`), sonst wäre auch `scrollTop` grundsätzlich wirkungslos
      gewesen. End-to-End mit echtem Browser (Playwright-Preview) verifiziert.
+  2. ~~`:MDView blanklines [on|off|toggle]`: Leerzeilen im Quelltext 1:1 als sichtbaren
+     Abstand in der Preview zeigen, statt CommonMarks Standardverhalten (jede Folge von
+     Leerzeilen wird zu genau einem Absatzabstand komprimiert)~~ — umgesetzt. Kein
+     Rust/Comrak-Änderungsbedarf: `data-sourcepos="startLine:col-endLine:col"` wird bereits
+     unbedingt auf jedem Top-Level-Block emittiert (`native/wasm-render/src/lib.rs`,
+     `options.render.sourcepos = true`), unabhängig vom Source-Map-Parameter fürs Caret.
+     Neue Client-Seite `src/client/render/blankLines.ts`: berechnet je zwei aufeinander-
+     folgenden Top-Level-Blöcken die tatsächliche Leerzeilen-Zahl aus der Sourcepos-Lücke
+     und fügt bei Bedarf einen reinen Spacer-`<div>` mit `height: Nem` VOR dem Block ein
+     (additiv, damit das Theme-eigene Absatz-/Heading-Margin unangetastet bleibt statt
+     überschrieben zu werden). `docModel.ts`s `BlockPos` um `endLine` erweitert. Wired wie
+     Zoom/Cursor/Overlay: `browser.preserve_blank_lines` (default `false`) in `DEFAULTS.lua`,
+     `?blanklines=1` in `launcher.lua`s URL-Aufbau (nur bei `true`, wie bei `zoom`), neues
+     `lua/mdview/bindings/usrcmds/blanklines.lua` + Route in `usrcmds/init.lua`, Live-Update
+     über denselben `/control`-Kanal (`{blankLines: bool}` — Wire-Key bleibt bewusst anders
+     als der Config-Feldname, wie bei `cursor_marker` → `cursor`). End-to-End verifiziert:
+     lokal gebaute Relay über `:MDView start` (mit dem neuen `dev.binary_path`/`dev.web_root`,
+     siehe „Allgemein"), `:MDView blanklines on` → Notify bestätigt + `/control` mit
+     `{"blankLines":true}` direkt gepostet → `204`. Lua-Testsuite (24/24) und ESLint auf den
+     neuen/geänderten Client-Dateien grün; `tsc --noEmit` bricht nur an der in diesem Worktree
+     fehlenden generierten `wasm-render`-Datei ab (nie gebaut, unabhängig von dieser Änderung)
+     — sonst keine Typfehler.
 
 ---
 
