@@ -159,7 +159,7 @@ Defaults: >lua
 
     install = {
       repo    = "StefanBartl/mdview.nvim", -- override to use a fork
-      version = "v0.2.0",                  -- pin a specific release tag
+      version = "v0.3.0",                  -- pin a specific release tag
     },
 
     standalone = {
@@ -181,7 +181,7 @@ Example override: >lua
     server_port = 43219,
     browser = { browser = "firefox", browser_autostart = false },
     start   = { push_strategy = "try_push" },
-    install = { repo = "your-fork/mdview.nvim", version = "v0.2.0" },
+    install = { repo = "your-fork/mdview.nvim", version = "v0.3.0" },
   })
 <
 
