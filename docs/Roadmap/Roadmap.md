@@ -90,9 +90,20 @@
      Das isolierte Profil bleibt — es ist genau das, was `stop_on_browser_exit`/
      `browser_autoclose` zuverlässig macht (ein Start in den bereits laufenden Browser des
      Nutzers würde sofort forken+exiten, Schließen wäre nicht detektierbar).
+  > **AUFGELÖST (2026-07-26) für #8–#10: `:MDView detach` wurde entfernt.** Die drei Bugs
+  > waren allesamt Symptome desselben Grundproblems — ein detachter, headless, stdio-loser
+  > nvim ist ein schlechter Langzeit-Host: input-poll-getriebene Loop (→ #8 Timing), kein
+  > File-Watch/`--listen` (→ #9 kein Live-Push, statischer Snapshot), kein Tab-Close-Observer
+  > (→ #10). Da die detachte Instanz zudem nie editiert wird, existiert der behauptete
+  > Live-Buffer-Vorteil faktisch nicht → `detach` war von `:MDView standalone` vollständig
+  > dominiert. Konsequenz: `detach`, `detach.lua` und das `User MDViewSessionEnded`-Event
+  > entfernt; die Terminal-Wrapper (`mdview-bg.*`) feuern jetzt `:MDView standalone`. Die
+  > untenstehende Analyse bleibt als Begründung stehen. Siehe
+  > `docs/Roadmap/KONZEPT_headless_und_standalone.md` und `docs/standalone.md`.
+
   8. **`:MDView detach` / `scripts/mdview-bg.ps1`: Browser-Tab öffnet sich gar nicht oder erst
      mit mehreren Minuten Verzögerung** (beobachtet unter Windows), obwohl der Relay selbst
-     sauber hochkommt (Health-Check ok, initialer Push kommt an). Noch offen — nächster
+     sauber hochkommt (Health-Check ok, initialer Push kommt an). ~~Noch offen~~ — nächster
      Ansatzpunkt beim Wiederaufnehmen:
      - Unterschied zu `:MDView standalone` (öffnet dort zuverlässig sofort): `standalone`s
        Browser-Open läuft direkt im Go-Relay-Binary (`native/server/open.go`, einzelner

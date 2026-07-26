@@ -17,7 +17,7 @@ the text came from. That leaves room for exactly two producers:
 
 | Source | Driven by | Reaches the relay via |
 | --- | --- | --- |
-| Neovim buffer | `:MDView start` / `:MDView detach` | `POST /update` (token-gated), on every buffer change |
+| Neovim buffer | `:MDView start` | `POST /update` (token-gated), on every buffer change |
 | File on disk | `:MDView standalone`, `mdview-server --watch` | `internal/source`, polling the file and calling `registry.Broadcast` in-process |
 
 Because both converge on the same `Broadcast`, standalone mode is not a second

@@ -83,19 +83,8 @@ function M.spawn(cmd, args, cwd, extra_env)
 	return pid, nil
 end
 
---- Absolute path to this mdview.nvim checkout, derived from this file's own
---- location (<root>/lua/mdview/adapter/detached.lua). Used to point a detached
---- Neovim at scripts/minimal_init.lua — asking the runtimepath instead would
---- find whichever copy the *user's* config loaded, which in a multi-checkout
---- setup is not necessarily the one running this code.
----@return string
-function M.plugin_root()
-	local this = debug.getinfo(1, "S").source:sub(2)
-	return vim.fs.normalize(vim.fn.fnamemodify(this, ":p:h:h:h:h"))
-end
-
---- Resolve the file a detached preview should target: the explicit argument if
---- given, else the current buffer's file. Returns nil for an unnamed buffer,
+--- Resolve the file a standalone preview should target: the explicit argument
+--- if given, else the current buffer's file. Returns nil for an unnamed buffer,
 --- since a background process has no buffer to read and needs a real path.
 ---@param arg string|nil
 ---@return string|nil path, string|nil err
@@ -106,7 +95,7 @@ function M.resolve_target(arg)
 	else
 		path = vim.api.nvim_buf_get_name(vim.api.nvim_get_current_buf())
 		if path == "" then
-			return nil, "current buffer has no file — pass a path, e.g. :MDView detach README.md"
+			return nil, "current buffer has no file — pass a path, e.g. :MDView standalone README.md"
 		end
 		path = vim.fn.fnamemodify(path, ":p")
 	end
