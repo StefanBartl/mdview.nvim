@@ -140,6 +140,18 @@ fn sanitizer() -> ammonia::Builder<'static> {
     input_attrs.insert("disabled");
     builder.add_tag_attributes("input", input_attrs);
 
+    // comrak emits `class="language-xxx"` on a fenced code block's <code>
+    // element; ammonia's default allowlist has no attributes at all for
+    // `code`, so it silently dropped that class. The client-side highlighters
+    // read exactly that class to pick a grammar (src/client/highlight/*.ts) —
+    // without it, Shiki falls back to unstyled plain text (highlight.js still
+    // looks fine only because it separately auto-detects from content). The
+    // class value is always "language-<name>" from a fixed, non-executable
+    // vocabulary — inert from a sanitization standpoint.
+    let mut code_attrs = HashSet::new();
+    code_attrs.insert("class");
+    builder.add_tag_attributes("code", code_attrs);
+
     builder
 }
 
@@ -351,6 +363,32 @@ mod tests {
         let html = render_markdown("```private\n<script>alert(1)</script> hi\n```", false);
         assert!(html.contains("<div data-private"));
         assert!(!html.contains("<script"));
+        assert!(!html.contains("alert(1)"));
+    }
+
+    // ---- fenced code block language class (client highlighter detection) --
+
+    #[test]
+    fn fenced_code_keeps_language_class_for_client_highlighters() {
+        // Regression: ammonia's default allowlist has no attributes for <code>,
+        // so it silently stripped comrak's class="language-xxx" — Shiki (which
+        // has no auto-detect) then rendered every fence as unstyled plain text.
+        // highlight.js masked the same bug via its own content auto-detection.
+        let html = render_markdown("```lua\nlocal x = 1\n```", false);
+        eprintln!("FENCE: {html}");
+        assert!(html.contains("class=\"language-lua\""));
+    }
+
+    #[test]
+    fn fenced_code_class_carries_no_other_attributes() {
+        // The class fix must not reopen the door to arbitrary <code> attributes
+        // (e.g. an event handler) — only "class" should get through.
+        let html = render_markdown(
+            "<pre><code onclick=\"alert(1)\" class=\"language-lua\">x</code></pre>",
+            false,
+        );
+        assert!(html.contains("class=\"language-lua\""));
+        assert!(!html.contains("onclick"));
         assert!(!html.contains("alert(1)"));
     }
 }
