@@ -1,16 +1,21 @@
 ---@module 'scripts.minimal_init'
 --- Minimal Neovim config that loads *only* mdview.nvim and its hard dependency
---- lib.nvim — nothing from the user's own configuration. Used as `nvim -u` for
---- detached background previews (`:MDView detach`, `scripts/mdview-bg.*`), so a
---- background preview can't be broken by an unrelated plugin in the user's
---- config, and can't drag that whole config into a long-lived process.
+--- lib.nvim — nothing from the user's own configuration. Used as `nvim -u` by
+--- the terminal wrappers (scripts/mdview-bg.*) to launch a standalone preview:
 ---
----   nvim --headless -u scripts/minimal_init.lua -c "MDView start" file.md
+---   nvim --headless -u scripts/minimal_init.lua -c "MDView standalone file.md" -c "qa!"
+---
+--- This Neovim is only a launcher — `:MDView standalone` spawns the relay
+--- detached (it watches the file on disk itself and outlives everything), then
+--- this instance quits. Nothing long-lived runs here, so there's no headless
+--- event-loop to keep warm.
 ---
 --- Env vars honored (all optional, set by the callers):
----   $MDVIEW_PATH        mdview.nvim root (default: derived from this file)
----   $LIB_NVIM_PATH      lib.nvim root (same lookup order as tests/nvim/harness.lua)
----   $MDVIEW_NO_BROWSER  "1" -> start the relay but don't open a browser tab
+---   $MDVIEW_PATH            mdview.nvim root (default: derived from this file)
+---   $LIB_NVIM_PATH          lib.nvim root (same lookup order as tests/nvim/harness.lua)
+---   $MDVIEW_STANDALONE_BIN  relay binary for standalone mode (needs --watch,
+---                           v0.3.0+); until a release ships, point this at a
+---                           locally built native/server/mdview-server
 
 -- Nothing inherited: no user rtp, no shada, no swapfile. `-u <this file>`
 -- already skips init.lua, but rtp still carries the site dirs.
@@ -81,25 +86,12 @@ end
 prepend_rtp(lib)
 prepend_rtp(root)
 
--- A detached background instance has no terminal to report into, so file
--- logging is on by default here — it's the only way to diagnose one after the
--- fact. Everything else stays at plugin defaults.
-require("mdview").setup({
-	file_log = true,
-	browser = {
-		browser_autostart = vim.env.MDVIEW_NO_BROWSER ~= "1",
-		-- The instance outlives the terminal that spawned it; closing the tab
-		-- should end it rather than leave an invisible nvim running forever.
-		stop_on_browser_exit = true,
-	},
-})
+-- Optional binary override lets a terminal launch use a locally built relay
+-- (with --watch) before a v0.3.0 release exists — the same escape hatch as the
+-- standalone.binary_path config key, surfaced as an env var for the wrappers.
+local overrides = {}
+if vim.env.MDVIEW_STANDALONE_BIN and vim.env.MDVIEW_STANDALONE_BIN ~= "" then
+	overrides.standalone = { binary_path = vim.env.MDVIEW_STANDALONE_BIN }
+end
 
--- Headless has no UI to keep the loop alive on its own once `-c` commands are
--- done, so quitting must be driven by the session ending. mdview's own
--- VimLeavePre autocmd still tears the relay down on :qa.
-vim.api.nvim_create_autocmd("User", {
-	pattern = "MDViewSessionEnded",
-	callback = function()
-		vim.cmd("qa!")
-	end,
-})
+require("mdview").setup(overrides)

@@ -1,25 +1,26 @@
 <#
 .SYNOPSIS
-  Open a Markdown file in an mdview preview from the terminal, without tying the
-  preview to the shell that started it.
+  Open a Markdown file in a standalone mdview preview from the terminal, with no
+  long-lived Neovim in the chain.
 
 .DESCRIPTION
-  Runs Neovim headless against scripts/minimal_init.lua, so the preview gets the
-  full plugin (live push, scroll sync) while loading none of your own config — a
-  background process shouldn't depend on, or keep alive, plugins that have
-  nothing to do with the preview.
+  Runs a throwaway headless Neovim just long enough to launch `:MDView
+  standalone` — which spawns the relay watching the file on disk and detaches it
+  — then quits. The relay keeps running independently, following the file, until
+  you kill it or close the preview. Nothing here stays resident.
 
   `nvim +MDView --background file.md` is NOT valid Neovim syntax (`+cmd` takes no
   trailing flags); this script is the supported spelling of that idea.
+
+  Standalone needs a relay binary with --watch support (v0.3.0+). Until a release
+  ships, set $env:MDVIEW_STANDALONE_BIN to a locally built one, e.g.
+  E:/repos/mdview.nvim/native/server/mdview-server.exe
 
 .PARAMETER File
   The Markdown file to preview.
 
 .PARAMETER NoBrowser
-  Start the relay but don't open a browser tab.
-
-.PARAMETER Foreground
-  Stay in the foreground (Ctrl-C to stop) instead of detaching.
+  Start the relay but don't open a browser tab (its URL is printed instead).
 
 .EXAMPLE
   .\mdview-bg.ps1 README.md
@@ -32,8 +33,7 @@ param(
 	[Parameter(Mandatory = $true, Position = 0)]
 	[string]$File,
 
-	[switch]$NoBrowser,
-	[switch]$Foreground
+	[switch]$NoBrowser
 )
 
 $ErrorActionPreference = 'Stop'
@@ -59,21 +59,14 @@ if (-not (Test-Path -LiteralPath $init -PathType Leaf)) {
 	exit 1
 }
 
-if ($NoBrowser) { $env:MDVIEW_NO_BROWSER = '1' }
-
-# Absolute path: the detached process may not share this shell's location.
+# Absolute path: the relay resolves its room key from it, and its cwd differs
+# from this shell's.
 $target = (Resolve-Path -LiteralPath $File).Path
 
-$nvimArgs = @('--headless', '-u', $init, '-c', 'MDView start', $target)
+$cmd = "MDView standalone $target"
+if ($NoBrowser) { $cmd = "$cmd --no-browser" }
 
-if ($Foreground) {
-	& $nvim @nvimArgs
-	exit $LASTEXITCODE
-}
-
-# -WindowStyle Hidden keeps a console window from flashing up; the process is
-# not a child of this shell's job object, so closing the terminal leaves it running.
-$proc = Start-Process -FilePath $nvim -ArgumentList $nvimArgs -WindowStyle Hidden -PassThru
-
-Write-Host "mdview: previewing $(Split-Path -Leaf $target) in the background (pid $($proc.Id))"
-Write-Host "mdview: close the preview tab to stop it, or: Stop-Process -Id $($proc.Id)"
+# The Neovim launcher is short-lived (it spawns the detached relay and quits),
+# so it runs in the foreground — its output carries the standalone notification,
+# including the preview URL under -NoBrowser.
+& $nvim --headless -u $init -c $cmd -c 'qa!'

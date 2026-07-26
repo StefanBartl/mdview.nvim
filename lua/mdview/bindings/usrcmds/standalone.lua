@@ -2,16 +2,18 @@
 --- Action behind :MDView standalone — hand a file to the relay binary's own
 --- watch mode and step out of the way entirely.
 ---
---- Unlike :MDView detach (which starts a second *Neovim*), this leaves no
---- Neovim in the chain at all: the relay watches the file on disk itself and
---- broadcasts changes straight to the browser. The trade-off is the point —
+--- It leaves no Neovim in the chain at all: the relay watches the file on disk
+--- itself and broadcasts changes straight to the browser, so the preview
+--- outlives `:qa` and can't be taken down by anything happening in the editor.
+--- The trade-off is deliberate — it previews the file as SAVED: no
+--- unsaved-buffer push, no scroll sync, no cursor marker (nothing that requires
+--- knowing where a cursor is). In exchange it costs one small process and keeps
+--- running no matter what happens to any editor.
 ---
----   detach     : full mdview (live buffer push, scroll sync, cursor marker,
----                click-navigate), because a real Neovim is driving it.
----   standalone : file-on-disk only. No unsaved-buffer preview, no scroll sync,
----                no cursor marker — nothing that requires knowing where a
----                cursor is. In exchange it costs one small process and keeps
----                running no matter what happens to any editor.
+--- (An earlier `:MDView detach` kept a headless Neovim in the chain to preserve
+--- those live features; it was removed because a detached headless instance is
+--- never edited, so live push never actually reached it — it was a static
+--- snapshot dominated by this command. See docs/standalone.md.)
 ---
 --- Use it for a reference document you want open beside your work, or to share
 --- a rendered doc with something that isn't Neovim.

@@ -1,23 +1,27 @@
 #!/usr/bin/env sh
-# mdview-bg — open a Markdown file in an mdview preview from the terminal,
-# without tying the preview to the shell that started it.
+# mdview-bg — open a Markdown file in a standalone mdview preview from the
+# terminal, with no long-lived Neovim in the chain.
 #
-#   mdview-bg README.md               # preview in the browser, return the prompt
-#   mdview-bg --no-browser notes.md   # start the relay only, print nothing to open
-#   mdview-bg --fg docs/spec.md       # stay in the foreground (Ctrl-C to stop)
+#   mdview-bg README.md               # preview in the browser
+#   mdview-bg --no-browser notes.md   # start the relay only, print its URL
 #
-# It runs Neovim headless against scripts/minimal_init.lua, so the preview gets
-# the full plugin (live push, scroll sync) while loading none of your own
-# config — a background process shouldn't depend on, or keep alive, plugins
-# that have nothing to do with the preview.
+# It runs a throwaway headless Neovim just long enough to launch `:MDView
+# standalone` — which spawns the relay watching the file on disk and detaches
+# it — then quits. The relay keeps running independently, following the file,
+# until you kill it or close the preview. Nothing here stays resident.
 #
 # `nvim +MDView --background file.md` is NOT valid Neovim syntax (`+cmd` takes
 # no trailing flags); this script is the supported spelling of that idea.
 #
+# Standalone needs a relay binary with --watch support (v0.3.0+). Until a
+# release ships, point $MDVIEW_STANDALONE_BIN at a locally built one:
+#   MDVIEW_STANDALONE_BIN=~/repos/mdview.nvim/native/server/mdview-server
+#
 # Environment:
-#   MDVIEW_PATH     mdview.nvim checkout (default: derived from this script)
-#   LIB_NVIM_PATH   lib.nvim checkout, if not next to mdview.nvim
-#   NVIM            nvim binary to use (default: nvim on PATH)
+#   MDVIEW_PATH             mdview.nvim checkout (default: derived from this script)
+#   LIB_NVIM_PATH           lib.nvim checkout, if not next to mdview.nvim
+#   MDVIEW_STANDALONE_BIN   relay binary override (see above)
+#   NVIM                    nvim binary to use (default: nvim on PATH)
 
 set -eu
 
@@ -26,18 +30,17 @@ SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
 : "${NVIM:=nvim}"
 export MDVIEW_PATH
 
-FOREGROUND=0
 FILE=''
+NO_BROWSER=0
 
 usage() {
-	sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//'
+	sed -n '2,26p' "$0" | sed 's/^# \{0,1\}//'
 	exit "${1:-0}"
 }
 
 while [ $# -gt 0 ]; do
 	case "$1" in
-		--no-browser) MDVIEW_NO_BROWSER=1; export MDVIEW_NO_BROWSER ;;
-		--fg|--foreground) FOREGROUND=1 ;;
+		--no-browser) NO_BROWSER=1 ;;
 		-h|--help) usage 0 ;;
 		-*) printf 'mdview-bg: unknown option: %s\n' "$1" >&2; usage 1 ;;
 		*)
@@ -71,22 +74,14 @@ if [ ! -r "$INIT" ]; then
 	exit 1
 fi
 
-# Absolute path: the detached process may not share this shell's cwd.
+# Absolute path: the relay resolves its room key from it, and its cwd differs
+# from this shell's.
 FILE=$(CDPATH='' cd -- "$(dirname -- "$FILE")" && printf '%s/%s' "$(pwd)" "$(basename -- "$FILE")")
 
-if [ "$FOREGROUND" -eq 1 ]; then
-	exec "$NVIM" --headless -u "$INIT" -c 'MDView start' "$FILE"
-fi
+CMD="MDView standalone $FILE"
+[ "$NO_BROWSER" -eq 1 ] && CMD="$CMD --no-browser"
 
-# setsid where available so the preview survives the terminal closing, not just
-# the shell exiting; plain nohup elsewhere (macOS has no setsid).
-if command -v setsid >/dev/null 2>&1; then
-	setsid "$NVIM" --headless -u "$INIT" -c 'MDView start' "$FILE" \
-		>/dev/null 2>&1 < /dev/null &
-else
-	nohup "$NVIM" --headless -u "$INIT" -c 'MDView start' "$FILE" \
-		>/dev/null 2>&1 < /dev/null &
-fi
-
-printf 'mdview: previewing %s in the background (pid %s)\n' "$(basename -- "$FILE")" "$!"
-printf 'mdview: close the preview tab to stop it, or: kill %s\n' "$!"
+# The Neovim launcher is short-lived (it spawns the detached relay and quits),
+# so it can run in the foreground — its output carries the standalone
+# notification, incl. the preview URL under --no-browser.
+exec "$NVIM" --headless -u "$INIT" -c "$CMD" -c "qa!"

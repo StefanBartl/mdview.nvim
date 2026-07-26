@@ -1,15 +1,30 @@
 # Konzept: Preview ohne Server, Hintergrund-Instanz und Standalone-Binary
 
-> **Status: umgesetzt** (Abschnitte 2, 3/Stufe A und 4). Nutzerdoku:
-> [`docs/standalone.md`](../standalone.md). Konkret gebaut wurden:
-> `scripts/minimal_init.lua`, `scripts/mdview-bg.{sh,ps1}`,
-> `native/server/internal/source` (`--watch`/`--open`), `:MDView detach`,
-> `:MDView standalone` und `standalone.binary_path`.
+> **Status: umgesetzt — mit einer Korrektur nach Praxistest.** Nutzerdoku:
+> [`docs/standalone.md`](../standalone.md). Gebaut wurden:
+> `native/server/internal/source` (`--watch`/`--open`), `:MDView standalone`,
+> `standalone.binary_path`, `scripts/minimal_init.lua` und
+> `scripts/mdview-bg.{sh,ps1}`.
+>
+> **`:MDView detach` (Abschnitt 4, Hintergrund-nvim) wurde nach dem Test wieder
+> entfernt.** Der Praxistest zeigte zwei Probleme, die im Konzept unterschätzt
+> waren: (a) der detachte headless-nvim öffnete den Browser mal sofort, mal
+> erst nach 10–15 Min, mal nie — die input-getriebene headless-Main-Loop
+> verarbeitet anstehende libuv-Events unzuverlässig, wenn sie ohne stdin idle
+> läuft; (b) grundsätzlicher: die detachte Instanz hält einen **statischen
+> Buffer** (kein autoread, kein fs-watch), also erreicht Live-Push sie nie —
+> der behauptete Mehrwert „volle Editor-Features im Hintergrund" existiert
+> faktisch nicht, weil in einer headless-Instanz niemand editiert. Damit war
+> `detach` von `standalone` in jeder praktischen Hinsicht dominiert (statischer
+> Snapshot + unzuverlässig vs. live-dem-File-folgend + robust). Der
+> Terminal-Wrapper zeigt jetzt auf `standalone`.
+>
 > Offen geblieben: Abschnitt 1 Option A (statischer HTML-Export) und
 > Abschnitt 3.4/Stufe B (eigenes Single-Binary mit `go:embed`).
 >
-> Dieses Dokument bleibt als Entscheidungsgrundlage bestehen — es begründet,
-> *warum* es so gebaut wurde. Der Text unten ist der ursprüngliche Konzeptstand.
+> Dieses Dokument bleibt als Entscheidungsgrundlage bestehen — inklusive des
+> überschätzten Abschnitts 4, damit die Lehre dokumentiert ist. Der Text unten
+> ist der ursprüngliche Konzeptstand.
 
 > Beantwortet drei zusammenhängende Fragen:
 > (1) Lässt sich das Hauptfeature ohne Serverstart anbieten? (2) Lässt sich
