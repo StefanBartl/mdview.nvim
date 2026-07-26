@@ -25,6 +25,9 @@ local function add_lib_nvim()
 		candidates[#candidates + 1] = vim.env.LIB_NVIM_PATH
 	end
 	candidates[#candidates + 1] = vim.fn.getcwd() .. "/../lib.nvim"
+	-- CI (.github/workflows/ci.yml) clones lib.nvim here rather than as a true
+	-- sibling checkout; local dev can also use this (see .gitignore).
+	candidates[#candidates + 1] = vim.fn.getcwd() .. "/.deps/lib.nvim"
 	candidates[#candidates + 1] = vim.fn.stdpath("data") .. "/lazy/lib.nvim"
 
 	for _, path in ipairs(candidates) do
