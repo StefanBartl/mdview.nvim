@@ -1,0 +1,30 @@
+#!/usr/bin/env sh
+# Keep the local dev build artifacts (dist/client, native/server/mdview-server)
+# fresh after every commit, so a dev.web_root/dev.binary_path override
+# (see lua/mdview/adapter/server_args.lua) never silently serves stale JS/Go
+# code for the next `:MDView start`. Only rebuilds the piece(s) whose sources
+# actually changed in the commit; never blocks the commit itself.
+
+changed=$(git diff-tree --no-commit-id --name-only -r HEAD)
+
+rebuild_client=0
+rebuild_go=0
+
+echo "$changed" | grep -qE '^(src/client/|native/wasm-render/)' && rebuild_client=1
+echo "$changed" | grep -qE '^native/server/' && rebuild_go=1
+
+if [ "$rebuild_client" = "1" ]; then
+  echo "[post-commit] client/wasm sources changed -> npm run build"
+  npm run build || echo "[post-commit] WARNING: client build failed — dev bundle may be stale"
+fi
+
+if [ "$rebuild_go" = "1" ]; then
+  echo "[post-commit] relay server sources changed -> npm run build:go"
+  npm run build:go || echo "[post-commit] WARNING: relay build failed — dev binary may be stale"
+fi
+
+if [ "$rebuild_client" = "0" ] && [ "$rebuild_go" = "0" ]; then
+  echo "[post-commit] no client/relay source changes — skipping rebuild"
+fi
+
+exit 0
