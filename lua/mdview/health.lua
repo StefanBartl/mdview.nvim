@@ -184,6 +184,8 @@ function M.check()
 	else
 		ok("color_my_ascii.nvim not installed (optional; highlights fenced code inside Neovim)")
 	end
+
+	require("lib.nvim.usercmd.composer").checkhealth("MDView")
 end
 
 return M
