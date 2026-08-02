@@ -388,3 +388,34 @@
      werden weiterhin entfernt — mit Test `strips_dangerous_input_attributes`).
 
 ---
+
+## Performance: `:MDView start` vs. `:MDView standalone`
+
+  1. ~~Entlastet `standalone` Neovim gegenüber dem normalen `start`-Pfad?~~ — ja, klar und
+     drastisch gemessen. Kontrollierter Benchmark: 150 diskrete Edits an einer Markdown-Datei,
+     einmal durch `:MDView start` (Edits über `nvim_buf_set_lines` in derselben Instanz, die auch
+     den Relay-Kindprozess hält), einmal durch `:MDView standalone` (dieselben 150 Edits extern
+     per `Add-Content` direkt auf die Datei, während die startende nvim-Instanz nur noch daneben
+     steht). Gemessen wurde die CPU-Zeit des nvim.exe-Prozesses selbst (`Get-Process
+     .TotalProcessorTime`-Delta, Windows).
+     - **`start`: 1875 ms CPU** für 150 Edits (~2.9s Wall-Zeit) — nvim war den Großteil der Zeit
+       aktiv CPU-beschäftigt.
+     - **`standalone`: 0 ms CPU** — komplett unverändert, obwohl dieselben 150 Edits an der
+       beobachteten Datei ankamen.
+     - Ursache gefunden: `bindings/autocmds/live_push.lua` throttelt **nicht** — jedes
+       `TextChanged`/`TextChangedI` (potenziell jeder Tastenanschlag im Insert-Modus) spawnt
+       sofort einen eigenen `curl`-Prozess via `vim.fn.jobstart` für den vollen Buffer-Push. Bei
+       `standalone` gibt es diesen Pfad überhaupt nicht — der Relay beobachtet die Datei mit
+       seinem eigenen (Go-seitigen) Watcher, komplett entkoppelt von Neovim.
+     - ~~Mögliche Folge-Optimierung: `live_push` throttlen (ähnlich `scroll_sync_throttle_ms`)~~ —
+       umgesetzt. Neues `live_push_throttle_ms` (default 150, wie `scroll_sync_throttle_ms`) in
+       `lua/mdview/bindings/autocmds/live_push.lua`. Anders als Scroll-Sync's Throttle (das einen
+       zu frühen Ping einfach verwirft — unkritisch für eine transiente Scroll-Position) darf ein
+       Content-Push nicht verworfen werden, sonst bliebe die Preview dauerhaft veraltet, ohne dass
+       etwas anderes einen Resync auslöst. Deshalb: Push innerhalb des Throttle-Fensters wird nicht
+       verworfen, sondern auf einen einzelnen Trailing-Timer verschoben (max. `throttle_ms`
+       Verzögerung, kein Neu-Terminieren bei jedem weiteren Tastenanschlag) — der letzte Stand
+       kommt garantiert an. `BufWritePost`s Full-Push beim Speichern bleibt bewusst ungedrosselt
+       (seltener, dient als Resync-Punkt). Verifiziert mit demselben Benchmark wie oben: 150 Edits
+       unter `:MDView start` fielen von 1875ms auf **937,5ms CPU** (−50%). Lua-Testsuite (24/24)
+       weiterhin grün.

@@ -18,6 +18,7 @@ Partial nested overrides merge recursively — `{ browser = { browser = "firefox
 | Option | Default | Purpose |
 | --- | --- | --- |
 | `server_port` | `43219` | Preferred loopback port; the relay picks the next free one if taken. |
+| `live_push_throttle_ms` | `150` | Minimum time between full-buffer pushes on `TextChanged`/`TextChangedI` (each spawns a `curl` process). A push inside the window is deferred to a single trailing push rather than dropped, so the latest content is never lost, just delayed by at most this long. `BufWritePost`'s save-triggered full push is never throttled. |
 | `scroll_sync` | `true` | Sync the nvim cursor position to the browser scroll position (line-accurate via comrak sourcepos). |
 | `scroll_sync_mode` | `"top"` | Where the cursor line lands in the browser viewport: `"top"` (near the top; `scroll_sync_top_offset` = fraction down, `0` = glued to top) or `"cursor"` (mirror — same relative height as the cursor in the nvim window). |
 | `open_preview_tab` | `false` | Render into a read-only Neovim tab (Treesitter-highlighted) instead of the browser. |

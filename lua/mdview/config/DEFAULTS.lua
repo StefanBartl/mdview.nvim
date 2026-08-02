@@ -73,6 +73,7 @@
 ---@field debug_plugin boolean enable plugin-internal debug notifications
 ---@field debug_preview boolean enable live-push debug notifications
 ---@field dev_server_port integer Vite dev server port for client (dev workflow only)
+---@field live_push_throttle_ms integer minimum time between full-buffer pushes on TextChanged/TextChangedI (each push spawns a curl process; rapid edits within the window coalesce into one trailing push instead of one per keystroke — see :MDView start vs standalone CPU benchmark in Roadmap.md). BufWritePost's save-triggered full push is never throttled.
 ---@field scroll_sync boolean send cursor position to the browser preview so it scrolls to follow (nvim-to-browser only)
 ---@field scroll_sync_throttle_ms integer minimum time between scroll-position pings
 ---@field scroll_sync_mode "top"|"cursor" where the cursor line lands in the browser viewport: near the top, or mirroring the cursor's height in the nvim window
@@ -114,6 +115,8 @@ return {
 	debug_preview = false,
 
 	dev_server_port = 43220,
+
+	live_push_throttle_ms = 150,
 
 	scroll_sync = true,
 	scroll_sync_throttle_ms = 150,
