@@ -24,6 +24,32 @@ local M = {}
 ---@type table<string, string>
 M._last_doc = {}
 
+---@return integer
+local function now_ms()
+	local uv = vim.uv or vim.loop
+	return uv.now()
+end
+
+-- Throttle state for TextChanged/TextChangedI (see the CPU benchmark in
+-- Roadmap.md's "Performance" section: unthrottled, every keystroke spawned its
+-- own curl process). Unlike scroll_sync's throttle — which just drops a ping
+-- that arrives too soon, fine for a transient scroll position — dropping a
+-- content push would leave the preview stale indefinitely with nothing else to
+-- trigger a resync. So a push inside the throttle window is deferred to a
+-- single trailing timer instead of dropped, guaranteeing the latest content is
+-- eventually sent no more than throttle_ms after it was made.
+local last_sent_at = 0
+local pending_timer = nil
+local pending_bufnr = nil
+
+local function cancel_pending()
+	if pending_timer then
+		pending_timer:stop()
+		pending_timer:close()
+		pending_timer = nil
+	end
+end
+
 -- Send the current content of bufnr to the relay for `bufnr`'s room and store a
 -- session snapshot for bookkeeping. Routing (per-path vs the preview key) and
 -- full-vs-diff (when experimental.line_diff is on) are decided here / in
@@ -90,17 +116,49 @@ end
 function M.attach(group)
 	log.debug("setting up live push autocmds", nil, "livepush", true)
 	M._last_doc = {} -- fresh session: re-announce the document on the first push
+	last_sent_at = 0
+	cancel_pending()
+
+	local function push_now(bufnr)
+		ws_client.wait_ready(function(ok)
+			if not ok then
+				return
+			end
+			log.debug("TextChanged fired, buf: " .. bufnr, nil, "livepush", true)
+			M.push_buffer_changes(bufnr)
+		end, ws_client.WAIT_READY_TIMEOUT)
+	end
 
 	local opts_a = {
 		pattern = defaults.ft_pattern,
 		callback = function(args)
-			ws_client.wait_ready(function(ok)
-				if not ok then
-					return
-				end
-				log.debug("TextChanged fired, buf: " .. args.buf, nil, "livepush", true)
-				M.push_buffer_changes(args.buf)
-			end, ws_client.WAIT_READY_TIMEOUT)
+			local throttle_ms = defaults.live_push_throttle_ms or 150
+			local t = now_ms()
+			if t - last_sent_at >= throttle_ms then
+				cancel_pending()
+				last_sent_at = t
+				push_now(args.buf)
+				return
+			end
+
+			-- Within the throttle window: remember the latest buffer and make
+			-- sure exactly one trailing push is scheduled for when the window
+			-- ends (don't reschedule on every keystroke, or continuous typing
+			-- would never actually fire one).
+			pending_bufnr = args.buf
+			if not pending_timer then
+				local remaining = throttle_ms - (t - last_sent_at)
+				pending_timer = (vim.uv or vim.loop).new_timer()
+				pending_timer:start(
+					math.max(0, remaining),
+					0,
+					vim.schedule_wrap(function()
+						cancel_pending()
+						last_sent_at = now_ms()
+						push_now(pending_bufnr)
+					end)
+				)
+			end
 		end,
 	}
 	if group then
