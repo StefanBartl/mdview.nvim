@@ -17,6 +17,7 @@ local M = {}
 ---@type string[]
 M.modes = { "line", "caret", "section", "off" }
 
+---@internal
 ---@param v string
 ---@return boolean
 local function is_valid(v)

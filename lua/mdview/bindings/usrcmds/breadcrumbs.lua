@@ -9,7 +9,9 @@ local notify = require("lib.nvim.notify").create("").notify
 
 local M = {}
 
+---@internal
 ---@param lines string[]
+---@return nil
 local function show_in_scratch(lines)
 	vim.cmd("botright new")
 	local buf = vim.api.nvim_get_current_buf()

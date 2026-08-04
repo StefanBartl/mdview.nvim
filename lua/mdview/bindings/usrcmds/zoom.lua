@@ -22,6 +22,7 @@ local MAX = 3.0
 ---@type string[]
 M.actions = { "+", "-", "reset" }
 
+---@internal
 ---@param z number
 ---@return number
 local function clamp(z)

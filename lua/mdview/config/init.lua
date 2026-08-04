@@ -17,8 +17,10 @@ local M = {}
 ---@type mdview.config.Defaults
 M.defaults = vim.deepcopy(DEFAULTS)
 
+---@internal
 ---@param target table
 ---@param override table
+---@return nil
 local function deep_merge_in_place(target, override)
 	for k, v in pairs(override) do
 		if type(v) == "table" and type(target[k]) == "table" then
@@ -40,8 +42,14 @@ local KNOWN_NIL_KEYS = {
 }
 
 -- Collect every valid leaf key name across all levels (for "did you mean").
+---@internal
+---@return table<string, string>
 local function collect_known_names()
 	local names = {}
+	---@internal
+	---@param tbl table
+	---@param path string
+	---@return nil
 	local function walk(tbl, path)
 		for k, v in pairs(tbl) do
 			if type(k) == "string" then
@@ -74,6 +82,12 @@ function M.validate(opts)
 	local known_names = collect_known_names()
 	local unknown = {}
 
+	---@internal
+	---@param user_tbl table
+	---@param default_tbl table
+	---@param path string
+	---@param nil_keys table<string, boolean>|nil
+	---@return nil
 	local function check(user_tbl, default_tbl, path, nil_keys)
 		for k, v in pairs(user_tbl) do
 			local valid = (default_tbl[k] ~= nil) or (nil_keys and nil_keys[k])

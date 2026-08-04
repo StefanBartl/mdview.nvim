@@ -16,6 +16,7 @@ local M = {}
 
 
 -- on BufEnter, store snapshot if not present
+---@internal
 ---@param bufnr integer
 ---@return nil
 local function on_buf_enter(bufnr)

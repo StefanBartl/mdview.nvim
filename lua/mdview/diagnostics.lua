@@ -13,13 +13,16 @@ local is_windows = require("lib.nvim.cross.platform.is_windows")
 
 local M = {}
 
+---@internal
 ---@param lines string[]
 ---@param key string
 ---@param value any
+---@return nil
 local function kv(lines, key, value)
 	lines[#lines + 1] = ("  %-22s %s"):format(key .. ":", tostring(value))
 end
 
+---@internal
 ---@param cmd string
 ---@return boolean
 local function has_exe(cmd)
@@ -27,6 +30,7 @@ local function has_exe(cmd)
 end
 
 -- Synchronous localhost GET (diagnostics run on demand, blocking is fine).
+---@internal
 ---@param url string
 ---@return string # trimmed body or an error marker
 local function curl_get(url)
@@ -44,6 +48,9 @@ end
 ---@return string[]
 function M.collect()
 	local lines = {}
+	---@internal
+	---@param title string
+	---@return nil
 	local function section(title)
 		lines[#lines + 1] = ""
 		lines[#lines + 1] = "== " .. title .. " =="

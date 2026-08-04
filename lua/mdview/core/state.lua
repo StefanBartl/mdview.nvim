@@ -43,6 +43,7 @@ M.WebKey = WebKey
 local ok_lib_tables, lib_tables = pcall(require, "lib.lua.tables")
 local has_lib_dict_clone = ok_lib_tables and type(lib_tables.dict_clone) == "function"
 
+---@internal
 ---@param t table
 ---@return table
 local function shallow_copy(t)
@@ -60,6 +61,7 @@ local function shallow_copy(t)
 end
 
 -- validate a key is one of the allowed enum members
+---@internal
 ---@param k string
 ---@return boolean
 local function is_valid_key(k)

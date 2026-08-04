@@ -28,6 +28,7 @@ local M = {}
 --   :MDView start cwd="c:/Users/bartl/"
 -- The first non-`cwd=`-prefixed token is taken as the file path; surrounding
 -- quotes on the cwd value (single or double) are stripped.
+---@internal
 ---@param fargs string[]
 ---@return string|nil file, string|nil cwd
 local function parse_start_args(fargs)
@@ -45,6 +46,7 @@ end
 
 -- initial_push_async: if an explicit path is provided (arg_path), prefer immediate try_push.
 -- This allows `:MDViewStart /path/to/file.md` to immediately render that file into the preview.
+---@internal
 ---@param push_strategy "launcher"|"try_push"
 ---@param try_push_opts table|nil
 ---@param wait_timeout integer|nil
@@ -119,6 +121,7 @@ end
 --- `ctx.rest` — deliberately left as a free-form tail rather than a fixed
 --- positional schema, since `cwd=` may appear before or after the file arg.)
 ---@param fargs string[]
+---@return nil
 function M.run(fargs)
 	notify("[mdview] start invoked", vim.log.levels.DEBUG)
 

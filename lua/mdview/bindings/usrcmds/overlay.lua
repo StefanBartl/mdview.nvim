@@ -35,6 +35,7 @@ function M.names()
 	return out
 end
 
+---@internal
 ---@return table<string, boolean>
 local function overlay_state()
 	local browser = require("mdview.config.browser").defaults

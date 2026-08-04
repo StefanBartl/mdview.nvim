@@ -11,7 +11,9 @@ local autocmd_registry = require("mdview.helper.autocmds_registry")
 
 local M = {}
 
+---@internal
 ---@param bufnr integer
+---@return nil
 local function on_text_changed(bufnr)
 	log.debug("TextChanged fired for buf " .. bufnr, nil, "textchange", true)
 	push_buffer(bufnr, false) -- only push diffs

@@ -31,6 +31,7 @@ M._last = nil
 ---@type table<string, boolean>
 M._opened = {}
 
+---@internal
 ---@param bufnr integer
 ---@return string|nil # normalized markdown path, or nil if not an eligible buffer
 local function eligible_path(bufnr)
@@ -45,7 +46,9 @@ local function eligible_path(bufnr)
 	return normalize.path(name)
 end
 
+---@internal
 ---@param bufnr integer
+---@return nil
 local function on_switch(bufnr)
 	-- Only relevant while a browser session is running. In tab-preview mode the
 	-- nvim tab already follows the buffer via its own sync, so skip entirely.

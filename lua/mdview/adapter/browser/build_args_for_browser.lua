@@ -14,6 +14,7 @@ local fn = vim.fn
 -- browser.stop_on_browser_exit / browser_autoclose rely on (launching into
 -- the user's already-running browser would hand off to that process and
 -- exit immediately, so close/exit could never be detected).
+---@internal
 ---@return string profile_dir
 local function make_tmp_profile()
   local base = fn.stdpath("data") .. "/mdview/browser-profile"

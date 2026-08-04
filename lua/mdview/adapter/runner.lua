@@ -19,6 +19,7 @@ local desc_tag = "[mdview.runner] "
 -- relative to its cwd (it takes --web-root explicitly), so no project-root
 -- detection is needed here. Both sources may contain ~/$VAR/%VAR% (e.g.
 -- `:MDView start cwd=$REPOS_DIR/proj`), so both are expanded here.
+---@internal
 ---@param optional_cwd string|nil  # optional working directory override
 ---@return string # resolved path to use as cwd for spawning processes
 local function resolve_spawn_cwd(optional_cwd)

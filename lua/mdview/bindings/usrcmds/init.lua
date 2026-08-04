@@ -38,6 +38,7 @@ local M = {}
 --- `log <level>` routes, one per known level (trace|debug|info|warn|error),
 --- generated from log.LEVELS so the route list can't drift from the filter it
 --- drives.
+---@internal
 ---@return Lib.UserCmd.Composer.Route[]
 local function log_level_routes()
 	local routes = {}

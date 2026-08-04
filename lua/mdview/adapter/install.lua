@@ -15,12 +15,14 @@ local CLIENT_ASSET = "mdview-client.tar.gz"
 
 -- Read through to mdview.config.defaults.install so a fork or a pinned
 -- release version (require('mdview').setup({ install = {...} })) is honored.
+---@internal
 ---@return string repo, string version
 local function repo_and_version()
 	local install_cfg = require("mdview.config").defaults.install
 	return install_cfg.repo, install_cfg.version
 end
 
+---@internal
 ---@return string os_name, string arch
 local function platform_triplet()
 	local os_name
@@ -45,6 +47,7 @@ local function platform_triplet()
 	return os_name, arch
 end
 
+---@internal
 ---@return string
 local function binary_name()
 	local os_name, arch = platform_triplet()
@@ -52,6 +55,7 @@ local function binary_name()
 	return string.format("mdview-server_%s_%s%s", os_name, arch, ext)
 end
 
+---@internal
 ---@return string
 local function install_dir()
 	local _, version = repo_and_version()
@@ -59,6 +63,7 @@ local function install_dir()
 end
 
 -- Compute sha256 of a file's raw bytes.
+---@internal
 ---@param path string
 ---@return string|nil
 local function file_sha256(path)
@@ -76,6 +81,7 @@ end
 
 -- Parse a goreleaser-style checksums.txt (lines: "<sha256>  <filename>") and
 -- return the expected checksum for `name`, or nil if not listed.
+---@internal
 ---@param checksums_text string
 ---@param name string
 ---@return string|nil
@@ -89,6 +95,7 @@ local function expected_checksum(checksums_text, name)
 	return nil
 end
 
+---@internal
 ---@param url string
 ---@param dest string
 ---@return boolean ok, string|nil err
@@ -105,6 +112,7 @@ end
 
 -- Download `name` from the configured release into dir/name (skipped if it
 -- already exists) and verify it against dir/checksums.txt.
+---@internal
 ---@param dir string
 ---@param name string
 ---@return string|nil path, string|nil err

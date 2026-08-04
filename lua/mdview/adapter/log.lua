@@ -29,6 +29,7 @@ local debug_override = nil
 ---@type string|nil
 local buf_name_override = nil
 
+---@internal
 ---@return boolean
 local function is_debug()
 	if debug_override ~= nil then
@@ -37,6 +38,7 @@ local function is_debug()
 	return cfg.defaults.debug == true
 end
 
+---@internal
 ---@return string
 local function log_buf_name()
 	return buf_name_override or cfg.defaults.log_buffer_name or "mdview://logs"
@@ -65,6 +67,7 @@ local file_path_override = nil
 ---@type string
 local default_file_path = ("%s/mdview/relay-%s.log"):format(vim.fn.stdpath("log"), timestamp)
 
+---@internal
 ---@return boolean
 local function is_file_log()
 	if file_log_override ~= nil then
@@ -75,6 +78,7 @@ end
 
 -- Path used when file logging is on. Never relative to the cwd: falls back to
 -- Neovim's own log dir so enabling it can't litter a project directory.
+---@internal
 ---@return string
 local function file_path()
 	if file_path_override then
@@ -141,6 +145,7 @@ end
 -- Helper: return dirname of a path, works with both '/' and '\'
 -- English comments:
 -- Use pattern matching to avoid calling vim.fn.fnamemodify or vim.fn.expand.
+---@internal
 ---@param path string
 ---@return string dirname
 local function path_dirname(path)
@@ -162,6 +167,7 @@ end
 -- Helper: ensure directory exists by creating missing segments using luv (vim.uv)
 -- English comments:
 -- Avoid calling vim.fn.mkdir to prevent E5560 in fast event contexts.
+---@internal
 ---@param dir string
 ---@return boolean ok, string|nil err
 local function ensure_dir(dir)

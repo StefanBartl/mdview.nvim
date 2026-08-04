@@ -27,6 +27,7 @@ local M = {}
 -- server is actually reachable (DISPLAY for X11, WAYLAND_DISPLAY for
 -- Wayland). Without this, a headless SSH session with no X forwarding would
 -- silently spawn a `jobstart` for a browser that can never open a window.
+---@internal
 ---@return boolean
 local function has_display()
 	local is_windows = require("mdview.helper.is_windows")
@@ -42,6 +43,7 @@ M.has_display = has_display
 -- upgrade that doesn't present both (see native/server/main.go handleWS).
 -- Prefers a client dev server URL when available, falls back to the backend
 -- server (production).
+---@internal
 ---@param opts table|nil # { browser_url?: string, key?: string }
 ---@return string
 local function resolve_browser_url(opts)

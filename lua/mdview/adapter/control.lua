@@ -10,6 +10,7 @@ local ws_client = require("mdview.adapter.ws_client")
 local M = {}
 
 --- Resolve the room key the open preview tab is watching.
+---@internal
 ---@return string|nil
 local function target_key()
 	local behavior = require("mdview.config.browser").defaults.behavior or "reuse"

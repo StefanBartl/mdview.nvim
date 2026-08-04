@@ -17,6 +17,7 @@ local M = {}
 M.LEVELS = { trace = 0, debug = 1, info = 2, warn = 3, error = 4 }
 
 -- Format the ring (optionally filtered to level >= min_level) into lines.
+---@internal
 ---@param min_level integer|nil
 ---@return string[]
 local function format_ring(min_level)
@@ -46,7 +47,9 @@ local SCRATCH_NAME = "mdview://log"
 -- than creating a new one each time — nvim_buf_set_name throws E95 on a name
 -- collision, which happens whenever the previous log window is still open (its
 -- bufhidden = "wipe" only fires once the buffer is no longer displayed).
+---@internal
 ---@param lines string[]
+---@return nil
 local function show_in_scratch(lines)
 	local existing = vim.fn.bufnr(SCRATCH_NAME)
 	if existing ~= -1 then

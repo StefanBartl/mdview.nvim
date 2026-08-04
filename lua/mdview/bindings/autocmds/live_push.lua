@@ -24,6 +24,7 @@ local M = {}
 ---@type table<string, string>
 M._last_doc = {}
 
+---@internal
 ---@return integer
 local function now_ms()
 	local uv = vim.uv or vim.loop
@@ -42,6 +43,8 @@ local last_sent_at = 0
 local pending_timer = nil
 local pending_bufnr = nil
 
+---@internal
+---@return nil
 local function cancel_pending()
 	if pending_timer then
 		pending_timer:stop()
@@ -119,6 +122,9 @@ function M.attach(group)
 	last_sent_at = 0
 	cancel_pending()
 
+	---@internal
+	---@param bufnr integer
+	---@return nil
 	local function push_now(bufnr)
 		ws_client.wait_ready(function(ok)
 			if not ok then

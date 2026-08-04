@@ -33,6 +33,7 @@ local M = {}
 -- focus to whatever window was in front (i.e. Neovim's terminal): capture the
 -- foreground HWND, launch the browser, briefly wait for it to come up, then
 -- push focus back. Best-effort — window managers can override it.
+---@internal
 ---@param url string
 ---@return string
 local function windows_focus_preserving_ps(url)
@@ -56,6 +57,7 @@ end
 -- keyboard focus. "nvim" keeps focus in the editor: clean on macOS (`open -g`),
 -- best-effort focus-restore on Windows, and a no-op (opens normally) on Linux
 -- where there is no portable way to do it.
+---@internal
 ---@param url URL
 ---@param focus "browser"|"nvim"|nil
 ---@return BrowserHandle|nil, string|nil
@@ -116,6 +118,7 @@ end
 
 -- Open `url` by spawning a dedicated, trackable browser process against the
 -- isolated mdview profile. Returns a handle with a job_id for close().
+---@internal
 ---@param url URL
 ---@param opts BrowserOptions
 ---@return BrowserHandle|nil, string|nil

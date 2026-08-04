@@ -27,6 +27,7 @@ M._candidates = { "chrome", "google-chrome", "chromium", "msedge", "firefox" }
 
 -- Validate that a path is an executable that can be launched.
 -- Uses vim.executable() where appropriate; falls back to filereadable for platform bundle paths.
+---@internal
 ---@param path string
 ---@return boolean
 local function is_executable(path)
@@ -54,6 +55,7 @@ end
 
 -- Try to resolve candidate name via PATH and common platform locations.
 -- Returns absolute command string or nil.
+---@internal
 ---@param name string
 ---@return string|nil
 local function resolve_candidate(name)

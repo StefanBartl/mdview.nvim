@@ -10,6 +10,7 @@ local probe_platform_paths = require("mdview.adapter.browser.probe_plattform_pat
 local default_candidates = { "chrome", "google-chrome", "chromium", "msedge", "firefox" }
 
 -- Test whether a candidate path/name is usable
+---@internal
 ---@param name string
 ---@return string|nil resolved # returns the input or absolute candidate path or nil
 local function try_resolve(name)
