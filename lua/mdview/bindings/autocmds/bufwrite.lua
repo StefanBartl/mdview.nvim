@@ -12,6 +12,8 @@ local M = {}
 --- Setup BufWritePost autocmd in the given augroup.
 --- @param group integer|nil
 function M.attach(group)
+	---@internal
+	---@param bufnr integer
 	local function on_buf_write(bufnr)
 		-- delegate to core.events push_buffer (force full push)
 		pcall(function()

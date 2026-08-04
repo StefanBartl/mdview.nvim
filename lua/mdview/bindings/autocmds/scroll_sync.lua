@@ -16,6 +16,7 @@ local M = {}
 
 local last_sent_at = 0
 
+---@internal
 ---@return integer
 local function now_ms()
 	local uv = vim.uv or vim.loop
@@ -61,7 +62,9 @@ function M.toggle_paused()
 	return paused
 end
 
+---@internal
 ---@param bufnr integer
+---@return nil
 local function send_current_position(bufnr)
 	local ft = safe_buf_get_option(bufnr, "filetype") or ""
 	if ft ~= "markdown" and ft ~= "md" then

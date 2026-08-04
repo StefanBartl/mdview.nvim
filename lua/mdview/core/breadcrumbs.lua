@@ -21,6 +21,7 @@ M._last_heading = nil
 
 --- Nearest ATX heading at or above `line` (1-based). Scans the buffer prefix
 --- once and walks back. Returns "# Title" style text, or nil if none above.
+---@internal
 ---@param bufnr integer
 ---@param line integer
 ---@return string|nil

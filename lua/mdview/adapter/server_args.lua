@@ -13,6 +13,7 @@ local M = {}
 --- configured, else `$MDVIEW_DEV_BINARY` (the only way a detached instance —
 --- scripts/minimal_init.lua loads none of the user's Lua config — can reach
 --- one), else whatever `install` manages.
+---@internal
 ---@return string|nil path, string|nil err
 local function resolve_binary()
 	local dev = require("mdview.config").defaults.dev or {}
@@ -33,6 +34,7 @@ end
 --- Client bundle dir the normal `:MDView start` path passes as --web-root:
 --- `dev.web_root` if configured, else `$MDVIEW_DEV_WEB_ROOT`, else whatever
 --- `install` manages. See resolve_binary for why the env var fallback exists.
+---@internal
 ---@return string|nil path, string|nil err
 local function resolve_web_root()
 	local dev = require("mdview.config").defaults.dev or {}

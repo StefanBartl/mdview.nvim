@@ -34,11 +34,15 @@ M._is_waiting = false
 -- the server process is (re)spawned or stopped (launcher.start / stop.stop).
 M._ready = false
 
+--- Forget that the server was seen healthy, so the next M.wait_ready call
+--- performs a real /health round trip instead of short-circuiting.
+---@return nil
 function M.reset_ready()
 	M._ready = false
 end
 
 -- simple helper to construct /health URL
+---@internal
 ---@param port integer
 ---@return string
 local function health_url(port)
@@ -46,8 +50,10 @@ local function health_url(port)
 end
 
 -- Non-blocking curl GET fallback
+---@internal
 ---@param url string
 ---@param cb fun(code:integer)
+---@return nil
 local function http_get(url, cb)
 	local curl = fn.executable("curl") == 1 and "curl" or nil
 	if curl then
@@ -85,6 +91,8 @@ function M.wait_ready(cb, timeout_ms)
 	local start_time = uv.now()
 	local attempt = 0
 
+	---@internal
+	---@return nil
 	local function poll()
 		attempt = attempt + 1
 		local port = vim.g.mdview_server_port or DEFAULT_PORT
@@ -131,6 +139,7 @@ end
 -- internal helper: construct a URL for an mdview-server endpoint,
 -- authenticated with the shared session token generated for the currently
 -- running process.
+---@internal
 ---@param endpoint string # e.g. "update" or "scroll"
 ---@param path string # file path being previewed (used as the room key)
 ---@return string
@@ -147,30 +156,35 @@ local function endpoint_url_for(endpoint, path)
 	)
 end
 
+---@internal
 ---@param path string
 ---@return string
 local function update_url_for(path)
 	return endpoint_url_for("update", path)
 end
 
+---@internal
 ---@param path string
 ---@return string
 local function scroll_url_for(path)
 	return endpoint_url_for("scroll", path)
 end
 
+---@internal
 ---@param path string
 ---@return string
 local function diff_url_for(path)
 	return endpoint_url_for("diff", path)
 end
 
+---@internal
 ---@param path string
 ---@return string
 local function doc_url_for(path)
 	return endpoint_url_for("doc", path)
 end
 
+---@internal
 ---@param path string
 ---@return string
 local function control_url_for(path)
@@ -181,6 +195,7 @@ end
 -- (try_send_pending) can log the server response body (and quickly detect empty replies).
 -- Helper: execute an HTTP POST using curl via jobstart when available.
 -- Callback signature: cb(exit_code:number, stdout_lines:string[]|nil, stderr_lines:string[]|nil)
+---@internal
 ---@param url URL # target URL for the POST request
 ---@param body string # request body content
 ---@param cb fun(exit_code: integer, stdout_lines: string[]|nil, stderr_lines: string[]|nil)? # optional callback invoked on completion
@@ -265,7 +280,9 @@ local function http_post_nonblocking(url, body, cb)
 end
 
 -- Replace or augment try_send_pending callback handling to log response body.
+---@internal
 ---@param path string # file path whose pending markdown should be sent
+---@return nil
 local function try_send_pending(path)
 	-- English comment: normalize incoming path and bail out if normalization fails
 	local norm_path = normalize.path(path)
@@ -330,9 +347,10 @@ end
 
 -- Public: send markdown to server.
 -- Non-blocking; retries on failure with exponential backoff.
--- @param path string absolute file path (used as key)
--- @param markdown string file content
--- @param opts table|nil { max_retries?: integer, immediate?: boolean }
+---@param path string absolute file path (used as key)
+---@param markdown string file content
+---@param opts table|nil { max_retries?: integer, immediate?: boolean }
+---@return nil
 function M.send_markdown(path, markdown, opts)
 	opts = opts or {}
 	if type(path) ~= "string" or type(markdown) ~= "string" then
@@ -440,6 +458,7 @@ function M.reset_diff_state(key)
 	end
 end
 
+---@internal
 ---@return boolean
 local function line_diff_enabled()
 	local ok, exp = pcall(function()

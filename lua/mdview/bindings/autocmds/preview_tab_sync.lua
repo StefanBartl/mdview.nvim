@@ -13,7 +13,9 @@ local api = vim.api
 local M = {}
 local attached = false
 
+---@internal
 ---@param bufnr integer
+---@return nil
 local function on_change(bufnr)
 	local preview_tab = require("mdview.adapter.preview_tab")
 	if preview_tab.is_open(bufnr) then

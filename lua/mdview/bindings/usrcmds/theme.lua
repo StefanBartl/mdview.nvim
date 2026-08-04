@@ -20,6 +20,7 @@ local M = {}
 ---@type string[]
 M.known = { "github", "dark-dimmed", "plain", "tokyonight", "catppuccin" }
 
+---@internal
 ---@param name string
 ---@return boolean
 local function is_known(name)

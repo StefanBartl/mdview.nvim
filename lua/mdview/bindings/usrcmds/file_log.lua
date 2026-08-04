@@ -20,8 +20,10 @@ local notify = require("lib.nvim.notify").create("").notify
 
 local M = {}
 
+---@internal
 ---@param enabled boolean
 ---@param path string
+---@return nil
 local function report(enabled, path)
 	if enabled then
 		notify("[mdview] file logging ON -> " .. path, vim.log.levels.INFO)
@@ -35,6 +37,7 @@ end
 -- fast event context) and can't expand it itself. Resolving also means a
 -- relative path is pinned to the cwd at the time the command ran, rather than
 -- silently following later :cd's.
+---@internal
 ---@param path string
 ---@return string
 local function absolute(path)

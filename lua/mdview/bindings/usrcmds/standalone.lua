@@ -37,6 +37,7 @@ local M = {}
 --- Go's flag package prints its usage (which lists every defined flag) to
 --- stderr and exits non-zero for an unknown flag, so an unknown-flag probe is
 --- itself the capability check.
+---@internal
 ---@param bin string
 ---@return boolean
 local function supports_watch(bin)
@@ -47,6 +48,7 @@ end
 --- The relay binary to use for standalone mode: an explicit
 --- `standalone.binary_path` override if configured (for a locally built relay,
 --- or a newer one than `install.version` pins), else the installed release.
+---@internal
 ---@return string|nil path, string|nil err
 local function resolve_binary()
 	local cfg = require("mdview.config").defaults.standalone or {}

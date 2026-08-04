@@ -18,12 +18,14 @@ local ok = health.ok or health.report_ok
 local warn = health.warn or health.report_warn
 local error_ = health.error or health.report_error
 
+---@internal
 ---@param cmd string
 ---@return boolean
 local function executable(cmd)
 	return vim.fn.executable(cmd) == 1
 end
 
+---@return nil
 function M.check()
 	start("mdview.nvim: environment")
 
@@ -167,6 +169,9 @@ function M.check()
 	-- Companion plugins (optional, not dependencies) --------------------------
 	start("mdview.nvim: optional companions")
 
+	---@internal
+	---@param mod string
+	---@return boolean
 	local function has_plugin(mod)
 		return pcall(require, mod)
 	end

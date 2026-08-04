@@ -24,6 +24,7 @@ local preview_to_source = {}
 ---@type table<integer, integer> preview bufnr -> tabpage handle it was opened in
 local preview_tabpage = {}
 
+---@internal
 ---@param source_bufnr integer
 ---@return boolean
 local function is_markdown(source_bufnr)
@@ -34,7 +35,9 @@ end
 -- Apply Treesitter markdown highlighting if the parser is available, else
 -- fall back to Vim's bundled regex syntax file (ships with Neovim, no
 -- install needed) so the preview is never left completely unhighlighted.
+---@internal
 ---@param preview_bufnr integer
+---@return nil
 local function apply_highlighting(preview_bufnr)
 	local ok = pcall(vim.treesitter.start, preview_bufnr, "markdown")
 	if not ok then
@@ -45,8 +48,10 @@ end
 -- Refill preview_bufnr's lines from source_bufnr, preserving the cursor
 -- position of any window currently showing the preview so it doesn't jump
 -- to the top on every keystroke in the source buffer.
+---@internal
 ---@param source_bufnr integer
 ---@param preview_bufnr integer
+---@return nil
 local function sync_content(source_bufnr, preview_bufnr)
 	if not api.nvim_buf_is_valid(source_bufnr) or not api.nvim_buf_is_valid(preview_bufnr) then
 		return

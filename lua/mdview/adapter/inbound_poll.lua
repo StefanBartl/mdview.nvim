@@ -19,6 +19,7 @@ local timer = nil
 local nav_inflight = false
 local scroll_inflight = false
 
+---@internal
 ---@param endpoint string
 ---@return string
 local function url_for(endpoint)
@@ -27,6 +28,7 @@ local function url_for(endpoint)
 	return string.format("http://localhost:%d/%s?token=%s", port, endpoint, vim.uri_encode(token))
 end
 
+---@internal
 ---@return table
 local function experimental()
 	return require("mdview.config").defaults.experimental or {}
@@ -39,12 +41,17 @@ end
 -- Absolute path? (Unix "/…" or Windows "C:/…" / "C:\…"). Back/forward
 -- navigation sends absolute document paths; relative links are resolved against
 -- the source document's directory.
+---@internal
 ---@param p string
 ---@return boolean
 local function is_absolute(p)
 	return p:match("^/") ~= nil or p:match("^%a:[/\\]") ~= nil
 end
 
+---@internal
+---@param key string
+---@param href string
+---@return nil
 local function handle_nav(key, href)
 	if type(key) ~= "string" or type(href) ~= "string" or href == "" then
 		return
@@ -67,6 +74,8 @@ local function handle_nav(key, href)
 	pcall(vim.cmd.edit, vim.fn.fnameescape(target))
 end
 
+---@internal
+---@return nil
 local function poll_nav()
 	if nav_inflight then
 		return
@@ -103,6 +112,7 @@ end
 -- ---- reverse scroll (browser -> nvim) --------------------------------------
 
 -- Find the loaded buffer whose (normalized) name matches `key`.
+---@internal
 ---@param key string
 ---@return integer|nil
 local function buf_for_key(key)
@@ -118,8 +128,10 @@ local function buf_for_key(key)
 	return nil
 end
 
+---@internal
 ---@param key string
 ---@param ratio number
+---@return nil
 local function handle_scroll(key, ratio)
 	if type(key) ~= "string" or type(ratio) ~= "number" then
 		return
@@ -151,6 +163,8 @@ local function handle_scroll(key, ratio)
 	pcall(vim.api.nvim_win_set_cursor, win, { line, 0 })
 end
 
+---@internal
+---@return nil
 local function poll_scroll()
 	if scroll_inflight then
 		return
@@ -182,6 +196,8 @@ end
 
 -- ---- lifecycle -------------------------------------------------------------
 
+---@internal
+---@return nil
 local function tick()
 	if not require("mdview.core.state").get_server() then
 		return

@@ -18,6 +18,7 @@ local DEFAULTS = {
 }
 
 --- Apply symmetric jitter up to fraction `p` of base (p in 0..1)
+---@internal
 --- @param base number
 --- @param p number
 --- @return number
@@ -49,6 +50,8 @@ function M.try_push(path, lines, opts)
 
 	local attempt = 0
 
+	---@internal
+	---@return nil
 	local function attempt_once()
 		attempt = attempt + 1
 		local delay = math.floor(cfg.initial_delay_ms * (cfg.backoff_factor ^ (attempt - 1)))
