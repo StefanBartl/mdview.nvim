@@ -178,9 +178,12 @@ return {
 		-- `install` resolves (downloaded/cached from GitHub Releases). Set both
 		-- to test a locally built relay/client, e.g.
 		--   dev = {
-		--     binary_path = "~/repos/mdview.nvim/native/server/mdview-server.exe",
+		--     binary_path = "~/repos/mdview.nvim/native/server/mdview-server",
 		--     web_root    = "~/repos/mdview.nvim/dist/client",
 		--   }
+		-- `npm run build:go` writes that name literally — no .exe on Windows —
+		-- and `web_root` needs `npm run build` (wasm-pack + vite) to exist.
+		-- Neither falls back to the release if the path is missing.
 		-- Falls back to $MDVIEW_DEV_BINARY / $MDVIEW_DEV_WEB_ROOT when unset —
 		-- the only way to reach a detached instance (scripts/minimal_init.lua
 		-- loads none of this Lua config), since those are real OS env vars
@@ -194,7 +197,7 @@ return {
 		-- resolved. Standalone mode needs a relay with --watch support
 		-- (v0.3.0+); until `install.version` points at such a release, set this
 		-- to a locally built one, e.g.
-		--   standalone = { binary_path = "~/repos/mdview.nvim/native/server/mdview-server.exe" }
+		--   standalone = { binary_path = "~/repos/mdview.nvim/native/server/mdview-server" }
 		-- :MDView standalone probes the binary and says so if it's too old,
 		-- rather than spawning a process that dies silently.
 		binary_path = nil,
