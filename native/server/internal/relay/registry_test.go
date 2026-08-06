@@ -161,3 +161,36 @@ func TestRegistry_BroadcastAllEphemeralReachesEveryRoomWithoutTouchingLastPayloa
 		t.Fatalf("BroadcastAllEphemeral must not touch LastPayload; got %q", p)
 	}
 }
+
+func TestRegistry_DocDirUnrecordedBeforeSetDocDir(t *testing.T) {
+	r := NewRegistry()
+	if _, ok := r.DocDir("session-1"); ok {
+		t.Fatalf("expected no doc dir before SetDocDir was ever called")
+	}
+}
+
+func TestRegistry_SetDocDirRecordsPerKey(t *testing.T) {
+	r := NewRegistry()
+	r.SetDocDir("session-1", "/docs/a")
+	r.SetDocDir("session-2", "/docs/b")
+
+	dir, ok := r.DocDir("session-1")
+	if !ok || dir != "/docs/a" {
+		t.Fatalf("expected session-1 -> /docs/a, got %q (ok=%v)", dir, ok)
+	}
+	dir, ok = r.DocDir("session-2")
+	if !ok || dir != "/docs/b" {
+		t.Fatalf("expected session-2 -> /docs/b, got %q (ok=%v)", dir, ok)
+	}
+}
+
+func TestRegistry_SetDocDirOverwritesOnDocumentSwitch(t *testing.T) {
+	r := NewRegistry()
+	r.SetDocDir("session-1", "/docs/a")
+	r.SetDocDir("session-1", "/docs/c")
+
+	dir, ok := r.DocDir("session-1")
+	if !ok || dir != "/docs/c" {
+		t.Fatalf("expected the later SetDocDir to win, got %q (ok=%v)", dir, ok)
+	}
+}

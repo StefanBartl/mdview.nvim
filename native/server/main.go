@@ -122,6 +122,7 @@ func main() {
 	mux.HandleFunc("/update", handleUpdate(registry, *token))
 	mux.HandleFunc("/scroll", handleScroll(registry, *token))
 	mux.HandleFunc("/doc", handleDoc(registry, *token))
+	mux.HandleFunc("/asset", handleAsset(registry, *token))
 	mux.HandleFunc("/control", handleControl(registry, *token))
 	mux.HandleFunc("/diff", handleDiff(registry, *token))
 	mux.HandleFunc("/close", handleClose(registry, *token))
@@ -307,8 +308,75 @@ func handleDoc(registry *relay.Registry, token string) http.HandlerFunc {
 			http.Error(w, "failed to read body", http.StatusBadRequest)
 			return
 		}
+		// Record the directory for /asset before broadcasting — a relative
+		// <img> target rendered from this document's markdown needs it to
+		// resolve against, see handleAsset.
+		registry.SetDocDir(key, filepath.Dir(string(body)))
 		registry.BroadcastEphemeral(key, append([]byte(docMessagePrefix), body...))
 		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
+// assetExts is the extension allowlist for /asset — deliberately narrow
+// (markdown image formats only, matching images.nvim's own list), not a
+// generic file server. Keeps the blast radius of a bug in the containment
+// check below to "can read an unintended image", not "can read anything".
+var assetExts = map[string]bool{
+	".png": true, ".jpg": true, ".jpeg": true, ".gif": true,
+	".webp": true, ".bmp": true, ".svg": true,
+}
+
+// handleAsset serves a local image file next to the currently-previewed
+// document, so a relative <img src="..."> target in the rendered HTML (the
+// WASM renderer already produces correct markup for `![alt](img.png)`,
+// see native/wasm-render's tests) actually loads instead of 404ing: the
+// plain http.FileServer registered below is rooted at *webRoot (the client
+// bundle), not the document's own directory.
+//
+// `key` looks up the directory SetDocDir recorded from handleDoc's body —
+// itself only ever fed by the trusted local Neovim process, never client
+// input. The browser tab only supplies `path`, which is resolved and
+// clamped to that directory (path traversal protection) before serving, and
+// only image extensions are allowed through.
+func handleAsset(registry *relay.Registry, token string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		if !relay.ValidToken(token, r.URL.Query().Get("token")) {
+			http.Error(w, "forbidden", http.StatusForbidden)
+			return
+		}
+		key := r.URL.Query().Get("key")
+		reqPath := r.URL.Query().Get("path")
+		if key == "" || reqPath == "" {
+			http.Error(w, "missing key or path", http.StatusBadRequest)
+			return
+		}
+
+		ext := strings.ToLower(filepath.Ext(reqPath))
+		if !assetExts[ext] {
+			http.Error(w, "unsupported file type", http.StatusForbidden)
+			return
+		}
+
+		dir, ok := registry.DocDir(key)
+		if !ok {
+			http.Error(w, "no active document for this session", http.StatusNotFound)
+			return
+		}
+
+		resolved := filepath.Clean(filepath.Join(dir, reqPath))
+		// Containment: resolved must be dir itself, or underneath it. The
+		// separator-terminated prefix avoids a "/docs-evil" vs "/docs"
+		// false-positive on a bare string prefix check.
+		if resolved != dir && !strings.HasPrefix(resolved, dir+string(filepath.Separator)) {
+			http.Error(w, "path escapes document directory", http.StatusForbidden)
+			return
+		}
+
+		http.ServeFile(w, r, resolved)
 	}
 }
 

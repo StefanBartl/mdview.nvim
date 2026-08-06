@@ -255,6 +255,26 @@
   1. ~~In server wss-Broadcast: vor dem client.send(payload) try/catch pro-client~~ — behoben in
      `native/server/internal/relay/registry.go`: `Registry.Broadcast` sammelt Send-Fehler pro
      Verbindung statt die Fan-out-Schleife abzubrechen (siehe `TestRegistry_BroadcastCollectsSendErrorsWithoutStoppingFanout`).
+  2. ~~Lokale Bildlinks im gerenderten HTML zeigen kaputte Icons~~ — behoben. Der
+     WASM-Renderer (`comrak`) erzeugte für `![alt](bild.png)` schon immer
+     korrektes `<img>`-Markup (siehe `source_map_does_not_pollute_image_alt`
+     in `native/wasm-render/src/lib.rs`), aber der einzige `http.FileServer`
+     zeigte auf `web_root` (das Client-Bundle), nie auf das Verzeichnis des
+     gerade angezeigten Dokuments — ein relativer Bildpfad daneben lief
+     serverseitig ins Leere. Neu: `GET /asset?key=&path=&token=` in
+     `native/server/main.go`, aufgelöst relativ zu dem Verzeichnis, das
+     `handleDoc` pro Session mitschreibt (`Registry.SetDocDir`/`DocDir`) —
+     die Basis kommt also ausschließlich vom vertrauenswürdigen lokalen
+     Neovim-Prozess, nie vom Browser-Tab. Pfad-Traversal-Schutz
+     (`filepath.Clean` + Containment-Check) und eine Endungs-Allowlist
+     (nur Bildformate) engen die Route bewusst ein, statt ein generischer
+     Datei-Server zu sein. Client-seitig schreibt `src/client/render/
+     localImages.ts` (`resolveLocalImages`, nach jedem Render aufgerufen,
+     analog zu `markExternalLinks`) relative `<img src>` auf diese Route um;
+     `http(s)://`/`data:`-Quellen bleiben unangetastet. Aus
+     `images.nvim`s `docs/ROADMAP/CROSS-PLUGIN.md` (mdview.nvim-Eintrag).
+     Tests: `main_test.go` (Traversal/Allowlist/Token/Session), `registry_test.go`
+     (`SetDocDir`/`DocDir`), `tests/client/localImages.test.ts`.
 
 ---
 
