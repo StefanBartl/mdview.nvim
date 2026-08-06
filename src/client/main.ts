@@ -13,6 +13,7 @@ import { DiffDoc, isEnvelope } from './render/diffDoc';
 import { installClickNav } from './render/clickNav';
 import { pickScrollTarget, fractionInBlock, hasSourcepos } from './render/scrollSync';
 import { markExternalLinks, parseExternalLinkMode } from './render/externalLinks';
+import { resolveLocalImages } from './render/localImages';
 import { updateCursorMarker, parseCursorMarkerMode } from './render/cursorMarker';
 import { applyBlankLineSpacing, parseBlankLines } from './render/blankLines';
 import {
@@ -323,6 +324,9 @@ async function boot() {
       // Make external links open in a new tab so a click doesn't navigate the
       // preview away (default; see browser.external_links).
       markExternalLinks(container, externalLinkMode);
+      // Relative image targets need the /asset route to actually load —
+      // see render/localImages.ts.
+      resolveLocalImages(container, key, token);
       // Highlight fenced code after the sanitized HTML is in the DOM. Fire and
       // forget (the highlighter is async for Shiki) — it only adds/replaces
       // markup on the trusted, already-rendered DOM and never throws.

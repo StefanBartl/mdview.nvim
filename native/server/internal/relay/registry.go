@@ -15,16 +15,37 @@ type Conn interface {
 // is what keeps multiple open files from cross-contaminating each other's
 // preview tab.
 type Registry struct {
-	mu    sync.Mutex
-	rooms map[string]map[Conn]struct{}
-	last  map[string][]byte
+	mu      sync.Mutex
+	rooms   map[string]map[Conn]struct{}
+	last    map[string][]byte
+	docDirs map[string]string
 }
 
 func NewRegistry() *Registry {
 	return &Registry{
-		rooms: make(map[string]map[Conn]struct{}),
-		last:  make(map[string][]byte),
+		rooms:   make(map[string]map[Conn]struct{}),
+		last:    make(map[string][]byte),
+		docDirs: make(map[string]string),
 	}
+}
+
+// SetDocDir records dir as the directory of the document currently previewed
+// in key's room, so /asset can resolve a relative image path against it.
+// Called from handleDoc, whose body (the previewed document's absolute path)
+// comes only from the trusted local Neovim process — never from a browser
+// tab, which only ever supplies the relative `path` query param to /asset.
+func (r *Registry) SetDocDir(key, dir string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.docDirs[key] = dir
+}
+
+// DocDir returns the directory recorded by SetDocDir for key, if any.
+func (r *Registry) DocDir(key string) (string, bool) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	dir, ok := r.docDirs[key]
+	return dir, ok
 }
 
 // Join adds c to the room for key. Call LastPayload afterwards to seed a

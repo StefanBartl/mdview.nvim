@@ -3,7 +3,7 @@
 | Component         | Technology              | Description                                                          |
 | ----------------- | ----------------------- | ---------------------------------------------------------------------|
 | **Core**          | Lua (+ [lib.nvim](https://github.com/StefanBartl/lib.nvim)) | Handles Neovim buffer events, state management, IPC   |
-| **Server**        | Go                      | Loopback-only relay: file/buffer text in, WebSocket fan-out — no HTML |
+| **Server**        | Go                      | Loopback-only relay: file/buffer text in, WebSocket fan-out — no HTML. Also serves local image bytes for the currently-previewed document (`/asset`, see below) — the one place it touches a file's raw contents rather than just text/bytes handed to it directly |
 | **Client**        | TypeScript              | Thin WebSocket glue + DOM injection of already-sanitized HTML        |
 | **Communication** | WebSocket               | Buffer text in, sanitized HTML never leaves the browser               |
 | **Rendering**     | Rust → WASM (comrak + ammonia) | Markdown → HTML + allowlist sanitization, both in the browser  |
@@ -27,3 +27,23 @@ token, Origin check); only *who generates the token* differs, since in
 standalone mode there is no Lua side to do it.
 
 See [standalone.md](standalone.md) for the user-facing side of this.
+
+## Local image assets
+
+The WASM renderer produces correct `<img>` markup for `![alt](path)` on its
+own (`comrak`, no custom code needed) — the gap was resolution, not
+rendering: a relative `src` resolves against the *page's* URL in the
+browser, not the document's directory on disk, and the plain
+`http.FileServer` mentioned above is rooted at the client bundle, never the
+document.
+
+`GET /asset?key=&path=&token=` closes that gap: `path` is resolved and
+clamped to the directory `handleDoc` records per session (`Registry.
+SetDocDir`/`DocDir`) — that base directory comes only from the trusted
+local Neovim process (the body of every `/doc` call), never from the
+browser tab, which only ever supplies the relative `path`. A path-traversal
+containment check plus an image-extension allowlist (matching images.nvim's
+own list) keep the route narrowly scoped, not a general file server.
+`src/client/render/localImages.ts` rewrites relative `<img src>` to this
+route after each render, the same lifecycle `markExternalLinks` already
+uses for links; `http(s)://`/`data:` sources are left untouched.
