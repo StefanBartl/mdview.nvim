@@ -1,0 +1,20 @@
+{
+  "tools": [
+    {
+      "bin": "curl",
+      "required": false,
+      "why": "Downloads the relay binary from GitHub Releases on first `:MDView start`/`:MDView standalone`, and carries the websocket-fallback HTTP requests. Usually already present.",
+      "pkg": {
+        "apt": "curl",
+        "dnf": "curl",
+        "pacman": "curl",
+        "zypper": "curl",
+        "apk": "curl",
+        "brew": "curl",
+        "winget": "cURL.cURL",
+        "scoop": "curl",
+        "choco": "curl"
+      }
+    }
+  ]
+}
