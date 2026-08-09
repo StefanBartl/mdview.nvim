@@ -2,8 +2,8 @@
   "tools": [
     {
       "bin": "curl",
-      "required": false,
-      "why": "Downloads the relay binary from GitHub Releases on first `:MDView start`/`:MDView standalone`, and carries the websocket-fallback HTTP requests. Usually already present.",
+      "required": true,
+      "why": "Without curl, mdview.nvim cannot download the relay server binary or client bundle on first `:MDView start`/`:MDView standalone` — health.lua itself treats a missing curl as an error, not a warning, for exactly that reason. Usually already present.",
       "pkg": {
         "apt": "curl",
         "dnf": "curl",
