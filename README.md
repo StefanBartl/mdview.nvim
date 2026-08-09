@@ -40,6 +40,7 @@
 
 - [Overview](#overview)
 - [Quickstart](#quickstart)
+- [Requirements](#requirements)
 - [Documentation](#documentation)
 - [Disclaimer](#disclaimer)
 - [Feedback](#feedback)
@@ -79,6 +80,17 @@ turned into DOM content without passing through an allowlist-based sanitizer.
 ```
 
 Then open a markdown file and run `:MDView start`. No external toolchain is required to run the plugin. See [Installation](docs/installation.md) for packer and eager-loading variants.
+
+---
+
+## Requirements
+
+`curl` (used to download the relay binary and client bundle on first use) —
+declared in [`docs/install.json`](docs/install.json) and checked by
+`:checkhealth mdview`. If [lib.nvim](https://github.com/StefanBartl/lib.nvim)'s
+[`deps` module](https://github.com/StefanBartl/lib.nvim/blob/main/lua/lib/nvim/deps/README.md)
+is available, a popup explains this the first time `setup()` runs after
+installing mdview.nvim; `:Lib deps show mdview.nvim` repeats it any time.
 
 ---
 

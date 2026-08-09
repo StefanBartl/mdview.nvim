@@ -39,6 +39,16 @@ function M.setup(opts)
 	-- Resolve browser at setup time and notify user if resolution failed
 	require("mdview.config.browser").setup_and_notify()
 	require("mdview.bindings.usrcmds").attach()
+
+	-- One-time (persisted across restarts) popup on the first setup() after
+	-- installing this plugin: which CLI tools it needs and why
+	-- (docs/install.json). `:Lib deps show mdview.nvim` thereafter. pcall'd:
+	-- an older lib.nvim without lib.nvim.deps mustn't break setup() over an
+	-- informational popup.
+	local ok_deps, deps = pcall(require, "lib.nvim.deps")
+	if ok_deps then
+		deps.show_once("mdview.nvim")
+	end
 end
 
 --- Re-open a browser tab for the current buffer against the already-running
