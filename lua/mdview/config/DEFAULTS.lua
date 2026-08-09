@@ -86,6 +86,7 @@
 ---@field dev mdview.config.DevDefaults
 ---@field standalone mdview.config.StandaloneDefaults
 ---@field experimental mdview.config.ExperimentalDefaults
+---@field deps_popup boolean show the lib.nvim.deps "declared tools" popup once, ever, on first setup() after install (default true; needs lib.nvim.deps — a no-op without it)
 
 ---@type mdview.config.Defaults
 return {
@@ -131,6 +132,12 @@ return {
 	breadcrumbs = true,
 
 	open_preview_tab = false,
+
+	-- One-time "which CLI tools does this plugin want, and why" popup on
+	-- first setup() after install (via lib.nvim.deps). false disables it
+	-- for this plugin specifically, right here in the spec passed to
+	-- setup() — no vim.g needed. See README "Requirements".
+	deps_popup = true,
 
 	browser = {
 		open_mode = "default",

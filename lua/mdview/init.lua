@@ -42,12 +42,16 @@ function M.setup(opts)
 
 	-- One-time (persisted across restarts) popup on the first setup() after
 	-- installing this plugin: which CLI tools it needs and why
-	-- (docs/install.json). `:Lib deps show mdview.nvim` thereafter. pcall'd:
-	-- an older lib.nvim without lib.nvim.deps mustn't break setup() over an
-	-- informational popup.
-	local ok_deps, deps = pcall(require, "lib.nvim.deps")
-	if ok_deps then
-		deps.show_once("mdview.nvim")
+	-- (docs/install.json). `:Lib deps show mdview.nvim` thereafter.
+	-- `cfg.defaults.deps_popup = false` (set right in the setup() spec,
+	-- config/DEFAULTS.lua) disables it for this plugin specifically.
+	-- pcall'd: an older lib.nvim without lib.nvim.deps mustn't break setup()
+	-- over an informational popup.
+	if cfg.defaults.deps_popup ~= false then
+		local ok_deps, deps = pcall(require, "lib.nvim.deps")
+		if ok_deps then
+			deps.show_once("mdview.nvim")
+		end
 	end
 end
 
