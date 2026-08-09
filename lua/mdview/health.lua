@@ -45,7 +45,7 @@ function M.check()
 	else
 		error_(
 			"lib.nvim not found — it is a required dependency. "
-				.. "Add \"StefanBartl/lib.nvim\" to your plugin manager's dependencies (see README)."
+				.. 'Add "StefanBartl/lib.nvim" to your plugin manager\'s dependencies (see README).'
 		)
 	end
 
@@ -99,12 +99,14 @@ function M.check()
 	start("mdview.nvim: configuration")
 
 	local defaults = require("mdview.config").defaults
-	ok(("open_mode = %q, theme = %q, scroll_sync = %s, open_preview_tab = %s"):format(
-		tostring(defaults.browser and defaults.browser.open_mode),
-		tostring(defaults.browser and defaults.browser.theme),
-		tostring(defaults.scroll_sync),
-		tostring(defaults.open_preview_tab)
-	))
+	ok(
+		("open_mode = %q, theme = %q, scroll_sync = %s, open_preview_tab = %s"):format(
+			tostring(defaults.browser and defaults.browser.open_mode),
+			tostring(defaults.browser and defaults.browser.theme),
+			tostring(defaults.scroll_sync),
+			tostring(defaults.open_preview_tab)
+		)
+	)
 
 	local exp = defaults.experimental or {}
 	local enabled = {}
@@ -126,10 +128,10 @@ function M.check()
 		if resolved and resolved ~= "" then
 			ok("browser resolved (isolated mode): " .. resolved)
 		else
-			warn("open_mode = \"isolated\" but no browser resolved — set browser.browser_cmd or browser.browser")
+			warn('open_mode = "isolated" but no browser resolved — set browser.browser_cmd or browser.browser')
 		end
 	else
-		ok("open_mode = \"default\" — uses the OS opener (no browser executable needed)")
+		ok('open_mode = "default" — uses the OS opener (no browser executable needed)')
 	end
 
 	if defaults.browser and defaults.browser.require_display then
@@ -141,7 +143,9 @@ function M.check()
 		if has_display then
 			ok("a GUI/display is available for browser autostart")
 		else
-			warn("no DISPLAY/WAYLAND_DISPLAY detected — browser autostart is skipped (set browser.require_display = false to override)")
+			warn(
+				"no DISPLAY/WAYLAND_DISPLAY detected — browser autostart is skipped (set browser.require_display = false to override)"
+			)
 		end
 	end
 
@@ -161,7 +165,12 @@ function M.check()
 		else
 			warn(("relay process is up on port %d but /health did not return ok (got %q)"):format(port, tostring(body)))
 		end
-		ok("attached = " .. tostring(state.is_attached()) .. ", session token set = " .. tostring(state.get_token() ~= nil))
+		ok(
+			"attached = "
+				.. tostring(state.is_attached())
+				.. ", session token set = "
+				.. tostring(state.get_token() ~= nil)
+		)
 	else
 		ok("no relay session running (start one with :MDView start)")
 	end

@@ -174,7 +174,7 @@ local function ensure_dir(dir)
 	if not dir or dir == "" then
 		return false, "empty directory"
 	end
-			---@diagnostic disable-next-line LSP-problems with uv.loop
+	---@diagnostic disable-next-line LSP-problems with uv.loop
 	local stat = vim.uv.fs_stat(dir)
 	if stat then
 		-- already exists
@@ -214,14 +214,14 @@ local function ensure_dir(dir)
 		if i < #parts then
 			cur = cur .. "/"
 		end
-			---@diagnostic disable-next-line  LSP-Problems with uuv.loop
+		---@diagnostic disable-next-line  LSP-Problems with uuv.loop
 		local st = vim.uv.fs_stat(cur)
 		if not st then
 			---@diagnostic disable-next-line  LSP_Problems with uv.loop
 			local ok, _ = pcall(vim.uv.fs_mkdir, cur, tonumber("755", 8))
 			if not ok then
 				-- fs_mkdir may return nil and set errno; attempt non-pcall call for message
-			---@diagnostic disable-next-line  lsp problemsuuv.loop
+				---@diagnostic disable-next-line  lsp problemsuuv.loop
 				local _, e = vim.uv.fs_mkdir(cur, tonumber("755", 8))
 				return false, e
 			end
@@ -282,7 +282,12 @@ function M.append(line, prefix)
 				local ok, err = ensure_dir(log_dir)
 				if not ok and is_debug() then
 					schedule(function()
-						echo({ { ("[mdview.log] failed to create dir %s: %s"):format(tostring(log_dir), tostring(err)), "ErrorMsg" } }, true, { err = true })
+						echo({
+							{
+								("[mdview.log] failed to create dir %s: %s"):format(tostring(log_dir), tostring(err)),
+								"ErrorMsg",
+							},
+						}, true, { err = true })
 					end)
 				end
 			end
@@ -297,7 +302,10 @@ function M.append(line, prefix)
 					schedule(function()
 						echo({
 							{
-								("[mdview.log] failed to write to %s: %s"):format(tostring(log_file_path), tostring(err)),
+								("[mdview.log] failed to write to %s: %s"):format(
+									tostring(log_file_path),
+									tostring(err)
+								),
 								"ErrorMsg",
 							},
 						}, true, { err = true })

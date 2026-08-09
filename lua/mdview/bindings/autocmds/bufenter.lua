@@ -10,10 +10,9 @@ local copy_lines = require("mdview.helper.copy_lines")
 local normalize = require("mdview.helper.normalize")
 local log = require("mdview.helper.log")
 local defaults = require("mdview.config").defaults
-local autocmds_registry =require("mdview.helper.autocmds_registry")
+local autocmds_registry = require("mdview.helper.autocmds_registry")
 
 local M = {}
-
 
 -- on BufEnter, store snapshot if not present
 ---@internal

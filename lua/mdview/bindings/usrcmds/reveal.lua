@@ -37,10 +37,7 @@ function M.run(action)
 	elseif action == "toggle" or action == "" then
 		reveal = not M._revealed
 	else
-		notify(
-			("[mdview] reveal: expected one of: %s"):format(table.concat(M.actions, ", ")),
-			vim.log.levels.WARN
-		)
+		notify(("[mdview] reveal: expected one of: %s"):format(table.concat(M.actions, ", ")), vim.log.levels.WARN)
 		return
 	end
 

@@ -27,10 +27,10 @@ end
 ---@param close_browser_override boolean?  # when provided, explicitly control whether to close the browser handle; if nil, use browser_cfg.defaults.browser_autoclose
 ---@return nil
 function M.stop(close_browser_override)
-  if state.is_attached() then
-    pcall(autocmds.teardown)
-    state.set_attached(false)
-  end
+	if state.is_attached() then
+		pcall(autocmds.teardown)
+		state.set_attached(false)
+	end
 
 	-- Ask preview tabs to close themselves BEFORE killing the relay — the
 	-- signal travels over the relay, so it must still be alive. This is the

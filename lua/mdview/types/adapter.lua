@@ -7,7 +7,6 @@
 ---@field file_log boolean?      # enable persistent file logging (default off, see config `file_log`)
 ---@field file_path string?      # optional file path to append persistent logs
 
-
 -- == runner ==
 ---@class SpawnedProcess
 ---@field handle userdata        # luv handle for the spawned process
@@ -15,7 +14,6 @@
 ---@field stdout userdata        # stdout pipe handle
 ---@field stderr userdata        # stderr pipe handle
 ---@field cwd string             # working directory used for the spawn
-
 
 -- == browser.init ==
 ---@class BrowserHandle
@@ -35,9 +33,7 @@
 
 -- == browser.resolve_command ==
 ---@class browser_resolver
----@field try_resolve fun(string): boolean function to test if a candidate command is valid
+---@field try_resolve fun(cmd: string): boolean function to test if a candidate command is valid
 ---@field default_candidates string[] list of fallback browser executable names
 ---@field browser_cfg table plugin/browser configuration with get_resolved_cmd method
 ---@field probe_platform_paths fun(): string[] returns platform-specific candidate paths
-
-

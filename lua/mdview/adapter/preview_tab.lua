@@ -171,11 +171,7 @@ function M.open(source_bufnr)
 	-- prefix can't be mistaken for a drive/scheme; the (bufnr) suffix keeps
 	-- it unique.
 	local basename = source_name ~= "" and vim.fn.fnamemodify(source_name, ":t") or "[no name]"
-	pcall(
-		api.nvim_buf_set_name,
-		preview_bufnr,
-		("[mdview preview] %s (%d)"):format(basename, source_bufnr)
-	)
+	pcall(api.nvim_buf_set_name, preview_bufnr, ("[mdview preview] %s (%d)"):format(basename, source_bufnr))
 	vim.bo[preview_bufnr].buftype = "nofile"
 	vim.bo[preview_bufnr].bufhidden = "wipe"
 	vim.bo[preview_bufnr].swapfile = false

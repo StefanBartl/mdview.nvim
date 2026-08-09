@@ -32,10 +32,7 @@ function M.run(action)
 	elseif action == "toggle" or action == "" then
 		on = browser.preserve_blank_lines ~= true
 	else
-		notify(
-			("[mdview] blanklines: expected one of: %s"):format(table.concat(M.actions, ", ")),
-			vim.log.levels.WARN
-		)
+		notify(("[mdview] blanklines: expected one of: %s"):format(table.concat(M.actions, ", ")), vim.log.levels.WARN)
 		return
 	end
 

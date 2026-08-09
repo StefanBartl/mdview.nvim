@@ -76,7 +76,7 @@ function M.push_buffer(bufnr, force)
 			chunk_lines = vim.list_slice(new_lines, d.start + 1, d.start + (d.count or #new_lines))
 		end
 		local payload = table.concat(chunk_lines, "\n")
-ws_client.send_markdown(path, payload, { immediate = (force == true) })
+		ws_client.send_markdown(path, payload, { immediate = (force == true) })
 		log.debug(string.format("Sent chunk op=%s lines=%d for %s", d.op, #chunk_lines, path), nil, "push", true)
 	end
 
@@ -87,24 +87,27 @@ end
 --- Superseded by bindings/autocmds/bufenter.lua, which is the live BufEnter handler.
 ---@param bufnr integer
 function M.store_snapshot_on_enter(bufnr)
-  local ft = safe_buf_get_option(bufnr, "filetype") or ""
-  if ft ~= "markdown" and ft ~= "md" then return end
+	local ft = safe_buf_get_option(bufnr, "filetype") or ""
+	if ft ~= "markdown" and ft ~= "md" then
+		return
+	end
 
-  local path = nvim_buf_get_name(bufnr)
-  if path == "" then return end
+	local path = nvim_buf_get_name(bufnr)
+	if path == "" then
+		return
+	end
 
-  local norm_path = normalize.path(path)
-  if not norm_path then
-    log.debug("normalized path ist nil", vim.log.levels.ERROR, "events", true)
-    return
-  end
-  path = norm_path
+	local norm_path = normalize.path(path)
+	if not norm_path then
+		log.debug("normalized path ist nil", vim.log.levels.ERROR, "events", true)
+		return
+	end
+	path = norm_path
 
-  if not session.get(path) then
-    local lines = api.nvim_buf_get_lines(bufnr, 0, -1, false)
-    session.store(path, copy_lines(lines))
-    log.debug("BufEnter snapshot stored for path: " .. path, nil, "bufenter", true)
-  end
-
+	if not session.get(path) then
+		local lines = api.nvim_buf_get_lines(bufnr, 0, -1, false)
+		session.store(path, copy_lines(lines))
+		log.debug("BufEnter snapshot stored for path: " .. path, nil, "bufenter", true)
+	end
 end
 return M

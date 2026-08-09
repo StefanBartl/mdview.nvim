@@ -25,8 +25,6 @@
 ---@field handle userdata|nil
 ---@field pid integer|nil
 
-
 -- == adapter/ws_client ==
 ---@class mdview.ws_client
 ---@field last_request table<string, number> timestamp map per path
-

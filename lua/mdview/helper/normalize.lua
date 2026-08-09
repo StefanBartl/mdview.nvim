@@ -17,7 +17,8 @@ else
 	return
 end
 
-]]--
+]]
+--
 
 local unify_slashes = require("lib.nvim.cross.fs.separators.unify_slashes")
 
@@ -26,19 +27,19 @@ local M = {}
 ---@param path string
 ---@return string|nil
 function M.path(path)
-  if not path then
-    return nil
-  end
-  return unify_slashes(tostring(path))
+	if not path then
+		return nil
+	end
+	return unify_slashes(tostring(path))
 end
 
 ---@param path string
 ---@return string|nil
 function M.path_for_url(path)
-  if not path then
-    return nil
-  end
-  return vim.uri_encode(unify_slashes(tostring(path)))
+	if not path then
+		return nil
+	end
+	return vim.uri_encode(unify_slashes(tostring(path)))
 end
 
 return M

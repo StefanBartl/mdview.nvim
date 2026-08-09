@@ -6,7 +6,7 @@
 local assert = require("luassert")
 
 describe("smoke test", function()
-  it("Should be true", function()
+	it("Should be true", function()
 		assert.is._true(true)
-  end)
+	end)
 end)

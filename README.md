@@ -10,6 +10,14 @@
    ##     ## ########     ###    #### ########  ###  ###     ###    ##    ##    ###    #### ##     ##
 ```
 
+> mdview.nvim is a **live mirror** of your Markdown buffer, not an editing
+> toolkit — pair it with
+> [markdown.nvim](https://github.com/StefanBartl/markdown.nvim) (TOC,
+> reference updater, table formatter, heading shifting, …) for editing
+> features. Since markdown.nvim only ever transforms buffer text, its edits
+> show up in the live preview automatically. Recommended companion, not a
+> dependency — see [Companion plugins](docs/companion-plugins.md).
+
 > Inspired by and positioned as a security/performance-focused alternative to
 > [iamcco/markdown-preview.nvim](https://github.com/iamcco/markdown-preview.nvim).
 
@@ -25,6 +33,16 @@
 ![Performance](https://img.shields.io/badge/optimized-true-success.svg)
 ![Build](https://img.shields.io/badge/build-edge%20runtime-informational.svg)
 ![Contributions](https://img.shields.io/badge/contributions-welcome-brightgreen.svg)
+
+---
+
+## Table of Contents
+
+- [Overview](#overview)
+- [Quickstart](#quickstart)
+- [Documentation](#documentation)
+- [Disclaimer](#disclaimer)
+- [Feedback](#feedback)
 
 ---
 
