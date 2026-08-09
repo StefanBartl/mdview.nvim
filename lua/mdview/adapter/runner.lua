@@ -54,9 +54,10 @@ function M.start_server(cmd, args, cwd)
 	local spawn_cwd = resolve_spawn_cwd(cwd)
 
 	if type(spawn_cmd) ~= "string" then
-		vim.schedule(function()
-			notify(desc_tag .. "invalid spawn command: " .. tostring(cmd), vim.log.levels.ERROR, {})
-		end)
+		-- Low-level: log only, don't notify() — the caller (launcher.lua)
+		-- already notifies the user when start_server() returns nil (see
+		-- Refactoring.md "fail late" / report-at-the-boundary).
+		log.append(desc_tag .. "invalid spawn command: " .. tostring(cmd), desc_tag)
 		pcall(stdout.close, stdout)
 		pcall(stderr.close, stderr)
 		return nil
@@ -91,20 +92,21 @@ function M.start_server(cmd, args, cwd)
 	end)
 
 	if not handle then
-		vim.schedule(function()
-			notify(
-				desc_tag .. "failed to spawn server process\ncmd="
-					.. tostring(spawn_cmd)
-					.. "\nargs="
-					.. vim.inspect(spawn_args)
-					.. "\ncwd="
-					.. tostring(spawn_cwd)
-					.. "\nerr="
-					.. tostring(err),
-				vim.log.levels.ERROR,
-				{}
-			)
-		end)
+		-- Low-level: log only, don't notify() — the caller (launcher.lua)
+		-- already notifies the user when start_server() returns nil (see
+		-- Refactoring.md "fail late" / report-at-the-boundary).
+		log.append(
+			desc_tag
+				.. "failed to spawn server process\ncmd="
+				.. tostring(spawn_cmd)
+				.. "\nargs="
+				.. vim.inspect(spawn_args)
+				.. "\ncwd="
+				.. tostring(spawn_cwd)
+				.. "\nerr="
+				.. tostring(err),
+			desc_tag
+		)
 		pcall(stdout.close, stdout)
 		pcall(stderr.close, stderr)
 		return nil
@@ -118,7 +120,9 @@ function M.start_server(cmd, args, cwd)
 			return
 		end
 
-		if not data then return	end
+		if not data then
+			return
+		end
 
 		log.append(data, desc_tag)
 

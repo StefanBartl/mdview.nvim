@@ -35,10 +35,7 @@ function M.run(action)
 	elseif action == "toggle" then
 		paused = scroll_sync.toggle_paused()
 	else
-		notify(
-			("[mdview] sync: expected one of: %s"):format(table.concat(M.actions, ", ")),
-			vim.log.levels.WARN
-		)
+		notify(("[mdview] sync: expected one of: %s"):format(table.concat(M.actions, ", ")), vim.log.levels.WARN)
 		return
 	end
 

@@ -95,8 +95,9 @@ function M.run(file_arg, no_browser)
 
 	if not supports_watch(bin) then
 		notify(
-			("[mdview] standalone: this relay binary has no --watch support.\n%s\nIt needs mdview-server v0.3.0+. Either bump install.version, or point standalone.binary_path at a newer/locally built relay.")
-				:format(bin),
+			("[mdview] standalone: this relay binary has no --watch support.\n%s\nIt needs mdview-server v0.3.0+. Either bump install.version, or point standalone.binary_path at a newer/locally built relay."):format(
+				bin
+			),
 			vim.log.levels.ERROR
 		)
 		return
@@ -121,17 +122,23 @@ function M.run(file_arg, no_browser)
 	local highlighter = tostring(browser_defaults.highlighter or "hljs")
 
 	local args = {
-		"--watch", target,
-		"--token", token,
-		"--web-root", web_root,
+		"--watch",
+		target,
+		"--token",
+		token,
+		"--web-root",
+		web_root,
 		-- Offset well clear of both server_port and dev_server_port
 		-- (server_port + 1 by default): a standalone preview is meant to sit
 		-- alongside a normal session, so it must not compete for the relay's
 		-- port, nor land on the Vite dev port during development. The relay's
 		-- FindFreePort still walks upward from here if this one is taken.
-		"--port", tostring(port),
-		"--theme", theme,
-		"--hl", highlighter,
+		"--port",
+		tostring(port),
+		"--theme",
+		theme,
+		"--hl",
+		highlighter,
 	}
 	if no_browser then
 		args[#args + 1] = "--open=false"
@@ -153,8 +160,10 @@ function M.run(file_arg, no_browser)
 
 	log.debug(("standalone: spawned pid %d for %s at %s"):format(pid, target, url), nil, "usercmds.standalone", true)
 
-	local msg = ("[mdview] standalone preview started (pid %d) for %s\nNo Neovim involved — it follows the file on disk. Stop it by killing the pid.")
-		:format(pid, vim.fn.fnamemodify(target, ":t"))
+	local msg = ("[mdview] standalone preview started (pid %d) for %s\nNo Neovim involved — it follows the file on disk. Stop it by killing the pid."):format(
+		pid,
+		vim.fn.fnamemodify(target, ":t")
+	)
 	if no_browser then
 		-- Nothing opened a tab, so the URL is the only way in. Port is the
 		-- requested one; the relay walks upward if it was taken.

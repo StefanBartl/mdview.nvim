@@ -72,9 +72,7 @@ local function resolve_browser_url(opts)
 	if vim.g.mdview_dev_port and vim.g.mdview_dev_port > 0 then
 		base = ("http://localhost:%d/"):format(vim.g.mdview_dev_port)
 	else
-		local server_port = vim.g.mdview_server_port
-			or require("mdview.config").defaults.server_port
-			or 43219
+		local server_port = vim.g.mdview_server_port or require("mdview.config").defaults.server_port or 43219
 		base = ("http://localhost:%d/"):format(server_port)
 	end
 
@@ -84,9 +82,7 @@ local function resolve_browser_url(opts)
 		return base
 	end
 
-	local url = base
-		.. "?key=" .. normalize.path_for_url(key)
-		.. "&token=" .. vim.uri_encode(token)
+	local url = base .. "?key=" .. normalize.path_for_url(key) .. "&token=" .. vim.uri_encode(token)
 
 	-- pass the configured preview theme to the client (main.ts reads ?theme=)
 	local browser_defaults = require("mdview.config.browser").defaults

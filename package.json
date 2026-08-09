@@ -4,7 +4,6 @@
   "private": true,
   "description": "Browser-based Markdown preview for Neovim (mdview.nvim)",
   "author": "Stefan Bartl",
-  "license": "MIT",
   "type": "module",
   "engines": {
     "node": ">=18"

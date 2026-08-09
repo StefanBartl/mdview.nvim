@@ -182,9 +182,12 @@ function M.run(fargs)
 	end
 
 	-- Ensure server proc spawned (cwd_arg, if given, overrides mdview.config.defaults.server_cwd for this spawn)
-	local proc = state.ensure_proc_started(cwd_arg)
+	local proc, proc_err = state.ensure_proc_started(cwd_arg)
 	if not proc then
-		notify("[mdview] failed to start server process", vim.log.levels.ERROR)
+		notify(
+			"[mdview] failed to start server process" .. (proc_err and (": " .. proc_err) or ""),
+			vim.log.levels.ERROR
+		)
 		return
 	end
 	-- Wire session + autocmds BEFORE marking the server as "running":

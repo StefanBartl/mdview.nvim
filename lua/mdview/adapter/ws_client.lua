@@ -147,13 +147,7 @@ local function endpoint_url_for(endpoint, path)
 	local port = vim.g.mdview_server_port or DEFAULT_PORT
 	local normalized = normalize.path_for_url(path)
 	local token = require("mdview.core.state").get_token() or ""
-	return string.format(
-		"http://localhost:%d/%s?key=%s&token=%s",
-		port,
-		endpoint,
-		normalized,
-		vim.uri_encode(token)
-	)
+	return string.format("http://localhost:%d/%s?key=%s&token=%s", port, endpoint, normalized, vim.uri_encode(token))
 end
 
 ---@internal

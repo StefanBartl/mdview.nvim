@@ -17,48 +17,47 @@ local fn = vim.fn
 ---@internal
 ---@return string profile_dir
 local function make_tmp_profile()
-  local base = fn.stdpath("data") .. "/mdview/browser-profile"
-  pcall(fn.mkdir, base, "p")
-  return base
+	local base = fn.stdpath("data") .. "/mdview/browser-profile"
+	pcall(fn.mkdir, base, "p")
+	return base
 end
 
 ---@param exe string # Absolute path or candidate name of the browser executable
 ---@param url URL # URL to open
 ---@return string[] args # Command-line arguments to pass to the executable
 ---@return string|nil tmp_profile # Path to temporary profile/directory (if created)
-return function (exe, url)
-  local name = exe:lower()
-  local tmp = make_tmp_profile()
+return function(exe, url)
+	local name = exe:lower()
+	local tmp = make_tmp_profile()
 
-  if name:match("chrome") or name:match("chromium") or name:match("msedge") or name:match("google%-chrome") then
-    -- A normal browser window (taskbar icon, address bar) rather than a
-    -- chromeless --app window: --app was dropped because it produced a
-    -- window with no taskbar entry and no toolbar, which reads as broken.
-    local args = {
-      "--user-data-dir=" .. tmp,
-      "--new-window",
-      "--no-first-run",
-      "--no-default-browser-check",
-      url,
-    }
-    return args, tmp
-
-  elseif name:match("firefox") then
-    local args = {
-      "-profile", tmp,
-      "--new-instance",
-      "--no-remote",
-      url,
-    }
-    return args, tmp
-
-  else
-    -- generic fallback for other executables
-    local args = {
-      "--user-data-dir=" .. tmp,
-      "--new-window",
-      url,
-    }
-    return args, tmp
-  end
+	if name:match("chrome") or name:match("chromium") or name:match("msedge") or name:match("google%-chrome") then
+		-- A normal browser window (taskbar icon, address bar) rather than a
+		-- chromeless --app window: --app was dropped because it produced a
+		-- window with no taskbar entry and no toolbar, which reads as broken.
+		local args = {
+			"--user-data-dir=" .. tmp,
+			"--new-window",
+			"--no-first-run",
+			"--no-default-browser-check",
+			url,
+		}
+		return args, tmp
+	elseif name:match("firefox") then
+		local args = {
+			"-profile",
+			tmp,
+			"--new-instance",
+			"--no-remote",
+			url,
+		}
+		return args, tmp
+	else
+		-- generic fallback for other executables
+		local args = {
+			"--user-data-dir=" .. tmp,
+			"--new-window",
+			url,
+		}
+		return args, tmp
+	end
 end

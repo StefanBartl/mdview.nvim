@@ -3,10 +3,6 @@
 -- Provides explicit getter/setter functions and simple validation so other
 -- modules do not mutate the internal table directly.
 
-local vim = vim
-
-local notify = require("lib.nvim.notify").create("").notify
-
 local M = {}
 
 ---@type mdview.core.state.web
@@ -149,8 +145,12 @@ end
 -- The callback receives a shallow copy of the current state and may return a
 --  table with keys to change (attached/browser/server). Any returned non-table
 --  value is ignored.
+--- Errors raised by `fn` are caught and reported via the returned `err`; this
+--- low-level module does not notify() itself (see Refactoring.md "fail late" /
+--- report-at-the-boundary) — callers decide whether/how to surface it.
 --- @param fn fun(cur_state: mdview.core.state.web): table|nil
---- @return mdview.core.state.web current state after update
+--- @return mdview.core.state.web current_state state after update
+--- @return string|nil err set when the callback raised an error
 function M.update_web(fn)
 	if type(fn) ~= "function" then
 		error("update_web expects a function", 2)
@@ -158,13 +158,12 @@ function M.update_web(fn)
 	local snapshot = shallow_copy(web_state)
 	local ok, res = pcall(fn, snapshot)
 	if not ok then
-		notify("update_web callback failed: " .. tostring(res), vim.log.levels.ERROR)
-		return shallow_copy(web_state)
+		return shallow_copy(web_state), "update_web callback failed: " .. tostring(res)
 	end
 	if type(res) == "table" then
-		return M.set_web(res)
+		return M.set_web(res), nil
 	end
-	return shallow_copy(web_state)
+	return shallow_copy(web_state), nil
 end
 
 --- @return boolean
@@ -242,22 +241,26 @@ end
 
 -- Runner API  ----------------
 
+--- Low-level: only returns status, does not notify() itself (see
+--- Refactoring.md "fail late" / report-at-the-boundary) — the caller decides
+--- whether/how to surface `err`.
 ---@param cwd_override string|nil # forwarded to mdview.adapter.server_args.resolve(), e.g. from `:MDViewStart cwd=...`
+---@return any proc the started (or already-running) process handle, or nil on failure
+---@return string|nil err set when resolving the command/args failed
 function M.ensure_proc_started(cwd_override)
 	local runner = require("mdview.adapter.runner")
 
 	-- spawn server process if not already running via runner API
 	if M.proc_is_running() then
-		return M.get_proc()
+		return M.get_proc(), nil
 	end
 
 	local cmd, args, cwd, err = require("mdview.adapter.server_args").resolve(cwd_override)
 	if not cmd then
-		notify("[mdview] " .. tostring(err), vim.log.levels.ERROR)
-		return nil
+		return nil, tostring(err)
 	end
 
-	return runner.start_server(cmd, args, cwd)
+	return runner.start_server(cmd, args, cwd), nil
 end
 
 --- Set the shared session token used to authenticate /update and /ws

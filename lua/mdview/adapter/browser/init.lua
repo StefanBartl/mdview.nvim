@@ -37,17 +37,17 @@ local M = {}
 ---@param url string
 ---@return string
 local function windows_focus_preserving_ps(url)
-  -- url is a loopback URL with only %-encoded query chars, so single-quoting is
-  -- safe. Kept on one line to pass cleanly as a single -Command argument.
-  return table.concat({
-    "$s='[DllImport(\"user32.dll\")]public static extern System.IntPtr GetForegroundWindow();",
-    "[DllImport(\"user32.dll\")]public static extern bool SetForegroundWindow(System.IntPtr h);';",
-    "$w=Add-Type -MemberDefinition $s -Name Win -Namespace Mdv -PassThru;",
-    "$h=$w::GetForegroundWindow();",
-    ("Start-Process '%s';"):format(url),
-    "Start-Sleep -Milliseconds 600;",
-    "$w::SetForegroundWindow($h)|Out-Null",
-  }, "")
+	-- url is a loopback URL with only %-encoded query chars, so single-quoting is
+	-- safe. Kept on one line to pass cleanly as a single -Command argument.
+	return table.concat({
+		'$s=\'[DllImport("user32.dll")]public static extern System.IntPtr GetForegroundWindow();',
+		'[DllImport("user32.dll")]public static extern bool SetForegroundWindow(System.IntPtr h);\';',
+		"$w=Add-Type -MemberDefinition $s -Name Win -Namespace Mdv -PassThru;",
+		"$h=$w::GetForegroundWindow();",
+		("Start-Process '%s';"):format(url),
+		"Start-Sleep -Milliseconds 600;",
+		"$w::SetForegroundWindow($h)|Out-Null",
+	}, "")
 end
 
 -- Open `url` in the user's default browser via the OS opener, as a new tab.
@@ -62,58 +62,58 @@ end
 ---@param focus "browser"|"nvim"|nil
 ---@return BrowserHandle|nil, string|nil
 local function open_default(url, focus)
-  local keep_nvim = focus == "nvim"
-  -- IMPORTANT: do NOT use vim.ui.open on Windows. It runs
-  -- `cmd.exe /c start "" <url>`, and cmd.exe treats every `&` in the URL as
-  -- a command separator — so our `?key=…&token=…&theme=…` URL is chopped at
-  -- the first `&`, the browser opens WITHOUT the token, and the client
-  -- refuses to connect (page stuck on "mdview loading…" forever). rundll32's
-  -- FileProtocolHandler takes the URL as a single, non-shell-interpreted
-  -- argument, so `&` is preserved (verified: the full query string arrives).
-  local cmd
-  if fn.has("win32") == 1 then
-    if keep_nvim then
-      -- Pass the script as a temp .ps1 via -File, NOT as -Command: Neovim's
-      -- jobstart builds the Windows command line with its own quoting, which
-      -- mangles a complex inline script (the DllImport quotes/semicolons), so
-      -- -Command silently fails and nothing opens. -File takes a plain path.
-      local tmp = fn.tempname() .. ".ps1"
-      local script = windows_focus_preserving_ps(url)
-        .. (";Remove-Item -LiteralPath '%s' -ErrorAction SilentlyContinue"):format(tmp)
-      local f = io.open(tmp, "w")
-      if f then
-        f:write(script)
-        f:close()
-        cmd = {
-          "powershell",
-          "-NoProfile",
-          "-ExecutionPolicy",
-          "Bypass",
-          "-WindowStyle",
-          "Hidden",
-          "-File",
-          tmp,
-        }
-      else
-        -- couldn't stage the script — fall back to opening normally
-        cmd = { "rundll32.exe", "url.dll,FileProtocolHandler", url }
-      end
-    else
-      cmd = { "rundll32.exe", "url.dll,FileProtocolHandler", url }
-    end
-  elseif fn.has("mac") == 1 then
-    -- `open -g` opens without bringing the browser to the foreground.
-    cmd = keep_nvim and { "open", "-g", url } or { "open", url }
-  else
-    cmd = { "xdg-open", url }
-  end
+	local keep_nvim = focus == "nvim"
+	-- IMPORTANT: do NOT use vim.ui.open on Windows. It runs
+	-- `cmd.exe /c start "" <url>`, and cmd.exe treats every `&` in the URL as
+	-- a command separator — so our `?key=…&token=…&theme=…` URL is chopped at
+	-- the first `&`, the browser opens WITHOUT the token, and the client
+	-- refuses to connect (page stuck on "mdview loading…" forever). rundll32's
+	-- FileProtocolHandler takes the URL as a single, non-shell-interpreted
+	-- argument, so `&` is preserved (verified: the full query string arrives).
+	local cmd
+	if fn.has("win32") == 1 then
+		if keep_nvim then
+			-- Pass the script as a temp .ps1 via -File, NOT as -Command: Neovim's
+			-- jobstart builds the Windows command line with its own quoting, which
+			-- mangles a complex inline script (the DllImport quotes/semicolons), so
+			-- -Command silently fails and nothing opens. -File takes a plain path.
+			local tmp = fn.tempname() .. ".ps1"
+			local script = windows_focus_preserving_ps(url)
+				.. (";Remove-Item -LiteralPath '%s' -ErrorAction SilentlyContinue"):format(tmp)
+			local f = io.open(tmp, "w")
+			if f then
+				f:write(script)
+				f:close()
+				cmd = {
+					"powershell",
+					"-NoProfile",
+					"-ExecutionPolicy",
+					"Bypass",
+					"-WindowStyle",
+					"Hidden",
+					"-File",
+					tmp,
+				}
+			else
+				-- couldn't stage the script — fall back to opening normally
+				cmd = { "rundll32.exe", "url.dll,FileProtocolHandler", url }
+			end
+		else
+			cmd = { "rundll32.exe", "url.dll,FileProtocolHandler", url }
+		end
+	elseif fn.has("mac") == 1 then
+		-- `open -g` opens without bringing the browser to the foreground.
+		cmd = keep_nvim and { "open", "-g", url } or { "open", url }
+	else
+		cmd = { "xdg-open", url }
+	end
 
-  local jid = fn.jobstart(cmd, { detach = true })
-  if not jid or jid <= 0 then
-    return nil, "failed to launch OS browser opener"
-  end
+	local jid = fn.jobstart(cmd, { detach = true })
+	if not jid or jid <= 0 then
+		return nil, "failed to launch OS browser opener"
+	end
 
-  return { open_mode = "default" }, nil
+	return { open_mode = "default" }, nil
 end
 
 -- Open `url` by spawning a dedicated, trackable browser process against the
@@ -123,41 +123,44 @@ end
 ---@param opts BrowserOptions
 ---@return BrowserHandle|nil, string|nil
 local function open_isolated(url, opts)
-  local cmd, err = resolve_command(opts.browser_cmd, opts.browser)
-  if not cmd then
-    return nil, err
-  end
+	local cmd, err = resolve_command(opts.browser_cmd, opts.browser)
+	if not cmd then
+		return nil, err
+	end
 
-  local args, tmp = build_args_for_browser(cmd, url)
-  if not args then
-    return nil, "failed to construct browser args"
-  end
+	local args, tmp = build_args_for_browser(cmd, url)
+	if not args then
+		return nil, "failed to construct browser args"
+	end
 
-  local cmd_list = { cmd }
-  for _, a in ipairs(args) do table.insert(cmd_list, a) end
+	local cmd_list = { cmd }
+	for _, a in ipairs(args) do
+		table.insert(cmd_list, a)
+	end
 
-  -- jobstart opts: keep detach=false so jobstop can be used later
-  local jid
-  jid = fn.jobstart(cmd_list, {
-    detach = false,
-    on_exit = function(_, code, _)
-      if opts.on_exit and type(opts.on_exit) == "function" then
-        pcall(opts.on_exit, jid, code)
-      end
-    end,
-  })
+	-- jobstart opts: keep detach=false so jobstop can be used later
+	local jid
+	jid = fn.jobstart(cmd_list, {
+		detach = false,
+		on_exit = function(_, code, _)
+			if opts.on_exit and type(opts.on_exit) == "function" then
+				pcall(opts.on_exit, jid, code)
+			end
+		end,
+	})
 
-  if not jid or jid <= 0 then
-    return nil, ("failed to start browser process (jobstart returned %s)"):format(tostring(jid))
-  end
+	if not jid or jid <= 0 then
+		return nil, ("failed to start browser process (jobstart returned %s)"):format(tostring(jid))
+	end
 
-  return {
-    job_id = jid,
-    tmp_profile = tmp,
-    cmd = cmd,
-    args = args,
-    platform = (fn.has("win32") == 1 and "win") or (fn.has("mac") == 1 and "mac") or "unix",
-  }, nil
+	return {
+		job_id = jid,
+		tmp_profile = tmp,
+		cmd = cmd,
+		args = args,
+		platform = (fn.has("win32") == 1 and "win") or (fn.has("mac") == 1 and "mac") or "unix",
+	},
+		nil
 end
 
 -- Open a browser tab/window pointing to `url`.
@@ -166,15 +169,15 @@ end
 ---@param opts BrowserOptions|nil # { open_mode?, browser_cmd?, browser?, on_exit? }
 ---@return BrowserHandle|nil, string|nil
 function M.open(url, opts)
-  opts = opts or {}
-  if not url or url == "" then
-    return nil, "empty url"
-  end
+	opts = opts or {}
+	if not url or url == "" then
+		return nil, "empty url"
+	end
 
-  if opts.open_mode == "isolated" then
-    return open_isolated(url, opts)
-  end
-  return open_default(url, opts.focus)
+	if opts.open_mode == "isolated" then
+		return open_isolated(url, opts)
+	end
+	return open_default(url, opts.focus)
 end
 
 -- Close a previously opened browser handle via jobstop(). The profile
@@ -184,19 +187,23 @@ end
 ---@param handle BrowserHandle|nil
 ---@return boolean, string|nil
 function M.close(handle)
-  if not handle then return true, nil end
-  if type(handle) ~= "table" then return false, "invalid handle" end
+	if not handle then
+		return true, nil
+	end
+	if type(handle) ~= "table" then
+		return false, "invalid handle"
+	end
 
-  local ok, err = pcall(function()
-    if handle.job_id and handle.job_id > 0 then
-      pcall(fn.jobstop, handle.job_id)
-    end
-  end)
+	local ok, err = pcall(function()
+		if handle.job_id and handle.job_id > 0 then
+			pcall(fn.jobstop, handle.job_id)
+		end
+	end)
 
-  if not ok then
-    return false, tostring(err)
-  end
-  return true, nil
+	if not ok then
+		return false, tostring(err)
+	end
+	return true, nil
 end
 
 return M

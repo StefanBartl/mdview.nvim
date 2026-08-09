@@ -94,8 +94,7 @@ function M.validate(opts)
 			if not valid then
 				local full = path == "" and tostring(k) or (path .. "." .. tostring(k))
 				local suggestion = known_names[k]
-				unknown[#unknown + 1] = suggestion and (("%s (did you mean `%s`?)"):format(full, suggestion))
-					or full
+				unknown[#unknown + 1] = suggestion and (("%s (did you mean `%s`?)"):format(full, suggestion)) or full
 			elseif type(v) == "table" and type(default_tbl[k]) == "table" then
 				local sub = path == "" and tostring(k) or (path .. "." .. tostring(k))
 				check(v, default_tbl[k], sub, KNOWN_NIL_KEYS[sub])
@@ -106,10 +105,7 @@ function M.validate(opts)
 	check(opts, M.defaults, "", KNOWN_NIL_KEYS[""])
 
 	if #unknown > 0 then
-		notify(
-			"[mdview] unknown setup() config key(s):\n  - " .. table.concat(unknown, "\n  - "),
-			vim.log.levels.WARN
-		)
+		notify("[mdview] unknown setup() config key(s):\n  - " .. table.concat(unknown, "\n  - "), vim.log.levels.WARN)
 	end
 end
 

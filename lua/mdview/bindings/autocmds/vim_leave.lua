@@ -29,7 +29,9 @@ function M.attach(group)
 			end
 		end,
 	}
-	if group then	opts.group = group end
+	if group then
+		opts.group = group
+	end
 
 	local id = nvim_create_autocmd("VimLeavePre", opts)
 	if group then
