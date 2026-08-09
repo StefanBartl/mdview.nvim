@@ -91,6 +91,9 @@ declared in [`docs/install.json`](docs/install.json) and checked by
 [`deps` module](https://github.com/StefanBartl/lib.nvim/blob/main/lua/lib/nvim/deps/README.md)
 is available, a popup explains this the first time `setup()` runs after
 installing mdview.nvim; `:Lib deps show mdview.nvim` repeats it any time.
+Opt out with `vim.g.lib_nvim_deps_disable_first_run = true` (every plugin)
+or `vim.g.lib_nvim_deps_disabled_plugins = { "mdview.nvim" }` (just this
+one), set anywhere in your config.
 
 ---
 
