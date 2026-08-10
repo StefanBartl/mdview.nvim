@@ -206,7 +206,7 @@ function M.attach()
 		{
 			path = { "cursor" },
 			args = { { name = "mode", type = "STRING", optional = true, values = cursor.modes } },
-			desc = "Set the Neovim-cursor marker in the preview (line|caret|section|off)",
+			desc = "Set the Neovim-cursor marker in the preview (line|caret|section|off|toggle — toggle flips section on/off)",
 			run = function(ctx)
 				cursor.run(ctx.args.mode)
 			end,

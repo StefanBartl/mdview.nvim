@@ -1,6 +1,11 @@
 ---@module 'mdview.bindings.usrcmds.cursor'
--- Action behind :MDView cursor [line|caret|section|off] — switch the
+-- Action behind :MDView cursor [line|caret|section|off|toggle] — switch the
 -- Neovim-cursor marker mode in the preview at runtime.
+--
+-- "toggle" is a shortcut for flipping "section" on/off specifically (the
+-- spotlight-on-current-heading mode, the one most likely to be toggled
+-- on-and-off repeatedly, e.g. while presenting): section -> off, anything
+-- else -> section. For any other mode switch, name it explicitly.
 --
 -- Sets browser.cursor_marker in the shared config (so the next browser URL
 -- carries the new ?cursor=) and, if a session is running, pushes a live control
@@ -15,7 +20,7 @@ local notify = require("lib.nvim.notify").create("").notify
 local M = {}
 
 ---@type string[]
-M.modes = { "line", "caret", "section", "off" }
+M.modes = { "line", "caret", "section", "off", "toggle" }
 
 ---@internal
 ---@param v string
@@ -44,6 +49,10 @@ function M.run(mode)
 			vim.log.levels.INFO
 		)
 		return
+	end
+
+	if mode == "toggle" then
+		mode = (browser.cursor_marker == "section") and "off" or "section"
 	end
 
 	if not is_valid(mode) then

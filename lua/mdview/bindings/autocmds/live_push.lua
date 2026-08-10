@@ -14,6 +14,7 @@ local session = require("mdview.core.session")
 local safe_buf_get_option = require("mdview.helper.safe_buf_get_option")
 local log = require("mdview.helper.log")
 local normalize = require("mdview.helper.normalize")
+local target_key = require("mdview.helper.target_key")
 local defaults = require("mdview.config").defaults
 local autocmd_registry = require("mdview.helper.autocmds_registry")
 
@@ -88,14 +89,7 @@ function M.push_buffer_changes(bufnr, opts)
 	-- watching (the preview key) rather than this buffer's own path. For
 	-- "new_tab"/"manual" — and whenever no tab has been opened yet — push to
 	-- the buffer's own path, i.e. the original per-document room model.
-	local target = path
-	local behavior = require("mdview.config.browser").defaults.behavior or "reuse"
-	if behavior == "reuse" then
-		local preview_key = require("mdview.core.state").get_preview_key()
-		if type(preview_key) == "string" and preview_key ~= "" then
-			target = preview_key
-		end
-	end
+	local target = target_key.resolve(bufnr) or path
 
 	ws_client.send_content(target, lines, { full = opts and opts.full == true or nil })
 	session.store(path, lines)
