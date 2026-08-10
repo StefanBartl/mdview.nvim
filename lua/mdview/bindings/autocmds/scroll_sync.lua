@@ -8,7 +8,7 @@
 local api = vim.api
 local ws_client = require("mdview.adapter.ws_client")
 local safe_buf_get_option = require("mdview.helper.safe_buf_get_option")
-local normalize = require("mdview.helper.normalize")
+local target_key = require("mdview.helper.target_key")
 local defaults = require("mdview.config").defaults
 local autocmd_registry = require("mdview.helper.autocmds_registry")
 
@@ -62,17 +62,24 @@ function M.toggle_paused()
 	return paused
 end
 
----@internal
+--- Send bufnr's current cursor line/column (and total line count) to the
+--- room the open tab watches. Exported (like live_push.push_buffer_changes)
+--- so tests can call it directly instead of only through the throttled
+--- CursorMoved/CursorMovedI autocmd.
 ---@param bufnr integer
 ---@return nil
-local function send_current_position(bufnr)
+function M.send_current_position(bufnr)
 	local ft = safe_buf_get_option(bufnr, "filetype") or ""
 	if ft ~= "markdown" and ft ~= "md" then
 		return
 	end
 
-	local path = normalize.path(api.nvim_buf_get_name(bufnr))
-	if not path or path == "" then
+	-- Route to the room the open tab actually watches (browser.behavior
+	-- "reuse" follows the active buffer via state.preview_key, so a scroll
+	-- ping to the buffer's own path after switching buffers would land in a
+	-- room nobody's listening to — see target_key.lua and Roadmap.md BUGS).
+	local target = target_key.resolve(bufnr)
+	if not target or target == "" then
 		return
 	end
 
@@ -92,7 +99,7 @@ local function send_current_position(bufnr)
 		viewfrac = defaults.scroll_sync_top_offset or 0.08
 	end
 
-	ws_client.send_scroll(path, line, total, viewfrac, col)
+	ws_client.send_scroll(target, line, total, viewfrac, col)
 end
 
 --- Setup CursorMoved/CursorMovedI autocmd for scroll sync.
@@ -118,7 +125,7 @@ function M.attach(group)
 				return
 			end
 			last_sent_at = t
-			send_current_position(args.buf)
+			M.send_current_position(args.buf)
 		end,
 	}
 	if group then
