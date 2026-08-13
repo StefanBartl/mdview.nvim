@@ -42,6 +42,74 @@ the cursor's relative height inside the Neovim window.
 - **Autocmds:** `CursorMoved`, `CursorMovedI`
 - **Config:** `scroll_sync` (default `true`), `scroll_sync_throttle_ms` (default `150`), `scroll_sync_mode` (`"top"` default, or `"cursor"`), `scroll_sync_top_offset` (default `0.08`)
 
+## Neovim cursor marker
+
+The preview highlights whatever the Neovim cursor is currently on, in one of
+three modes: `line` (highlight the whole source line), `caret` (an exact
+inline caret, byte-accurate via the renderer's `data-sp` spans — see
+[RENDERING.md](RENDERING.md#source-position-mapping)), or `section`
+(spotlight the enclosing heading section — the mode `:MDView cursor toggle`
+flips on and off, since it's the one most likely to be toggled repeatedly
+while presenting). Changing the mode updates the shared config (so the next
+browser URL carries `?cursor=`) and, if a session is already running, pushes
+a live control update — no reload needed either way.
+
+- **Module:** `lua/mdview/bindings/usrcmds/cursor.lua`, `lua/mdview/adapter/control.lua`
+- **Usercmds:** `:MDView cursor [line|caret|section|off|toggle]` (no argument reports the current mode)
+- **Config:** `browser.cursor_marker` (default unset — see the command's own report for the effective value)
+
+## Scroll sync pause/resume
+
+`:MDView sync [pause|resume|toggle]` freezes the nvim→browser scroll sync
+(and cursor marker) at runtime without tearing down the session — useful for
+jumping to a reference spot in the buffer without dragging the viewer along.
+No argument reports whether sync is currently paused.
+
+- **Module:** `lua/mdview/bindings/usrcmds/sync.lua`, `lua/mdview/bindings/autocmds/scroll_sync.lua`
+- **Usercmds:** `:MDView sync [pause|resume|toggle]`
+
+## Preview zoom
+
+`:MDView zoom [+|-|reset|<factor>]` adjusts the preview's font-size scale at
+runtime — handy for a screen share, where the viewer's own downsampling
+already costs legibility, without zooming the whole browser window. Accepts
+a relative step (`+`/`-`, 0.1 per press, clamped to 50%–300%), `reset` (back
+to 100%), or an explicit factor/percentage (`1.5` or `150` both mean 150%).
+Persists into the shared config so a reopened tab starts at the same zoom
+(`?zoom=`), and pushes a live update to an already-open tab.
+
+- **Module:** `lua/mdview/bindings/usrcmds/zoom.lua`
+- **Usercmds:** `:MDView zoom [+|-|reset|<factor>]` (no argument reports the current zoom)
+- **Config:** `browser.zoom` (default `1.0`)
+
+## Overlays (floating table of contents)
+
+`:MDView overlay <name> [on|off|toggle]` mounts/unmounts a named overlay on
+top of the rendered preview without a reload — currently one overlay ships,
+`toc`, a floating outline with the current section highlighted as the
+cursor/scroll position moves. `:MDView overlay list` (or a bare `:MDView
+overlay`) reports every known overlay and whether it's currently on. The
+Neovim-side manifest (`M.known` in the module below) has to stay in sync
+with the overlay names the client actually registers
+(`src/client/render/overlays/index.ts`) when a new one is added.
+
+- **Module:** `lua/mdview/bindings/usrcmds/overlay.lua`, `src/client/render/overlays/index.ts`
+- **Usercmds:** `:MDView overlay <name> [on|off|toggle]`, `:MDView overlay list`
+- **Config:** `browser.overlays.<name>` (per-overlay boolean, default off)
+
+## Breadcrumbs (session outline)
+
+A rough Markdown outline of which document and heading section was visited
+when, recorded across the whole preview session — a human-facing summary
+for writing follow-up notes after a call, distinct from `:MDView log` (the
+internal structured log ring covered in [OPERATIONS.md](OPERATIONS.md)).
+`:MDView breadcrumbs` opens the outline in a scratch buffer; `export
+[path]` writes it to disk (default `stdpath("log")/mdview-breadcrumbs.md`);
+`clear` drops everything recorded so far.
+
+- **Module:** `lua/mdview/bindings/usrcmds/breadcrumbs.lua`, `lua/mdview/core/breadcrumbs.lua`
+- **Usercmds:** `:MDView breadcrumbs [export [path] | clear]`
+
 ## Reverse scroll (browser → Neovim)
 
 The complement of the above, opt-in: scrolling the preview tab moves the

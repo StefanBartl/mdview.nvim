@@ -31,7 +31,7 @@ a dedicated test in `native/wasm-render/src/lib.rs`:
   `formaction` and `onfocus` stripped — the allowlist is per-attribute per-tag,
   not "trust `<input>`".
 - `<span data-sp="…">` — inline source-position wrappers used for the exact
-  cursor caret (see "Neovim cursor marker" in UI.md).
+  cursor caret (see "Neovim cursor marker" in [PREVIEW.md](PREVIEW.md)).
 - `<div data-private>` — the private-block container (see below).
 - `class="language-xxx"` on `<code>` — otherwise silently stripped by
   ammonia's default (which has no attributes at all for `<code>`), which
