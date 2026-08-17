@@ -217,7 +217,7 @@ link you brush past to its host — the same reasoning as markdown.nvim's
 which lives in Neovim, and the browser has no direct channel to it — only
 the 250 ms polling bridge. A round trip through it plus rasterization is
 about a second, and the resulting PNG lands in a temp directory that
-`/asset` deliberately cannot serve. See [`docs/ROADMAP.md`](../ROADMAP.md)
+`/asset` deliberately cannot serve. See [`docs/ROADMAP/ROADMAP.md`](../ROADMAP/ROADMAP.md)
 for the pre-render approach that would solve this properly. The in-editor
 hover in markdown.nvim does render the page, because there pdfport is in the
 same process.

@@ -2,7 +2,7 @@
 -- Very small line-diff: compute contiguous changed ranges. Only used by
 -- test/diff_harness.lua — dormant along with the rest of the line-diff
 -- transport this was built for (see core/events.lua's module docstring and
--- docs/Roadmap/Roadmap.md). If reactivated, replacing this prefix/suffix
+-- docs/ROADMAP/DONE.md). If reactivated, replacing this prefix/suffix
 -- scan with a proper LCS-based (Myers) diff is worth revisiting for correctness
 -- on interleaved edits — it currently only handles a single contiguous change.
 ---@param old_lines string[]|nil

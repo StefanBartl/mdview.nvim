@@ -7,7 +7,7 @@
 -- — live_push.lua supersedes both). This module's line-diff-based push
 -- (M.push_buffer, via utils/diff_granular) predates the current architecture,
 -- where the client WASM renderer needs whole-document context and can't
--- render from a partial diff chunk — see docs/Roadmap/Roadmap.md's deferred
+-- render from a partial diff chunk — see docs/ROADMAP/DONE.md's deferred
 -- line-diff-optimization note. Kept for reference/future reactivation, not
 -- an oversight.
 

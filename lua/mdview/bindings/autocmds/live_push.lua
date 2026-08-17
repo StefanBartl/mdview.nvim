@@ -5,7 +5,7 @@
 -- so partial-line diff pushing is not compatible with the current
 -- architecture (line-diff transport may be reintroduced later as a
 -- bandwidth optimization once the client can reconstruct full text from
--- diffs — see doc/Roadmap/Roadmap.md).
+-- diffs — see docs/ROADMAP/DONE.md).
 -- Adds debug logging controlled via mdview.config.defaults.debug_preview
 
 local api = vim.api
@@ -33,7 +33,7 @@ local function now_ms()
 end
 
 -- Throttle state for TextChanged/TextChangedI (see the CPU benchmark in
--- Roadmap.md's "Performance" section: unthrottled, every keystroke spawned its
+-- DONE.md's "Performance" section: unthrottled, every keystroke spawned its
 -- own curl process). Unlike scroll_sync's throttle — which just drops a ping
 -- that arrives too soon, fine for a transient scroll position — dropping a
 -- content push would leave the preview stale indefinitely with nothing else to

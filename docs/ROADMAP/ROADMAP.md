@@ -1,15 +1,17 @@
-# mdview.nvim — Roadmap (offene Punkte)
+# mdview.nvim — offene Punkte
 
-Es gibt zwei Roadmap-Dateien, und sie haben verschiedene Aufgaben:
+Alles, was ansteht und konkret genug ist, um angefangen zu werden. Was noch
+zu vage oder zu exotisch dafür ist, steht in [`../IDEAS/`](../IDEAS/).
 
-| Datei | Inhalt |
+| Wo | Inhalt |
 | --- | --- |
-| **diese** (`docs/ROADMAP.md`) | **offene** Punkte — hier anfangen |
-| [`docs/Roadmap/Roadmap.md`](Roadmap/Roadmap.md) | Log der **erledigten** Punkte samt Begründungen. Bleibt unter diesem Namen, weil lebende Quellkommentare (`preview_tab.lua`, `scroll_sync.lua`, `vim_leave.lua`, …) namentlich darauf verweisen. |
-
-Alles weitere unter [`docs/Roadmap/`](Roadmap/) ist Historie oder Konzept:
-`checkpoints/`, `WebTransportAPI/`, `markdown_preview/` tragen
-OUTDATED-Banner, `KONZEPT_*.md` sind Entwürfe.
+| **diese Datei** | **offene** Punkte — hier anfangen |
+| [`DONE.md`](DONE.md) | Entscheidungs-Log: was gebaut wurde und *warum so* |
+| [`../FEATURES/`](../FEATURES/) | Katalog dessen, was es heute gibt |
+| [`../IDEAS/`](../IDEAS/) | Ideen ohne nahe Umsetzung |
+| [`SCHLACHTPLAN.md`](SCHLACHTPLAN.md) | Feedback-Runde nach v0.1.0 |
+| [`history/`](history/) | Vor-Rewrite-Dokumente, nur Historie |
+| [`personal/`](personal/) | persönliche Notizen, kein Roadmap-Teil |
 
 ---
 
@@ -64,7 +66,7 @@ Lösungsidee: kooperatives Schließen — der Client reagiert auf ein
 WebSocket-`close`-Event mit `window.close()`. Damit würde Auto-Close auch im
 default-Modus funktionieren, ohne ein isoliertes Profil zu erzwingen.
 
-> Herkunft: In [`Roadmap/Roadmap.md`](Roadmap/Roadmap.md) (BUGS #2) als „in
+> Herkunft: In [`DONE.md`](DONE.md) (BUGS #2) als „in
 > `TASKS.md` erfasst" vermerkt — diese Datei wurde jedoch nie angelegt, die
 > Aufgabe war damit nirgends festgehalten. Hier nachgetragen.
 
@@ -82,6 +84,6 @@ würden das Gerät verlassen. Nur als ausdrückliches Opt-in mit deutlichem
 Privacy-Hinweis denkbar. `browser.open_url` ist bereits die Escape-Hatch,
 um eine beliebige URL zu öffnen, was den Bedarf teilweise abdeckt.
 
-> Herkunft: wie oben — in [`Roadmap/Roadmap.md`](Roadmap/Roadmap.md)
+> Herkunft: wie oben — in [`DONE.md`](DONE.md)
 > (Rendering #2) als „in `TASKS.md` festgehalten" vermerkt, ohne dass es
 > diese Datei je gab.

@@ -2,7 +2,7 @@
 
 > **Brainstorm-/Quelldokument.** Die konsolidierte, aktuelle Aufgabenliste steht
 > in [`../../ROADMAP.md`](../../ROADMAP.md); erledigte Punkte samt Begründung in
-> [`../Roadmap.md`](../Roadmap.md). Einige Vorschläge hier stammen aus der Zeit
+> [`../../DONE.md`](../../DONE.md). Einige Vorschläge hier stammen aus der Zeit
 > vor dem Go/Rust-Rewrite und nennen alte Endpoints (z. B. `/render?key=`), die
 > es nicht mehr gibt — als Idee bleiben sie gültig, die Umsetzung folgt aber der
 > heutigen Architektur (Go-Relay + Rust/WASM-Client).
