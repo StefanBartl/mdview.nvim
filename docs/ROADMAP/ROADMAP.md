@@ -1,14 +1,14 @@
 # mdview.nvim — offene Punkte
 
 Alles, was ansteht und konkret genug ist, um angefangen zu werden. Was noch
-zu vage oder zu exotisch dafür ist, steht in [`../IDEAS/`](../IDEAS/).
+zu vage oder zu exotisch dafür ist, steht in [`IDEAS/`](IDEAS/).
 
 | Wo | Inhalt |
 | --- | --- |
 | **diese Datei** | **offene** Punkte — hier anfangen |
 | [`DONE.md`](DONE.md) | Entscheidungs-Log: was gebaut wurde und *warum so* |
 | [`../FEATURES/`](../FEATURES/) | Katalog dessen, was es heute gibt |
-| [`../IDEAS/`](../IDEAS/) | Ideen ohne nahe Umsetzung |
+| [`IDEAS/`](IDEAS/) | Ideen ohne nahe Umsetzung |
 | [`SCHLACHTPLAN.md`](SCHLACHTPLAN.md) | Feedback-Runde nach v0.1.0 |
 | [`history/`](history/) | Vor-Rewrite-Dokumente, nur Historie |
 | [`personal/`](personal/) | persönliche Notizen, kein Roadmap-Teil |

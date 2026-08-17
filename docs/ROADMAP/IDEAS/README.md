@@ -6,8 +6,8 @@ verlorengeht.
 | Ordner | Inhalt |
 | --- | --- |
 | **dieser** | Ideen ohne nahe Umsetzung: exotisch, noch nicht konkretisiert, oder bewusst zurückgestellt |
-| [`../ROADMAP/ROADMAP.md`](../ROADMAP/ROADMAP.md) | offene Punkte, die konkret genug zum Anfangen sind |
-| [`../ROADMAP/DONE.md`](../ROADMAP/DONE.md) | Entscheidungs-Log: was gebaut wurde und warum so |
+| [`../ROADMAP.md`](../ROADMAP.md) | offene Punkte, die konkret genug zum Anfangen sind |
+| [`../DONE.md`](../DONE.md) | Entscheidungs-Log: was gebaut wurde und warum so |
 | [`../FEATURES/`](../FEATURES/) | Katalog dessen, was es heute gibt |
 
 Die Grenze zur Roadmap: **kann man morgen anfangen?** Wenn ja, gehört es in

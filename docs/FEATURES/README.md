@@ -31,5 +31,5 @@ for the full `:MDView` subcommand reference and
 
 Neighbouring folders: [`../ROADMAP/ROADMAP.md`](../ROADMAP/ROADMAP.md) (open
 items), [`../ROADMAP/DONE.md`](../ROADMAP/DONE.md) (why things were built the
-way they were), [`../IDEAS/`](../IDEAS/) (nothing planned, kept so it is not
+way they were), [`../ROADMAP/IDEAS/`](../ROADMAP/IDEAS/) (nothing planned, kept so it is not
 lost).

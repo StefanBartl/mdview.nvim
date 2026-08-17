@@ -1,7 +1,7 @@
 # Konzept: Preview ohne Server, Hintergrund-Instanz und Standalone-Binary
 
 > **Status: umgesetzt — mit einer Korrektur nach Praxistest.** Nutzerdoku:
-> [`docs/standalone.md`](../standalone.md). Gebaut wurden:
+> [`docs/standalone.md`](../../standalone.md). Gebaut wurden:
 > `native/server/internal/source` (`--watch`/`--open`), `:MDView standalone`,
 > `standalone.binary_path`, `scripts/minimal_init.lua` und
 > `scripts/mdview-bg.{sh,ps1}`.
