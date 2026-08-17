@@ -1,7 +1,7 @@
 # mdview.nvim — Log der erledigten Punkte
 
 > **Offene Aufgaben:** [`ROADMAP.md`](ROADMAP.md) · **Ideen ohne nahe
-> Umsetzung:** [`../IDEAS/`](../IDEAS/) · **Feature-Katalog:**
+> Umsetzung:** [`IDEAS/`](IDEAS/) · **Feature-Katalog:**
 > [`../FEATURES/`](../FEATURES/)
 >
 > Diese Datei ist das **Entscheidungs-Log**: was gebaut wurde, warum es so
