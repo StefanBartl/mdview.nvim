@@ -18,6 +18,7 @@ local INTERVAL_MS = 250
 local timer = nil
 local nav_inflight = false
 local scroll_inflight = false
+local toggle_inflight = false
 
 ---@internal
 ---@param endpoint string
@@ -194,6 +195,82 @@ local function poll_scroll()
 	})
 end
 
+-- ---- task-list checkbox toggle (browser -> nvim buffer) --------------------
+
+-- Flip the GFM task-list checkbox on 1-based `line` of the buffer showing
+-- `key` to `checked`, then push the change so the preview reflects it. Standalone
+-- mode never reaches here (the relay edits the file itself); this is the
+-- :MDView start path, where the buffer — possibly with unsaved edits — is the
+-- source of truth the relay must not touch. A line that no longer holds a task
+-- marker is left alone (a re-render can race a rapid edit).
+---@internal
+---@param key string
+---@param line integer
+---@param checked boolean
+---@return nil
+local function handle_toggle(key, line, checked)
+	if type(key) ~= "string" or type(line) ~= "number" or line < 1 then
+		return
+	end
+	local buf = buf_for_key(key)
+	if not buf or not vim.api.nvim_buf_is_loaded(buf) then
+		return
+	end
+	if line > vim.api.nvim_buf_line_count(buf) then
+		return
+	end
+	local cur = vim.api.nvim_buf_get_lines(buf, line - 1, line, false)[1]
+	if not cur then
+		return
+	end
+	local pre, state, post = cur:match("^(%s*[-*+] %[)([ xX])(%].*)$")
+	if not pre then
+		return -- not a checkbox line; don't corrupt it
+	end
+	local want = checked and "x" or " "
+	if state == want then
+		return -- already in the requested state
+	end
+	vim.api.nvim_buf_set_lines(buf, line - 1, line, false, { pre .. want .. post })
+	-- nvim_buf_set_lines doesn't fire TextChanged, so push explicitly.
+	pcall(require("mdview.bindings.autocmds.live_push").push_buffer_changes, buf, { full = true })
+end
+
+---@internal
+---@return nil
+local function poll_toggle()
+	if toggle_inflight then
+		return
+	end
+	toggle_inflight = true
+	vim.fn.jobstart({ "curl", "-sS", "--max-time", "2", url_for("toggle") }, {
+		stdout_buffered = true,
+		on_stdout = function(_, data)
+			if not data then
+				return
+			end
+			local body = vim.trim(table.concat(data, "\n"))
+			if body == "" or body == "null" then
+				return
+			end
+			local ok, arr = pcall(vim.json.decode, body)
+			if not ok or type(arr) ~= "table" then
+				return
+			end
+			vim.schedule(function()
+				for _, r in ipairs(arr) do
+					if type(r) == "table" then
+						handle_toggle(r.key, r.line, r.checked)
+					end
+				end
+			end)
+		end,
+		on_exit = function()
+			toggle_inflight = false
+		end,
+	})
+end
+
 -- ---- lifecycle -------------------------------------------------------------
 
 ---@internal
@@ -212,6 +289,9 @@ local function tick()
 	if exp.reverse_scroll == true then
 		poll_scroll()
 	end
+	if require("mdview.config").defaults.sync_checkboxes ~= false then
+		poll_toggle()
+	end
 end
 
 --- Start polling. No-op unless at least one inbound feature is enabled.
@@ -222,7 +302,8 @@ function M.start()
 		return
 	end
 	local exp = experimental()
-	if not (exp.click_navigate == true or exp.reverse_scroll == true) then
+	local sync_checkboxes = require("mdview.config").defaults.sync_checkboxes ~= false
+	if not (exp.click_navigate == true or exp.reverse_scroll == true or sync_checkboxes) then
 		return
 	end
 	timer = uv.new_timer()
@@ -241,10 +322,12 @@ function M.stop()
 	end
 	nav_inflight = false
 	scroll_inflight = false
+	toggle_inflight = false
 end
 
 -- Exposed for headless tests.
 M._handle_nav = handle_nav
 M._handle_scroll = handle_scroll
+M._handle_toggle = handle_toggle
 
 return M

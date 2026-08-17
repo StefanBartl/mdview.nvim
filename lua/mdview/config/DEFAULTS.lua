@@ -78,6 +78,7 @@
 ---@field scroll_sync_throttle_ms integer minimum time between scroll-position pings
 ---@field scroll_sync_mode "top"|"cursor" where the cursor line lands in the browser viewport: near the top, or mirroring the cursor's height in the nvim window
 ---@field scroll_sync_top_offset number in "top" mode, fraction (0..1) down from the viewport top to place the line (0 = glued to top)
+---@field sync_checkboxes boolean let ticking a GFM task-list checkbox in the preview write back to the source: standalone rewrites the file directly, :MDView start edits the buffer (polled, since Neovim has no WebSocket client). Default true; set false to render checkboxes read-only and stop the browser->Neovim poll
 ---@field breadcrumbs boolean record session breadcrumbs (which document + heading section over time) for :MDViewBreadcrumbs (default true)
 ---@field open_preview_tab boolean :MDViewStart opens an nvim-tab preview (Treesitter-highlighted mirror, no browser/relay HTML) instead of the browser
 ---@field browser mdview.config.BrowserDefaults
@@ -130,6 +131,13 @@ return {
 	scroll_sync_top_offset = 0.08,
 
 	breadcrumbs = true,
+
+	-- Ticking a task-list checkbox in the preview writes `[ ]`<->`[x]` back to
+	-- the source. Standalone rewrites the file directly (in the relay); :MDView
+	-- start edits the buffer, which — since Neovim has no WebSocket client —
+	-- needs the browser->Neovim poll (inbound_poll) running. Default on; set
+	-- false to keep checkboxes read-only and avoid that poll in start mode.
+	sync_checkboxes = true,
 
 	open_preview_tab = false,
 

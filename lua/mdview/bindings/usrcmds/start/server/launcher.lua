@@ -148,6 +148,13 @@ local function resolve_browser_url(opts)
 		url = url .. "&rscroll=1"
 	end
 
+	-- Task-list checkbox sync is on by default; only signal when it's off, so
+	-- the client renders checkboxes read-only and doesn't POST /toggle. (The
+	-- standalone URL has no such param — standalone is inherently sync-on.)
+	if require("mdview.config").defaults.sync_checkboxes == false then
+		url = url .. "&sync=0"
+	end
+
 	return url
 end
 M.resolve_browser_url = resolve_browser_url
