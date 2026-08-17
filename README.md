@@ -108,6 +108,8 @@ work, for turning it off without touching any plugin's config.
 - [Companion plugins](docs/companion-plugins.md) — optional plugins that pair well with the live preview.
 - [Development](docs/development.md) — building mdview.nvim from source and running its test suites.
 - [Architecture](docs/architecture.md) — the Lua/Go/TypeScript/Rust components and how they communicate.
+- [Features](docs/FEATURES/README.md) — per-theme write-up: [preview](docs/FEATURES/PREVIEW.md) (incl. link hover previews), [rendering](docs/FEATURES/RENDERING.md), [operations](docs/FEATURES/OPERATIONS.md), [security](docs/FEATURES/SECURITY.md).
+- [Roadmap](docs/ROADMAP.md) — open items; [`docs/Roadmap/Roadmap.md`](docs/Roadmap/Roadmap.md) logs what is already done, and why.
 
 ---
 
