@@ -45,9 +45,10 @@ local function supports_watch(bin)
 	return type(out) == "string" and out:find("-watch", 1, true) ~= nil
 end
 
---- The relay binary to use for standalone mode: an explicit
---- `standalone.binary_path` override if configured (for a locally built relay,
---- or a newer one than `install.version` pins), else the installed release.
+--- The relay binary to use for standalone mode, in precedence order: an explicit
+--- `standalone.binary_path` override, then a build inside this checkout
+--- (zero-config — and it's --watch-capable, which the pinned release may not be),
+--- then the installed release.
 ---@internal
 ---@return string|nil path, string|nil err
 local function resolve_binary()
@@ -59,6 +60,10 @@ local function resolve_binary()
 			return nil, "standalone.binary_path is not executable: " .. path
 		end
 		return path, nil
+	end
+	local built = require("mdview.adapter.server_args").local_built_binary()
+	if built then
+		return built, nil
 	end
 	return install.ensure_binary()
 end

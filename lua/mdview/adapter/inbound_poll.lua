@@ -348,7 +348,9 @@ local function handle_field(key, name, value)
 		local repl = 'value="' .. escape_attr(value) .. '"'
 		local new_tag
 		if tag:find('value="[^"]*"') then
-			new_tag = (tag:gsub('value="[^"]*"', function() return repl end, 1))
+			new_tag = (tag:gsub('value="[^"]*"', function()
+				return repl
+			end, 1))
 		elseif tag:sub(-2) == "/>" then
 			new_tag = tag:sub(1, -3):gsub("%s+$", "") .. " " .. repl .. "/>"
 		else

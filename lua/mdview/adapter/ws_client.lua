@@ -21,8 +21,15 @@ local HEALTH_POLL_MS = 200 -- polling interval
 local HEALTH_TIMEOUT_MS = 10000 -- total wait time
 local MAX_RETRIES = 5 -- number of retry attempts for a single message
 local BASE_RETRY_MS = 150 -- initial retry delay (exponential backoff)
--- exported per-call wait timeout (used by live_push)
-M.WAIT_READY_TIMEOUT = M.WAIT_READY_TIMEOUT or 2000
+-- Per-call readiness wait (used by the launcher). 15s, not the old 2s: a
+-- freshly built or first-run relay binary can take several seconds to bind
+-- while the OS/antivirus scans it, and the launcher gates the browser open on
+-- this window (it must — the relay also serves the page, so opening before it's
+-- up would just load a browser error page). A 2s cap made the tab
+-- intermittently never open — the "worked last time" flakiness. Polling ends
+-- the moment /health answers, so a healthy relay still opens in well under a
+-- second; only a slow start waits.
+M.WAIT_READY_TIMEOUT = M.WAIT_READY_TIMEOUT or 15000
 
 M.last_request = {}
 M._pending = {} -- pending queue: path -> { markdown=..., tries=0 }

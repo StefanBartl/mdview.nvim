@@ -70,6 +70,33 @@ npm run build:go     # -> native/server/mdview-server
 npm run build        # build:wasm (wasm-pack) then build:client (vite) -> dist/client
 ```
 
+**Zero config needed once built.** `:MDView start` and `:MDView standalone`
+auto-detect a build sitting inside the plugin's own checkout —
+`native/server/mdview-server` (Go keeps the exact `-o` name, so no `.exe` on
+Windows) and `dist/client` — and use it ahead of the downloaded release. A
+normal install never ships those (both are gitignored), so this only ever kicks
+in on a dev checkout. So you usually **don't** need the `dev.*` /
+`standalone.binary_path` overrides at all — they're only for pointing at a build
+*outside* this checkout.
+
+Let your plugin manager rebuild on update so the auto-detected build stays
+current. With lazy.nvim:
+
+```lua
+{
+  "StefanBartl/mdview.nvim",
+  build = "npm ci && npm run build:go && npm run build",
+  -- no dev.*/standalone.binary_path needed — the build is auto-detected
+}
+```
+
+`build` runs on `:Lazy install` / `:Lazy update` / `:Lazy build` (not on every
+startup — a source build needs the Go/Rust/Node toolchains and would be far too
+slow to gate editor startup on). After a manual `git pull`, run `:Lazy build`
+(or `npm run build && npm run build:go`) to refresh.
+
+If you *do* want an explicit override (a build outside the checkout):
+
 ```lua
 require("mdview").setup({
   dev = {

@@ -209,90 +209,106 @@ function M.start(opts)
 	-- Wait for server health, then perform the initial full push and open
 	-- the browser (only once the server is actually reachable, so the tab
 	-- doesn't load against a not-yet-ready port).
+	-- The initial push + browser open, run once the relay is (or should be)
+	-- reachable. Factored out so it runs on BOTH a healthy /health and a
+	-- health-check timeout: gating the browser entirely on the health window is
+	-- what made the tab intermittently never open when a freshly built binary
+	-- was slow to bind. On a timeout the relay is usually up moments later; the
+	-- client's WebSocket transport reconnects, so opening best-effort is safe.
+	local opened = false
+	local function push_and_open()
+		if opened then
+			return
+		end
+		opened = true
+		schedule(function()
+			log.debug("launcher: performing initial full push", nil, "launcher", true)
+			local buf = api.nvim_get_current_buf()
+			local key = normalize.path(api.nvim_buf_get_name(buf))
+			-- live_push autocmds are already registered by autocmds.attach()
+			-- at spawn time (in their augroup); do NOT call
+			-- live_push.attach() here again — the no-arg call used
+			-- group=0, which nvim_create_autocmd rejects ("Invalid
+			-- 'group': 0"), aborting this whole callback right before the
+			-- initial push and browser open.
+			live_push.push_buffer_changes(buf)
+
+			-- open_preview_tab replaces the browser tab with an nvim-tab
+			-- preview (Treesitter mirror, no HTML/relay involved at all —
+			-- see mdview.adapter.preview_tab) — the relay/WASM pipeline
+			-- above still runs normally, so :MDViewOpen can still open the
+			-- browser later if wanted.
+			if require("mdview.config").defaults.open_preview_tab then
+				require("mdview.adapter.preview_tab").open(buf)
+				return
+			end
+
+			-- open browser after readiness (best-effort)
+			if browser_autostart and browser_adapter and browser_adapter.open then
+				local browser_defaults = require("mdview.config.browser").defaults
+				if browser_defaults.require_display and not has_display() then
+					notify(
+						"[mdview] no display available (headless/SSH session without DISPLAY) — "
+							.. "skipping browser autostart. Set browser.require_display = false to override.",
+						vim.log.levels.WARN
+					)
+					return
+				end
+
+				local browser_url = resolve_browser_url({ browser_url = opts.browser_url, key = key })
+				log.debug("Opening browser: " .. browser_url, nil, "launcher", true)
+
+				-- Record which room the visible tab watches so the "reuse"
+				-- browser_behavior can route later buffers' content here.
+				state.set_preview_key(key)
+
+				local opts_table = {
+					open_mode = browser_defaults.open_mode,
+					focus = browser_defaults.focus,
+					browser_cmd = browser_cmd,
+					browser_args = browser_args,
+					-- stop_on_browser_exit only applies in isolated mode: in
+					-- "default" mode the OS opener returns no process handle,
+					-- so on_exit never fires (the tab lives in the user's
+					-- own browser, which mdview doesn't own).
+					on_exit = function(_, code)
+						log.debug(("browser exited with code %s"):format(tostring(code)), nil, "launcher", true)
+						if browser_defaults.open_mode == "isolated" and browser_defaults.stop_on_browser_exit then
+							schedule(function()
+								require("mdview.bindings.usrcmds.stop").stop()
+							end)
+						end
+					end,
+				}
+				local ok2, handle_or_err = pcall(browser_adapter.open, browser_url, opts_table)
+				if ok2 and handle_or_err then
+					state.set_browser(handle_or_err)
+					log.debug("launcher: browser autostart successful", nil, "launcher", true)
+				else
+					notify(
+						("[mdview.bindings.usrcmds] browser adapter failed: %s"):format(tostring(handle_or_err)),
+						vim.log.levels.WARN
+					)
+				end
+			end
+		end)
+	end
+
 	ws_client.wait_ready(function(ok)
 		if ok then
 			local port = vim.g.mdview_server_port or 43219
 			vim.g.mdview_server_port = port
 			notify("[mdview] detected server port: " .. tostring(port), 2)
-
-			schedule(function()
-				log.debug("launcher: server ready — performing initial full push", nil, "launcher", true)
-				local buf = api.nvim_get_current_buf()
-				local key = normalize.path(api.nvim_buf_get_name(buf))
-				-- live_push autocmds are already registered by autocmds.attach()
-				-- at spawn time (in their augroup); do NOT call
-				-- live_push.attach() here again — the no-arg call used
-				-- group=0, which nvim_create_autocmd rejects ("Invalid
-				-- 'group': 0"), aborting this whole callback right before the
-				-- initial push and browser open.
-				live_push.push_buffer_changes(buf)
-
-				-- open_preview_tab replaces the browser tab with an nvim-tab
-				-- preview (Treesitter mirror, no HTML/relay involved at all —
-				-- see mdview.adapter.preview_tab) — the relay/WASM pipeline
-				-- above still runs normally, so :MDViewOpen can still open the
-				-- browser later if wanted.
-				if require("mdview.config").defaults.open_preview_tab then
-					require("mdview.adapter.preview_tab").open(buf)
-					return
-				end
-
-				-- open browser after readiness (best-effort)
-				if browser_autostart and browser_adapter and browser_adapter.open then
-					local browser_defaults = require("mdview.config.browser").defaults
-					if browser_defaults.require_display and not has_display() then
-						notify(
-							"[mdview] no display available (headless/SSH session without DISPLAY) — "
-								.. "skipping browser autostart. Set browser.require_display = false to override.",
-							vim.log.levels.WARN
-						)
-						return
-					end
-
-					local browser_url = resolve_browser_url({ browser_url = opts.browser_url, key = key })
-					log.debug("Opening browser: " .. browser_url, nil, "launcher", true)
-
-					-- Record which room the visible tab watches so the "reuse"
-					-- browser_behavior can route later buffers' content here.
-					state.set_preview_key(key)
-
-					local opts_table = {
-						open_mode = browser_defaults.open_mode,
-						focus = browser_defaults.focus,
-						browser_cmd = browser_cmd,
-						browser_args = browser_args,
-						-- stop_on_browser_exit only applies in isolated mode: in
-						-- "default" mode the OS opener returns no process handle,
-						-- so on_exit never fires (the tab lives in the user's
-						-- own browser, which mdview doesn't own).
-						on_exit = function(_, code)
-							log.debug(("browser exited with code %s"):format(tostring(code)), nil, "launcher", true)
-							if browser_defaults.open_mode == "isolated" and browser_defaults.stop_on_browser_exit then
-								schedule(function()
-									require("mdview.bindings.usrcmds.stop").stop()
-								end)
-							end
-						end,
-					}
-					local ok2, handle_or_err = pcall(browser_adapter.open, browser_url, opts_table)
-					if ok2 and handle_or_err then
-						state.set_browser(handle_or_err)
-						log.debug("launcher: browser autostart successful", nil, "launcher", true)
-					else
-						notify(
-							("[mdview.bindings.usrcmds] browser adapter failed: %s"):format(tostring(handle_or_err)),
-							vim.log.levels.WARN
-						)
-					end
-				end
-			end)
+			-- Open only once /health answered: the relay also serves the page, so
+			-- opening before it's up would load a browser error page (and the
+			-- browser wouldn't retry). Polling ends on first success, so a healthy
+			-- relay opens in well under a second.
+			push_and_open()
 		else
-			schedule(function()
-				notify(
-					"[mdview.bindings.usrcmds] Server health-check failed; preview may not update automatically",
-					vim.log.levels.WARN
-				)
-			end)
+			notify(
+				("[mdview] relay did not respond within %dms — run :MDView open once it's up"):format(wait_timeout),
+				vim.log.levels.WARN
+			)
 		end
 	end, wait_timeout)
 
