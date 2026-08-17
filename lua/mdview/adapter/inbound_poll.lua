@@ -19,6 +19,7 @@ local timer = nil
 local nav_inflight = false
 local scroll_inflight = false
 local toggle_inflight = false
+local field_inflight = false
 
 ---@internal
 ---@param endpoint string
@@ -271,6 +272,128 @@ local function poll_toggle()
 	})
 end
 
+-- ---- text field write-back (browser -> nvim buffer) ------------------------
+
+local escape_attr, escape_text
+do
+	-- HTML-escape for a double-quoted attribute value / element text, mirroring
+	-- native/server/internal/source/field.go so start mode and standalone write
+	-- byte-identical output.
+	local function replace(s, from, to)
+		return (s:gsub(from, to))
+	end
+	escape_attr = function(v)
+		v = replace(v, "&", "&amp;")
+		v = replace(v, "<", "&lt;")
+		v = replace(v, ">", "&gt;")
+		v = replace(v, '"', "&quot;")
+		return v
+	end
+	escape_text = function(v)
+		v = replace(v, "&", "&amp;")
+		v = replace(v, "<", "&lt;")
+		v = replace(v, ">", "&gt;")
+		return v
+	end
+end
+
+-- Replace the whole buffer's text and push the result. Used for field edits,
+-- which can change content across lines (a multi-line textarea body); a
+-- single-line set like handle_toggle's isn't enough.
+---@internal
+---@param buf integer
+---@param new_text string
+---@return nil
+local function apply_buffer_text(buf, new_text)
+	local lines = vim.split(new_text, "\n", { plain = true })
+	vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
+	pcall(require("mdview.bindings.autocmds.live_push").push_buffer_changes, buf, { full = true })
+end
+
+-- Set the syncable field named `name` in the buffer showing `key` to `value`,
+-- then push. Located by the `name` attribute (raw HTML has no source position),
+-- like the Go side. Standalone never reaches here (the relay edits the file).
+---@internal
+---@param key string
+---@param name string
+---@param value string
+---@return nil
+local function handle_field(key, name, value)
+	if type(key) ~= "string" or type(name) ~= "string" or name == "" or type(value) ~= "string" then
+		return
+	end
+	local buf = buf_for_key(key)
+	if not buf or not vim.api.nvim_buf_is_loaded(buf) then
+		return
+	end
+	local text = table.concat(vim.api.nvim_buf_get_lines(buf, 0, -1, false), "\n")
+	local q = vim.pesc(name)
+
+	-- textarea first (explicit close, unambiguous body). `.` in Lua patterns
+	-- matches newlines, so a multi-line body is handled.
+	local ta_open, ta_body_start = text:find('<textarea[^>]*name="' .. q .. '"[^>]*>')
+	if ta_open then
+		local close_start = text:find("</textarea>", ta_body_start + 1, true)
+		if close_start then
+			local new_text = text:sub(1, ta_body_start) .. escape_text(value) .. text:sub(close_start)
+			apply_buffer_text(buf, new_text)
+			return
+		end
+	end
+
+	-- input: find the tag by name, then set/insert its value attribute.
+	local in_start, in_end = text:find('<input[^>]*name="' .. q .. '"[^>]*>')
+	if in_start then
+		local tag = text:sub(in_start, in_end)
+		local repl = 'value="' .. escape_attr(value) .. '"'
+		local new_tag
+		if tag:find('value="[^"]*"') then
+			new_tag = (tag:gsub('value="[^"]*"', function() return repl end, 1))
+		elseif tag:sub(-2) == "/>" then
+			new_tag = tag:sub(1, -3):gsub("%s+$", "") .. " " .. repl .. "/>"
+		else
+			new_tag = tag:sub(1, -2):gsub("%s+$", "") .. " " .. repl .. ">"
+		end
+		local new_text = text:sub(1, in_start - 1) .. new_tag .. text:sub(in_end + 1)
+		apply_buffer_text(buf, new_text)
+	end
+end
+
+---@internal
+---@return nil
+local function poll_field()
+	if field_inflight then
+		return
+	end
+	field_inflight = true
+	vim.fn.jobstart({ "curl", "-sS", "--max-time", "2", url_for("field") }, {
+		stdout_buffered = true,
+		on_stdout = function(_, data)
+			if not data then
+				return
+			end
+			local body = vim.trim(table.concat(data, "\n"))
+			if body == "" or body == "null" then
+				return
+			end
+			local ok, arr = pcall(vim.json.decode, body)
+			if not ok or type(arr) ~= "table" then
+				return
+			end
+			vim.schedule(function()
+				for _, r in ipairs(arr) do
+					if type(r) == "table" then
+						handle_field(r.key, r.name, r.value)
+					end
+				end
+			end)
+		end,
+		on_exit = function()
+			field_inflight = false
+		end,
+	})
+end
+
 -- ---- lifecycle -------------------------------------------------------------
 
 ---@internal
@@ -289,8 +412,12 @@ local function tick()
 	if exp.reverse_scroll == true then
 		poll_scroll()
 	end
-	if require("mdview.config").defaults.sync_checkboxes ~= false then
+	local cfg = require("mdview.config").defaults
+	if cfg.sync_checkboxes ~= false then
 		poll_toggle()
+	end
+	if cfg.sync_fields ~= false then
+		poll_field()
 	end
 end
 
@@ -302,8 +429,9 @@ function M.start()
 		return
 	end
 	local exp = experimental()
-	local sync_checkboxes = require("mdview.config").defaults.sync_checkboxes ~= false
-	if not (exp.click_navigate == true or exp.reverse_scroll == true or sync_checkboxes) then
+	local cfg = require("mdview.config").defaults
+	local sync = cfg.sync_checkboxes ~= false or cfg.sync_fields ~= false
+	if not (exp.click_navigate == true or exp.reverse_scroll == true or sync) then
 		return
 	end
 	timer = uv.new_timer()
@@ -323,11 +451,13 @@ function M.stop()
 	nav_inflight = false
 	scroll_inflight = false
 	toggle_inflight = false
+	field_inflight = false
 end
 
 -- Exposed for headless tests.
 M._handle_nav = handle_nav
 M._handle_scroll = handle_scroll
 M._handle_toggle = handle_toggle
+M._handle_field = handle_field
 
 return M

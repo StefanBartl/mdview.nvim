@@ -75,6 +75,7 @@ turned into DOM content without passing through an allowlist-based sanitizer.
 | `:MDView preview-tab` | In-editor tab preview, no browser or server needed | [Preview](docs/FEATURES/PREVIEW.md#in-editor-preview-tab-no-browser-no-server) |
 | `:MDView cursor` | Neovim cursor marker in the preview (line/caret/section spotlight) | [Preview](docs/FEATURES/PREVIEW.md#neovim-cursor-marker) |
 | Task-list checkbox sync | Tick a `- [ ]` in the preview → written back to the source (`sync_checkboxes`) | [Preview](docs/FEATURES/PREVIEW.md#task-list-checkbox-sync) |
+| Text field sync | Edit a `<input name>` / `<textarea name>` in the preview → written back to the source (`sync_fields`) | [Preview](docs/FEATURES/PREVIEW.md#text-field-sync) |
 | `:MDView sync` | Pause/resume Neovim → browser scroll sync at runtime | [Preview](docs/FEATURES/PREVIEW.md#scroll-sync-pauseresume) |
 | Reverse scroll / click-to-navigate | Browser scroll and clicks move the Neovim cursor back | [Preview](docs/FEATURES/PREVIEW.md#reverse-scroll-browser--neovim) |
 | `:MDView zoom` | Adjust the preview's font-size scale independently of the browser | [Preview](docs/FEATURES/PREVIEW.md#preview-zoom) |

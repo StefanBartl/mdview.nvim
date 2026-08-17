@@ -79,6 +79,7 @@
 ---@field scroll_sync_mode "top"|"cursor" where the cursor line lands in the browser viewport: near the top, or mirroring the cursor's height in the nvim window
 ---@field scroll_sync_top_offset number in "top" mode, fraction (0..1) down from the viewport top to place the line (0 = glued to top)
 ---@field sync_checkboxes boolean let ticking a GFM task-list checkbox in the preview write back to the source: standalone rewrites the file directly, :MDView start edits the buffer (polled, since Neovim has no WebSocket client). Default true; set false to render checkboxes read-only and stop the browser->Neovim poll
+---@field sync_fields boolean let editing a raw-HTML text field (`<input name=…>` / `<textarea name=…>`) in the preview write its value back to the source, matched by the `name` attribute (raw HTML has no source position). Standalone rewrites the file, :MDView start edits the buffer (polled). Default true; set false to render such fields read-only
 ---@field breadcrumbs boolean record session breadcrumbs (which document + heading section over time) for :MDViewBreadcrumbs (default true)
 ---@field open_preview_tab boolean :MDViewStart opens an nvim-tab preview (Treesitter-highlighted mirror, no browser/relay HTML) instead of the browser
 ---@field browser mdview.config.BrowserDefaults
@@ -138,6 +139,14 @@ return {
 	-- needs the browser->Neovim poll (inbound_poll) running. Default on; set
 	-- false to keep checkboxes read-only and avoid that poll in start mode.
 	sync_checkboxes = true,
+
+	-- Editing a raw-HTML text field (`<input name="x">` / `<textarea
+	-- name="y">`) in the preview writes its value back to the source, located
+	-- by the `name` attribute (raw HTML carries no source position, so unlike
+	-- checkboxes there is no line to target — the name is the anchor).
+	-- Standalone rewrites the file; :MDView start edits the buffer via the same
+	-- browser->Neovim poll. Default on; false renders such fields read-only.
+	sync_fields = true,
 
 	open_preview_tab = false,
 

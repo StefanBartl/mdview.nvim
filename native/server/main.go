@@ -114,6 +114,7 @@ func main() {
 	registry := relay.NewRegistry()
 	navQueue := relay.NewNavQueue()
 	toggleQueue := relay.NewToggleQueue()
+	fieldQueue := relay.NewFieldQueue()
 	scrollBox := relay.NewScrollBox()
 
 	// In standalone mode the relay owns the file, so a checkbox toggle is
@@ -139,6 +140,7 @@ func main() {
 	mux.HandleFunc("/close", handleClose(registry, *token))
 	mux.HandleFunc("/nav", handleNav(navQueue, *token))
 	mux.HandleFunc("/toggle", handleToggle(toggleQueue, watchKey, watchPath, *token))
+	mux.HandleFunc("/field", handleField(fieldQueue, watchKey, watchPath, *token))
 	mux.HandleFunc("/scrollback", handleScrollback(scrollBox, *token))
 	mux.HandleFunc("/clientlog", handleClientLog(*token))
 	mux.HandleFunc("/ws", handleWS(registry, *token, port))
@@ -703,6 +705,60 @@ func parseToggle(body string) (line int, checked bool, ok bool) {
 		return n, false, true
 	default:
 		return 0, false, false
+	}
+}
+
+const maxFieldBodyBytes = 64 << 10 // a field value; generous for a textarea
+
+// handleField is the browser->source bridge for syncable text fields
+// (`<input name=…>` / `<textarea name=…>`). On POST the browser sends a JSON
+// {name, value} for a room. Like /toggle, standalone applies it to the watched
+// file in place (matched by the field's name, since raw HTML has no
+// data-sourcepos), while Neovim-driven mode queues it for Neovim to apply to
+// its buffer. Token-gated.
+func handleField(queue *relay.FieldQueue, watchKey, watchPath, token string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if !relay.ValidToken(token, r.URL.Query().Get("token")) {
+			http.Error(w, "forbidden", http.StatusForbidden)
+			return
+		}
+		switch r.Method {
+		case http.MethodGet:
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(queue.Drain())
+		case http.MethodPost:
+			key := r.URL.Query().Get("key")
+			if key == "" {
+				http.Error(w, "missing key", http.StatusBadRequest)
+				return
+			}
+			body, err := io.ReadAll(io.LimitReader(r.Body, maxFieldBodyBytes))
+			if err != nil {
+				http.Error(w, "failed to read body", http.StatusBadRequest)
+				return
+			}
+			var req struct {
+				Name  string `json:"name"`
+				Value string `json:"value"`
+			}
+			if err := json.Unmarshal(body, &req); err != nil || req.Name == "" {
+				http.Error(w, "invalid field payload", http.StatusBadRequest)
+				return
+			}
+
+			if watchKey != "" && key == watchKey {
+				if err := source.SetFieldValue(watchPath, req.Name, req.Value); err != nil {
+					fmt.Printf("[field] %s name=%q: %v\n", watchPath, req.Name, err)
+					http.Error(w, "field write failed", http.StatusInternalServerError)
+					return
+				}
+			} else {
+				queue.Push(relay.FieldRequest{Key: key, Name: req.Name, Value: req.Value})
+			}
+			w.WriteHeader(http.StatusNoContent)
+		default:
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
 	}
 }
 

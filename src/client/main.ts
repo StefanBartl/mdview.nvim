@@ -18,6 +18,7 @@ import { installLinkHover } from './render/linkHover';
 import { updateCursorMarker, parseCursorMarkerMode } from './render/cursorMarker';
 import { applyBlankLineSpacing, parseBlankLines } from './render/blankLines';
 import { enableTaskCheckboxes, installTaskToggle } from './render/taskToggle';
+import { installFieldSync } from './render/fieldSync';
 import {
   initOverlays,
   setOverlay,
@@ -274,6 +275,27 @@ async function boot() {
         });
       } catch {
         /* toggle is best-effort */
+      }
+    });
+  }
+
+  // Syncable text fields: editing a `<input name=…>` / `<textarea name=…>` and
+  // committing it (blur/Enter) POSTs {name, value} to /field, which rewrites the
+  // value in the source (matched by name — raw HTML has no sourcepos). Gated by
+  // ?fields (sync_fields); delegated on container so it survives re-renders.
+  const fieldSyncEnabled = params.get('fields') !== '0';
+  if (container && fieldSyncEnabled) {
+    installFieldSync(container, (name: string, value: string) => {
+      clientLog(`field: ${name} (${value.length} chars)`);
+      try {
+        void fetch(`/field?token=${encodeURIComponent(token)}&key=${encodeURIComponent(key)}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, value }),
+          keepalive: true,
+        });
+      } catch {
+        /* field sync is best-effort */
       }
     });
   }
