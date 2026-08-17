@@ -1,7 +1,15 @@
-# mdview.nvim — Roadmap
+# mdview.nvim — Roadmap (offene Punkte)
 
-> Erledigtes samt Begründungen: [`Roadmap/Roadmap.md`](Roadmap/Roadmap.md).
-> Diese Datei sammelt **offene** Punkte.
+Es gibt zwei Roadmap-Dateien, und sie haben verschiedene Aufgaben:
+
+| Datei | Inhalt |
+| --- | --- |
+| **diese** (`docs/ROADMAP.md`) | **offene** Punkte — hier anfangen |
+| [`docs/Roadmap/Roadmap.md`](Roadmap/Roadmap.md) | Log der **erledigten** Punkte samt Begründungen. Bleibt unter diesem Namen, weil lebende Quellkommentare (`preview_tab.lua`, `scroll_sync.lua`, `vim_leave.lua`, …) namentlich darauf verweisen. |
+
+Alles weitere unter [`docs/Roadmap/`](Roadmap/) ist Historie oder Konzept:
+`checkpoints/`, `WebTransportAPI/`, `markdown_preview/` tragen
+OUTDATED-Banner, `KONZEPT_*.md` sind Entwürfe.
 
 ---
 
@@ -40,3 +48,40 @@ gehovert werden, und Schreibzugriff neben dem Dokument (Cache-Verzeichnis,
 Aufräumen, `.gitignore`-Frage).
 
 Erst angehen, wenn es einen konkreten Bedarfsfall gibt.
+
+---
+
+## Kooperatives Tab-Schließen im `default`-Browsermodus
+
+**Status:** offen, Aufwand mittel.
+
+Im Modus `browser.mode = "default"` öffnet mdview die URL im normalen Browser
+des Nutzers (eigene Extensions, eigenes Profil). Preis: mdview kann den Tab
+nicht programmatisch schließen, deshalb sind `browser_autoclose` und
+`stop_on_browser_exit` dort No-ops.
+
+Lösungsidee: kooperatives Schließen — der Client reagiert auf ein
+WebSocket-`close`-Event mit `window.close()`. Damit würde Auto-Close auch im
+default-Modus funktionieren, ohne ein isoliertes Profil zu erzwingen.
+
+> Herkunft: In [`Roadmap/Roadmap.md`](Roadmap/Roadmap.md) (BUGS #2) als „in
+> `TASKS.md` erfasst" vermerkt — diese Datei wurde jedoch nie angelegt, die
+> Aufgabe war damit nirgends festgehalten. Hier nachgetragen.
+
+---
+
+## Externe Renderer-Website (opt-in)
+
+**Status:** offen, opt-in, mit Vorbehalt.
+
+Idee: das Rendering optional an eine externe Website auslagern statt lokal
+per WASM.
+
+**Vorbehalt:** widerspricht dem Loopback-only-Modell — Dokumentinhalte
+würden das Gerät verlassen. Nur als ausdrückliches Opt-in mit deutlichem
+Privacy-Hinweis denkbar. `browser.open_url` ist bereits die Escape-Hatch,
+um eine beliebige URL zu öffnen, was den Bedarf teilweise abdeckt.
+
+> Herkunft: wie oben — in [`Roadmap/Roadmap.md`](Roadmap/Roadmap.md)
+> (Rendering #2) als „in `TASKS.md` festgehalten" vermerkt, ohne dass es
+> diese Datei je gab.

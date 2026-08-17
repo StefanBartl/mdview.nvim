@@ -25,6 +25,7 @@
 // contents, which are not trusted markup.
 
 import { isExternalHref } from './externalLinks';
+import { headings } from './docModel';
 
 const IMAGE_EXT = /\.(png|jpe?g|gif|webp|bmp|svg|ico|avif)$/i;
 const TEXT_EXT = /\.(md|markdown|mdx|txt)$/i;
@@ -45,6 +46,21 @@ export function classifyHref(href: string | null | undefined): HoverTargetKind {
   if (TEXT_EXT.test(withoutFragment)) return 'text';
   if (PDF_EXT.test(withoutFragment)) return 'pdf';
   return 'other';
+}
+
+/**
+ * GitHub-style heading slug: lowercase, strip anything that is not a word
+ * character/space/hyphen, spaces to hyphens. Mirrors markdown.nvim's
+ * `core.slug.gfm`, so an anchor that resolves in the editor resolves here
+ * too.
+ */
+export function slugify(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s-]/gu, '')
+    .trim()
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-');
 }
 
 /** Split a URL for display. Enough for a hover line, not a spec parser. */
@@ -186,14 +202,17 @@ export function installLinkHover(root: HTMLElement, opts: LinkHoverOptions): () 
     }
 
     if (kind === 'anchor') {
-      const id = decodeURIComponent(href.slice(1));
-      const heading =
-        root.querySelector<HTMLElement>(`#${CSS.escape(id)}`) ??
-        root.querySelector<HTMLElement>(`[name="${CSS.escape(id)}"]`);
+      const wanted = slugify(decodeURIComponent(href.slice(1)));
+      // Resolved against the document's heading outline (docModel.headings,
+      // which keys off H1..H6 tags), NOT off element ids: the WASM renderer
+      // emits no id attributes, so an id lookup would silently find nothing
+      // for every anchor. Slug matching also mirrors how markdown.nvim's
+      // in-editor hover resolves the same link.
+      const target = headings(root).find(h => slugify(h.text) === wanted);
       const popup = createPopup('anchor');
-      if (heading) {
-        const parts: string[] = [heading.textContent?.trim() ?? ''];
-        let sib = heading.nextElementSibling;
+      if (target) {
+        const parts: string[] = [target.text];
+        let sib = target.el.nextElementSibling;
         let count = 0;
         while (sib && count < 4 && !/^H[1-6]$/.test(sib.tagName)) {
           const text = sib.textContent?.trim();
@@ -205,7 +224,7 @@ export function installLinkHover(root: HTMLElement, opts: LinkHoverOptions): () 
         }
         appendLines(popup, parts, maxLines);
       } else {
-        appendNote(popup, `no heading “${id}” in this document`);
+        appendNote(popup, `no heading matches #${decodeURIComponent(href.slice(1))}`);
       }
       positionPopup(popup, anchor);
       return;
