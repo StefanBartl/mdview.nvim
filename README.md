@@ -56,11 +56,34 @@ Rust module compiled to WebAssembly, so untrusted Markdown/HTML never gets
 turned into DOM content without passing through an allowlist-based sanitizer.
 
 **Key features:**
-* Live browser preview for Markdown documents
-* Automatic update on buffer change
+* Live browser preview for Markdown documents, with scroll sync (both directions), a cursor marker, click-to-navigate, and an in-editor tab preview that needs no browser or server
+* Standalone preview that outlives Neovim — the relay watches the file on disk directly
 * Sanitized HTML rendering (Rust/WASM: comrak + ammonia) — no server-side rendering step
+* Runtime theme switching, preview zoom, floating overlays (table of contents), and a breadcrumbs session outline
 * No Node/Go/Rust toolchain required to run it: the relay binary and client bundle are downloaded once from GitHub Releases
 * Loopback-only server with per-session token + Origin checks
+* Built-in diagnostics: internal log ring, persistent relay-log file, relay stdout viewer, and a one-shot full component-state report
+
+---
+
+## Capabilities
+
+| Capability | What it does | Details |
+|---|---|---|
+| `:MDView start` / `stop` / `toggle` / `open` | Start, stop, or re-open the live browser preview session | [Commands](docs/commands.md) |
+| `:MDView standalone` | Preview via the relay's own file watcher — outlives `:qa`, no Neovim in the chain | [Standalone](docs/standalone.md) |
+| `:MDView preview-tab` | In-editor tab preview, no browser or server needed | [Preview](docs/FEATURES/PREVIEW.md#in-editor-preview-tab-no-browser-no-server) |
+| `:MDView cursor` | Neovim cursor marker in the preview (line/caret/section spotlight) | [Preview](docs/FEATURES/PREVIEW.md#neovim-cursor-marker) |
+| `:MDView sync` | Pause/resume Neovim → browser scroll sync at runtime | [Preview](docs/FEATURES/PREVIEW.md#scroll-sync-pauseresume) |
+| Reverse scroll / click-to-navigate | Browser scroll and clicks move the Neovim cursor back | [Preview](docs/FEATURES/PREVIEW.md#reverse-scroll-browser--neovim) |
+| `:MDView zoom` | Adjust the preview's font-size scale independently of the browser | [Preview](docs/FEATURES/PREVIEW.md#preview-zoom) |
+| `:MDView overlay` | Mount/unmount a floating overlay (table of contents) on the preview | [Preview](docs/FEATURES/PREVIEW.md#overlays-floating-table-of-contents) |
+| `:MDView breadcrumbs` | Session outline of visited sections, exportable | [Preview](docs/FEATURES/PREVIEW.md#breadcrumbs-session-outline) |
+| `:MDView reveal` | Reveal/hide private (fenced) blocks | [Rendering](docs/FEATURES/RENDERING.md#private-blocks) |
+| `:MDView blanklines` | Toggle blank-line handling in rendered output | [Rendering](docs/FEATURES/RENDERING.md#blank-line-handling) |
+| `:MDView theme` | Switch the preview theme at runtime | [Rendering](docs/FEATURES/RENDERING.md#themes) |
+| `:MDView weblogs` / `log` / `file-log` / `diagnose` | Relay stdout viewer, internal log ring, persistent relay-log file, full diagnostics report | [Operations](docs/FEATURES/OPERATIONS.md) |
+| Link hover previews | Preview a link's target inline in the browser | [Preview](docs/FEATURES/PREVIEW.md#link-hover-previews) |
 
 ---
 
@@ -108,8 +131,8 @@ work, for turning it off without touching any plugin's config.
 - [Companion plugins](docs/companion-plugins.md) — optional plugins that pair well with the live preview.
 - [Development](docs/development.md) — building mdview.nvim from source and running its test suites.
 - [Architecture](docs/architecture.md) — the Lua/Go/TypeScript/Rust components and how they communicate.
-- [Features](docs/FEATURES/README.md) — per-theme write-up: [preview](docs/FEATURES/PREVIEW.md) (incl. link hover previews), [rendering](docs/FEATURES/RENDERING.md), [operations](docs/FEATURES/OPERATIONS.md), [security](docs/FEATURES/SECURITY.md).
-- [Roadmap](docs/ROADMAP.md) — open items; [`docs/Roadmap/Roadmap.md`](docs/Roadmap/Roadmap.md) logs what is already done, and why.
+- [Features](docs/FEATURES/FEATURES.md) — the complete catalog, user-facing *and* internal (caches, throttling, diff transport). Per-theme depth in [preview](docs/FEATURES/PREVIEW.md) (incl. link hover previews), [rendering](docs/FEATURES/RENDERING.md), [operations](docs/FEATURES/OPERATIONS.md), [security](docs/FEATURES/SECURITY.md).
+- [Roadmap](docs/ROADMAP/ROADMAP.md) — open items; [`docs/ROADMAP/DONE.md`](docs/ROADMAP/DONE.md) records what was built and why. [`docs/IDEAS/`](docs/IDEAS/) holds what is not planned.
 
 ---
 
