@@ -113,7 +113,17 @@ func main() {
 
 	registry := relay.NewRegistry()
 	navQueue := relay.NewNavQueue()
+	toggleQueue := relay.NewToggleQueue()
 	scrollBox := relay.NewScrollBox()
+
+	// In standalone mode the relay owns the file, so a checkbox toggle is
+	// applied here directly; the room key is the watched path in slash form
+	// (matches how the standalone URL/key is built). Empty in Neovim-driven
+	// mode, where toggles are queued for Neovim to apply to its buffer instead.
+	watchKey := ""
+	if standalone {
+		watchKey = filepath.ToSlash(watchPath)
+	}
 	mime.AddExtensionType(".wasm", "application/wasm")
 	fileServer := http.FileServer(http.Dir(*webRoot))
 
@@ -128,6 +138,7 @@ func main() {
 	mux.HandleFunc("/diff", handleDiff(registry, *token))
 	mux.HandleFunc("/close", handleClose(registry, *token))
 	mux.HandleFunc("/nav", handleNav(navQueue, *token))
+	mux.HandleFunc("/toggle", handleToggle(toggleQueue, watchKey, watchPath, *token))
 	mux.HandleFunc("/scrollback", handleScrollback(scrollBox, *token))
 	mux.HandleFunc("/clientlog", handleClientLog(*token))
 	mux.HandleFunc("/ws", handleWS(registry, *token, port))
@@ -610,6 +621,88 @@ func handleNav(queue *relay.NavQueue, token string) http.HandlerFunc {
 		default:
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		}
+	}
+}
+
+const maxToggleBodyBytes = 32 // "<line>:<0|1>"
+
+// handleToggle is the browser->source bridge for GFM task-list checkboxes. On
+// POST the browser sends "<line>:<0|1>" for a room — the 1-based source line of
+// the ticked checkbox and its new state. How it's applied depends on who owns
+// the document:
+//
+//   - standalone mode (watchKey != "" and it matches the room): the relay owns
+//     the file, so it flips the marker on that line in place. Its own watcher
+//     then re-broadcasts the changed file, so every tab reflects the new state.
+//   - Neovim-driven mode: the buffer may hold unsaved edits the relay must not
+//     clobber, so the toggle is queued and Neovim drains it (GET /toggle) and
+//     edits the buffer itself.
+//
+// Token-gated. A malformed body is rejected rather than guessed at.
+func handleToggle(queue *relay.ToggleQueue, watchKey, watchPath, token string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if !relay.ValidToken(token, r.URL.Query().Get("token")) {
+			http.Error(w, "forbidden", http.StatusForbidden)
+			return
+		}
+		switch r.Method {
+		case http.MethodGet:
+			// Neovim drains queued toggles (Neovim-driven mode only).
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(queue.Drain())
+		case http.MethodPost:
+			key := r.URL.Query().Get("key")
+			if key == "" {
+				http.Error(w, "missing key", http.StatusBadRequest)
+				return
+			}
+			body, err := io.ReadAll(io.LimitReader(r.Body, maxToggleBodyBytes))
+			if err != nil {
+				http.Error(w, "failed to read body", http.StatusBadRequest)
+				return
+			}
+			line, checked, ok := parseToggle(string(body))
+			if !ok {
+				http.Error(w, "invalid toggle payload", http.StatusBadRequest)
+				return
+			}
+
+			if watchKey != "" && key == watchKey {
+				// Standalone: apply straight to the watched file.
+				if err := source.ToggleCheckbox(watchPath, line, checked); err != nil {
+					fmt.Printf("[toggle] %s line %d: %v\n", watchPath, line, err)
+					http.Error(w, "toggle failed", http.StatusInternalServerError)
+					return
+				}
+			} else {
+				// Neovim-driven: hand it off for Neovim to apply to its buffer.
+				queue.Push(relay.ToggleRequest{Key: key, Line: line, Checked: checked})
+			}
+			w.WriteHeader(http.StatusNoContent)
+		default:
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	}
+}
+
+// parseToggle reads a "<line>:<0|1>" payload into a 1-based line and a boolean.
+func parseToggle(body string) (line int, checked bool, ok bool) {
+	body = strings.TrimSpace(body)
+	i := strings.IndexByte(body, ':')
+	if i <= 0 || i == len(body)-1 {
+		return 0, false, false
+	}
+	n, err := strconv.Atoi(body[:i])
+	if err != nil || n < 1 {
+		return 0, false, false
+	}
+	switch body[i+1:] {
+	case "1":
+		return n, true, true
+	case "0":
+		return n, false, true
+	default:
+		return 0, false, false
 	}
 }
 

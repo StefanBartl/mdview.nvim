@@ -123,6 +123,9 @@ Defaults: >lua
     breadcrumbs             = true, -- record session breadcrumbs
                                     -- (:MDView breadcrumbs)
 
+    sync_checkboxes         = true, -- ticking a task-list checkbox in the
+                                    -- preview writes back to the source
+
     open_preview_tab = false, -- :MDView start opens an nvim tab, not a browser
 
     browser = {
@@ -206,6 +209,15 @@ scroll_sync ~
 
 scroll_sync_throttle_ms ~
   Minimum time between scroll-position pings sent to the relay.
+
+sync_checkboxes ~
+  When `true` (default), ticking a GFM task-list checkbox (`- [ ]` / `- [x]`)
+  in the preview writes the change back to the source: |:MDView-standalone|
+  rewrites the file in the relay, |:MDView-start| edits the buffer (polled via
+  the browser->Neovim bridge, since Neovim has no WebSocket client). Only the
+  one marker character changes — indentation, bullet style and text are
+  preserved. Set `false` to render checkboxes read-only and, in start mode,
+  stop that poll.
 
 open_preview_tab ~
   When `true`, |:MDView-start| opens an nvim-tab preview (see

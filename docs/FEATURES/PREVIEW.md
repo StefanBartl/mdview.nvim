@@ -133,6 +133,30 @@ protocol-relative paths are left to the browser untouched; modifier-clicks
 - **Module:** `src/client/render/clickNav.ts`, `native/server/internal/relay/nav.go`
 - **Config:** `experimental.click_navigate` (default `true` — the one `experimental.*` flag on by default)
 
+## Task-list checkbox sync
+
+Ticking a GFM task-list checkbox (`- [ ]` / `- [x]`) in the preview writes the
+change back to the source, so it persists instead of reverting on the next
+re-render. comrak already emits the checkbox with `data-sourcepos` on its list
+item, so the client knows the exact source line; on toggle it POSTs
+`<line>:<0|1>` to the relay's `/toggle` bridge. How that's applied depends on
+who owns the document:
+
+- **Standalone** (`:MDView standalone`, `mdview-server --watch`): the relay owns
+  the file, so it flips just that one marker character in place and its watcher
+  re-broadcasts — every open tab updates.
+- **`:MDView start`**: the buffer may hold unsaved edits the relay must not
+  clobber, so the toggle is queued and Neovim drains it (via the same inbound
+  poller as click-to-navigate) and edits the buffer itself, then pushes.
+
+Only the one marker character changes — indentation, bullet style (`-`/`*`/`+`),
+line ending and the item text are all preserved. A line that no longer holds a
+task marker (a re-render racing a rapid edit) is left untouched rather than
+corrupted.
+
+- **Module:** `src/client/render/taskToggle.ts`, `native/server/internal/source/toggle.go`, `native/server/internal/relay/toggle.go`, `/toggle` route in `native/server/main.go`; `:MDView start` buffer edit in `lua/mdview/adapter/inbound_poll.lua`
+- **Config:** `sync_checkboxes` (default `true`; `false` renders checkboxes read-only and, in start mode, stops the browser→Neovim poll)
+
 ## Standalone preview (outlives Neovim)
 
 `:MDView standalone [file] [--no-browser]` hands the file to the relay

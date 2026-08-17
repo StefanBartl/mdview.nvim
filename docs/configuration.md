@@ -22,6 +22,7 @@ Partial nested overrides merge recursively — `{ browser = { browser = "firefox
 | `scroll_sync` | `true` | Sync the nvim cursor position to the browser scroll position (line-accurate via comrak sourcepos). |
 | `scroll_sync_mode` | `"top"` | Where the cursor line lands in the browser viewport: `"top"` (near the top; `scroll_sync_top_offset` = fraction down, `0` = glued to top) or `"cursor"` (mirror — same relative height as the cursor in the nvim window). |
 | `open_preview_tab` | `false` | Render into a read-only Neovim tab (Treesitter-highlighted) instead of the browser. |
+| `sync_checkboxes` | `true` | Ticking a task-list checkbox in the preview writes `[ ]`↔`[x]` back to the source (standalone rewrites the file; `:MDView start` edits the buffer via the browser→Neovim poll). `false` renders checkboxes read-only. See [Preview](FEATURES/PREVIEW.md#task-list-checkbox-sync). |
 | `browser.open_mode` | `"default"` | `"default"` opens a tab in your normal browser (your extensions/theme; auto-close via a cooperative `window.close()` on stop). `"isolated"` spawns a throwaway profile so process-handle auto-close works. |
 | `browser.behavior` | `"reuse"` | What happens when you switch markdown buffers: `"reuse"` (the one tab follows the active buffer), `"new_tab"` (each file opens its own tab), or `"manual"` (nothing; use `:MDView open`). |
 | `browser.theme` | `"github"` | Preview theme: `github`, `dark-dimmed`, `plain`, `tokyonight`, or `catppuccin` — optionally suffixed `-light`/`-dark` to pin the color scheme. |

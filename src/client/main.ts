@@ -17,6 +17,7 @@ import { resolveLocalImages } from './render/localImages';
 import { installLinkHover } from './render/linkHover';
 import { updateCursorMarker, parseCursorMarkerMode } from './render/cursorMarker';
 import { applyBlankLineSpacing, parseBlankLines } from './render/blankLines';
+import { enableTaskCheckboxes, installTaskToggle } from './render/taskToggle';
 import {
   initOverlays,
   setOverlay,
@@ -256,6 +257,27 @@ async function boot() {
     });
   }
 
+  // Task-list checkbox sync: ticking a `- [ ]` in the preview POSTs its source
+  // line + new state to /toggle, which rewrites the source (standalone) or has
+  // Neovim edit the buffer (start mode). The change comes back via the push
+  // path, so the box stays as set because the document now agrees. Delegated on
+  // container (survives innerHTML swaps); enableTaskCheckboxes runs per render.
+  const taskSyncEnabled = params.get('sync') !== '0';
+  if (container && taskSyncEnabled) {
+    installTaskToggle(container, (line: number, checked: boolean) => {
+      clientLog(`toggle: line ${line} -> ${checked ? 'checked' : 'unchecked'}`);
+      try {
+        void fetch(`/toggle?token=${encodeURIComponent(token)}&key=${encodeURIComponent(key)}`, {
+          method: 'POST',
+          body: `${line}:${checked ? 1 : 0}`,
+          keepalive: true,
+        });
+      } catch {
+        /* toggle is best-effort */
+      }
+    });
+  }
+
   // Link hover previews — the browser counterpart to markdown.nvim's
   // in-editor hover. Installed once rather than per render: the listeners are
   // delegated on `container`, which survives the innerHTML swap inside
@@ -349,6 +371,10 @@ async function boot() {
       notifyOverlayRender();
       // innerHTML above also wiped any blank-line spacers — reinsert them.
       applyBlankLineSpacing(container, blankLinesEnabled);
+      // comrak emits task-list checkboxes disabled; re-enable them each render
+      // so they stay clickable (the delegated change handler is installed once).
+      // Skipped when sync is off (?sync=0) — then they stay read-only.
+      if (taskSyncEnabled) enableTaskCheckboxes(container);
       if (firstRender) {
         firstRender = false;
         clientLog(`first render ok (${text.length} bytes)`);
