@@ -39,7 +39,15 @@ function M.path_for_url(path)
 	if not path then
 		return nil
 	end
-	return vim.uri_encode(unify_slashes(tostring(path)))
+	-- rfc2396, NOT the default: the default mode leaves ":" and "/" unencoded,
+	-- so a Windows path stays "C:/Users/...". Windows' rundll32
+	-- FileProtocolHandler (how :MDView start opens the default browser) then
+	-- treats the embedded "C:" as a drive/file reference and never opens the
+	-- URL — the exact reason the browser tab silently failed to appear while
+	-- :MDView standalone (whose Go side url.QueryEscape's the key) worked. Both
+	-- forms decode back to the same path server-side, so the relay room key is
+	-- unchanged; this only removes the bare "C:" from the emitted URL.
+	return vim.uri_encode(unify_slashes(tostring(path)), "rfc2396")
 end
 
 return M
