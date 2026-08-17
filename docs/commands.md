@@ -22,6 +22,13 @@ mdview.nvim registers a single `:MDView <subcommand>` command (built via
 | `:MDView file-log status` | Report persistent file logging state without changing anything. |
 | `:MDView file-log path [value]` | Set the file log path (`value` is a path or `default`); omit `value` to report the current path. |
 | `:MDView diagnose [path]` | Write a full component-state diagnostics report to a file and open it. |
+| `:MDView cursor [line\|caret\|section\|off\|toggle]` | Set/toggle how the Neovim cursor is marked in the preview; no argument reports the current mode. See [PREVIEW.md](FEATURES/PREVIEW.md#neovim-cursor-marker). |
+| `:MDView sync [pause\|resume\|toggle]` | Pause/resume Neovim → browser scroll sync (and the cursor marker) without tearing down the session. See [PREVIEW.md](FEATURES/PREVIEW.md#scroll-sync-pauseresume). |
+| `:MDView zoom [+\|-\|reset\|<factor>]` | Adjust the preview's font-size scale; no argument reports the current zoom. See [PREVIEW.md](FEATURES/PREVIEW.md#preview-zoom). |
+| `:MDView overlay <name> [on\|off\|toggle]` / `:MDView overlay list` | Mount/unmount a named overlay on the preview, or list known overlays and their state. See [PREVIEW.md](FEATURES/PREVIEW.md#overlays-floating-table-of-contents). |
+| `:MDView breadcrumbs` / `breadcrumbs export [path]` / `breadcrumbs clear` | Report, export, or clear the session's visited-section outline. See [PREVIEW.md](FEATURES/PREVIEW.md#breadcrumbs-session-outline). |
+| `:MDView reveal [on\|off\|toggle]` | Reveal/hide private (fenced) blocks in the preview; no argument toggles. See [RENDERING.md](FEATURES/RENDERING.md#private-blocks). |
+| `:MDView blanklines [on\|off\|toggle]` | Toggle blank-line handling in rendered output. See [RENDERING.md](FEATURES/RENDERING.md#blank-line-handling). |
 
 File logging is opt-in and off by default — nothing is written to disk until
 you run `:MDView file-log on`.
