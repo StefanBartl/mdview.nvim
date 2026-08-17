@@ -157,6 +157,34 @@ corrupted.
 - **Module:** `src/client/render/taskToggle.ts`, `native/server/internal/source/toggle.go`, `native/server/internal/relay/toggle.go`, `/toggle` route in `native/server/main.go`; `:MDView start` buffer edit in `lua/mdview/adapter/inbound_poll.lua`
 - **Config:** `sync_checkboxes` (default `true`; `false` renders checkboxes read-only and, in start mode, stops the browser→Neovim poll)
 
+## Text field sync
+
+The same idea extended to editable text fields. Writing a raw-HTML field in the
+Markdown source with a `name`:
+
+```html
+Title: <input type="text" name="title">
+
+<textarea name="notes" rows="4">initial content</textarea>
+```
+
+renders it editable; committing an edit (blur / Enter — **not** every keystroke,
+so a re-render never yanks the field out from under you while typing) writes the
+value back to the source. Because raw HTML carries no `data-sourcepos` (unlike a
+GFM task item), the field can't be located by line — instead it's matched by its
+`name` attribute: the relay/Neovim scans the source for `name="…"` and rewrites
+just that `<input>`'s `value` or that `<textarea>`'s body. The value is
+HTML-escaped on the way in, so it round-trips and can't break out of the tag or
+inject markup (`</textarea><script>` becomes inert escaped text).
+
+`name` must be unique within the document (it's the anchor). Only double-quoted
+`name="…"` is recognized. The sanitizer permits `<input>` `name`/`value`/
+`placeholder` and `<textarea>` `name`/`placeholder`/`rows`/`cols` — never
+`formaction`, `form`, or any `on*` handler, so a hostile field still can't act.
+
+- **Module:** `src/client/render/fieldSync.ts`, `native/server/internal/source/field.go`, `native/server/internal/relay/field.go`, `/field` route in `native/server/main.go`; `:MDView start` buffer edit in `lua/mdview/adapter/inbound_poll.lua`; sanitizer allowlist in `native/wasm-render/src/lib.rs`
+- **Config:** `sync_fields` (default `true`; `false` renders these fields read-only)
+
 ## Standalone preview (outlives Neovim)
 
 `:MDView standalone [file] [--no-browser]` hands the file to the relay

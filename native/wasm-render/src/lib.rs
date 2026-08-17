@@ -122,10 +122,13 @@ fn transform_private_blocks<'a>(root: &'a AstNode<'a>, inner_options: &Options) 
 /// so nothing dangerous (e.g. `formaction`) gets through.
 fn sanitizer() -> ammonia::Builder<'static> {
     let mut builder = ammonia::Builder::default();
-    // `input` for task-list checkboxes; `span` for the inline source-position
-    // wrappers (annotate_source_positions); `div` for private blocks
-    // (transform_private_blocks). None carry any executable surface.
-    builder.add_tags(["input", "span", "div"].iter().copied());
+    // `input` for task-list checkboxes AND (with a `name`) syncable text
+    // fields; `textarea` for syncable multi-line fields; `span` for the inline
+    // source-position wrappers (annotate_source_positions); `div` for private
+    // blocks (transform_private_blocks). None carry any executable surface —
+    // no form is submitted, and the per-attribute allowlist below keeps
+    // dangerous attributes (formaction, on*) off `input`/`textarea`.
+    builder.add_tags(["input", "textarea", "span", "div"].iter().copied());
 
     // Keep our source-position hints on every element so the client can do
     // line-accurate scroll sync (data-sourcepos, on blocks) and column-accurate
@@ -134,11 +137,27 @@ fn sanitizer() -> ammonia::Builder<'static> {
     // can't be used to inject script.
     builder.add_generic_attributes(["data-sourcepos", "data-sp", "data-private"].iter().copied());
 
+    // `type`/`checked`/`disabled` for checkboxes; `name`/`value`/`placeholder`
+    // for syncable text inputs. All inert data — crucially NOT `formaction`,
+    // `form`, or any `on*` handler, so a hostile `<input>` still can't act.
     let mut input_attrs = HashSet::new();
     input_attrs.insert("type");
     input_attrs.insert("checked");
     input_attrs.insert("disabled");
+    input_attrs.insert("name");
+    input_attrs.insert("value");
+    input_attrs.insert("placeholder");
     builder.add_tag_attributes("input", input_attrs);
+
+    // Syncable multi-line fields. The parser treats a <textarea>'s content as
+    // raw text, so `<textarea><script></textarea>` is inert text, not a script
+    // node; only inert layout/label attributes are allowed.
+    let mut textarea_attrs = HashSet::new();
+    textarea_attrs.insert("name");
+    textarea_attrs.insert("placeholder");
+    textarea_attrs.insert("rows");
+    textarea_attrs.insert("cols");
+    builder.add_tag_attributes("textarea", textarea_attrs);
 
     // comrak emits `class="language-xxx"` on a fenced code block's <code>
     // element; ammonia's default allowlist has no attributes at all for
@@ -273,6 +292,42 @@ mod tests {
             false,
         );
         assert!(!html.contains("formaction"));
+        assert!(!html.contains("onfocus"));
+        assert!(!html.contains("alert(1)"));
+    }
+
+    #[test]
+    fn keeps_syncable_text_input_value_and_name() {
+        // A named text input keeps name/value/placeholder so field sync can map
+        // and seed it.
+        let html = render_markdown(
+            "<input type=\"text\" name=\"title\" value=\"hi\" placeholder=\"p\">",
+            false,
+        );
+        assert!(html.contains("name=\"title\""));
+        assert!(html.contains("value=\"hi\""));
+        assert!(html.contains("placeholder=\"p\""));
+    }
+
+    #[test]
+    fn keeps_textarea_with_name_and_content() {
+        // <textarea> now survives (was stripped before) with its text content.
+        let html = render_markdown("<textarea name=\"notes\">line one</textarea>", false);
+        assert!(html.contains("<textarea"));
+        assert!(html.contains("name=\"notes\""));
+        assert!(html.contains("line one"));
+    }
+
+    #[test]
+    fn textarea_content_is_inert() {
+        // A <script> inside a <textarea> is parsed as text, never a script node.
+        let html = render_markdown("<textarea name=\"x\"><script>alert(1)</script></textarea>", false);
+        assert!(!html.contains("<script>"));
+    }
+
+    #[test]
+    fn strips_dangerous_textarea_attributes() {
+        let html = render_markdown("<textarea name=\"x\" onfocus=\"alert(1)\"></textarea>", false);
         assert!(!html.contains("onfocus"));
         assert!(!html.contains("alert(1)"));
     }

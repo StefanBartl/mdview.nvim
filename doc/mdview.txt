@@ -125,6 +125,8 @@ Defaults: >lua
 
     sync_checkboxes         = true, -- ticking a task-list checkbox in the
                                     -- preview writes back to the source
+    sync_fields             = true, -- editing an <input name>/<textarea name>
+                                    -- in the preview writes its value back
 
     open_preview_tab = false, -- :MDView start opens an nvim tab, not a browser
 
@@ -218,6 +220,16 @@ sync_checkboxes ~
   one marker character changes — indentation, bullet style and text are
   preserved. Set `false` to render checkboxes read-only and, in start mode,
   stop that poll.
+
+sync_fields ~
+  When `true` (default), editing a raw-HTML text field written in the source
+  with a `name` (`<input type="text" name="x">` or `<textarea name="y">`) and
+  committing it (blur/Enter) writes its value back to the source. Raw HTML has
+  no source position, so the field is located by its `name` attribute rather
+  than by line — `name` must be unique per document, double-quoted. The value
+  is HTML-escaped, so it can't break out of the tag. |:MDView-standalone|
+  rewrites the file; |:MDView-start| edits the buffer. Set `false` to render
+  such fields read-only.
 
 open_preview_tab ~
   When `true`, |:MDView-start| opens an nvim-tab preview (see
