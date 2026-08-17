@@ -14,6 +14,7 @@ import { installClickNav } from './render/clickNav';
 import { pickScrollTarget, fractionInBlock, hasSourcepos } from './render/scrollSync';
 import { markExternalLinks, parseExternalLinkMode } from './render/externalLinks';
 import { resolveLocalImages } from './render/localImages';
+import { installLinkHover } from './render/linkHover';
 import { updateCursorMarker, parseCursorMarkerMode } from './render/cursorMarker';
 import { applyBlankLineSpacing, parseBlankLines } from './render/blankLines';
 import {
@@ -253,6 +254,14 @@ async function boot() {
       clientLog(`nav: ${target}`);
       navigateTo(target);
     });
+  }
+
+  // Link hover previews — the browser counterpart to markdown.nvim's
+  // in-editor hover. Installed once rather than per render: the listeners are
+  // delegated on `container`, which survives the innerHTML swap inside
+  // renderMarkdown. Opt-out via ?hover=0.
+  if (container && params.get('hover') !== '0') {
+    installLinkHover(container, { key, token });
   }
 
   // Browser Back/Forward: Neovim announces the current document (\x04 ping) so
