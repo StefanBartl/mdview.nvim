@@ -1,6 +1,6 @@
 > ⚠️ **VERALTET / verworfen.** Beschreibt eine Transport-Abstraktion mit
 > `dev-config.ts` / `webtransport.transport.ts` (beide gelöscht). WebTransport
-> wurde nicht umgesetzt (siehe `Roadmap.md` BUGS #3). Nur Historie.
+> wurde nicht umgesetzt (siehe `../../DONE.md` BUGS #3). Nur Historie.
 
 ---
 

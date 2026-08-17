@@ -12,7 +12,7 @@
 --- Every outgoing channel needs this SAME rule (content push, scroll/cursor
 --- sync, live-control) — previously duplicated ad hoc per module, which let
 --- scroll_sync.lua drift out of sync and silently target the wrong room after
---- a buffer switch in "reuse" mode (see Roadmap.md BUGS).
+--- a buffer switch in "reuse" mode (see DONE.md BUGS).
 
 local normalize = require("mdview.helper.normalize")
 

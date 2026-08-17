@@ -50,7 +50,7 @@ end
 
 -- Naive line-diff (finds first/last differing line only, no LCS). Dormant —
 -- not on the current live-push path (see core/events.lua's module docstring
--- and docs/Roadmap/Roadmap.md); utils/diff_granular.lua has a proper Myers
+-- and docs/ROADMAP/DONE.md); utils/diff_granular.lua has a proper Myers
 -- LCS-based diff ready to swap in if this transport is reactivated.
 --
 -- Compute a lightweight diff between cached lines and new lines.

@@ -2,7 +2,7 @@
 -- Sends the cursor's current line (and total line count) to the relay on
 -- CursorMoved/CursorMovedI, throttled, so the browser preview can scroll to
 -- follow — the nvim-to-browser half of bidirectional scrolling (see
--- docs/Roadmap/Roadmap.md's bonus features). Gated behind
+-- docs/ROADMAP/DONE.md's bonus features). Gated behind
 -- mdview.config.defaults.scroll_sync (default true).
 
 local api = vim.api
@@ -77,7 +77,7 @@ function M.send_current_position(bufnr)
 	-- Route to the room the open tab actually watches (browser.behavior
 	-- "reuse" follows the active buffer via state.preview_key, so a scroll
 	-- ping to the buffer's own path after switching buffers would land in a
-	-- room nobody's listening to — see target_key.lua and Roadmap.md BUGS).
+	-- room nobody's listening to — see target_key.lua and DONE.md BUGS).
 	local target = target_key.resolve(bufnr)
 	if not target or target == "" then
 		return

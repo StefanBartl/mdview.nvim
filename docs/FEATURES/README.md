@@ -2,8 +2,14 @@
 
 mdview.nvim is a browser-based live Markdown preview: a Go relay streams raw
 buffer text over WebSocket, and a Rust module compiled to WebAssembly renders
-and sanitizes it entirely inside the browser tab. Four themes, roughly
-following the four places a feature actually lives:
+and sanitizes it entirely inside the browser tab.
+
+**Start here: [FEATURES.md](FEATURES.md)** — the complete catalog, covering
+both what a user operates and the machinery underneath (caches, throttling,
+the diff transport, lifecycle rules). The four theme files below go into
+depth on the big areas, in the
+[`FEATURES_FORMAT`](https://github.com/StefanBartl/documentation.nvim/blob/main/docs/FEATURES_FORMAT.md)
+shape (`## feature`, then `- **Key:** value` metadata):
 
 - [PREVIEW.md](PREVIEW.md) — getting a document on screen and keeping it in
   sync: starting/stopping a session, live push, scroll sync, standalone mode,
@@ -22,3 +28,8 @@ See [docs/commands.md](../commands.md) / [docs/BINDINGS.md](../BINDINGS.md)
 for the full `:MDView` subcommand reference and
 [docs/architecture.md](../architecture.md) for how the four components
 (Lua/Go/TypeScript/Rust) fit together.
+
+Neighbouring folders: [`../ROADMAP/ROADMAP.md`](../ROADMAP/ROADMAP.md) (open
+items), [`../ROADMAP/DONE.md`](../ROADMAP/DONE.md) (why things were built the
+way they were), [`../IDEAS/`](../IDEAS/) (nothing planned, kept so it is not
+lost).

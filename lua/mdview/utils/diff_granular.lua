@@ -4,7 +4,7 @@
 --
 -- Used by core/events.lua (dormant) and core/state.lua's compute_line_diff
 -- sibling; not on the current live-push path (see core/events.lua's module
--- docstring and docs/Roadmap/Roadmap.md — the client WASM renderer needs
+-- docstring and docs/ROADMAP/DONE.md — the client WASM renderer needs
 -- whole-document context, so line-diff transport is deferred, not gone).
 
 ---@param old_lines string[]|nil previous lines

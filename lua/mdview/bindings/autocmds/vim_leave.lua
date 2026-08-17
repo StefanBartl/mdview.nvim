@@ -5,7 +5,7 @@
 -- fires; a `pattern = defaults.ft_pattern` here previously meant the relay
 -- process was only stopped if the *last-focused* buffer happened to be
 -- markdown, orphaning the process whenever Neovim was quit from any other
--- buffer (confirmed and fixed — see docs/Roadmap/Roadmap.md).
+-- buffer (confirmed and fixed — see docs/ROADMAP/DONE.md).
 
 local autocmds_registry = require("mdview.helper.autocmds_registry")
 local nvim_create_autocmd = vim.api.nvim_create_autocmd
