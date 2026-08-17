@@ -190,3 +190,52 @@ the same preview machinery with a different producer, not a second
 implementation.
 
 - **Module:** `native/server/internal/relay/registry.go`
+
+## Link hover previews
+
+Hover a link in the preview tab and a small popup shows what it points at —
+the browser counterpart to markdown.nvim's in-editor hover, so both surfaces
+answer the same question the same way.
+
+| Target | Popup shows |
+| --- | --- |
+| Image | The picture, via the existing `/asset` route |
+| Markdown / text (`.md`, `.markdown`, `.mdx`, `.txt`) | Its first lines, via `/preview` |
+| PDF | Name only — see below |
+| URL | Host, path and decoded query, parsed locally |
+| In-page anchor | The target heading and its first paragraphs, read from the rendered DOM |
+| Missing target | "target not found" |
+
+Disable it per session by appending `?hover=0` to the preview URL.
+
+**URLs are never fetched.** The popup parses the URL and shows its parts; it
+does not request the page. A hover that issued requests would disclose every
+link you brush past to its host — the same reasoning as markdown.nvim's
+`hover.url.fetch`, which is off by default for exactly this.
+
+**PDFs show a name only.** Rendering a page needs `pdfport.render_page`,
+which lives in Neovim, and the browser has no direct channel to it — only
+the 250 ms polling bridge. A round trip through it plus rasterization is
+about a second, and the resulting PNG lands in a temp directory that
+`/asset` deliberately cannot serve. See [`docs/ROADMAP.md`](../ROADMAP.md)
+for the pre-render approach that would solve this properly. The in-editor
+hover in markdown.nvim does render the page, because there pdfport is in the
+same process.
+
+- **Modules:** `src/client/render/linkHover.ts`, `native/server/main.go` (`handlePreview`)
+- **Route:** `GET /preview?key=…&path=…&token=…`
+
+### The `/preview` route
+
+Same security model as `/asset`, deliberately: token check, `key` resolving
+to a directory recorded by the trusted Neovim process (never client input),
+the client-supplied `path` clamped to that directory, and an extension
+allowlist. On top of those it caps bytes read (64 KiB) and lines returned
+(40), because unlike an image this response is text the client renders.
+
+Its allowlist is **its own, narrower one** rather than a reuse of `/asset`'s:
+`/asset` serves bytes a browser renders as a picture, `/preview` hands back
+file *contents*. Source files (`.lua`, `.ts`, `.json`, …) are excluded on
+purpose, so a bug in the containment check cannot become "the browser tab
+can read any code next to the document". Covered by
+`native/server/preview_test.go`.

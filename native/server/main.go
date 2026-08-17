@@ -123,6 +123,7 @@ func main() {
 	mux.HandleFunc("/scroll", handleScroll(registry, *token))
 	mux.HandleFunc("/doc", handleDoc(registry, *token))
 	mux.HandleFunc("/asset", handleAsset(registry, *token))
+	mux.HandleFunc("/preview", handlePreview(registry, *token))
 	mux.HandleFunc("/control", handleControl(registry, *token))
 	mux.HandleFunc("/diff", handleDiff(registry, *token))
 	mux.HandleFunc("/close", handleClose(registry, *token))
@@ -377,6 +378,134 @@ func handleAsset(registry *relay.Registry, token string) http.HandlerFunc {
 		}
 
 		http.ServeFile(w, r, resolved)
+	}
+}
+
+// previewExts is the extension allowlist for /preview. Deliberately its own,
+// narrower list rather than a reuse of assetExts: /asset serves bytes a
+// browser renders as a picture, /preview hands back file *contents* as text,
+// which is a materially bigger thing to get wrong. Markdown and plain text
+// only — source files are not included on purpose, so a preview bug cannot
+// turn into "the browser tab can read any code next to the document".
+var previewExts = map[string]bool{
+	".md": true, ".markdown": true, ".mdx": true, ".txt": true,
+}
+
+const (
+	// previewMaxBytes caps how much of a file is read at all: a hover shows
+	// a couple dozen lines, and a multi-GB file must not be slurped to find
+	// them.
+	previewMaxBytes = 64 << 10
+	// previewMaxLines caps what is returned, independent of byte size (one
+	// very long line is still one line).
+	previewMaxLines = 40
+)
+
+// previewResponse is the JSON body /preview returns. Shaped for the hover
+// popup in src/client/render/linkHover.ts.
+type previewResponse struct {
+	Name      string   `json:"name"`
+	Lines     []string `json:"lines"`
+	Truncated bool     `json:"truncated"`
+	Size      int64    `json:"size"`
+}
+
+// handlePreview returns the first lines of a markdown/text file next to the
+// currently-previewed document, so the browser tab can show a hover preview
+// of a relative link target without the client ever getting a general file
+// read.
+//
+// Same security model as handleAsset, and deliberately so: token check,
+// `key` resolving to a directory recorded by the trusted local Neovim
+// process (never client input), the client-supplied `path` clamped to that
+// directory, and an extension allowlist. On top of those it caps bytes read
+// and lines returned, because unlike an image this response is text the
+// client will render.
+func handlePreview(registry *relay.Registry, token string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		if !relay.ValidToken(token, r.URL.Query().Get("token")) {
+			http.Error(w, "forbidden", http.StatusForbidden)
+			return
+		}
+		key := r.URL.Query().Get("key")
+		reqPath := r.URL.Query().Get("path")
+		if key == "" || reqPath == "" {
+			http.Error(w, "missing key or path", http.StatusBadRequest)
+			return
+		}
+
+		ext := strings.ToLower(filepath.Ext(reqPath))
+		if !previewExts[ext] {
+			http.Error(w, "unsupported file type", http.StatusForbidden)
+			return
+		}
+
+		dir, ok := registry.DocDir(key)
+		if !ok {
+			http.Error(w, "no active document for this session", http.StatusNotFound)
+			return
+		}
+
+		resolved := filepath.Clean(filepath.Join(dir, reqPath))
+		if resolved != dir && !strings.HasPrefix(resolved, dir+string(filepath.Separator)) {
+			http.Error(w, "path escapes document directory", http.StatusForbidden)
+			return
+		}
+
+		info, err := os.Stat(resolved)
+		if err != nil || info.IsDir() {
+			http.Error(w, "not found", http.StatusNotFound)
+			return
+		}
+
+		f, err := os.Open(resolved)
+		if err != nil {
+			http.Error(w, "not found", http.StatusNotFound)
+			return
+		}
+		defer f.Close()
+
+		body := make([]byte, previewMaxBytes)
+		n, err := io.ReadFull(f, body)
+		if err != nil && err != io.EOF && err != io.ErrUnexpectedEOF {
+			http.Error(w, "read failed", http.StatusInternalServerError)
+			return
+		}
+		body = body[:n]
+
+		// Normalize CRLF so a Windows-authored file does not render stray
+		// carriage returns in the popup.
+		text := strings.ReplaceAll(string(body), "\r\n", "\n")
+		all := strings.Split(text, "\n")
+
+		truncated := int64(n) < info.Size()
+		lines := all
+		if len(lines) > previewMaxLines {
+			lines = lines[:previewMaxLines]
+			truncated = true
+		}
+		// A partial read almost certainly cut the last line mid-way; drop it
+		// rather than showing half a line as if it were whole.
+		if int64(n) == previewMaxBytes && len(lines) > 1 {
+			lines = lines[:len(lines)-1]
+		}
+
+		resp := previewResponse{
+			Name:      filepath.Base(resolved),
+			Lines:     lines,
+			Truncated: truncated,
+			Size:      info.Size(),
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Cache-Control", "no-store")
+		if err := json.NewEncoder(w).Encode(resp); err != nil {
+			http.Error(w, "encode failed", http.StatusInternalServerError)
+		}
 	}
 }
 
