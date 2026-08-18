@@ -33,20 +33,34 @@ local M = {}
 -- focus to whatever window was in front (i.e. Neovim's terminal): capture the
 -- foreground HWND, launch the browser, briefly wait for it to come up, then
 -- push focus back. Best-effort — window managers can override it.
+--
+-- Every part is guarded so opening the browser can never be skipped by the
+-- focus machinery: the HWND capture (Add-Type + P/Invoke, which can fail under a
+-- restrictive execution/AppLocker policy or a missing compiler) runs in a
+-- try/catch, the actual Start-Process comes BEFORE the focus-restore, and the
+-- restore is itself guarded. So a failed Add-Type just loses the focus-return,
+-- not the tab. This was the cause of "focus=nvim opens nothing on Windows":
+-- the old order threw in Add-Type and never reached Start-Process, invisibly
+-- (the script runs -WindowStyle Hidden).
 ---@internal
 ---@param url string
 ---@return string
 local function windows_focus_preserving_ps(url)
 	-- url is a loopback URL with only %-encoded query chars, so single-quoting is
-	-- safe. Kept on one line to pass cleanly as a single -Command argument.
+	-- safe. Kept on one line to pass cleanly as a single -File script.
 	return table.concat({
+		"$h=$null;",
+		"try{",
 		'$s=\'[DllImport("user32.dll")]public static extern System.IntPtr GetForegroundWindow();',
 		'[DllImport("user32.dll")]public static extern bool SetForegroundWindow(System.IntPtr h);\';',
 		"$w=Add-Type -MemberDefinition $s -Name Win -Namespace Mdv -PassThru;",
 		"$h=$w::GetForegroundWindow();",
+		"}catch{}",
+		-- Open the browser FIRST, unconditionally — this must happen even if the
+		-- focus capture above failed.
 		("Start-Process '%s';"):format(url),
-		"Start-Sleep -Milliseconds 600;",
-		"$w::SetForegroundWindow($h)|Out-Null",
+		-- Restore focus only if we captured a handle, and never let it throw.
+		"if($h){Start-Sleep -Milliseconds 600;try{$w::SetForegroundWindow($h)|Out-Null}catch{}}",
 	}, "")
 end
 
