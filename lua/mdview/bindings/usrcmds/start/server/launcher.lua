@@ -257,6 +257,11 @@ function M.start(opts)
 
 				local browser_url = resolve_browser_url({ browser_url = opts.browser_url, key = key })
 				log.debug("Opening browser: " .. browser_url, nil, "launcher", true)
+				-- Always surface the URL: if the OS opener silently fails to raise
+				-- a tab (browser config, focus mode, a stubborn default handler),
+				-- the user can still open the preview by hand. Also makes "did it
+				-- build the right URL?" answerable from the message alone.
+				notify("[mdview] preview: " .. browser_url, vim.log.levels.INFO)
 
 				-- Record which room the visible tab watches so the "reuse"
 				-- browser_behavior can route later buffers' content here.
