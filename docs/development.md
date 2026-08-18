@@ -133,8 +133,8 @@ MDVIEW_DEV_WEB_ROOT=/path/to/dist/client
 
 | Symptom | Cause |
 |---|---|
-| `failed to resolve mdview-server binary: dev.binary_path is not executable: <path>` | `dev.binary_path` points at something that isn't there — stale path, wrong drive, or `.exe` appended to a Go build that has no suffix. Overrides never fall back to the release. |
-| `failed to resolve mdview client bundle: dev.web_root is not a directory: <path>` | `dist/client` was never built (`npm run build`) or the path is stale. |
+| `dev.binary_path is not executable, ignoring it: <path>` (warning) | `dev.binary_path` points at something that isn't there — stale path, wrong drive, or a doubled path segment. It's now ignored (start falls back to the auto-detected checkout build / release), so the simplest fix is to just delete the override. |
+| `dev.web_root is not a directory, ignoring it: <path>` (warning) | Same as above for `dist/client` — stale path or never built. Ignored; delete the override and let auto-detection find the build. |
 | `'wasm-pack' is not recognized` | `cargo install wasm-pack` (and `rustup target add wasm32-unknown-unknown`). |
 | `Cannot find module './wasm-render/mdview_wasm_render.js'` | `build:client` ran without `build:wasm`. Use `npm run build`. |
 | `:MDView standalone` reports no `--watch` support | The relay is older than v0.3.0 — bump `install.version` or point `standalone.binary_path` at a local build. |

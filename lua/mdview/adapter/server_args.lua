@@ -6,6 +6,7 @@
 
 local install = require("mdview.adapter.install")
 local gen_token = require("mdview.helper.gen_token")
+local notify = require("lib.nvim.notify").create("").notify
 
 local M = {}
 
@@ -66,10 +67,12 @@ local function resolve_binary()
 	end
 	if type(override) == "string" and override ~= "" then
 		local path = vim.fn.expand(override)
-		if vim.fn.executable(path) ~= 1 then
-			return nil, "dev.binary_path is not executable: " .. path
+		if vim.fn.executable(path) == 1 then
+			return path, nil
 		end
-		return path, nil
+		-- A stale/typo'd override shouldn't brick start — warn and fall through
+		-- to the auto-detected build / release, which usually works.
+		notify(("[mdview] dev.binary_path is not executable, ignoring it: %q"):format(path), vim.log.levels.WARN)
 	end
 	local built = local_built_binary()
 	if built then
@@ -91,10 +94,10 @@ local function resolve_web_root()
 	end
 	if type(override) == "string" and override ~= "" then
 		local path = vim.fn.expand(override)
-		if vim.fn.isdirectory(path) ~= 1 then
-			return nil, "dev.web_root is not a directory: " .. path
+		if vim.fn.isdirectory(path) == 1 then
+			return path, nil
 		end
-		return path, nil
+		notify(("[mdview] dev.web_root is not a directory, ignoring it: %q"):format(path), vim.log.levels.WARN)
 	end
 	local built = local_built_web_root()
 	if built then
