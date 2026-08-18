@@ -18,10 +18,15 @@ export class WebSocketTransport implements Transport {
 
   // Initial-connect retry: ~200ms * 60 ≈ 12s of relay-startup tolerance, a bit
   // more than the Neovim side's readiness window, before giving up the *first*
-  // connection. Reconnects after a successful connect are unbounded but slow.
+  // connection. After a successful connect, a dropped socket reconnects with
+  // exponential backoff (1s → 2s → … capped at 30s) so a relay that has gone
+  // for good (e.g. Neovim quit) doesn't spin the console with a connection
+  // attempt every second forever — it settles to a quiet once-every-30s probe.
   private static readonly RETRY_MS = 200;
   private static readonly MAX_INITIAL_ATTEMPTS = 60;
-  private static readonly RECONNECT_MS = 1000;
+  private static readonly RECONNECT_MIN_MS = 1000;
+  private static readonly RECONNECT_MAX_MS = 30000;
+  private reconnectDelay = WebSocketTransport.RECONNECT_MIN_MS;
 
   constructor(private readonly url: string) {}
 
@@ -37,6 +42,7 @@ export class WebSocketTransport implements Transport {
 
         ws.onopen = () => {
           this.connectedOnce = true;
+          this.reconnectDelay = WebSocketTransport.RECONNECT_MIN_MS; // reset backoff
           console.log('[mdview] WebSocket connected:', this.url);
           resolve();
         };
@@ -48,21 +54,24 @@ export class WebSocketTransport implements Transport {
         ws.onclose = () => {
           if (this.closed) return;
           if (this.connectedOnce) {
-            // Lost an established connection — keep trying to get it back.
-            setTimeout(attempt, WebSocketTransport.RECONNECT_MS);
+            // Lost an established connection — back off, then try to get it back.
+            setTimeout(attempt, this.reconnectDelay);
+            this.reconnectDelay = Math.min(
+              this.reconnectDelay * 2,
+              WebSocketTransport.RECONNECT_MAX_MS,
+            );
           } else if (attempts < WebSocketTransport.MAX_INITIAL_ATTEMPTS) {
-            // Relay not up yet — retry the first connection.
+            // Relay not up yet — retry the first connection at a steady pace.
             setTimeout(attempt, WebSocketTransport.RETRY_MS);
           } else {
             reject(new Error(`[mdview] could not reach the relay at ${this.url} after ${attempts} attempts`));
           }
         };
 
-        // Let onclose drive retries: a failed connect fires error then close, so
-        // handling it in one place avoids double-scheduling.
-        ws.onerror = () => {
-          if (this.connectedOnce) console.error('[mdview] WebSocket error; will reconnect');
-        };
+        // onclose drives retries (a failed connect fires error then close), so
+        // nothing to do here — and no per-attempt console noise: the browser
+        // already logs each failed connection on its own.
+        ws.onerror = () => {};
       };
 
       attempt();
