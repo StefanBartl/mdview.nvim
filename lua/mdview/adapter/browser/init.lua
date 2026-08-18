@@ -29,25 +29,24 @@ local build_args_for_browser = require("mdview.adapter.browser.build_args_for_br
 
 local M = {}
 
--- PowerShell that opens `url` in the default browser but restores keyboard
--- focus to whatever window was in front (i.e. Neovim's terminal): capture the
--- foreground HWND, launch the browser, briefly wait for it to come up, then
--- push focus back. Best-effort — window managers can override it.
+-- PowerShell that (best-effort) returns keyboard focus to whatever window is in
+-- front right now — Neovim's terminal — after the browser tab comes up. It does
+-- NOT open the browser: the tab is always opened separately via rundll32 (see
+-- open_default), which no security policy on a normal Windows blocks. This
+-- script only captures the current foreground HWND, waits for the browser to
+-- appear, then pushes focus back.
 --
--- Every part is guarded so opening the browser can never be skipped by the
--- focus machinery: the HWND capture (Add-Type + P/Invoke, which can fail under a
--- restrictive execution/AppLocker policy or a missing compiler) runs in a
--- try/catch, the actual Start-Process comes BEFORE the focus-restore, and the
--- restore is itself guarded. So a failed Add-Type just loses the focus-return,
--- not the tab. This was the cause of "focus=nvim opens nothing on Windows":
--- the old order threw in Add-Type and never reached Start-Process, invisibly
--- (the script runs -WindowStyle Hidden).
+-- Decoupling the open from this is deliberate: earlier versions opened the tab
+-- from inside PowerShell, so on a machine where PowerShell is locked down
+-- (execution policy / AppLocker) or Add-Type can't compile, the tab never
+-- opened at all — the "focus=nvim opens nothing" bug. Now the worst case is
+-- simply that focus stays on the browser; the tab is unaffected.
+--
+-- Fired just before the open so the foreground it captures is Neovim, not the
+-- browser.
 ---@internal
----@param url string
 ---@return string
-local function windows_focus_preserving_ps(url)
-	-- url is a loopback URL with only %-encoded query chars, so single-quoting is
-	-- safe. Kept on one line to pass cleanly as a single -File script.
+local function windows_focus_restore_ps()
 	return table.concat({
 		"$h=$null;",
 		"try{",
@@ -55,12 +54,10 @@ local function windows_focus_preserving_ps(url)
 		'[DllImport("user32.dll")]public static extern bool SetForegroundWindow(System.IntPtr h);\';',
 		"$w=Add-Type -MemberDefinition $s -Name Win -Namespace Mdv -PassThru;",
 		"$h=$w::GetForegroundWindow();",
+		-- Wait for the browser (opened in parallel) to grab focus, then take it back.
+		"Start-Sleep -Milliseconds 700;",
+		"if($h){$w::SetForegroundWindow($h)|Out-Null}",
 		"}catch{}",
-		-- Open the browser FIRST, unconditionally — this must happen even if the
-		-- focus capture above failed.
-		("Start-Process '%s';"):format(url),
-		-- Restore focus only if we captured a handle, and never let it throw.
-		"if($h){Start-Sleep -Milliseconds 600;try{$w::SetForegroundWindow($h)|Out-Null}catch{}}",
 	}, "")
 end
 
@@ -86,19 +83,27 @@ local function open_default(url, focus)
 	-- argument, so `&` is preserved (verified: the full query string arrives).
 	local cmd
 	if fn.has("win32") == 1 then
+		-- The tab is ALWAYS opened via rundll32's FileProtocolHandler — it takes
+		-- the URL as a single non-shell-interpreted argument (so `&` survives,
+		-- unlike cmd.exe's `start`), and no execution/AppLocker policy blocks it.
+		-- focus="nvim" no longer changes HOW the tab opens (that was the bug: a
+		-- locked-down PowerShell open silently opened nothing); it only fires an
+		-- extra, best-effort PowerShell that returns focus to Neovim afterwards.
+		-- If that PowerShell can't run, the tab is already open — focus just
+		-- stays on the browser.
 		if keep_nvim then
-			-- Pass the script as a temp .ps1 via -File, NOT as -Command: Neovim's
-			-- jobstart builds the Windows command line with its own quoting, which
-			-- mangles a complex inline script (the DllImport quotes/semicolons), so
-			-- -Command silently fails and nothing opens. -File takes a plain path.
 			local tmp = fn.tempname() .. ".ps1"
-			local script = windows_focus_preserving_ps(url)
-				.. (";Remove-Item -LiteralPath '%s' -ErrorAction SilentlyContinue"):format(tmp)
 			local f = io.open(tmp, "w")
 			if f then
-				f:write(script)
+				f:write(
+					windows_focus_restore_ps()
+						.. (";Remove-Item -LiteralPath '%s' -ErrorAction SilentlyContinue"):format(tmp)
+				)
 				f:close()
-				cmd = {
+				-- Fired BEFORE the open below so it captures Neovim as the
+				-- foreground window. Best-effort: a failure here never affects the
+				-- tab, which opens via rundll32 regardless.
+				pcall(fn.jobstart, {
 					"powershell",
 					"-NoProfile",
 					"-ExecutionPolicy",
@@ -107,14 +112,10 @@ local function open_default(url, focus)
 					"Hidden",
 					"-File",
 					tmp,
-				}
-			else
-				-- couldn't stage the script — fall back to opening normally
-				cmd = { "rundll32.exe", "url.dll,FileProtocolHandler", url }
+				}, { detach = true })
 			end
-		else
-			cmd = { "rundll32.exe", "url.dll,FileProtocolHandler", url }
 		end
+		cmd = { "rundll32.exe", "url.dll,FileProtocolHandler", url }
 	elseif fn.has("mac") == 1 then
 		-- `open -g` opens without bringing the browser to the foreground.
 		cmd = keep_nvim and { "open", "-g", url } or { "open", url }
