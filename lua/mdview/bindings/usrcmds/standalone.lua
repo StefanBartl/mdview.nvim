@@ -147,7 +147,6 @@ function M.run(file_arg, no_browser)
 			return
 		end
 
-
 		local web_root, web_err = install.ensure_client_bundle()
 		if not web_root then
 			notify("[mdview] standalone: " .. tostring(web_err), vim.log.levels.ERROR)
