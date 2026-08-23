@@ -5,7 +5,7 @@
 
 local api = vim.api
 local session = require("mdview.core.session")
-local safe_buf_get_option = require("mdview.helper.safe_buf_get_option")
+local previewable = require("mdview.helper.previewable")
 local copy_lines = require("mdview.helper.copy_lines")
 local normalize = require("mdview.helper.normalize")
 local log = require("mdview.helper.log")
@@ -19,9 +19,7 @@ local M = {}
 ---@param bufnr integer
 ---@return nil
 local function on_buf_enter(bufnr)
-	-- check filetype quickly
-	local ft = safe_buf_get_option(bufnr, "filetype") or ""
-	if ft ~= "markdown" and ft ~= "md" then
+	if not previewable.is(bufnr) then
 		return
 	end
 

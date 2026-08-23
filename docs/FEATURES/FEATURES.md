@@ -130,6 +130,28 @@ werden. Voll-Snapshots bleiben der Normalweg; der Diff-Pfad ist opt-in.
 - **Vorsicht:** Ein Diff, der auf einem anderen Basiszustand aufsetzt als der
   Client hat, rendert Unsinn — deshalb der Envelope mit Resync-Pfad.
 
+## Plain-Text-Vorschau für Nicht-Markdown-Dateien (experimentell)
+
+Mit `experimental.any_file` weitet `mdview.config.merge()` `ft_pattern` auf
+`{"*"}` — die Neovim-Glob-Ebene feuert dann für jeden benannten Buffer.
+`helper/previewable.lua` ist das eigentliche Gate danach (buftype leer,
+benannt, nicht binär, nicht mdviews eigener Log-Buffer); ohne
+`experimental.any_file` verlangt es zusätzlich `filetype == "markdown"/"md"`
+wie bisher. Der Client rendert eine Nicht-Markdown-Datei nicht durch den
+WASM-Renderer, sondern als einen einzigen, per Dateiendung eingefärbten
+Code-Block (dieselbe `<pre><code class="language-x">`-Form, die comrak für
+Fences erzeugt — kostenlos themed über `_base.css`, kostenlos gehighlightet
+über den bestehenden hljs/shiki-Dispatcher).
+
+- **Modul:** `lua/mdview/helper/previewable.lua`; Client:
+  `src/client/render/fileKind.ts`, `src/client/highlight/languageForPath.ts`,
+  `src/client/render/plainText.ts`
+- **Config:** `experimental.any_file` (default aus)
+- **Vorsicht:** Kein `data-sourcepos` für diese Dateien — Scroll-Sync fällt
+  auf die bestehende proportionale Schätzung zurück (siehe
+  `main.ts`'s `applyScrollPing`-Fallback), die Cursor-Zeilenleiste zeigt sich
+  nicht. Zeilengenaue Parität mit Markdown ist ein möglicher Folgeschritt.
+
 ## Dokumentmodell im Client
 
 Ein gemeinsames Modell statt drei eigener Parser: Top-Level-Blöcke mit

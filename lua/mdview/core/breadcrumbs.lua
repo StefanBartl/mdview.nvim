@@ -46,15 +46,11 @@ local function nearest_heading(bufnr, line)
 end
 
 --- Record the cursor's current document + heading, if it changed since the last
---- entry. No-op for non-markdown or unnamed buffers.
+--- entry. No-op for buffers mdview isn't previewing (see helper/previewable).
 ---@param bufnr integer
 ---@return boolean recorded
 function M.record(bufnr)
-	local ok, ft = pcall(function()
-		return require("mdview.helper.safe_buf_get_option")(bufnr, "filetype")
-	end)
-	ft = ok and ft or ""
-	if ft ~= "markdown" and ft ~= "md" then
+	if not require("mdview.helper.previewable").is(bufnr) then
 		return false
 	end
 
@@ -70,7 +66,17 @@ function M.record(bufnr)
 		line = pos[1]
 	end
 
-	local heading = nearest_heading(bufnr, line) or "(top)"
+	-- ATX heading scan only makes sense for actual Markdown: under
+	-- experimental.any_file, `#` is a plain comment marker in Python/Ruby/
+	-- Shell/etc., so scanning for it there would misdetect comment lines as
+	-- headings. Everything else just gets "(top)".
+	local ok_ft, ft = pcall(function()
+		return require("mdview.helper.safe_buf_get_option")(bufnr, "filetype")
+	end)
+	ft = ok_ft and ft or ""
+	local is_markdown = ft == "markdown" or ft == "md"
+
+	local heading = (is_markdown and nearest_heading(bufnr, line)) or "(top)"
 	if doc == M._last_doc and heading == M._last_heading then
 		return false
 	end

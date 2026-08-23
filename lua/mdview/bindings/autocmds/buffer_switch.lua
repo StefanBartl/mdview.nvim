@@ -13,7 +13,7 @@ local api = vim.api
 local ws_client = require("mdview.adapter.ws_client")
 local state = require("mdview.core.state")
 local normalize = require("mdview.helper.normalize")
-local safe_buf_get_option = require("mdview.helper.safe_buf_get_option")
+local previewable = require("mdview.helper.previewable")
 local log = require("mdview.helper.log")
 local defaults = require("mdview.config").defaults
 local autocmd_registry = require("mdview.helper.autocmds_registry")
@@ -33,10 +33,9 @@ M._opened = {}
 
 ---@internal
 ---@param bufnr integer
----@return string|nil # normalized markdown path, or nil if not an eligible buffer
+---@return string|nil # normalized path, or nil if not an eligible buffer
 local function eligible_path(bufnr)
-	local ft = safe_buf_get_option(bufnr, "filetype") or ""
-	if ft ~= "markdown" and ft ~= "md" then
+	if not previewable.is(bufnr) then
 		return nil
 	end
 	local name = api.nvim_buf_get_name(bufnr)

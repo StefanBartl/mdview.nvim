@@ -15,6 +15,43 @@ zu vage oder zu exotisch dafür ist, steht in [`IDEAS/`](IDEAS/).
 
 ---
 
+## `experimental.any_file` — Vorschau für Nicht-Markdown-Dateien
+
+**Status:** umgesetzt (2026-08-24), **noch nicht in echtem Neovim
+getestet** — bitte manuell verifizieren, bevor das hier als erledigt gilt.
+
+Erster Schritt Richtung "view.nvim": mit `experimental.any_file = true`
+weitet `mdview.config.merge()` `ft_pattern` auf `{"*"}`; `helper/previewable.lua`
+ist danach das eigentliche Gate (normaler Buftype, benannt, nicht binär,
+nicht mdviews eigener Log-Buffer — ohne `any_file` zusätzlich
+`filetype == "markdown"/"md"` wie bisher). Der Client rendert eine
+Nicht-Markdown-Datei nicht durch den WASM-Renderer, sondern als einen
+einzigen, per Dateiendung eingefärbten Code-Block. Details: siehe
+[`../FEATURES/FEATURES.md`](../FEATURES/FEATURES.md), Abschnitt
+"Plain-Text-Vorschau für Nicht-Markdown-Dateien".
+
+Verifiziert bisher: Lua-Testharness (55 Tests, inkl. neuer
+`previewable_spec.lua`), Client-Vitest (95 Tests), sowie ein manueller
+Browser-Check über den Relay im Standalone-`--watch`-Modus (eine `.lua`-
+und eine `.txt`-Datei rendern korrekt gehighlightet bzw. klartext). **Nicht**
+verifiziert: der eigentliche Weg über echtes Neovim
+(`setup({ experimental = { any_file = true } })`, Datei öffnen,
+`:MDView start`).
+
+**Zu testen:**
+- Eine `.lua`/`.py`/o.ä.-Datei öffnen, `:MDView start` — rendert sie
+  gehighlightet im Browser-Tab?
+- Scroll-Sync (sollte proportional sein, keine exakte Zeilenleiste — siehe
+  Roadmap-Vermerk zu Scroll-Sync-Parität weiter unten/in FEATURES.md).
+- `:MDViewBreadcrumbs` bei einer `.py`/`.sh`-Datei mit `#`-Kommentaren —
+  sollte keine Fake-Headings aufsammeln.
+- Puffer, die absichtlich ausgeschlossen sein sollen (Terminal, `:help`,
+  Quickfix, mdviews eigener Log-Buffer) — sollten weiterhin ignoriert werden.
+- Verhalten bei `any_file = false` (Default) — sollte sich exakt wie vorher
+  verhalten (reiner Markdown-Modus).
+
+---
+
 ## PDF-Seitenvorschau im Link-Hover
 
 **Status:** offen, bewusst zurückgestellt (2026-08-17).

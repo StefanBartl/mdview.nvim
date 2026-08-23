@@ -7,7 +7,7 @@
 
 local api = vim.api
 local ws_client = require("mdview.adapter.ws_client")
-local safe_buf_get_option = require("mdview.helper.safe_buf_get_option")
+local previewable = require("mdview.helper.previewable")
 local target_key = require("mdview.helper.target_key")
 local defaults = require("mdview.config").defaults
 local autocmd_registry = require("mdview.helper.autocmds_registry")
@@ -69,8 +69,7 @@ end
 ---@param bufnr integer
 ---@return nil
 function M.send_current_position(bufnr)
-	local ft = safe_buf_get_option(bufnr, "filetype") or ""
-	if ft ~= "markdown" and ft ~= "md" then
+	if not previewable.is(bufnr) then
 		return
 	end
 

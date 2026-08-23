@@ -63,6 +63,32 @@ describe("breadcrumbs.record heading detection + dedupe", function()
 	end)
 end)
 
+describe("breadcrumbs.record under experimental.any_file", function()
+	it("does not mistake a '#' comment for a heading in a non-markdown buffer", function()
+		local config = require("mdview.config")
+		local orig = config.defaults.experimental.any_file
+		config.defaults.experimental.any_file = true
+
+		local pybuf = vim.api.nvim_create_buf(true, false)
+		vim.api.nvim_buf_set_name(pybuf, "mdview_spec_crumbs.py")
+		vim.bo[pybuf].filetype = "python"
+		vim.api.nvim_buf_set_lines(pybuf, 0, -1, false, {
+			"# not a heading, just a comment",
+			"def f():",
+			"    pass",
+		})
+		vim.api.nvim_set_current_buf(pybuf)
+
+		crumbs.clear()
+		vim.api.nvim_win_set_cursor(0, { 3, 0 })
+		assert.is_true(crumbs.record(pybuf))
+		assert.are.equal("(top)", crumbs.snapshot()[1].heading)
+
+		config.defaults.experimental.any_file = orig
+		vim.api.nvim_set_current_buf(buf)
+	end)
+end)
+
 describe("breadcrumbs.format", function()
 	it("emits a Markdown outline grouped by document", function()
 		crumbs.clear()

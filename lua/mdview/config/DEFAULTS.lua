@@ -60,6 +60,7 @@
 ---@field line_diff boolean opt in to sending only changed lines per edit instead of the whole document (versioned diff transport; client reassembles full text)
 ---@field click_navigate boolean opt in to click-to-navigate: clicking a relative link in the preview opens the linked document in Neovim (via the relay's /nav bridge)
 ---@field reverse_scroll boolean opt in to reverse scroll: scrolling the preview moves Neovim's cursor to match (polled, so slightly lagged)
+---@field any_file boolean opt in to previewing any normal text buffer, not just Markdown: widens `ft_pattern` to `{"*"}` (see mdview.config.merge) and renders non-Markdown files as a syntax-highlighted read-only code view instead of through the Markdown renderer. Scroll-sync falls back to proportional (no per-line sourcepos yet). Takes precedence over a hand-set `ft_pattern`. Default false.
 
 ---@class mdview.config.Defaults
 ---@field ft_pattern string[] filetype/glob patterns mdview's autocmds attach to
@@ -260,5 +261,16 @@ return {
 		-- always-on nvim -> browser scroll_sync). Implemented by polling, so it
 		-- follows with a small lag rather than instantly. Default false.
 		reverse_scroll = false,
+
+		-- Opt in to previewing any normal text buffer, not just Markdown. When
+		-- true, mdview.config.merge() widens `ft_pattern` to `{"*"}` so every
+		-- autocmd that drives the preview fires for any named, normal-buftype
+		-- buffer (see helper/previewable.lua for the actual gate); the client
+		-- renders non-Markdown documents as a syntax-highlighted read-only code
+		-- view (extension -> language, see src/client/highlight/languageForPath.ts)
+		-- instead of through the Markdown WASM renderer. Scroll-sync falls back
+		-- to proportional positioning for these files (no per-line sourcepos yet,
+		-- so the cursor line-bar doesn't show). Default false.
+		any_file = false,
 	},
 }

@@ -125,6 +125,17 @@ function M.merge(opts)
 	if opts and not vim.tbl_isempty(opts) then
 		deep_merge_in_place(M.defaults, opts)
 	end
+
+	-- any_file widens preview scope from Markdown-only to every normal text
+	-- buffer; that needs the autocmd glob itself (ft_pattern) to match
+	-- everything, not just *.md/*.markdown/*.mdx. Takes precedence over a
+	-- hand-set ft_pattern (see DEFAULTS.lua's `any_file` doc comment) — the
+	-- per-buffer buftype/filetype gate that actually excludes non-previewable
+	-- buffers (terminal, help, quickfix, …) lives in helper/previewable.lua.
+	if M.defaults.experimental and M.defaults.experimental.any_file == true then
+		M.defaults.ft_pattern = { "*" }
+	end
+
 	return M.defaults
 end
 

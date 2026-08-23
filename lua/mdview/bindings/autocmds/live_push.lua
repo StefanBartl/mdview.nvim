@@ -11,7 +11,7 @@
 local api = vim.api
 local ws_client = require("mdview.adapter.ws_client")
 local session = require("mdview.core.session")
-local safe_buf_get_option = require("mdview.helper.safe_buf_get_option")
+local previewable = require("mdview.helper.previewable")
 local log = require("mdview.helper.log")
 local normalize = require("mdview.helper.normalize")
 local target_key = require("mdview.helper.target_key")
@@ -62,9 +62,8 @@ end
 ---@param bufnr integer
 ---@param opts { full?: boolean }|nil
 function M.push_buffer_changes(bufnr, opts)
-	local ft = safe_buf_get_option(bufnr, "filetype") or ""
-	if ft ~= "markdown" and ft ~= "md" then
-		log.debug("skipping buffer, filetype: " .. ft, nil, "livepush", true)
+	if not previewable.is(bufnr) then
+		log.debug("skipping buffer, not previewable", nil, "livepush", true)
 		return
 	end
 

@@ -10,6 +10,8 @@
 
 import { createTransport } from './transport/transportFactory';
 import { DiffDoc, isEnvelope } from './render/diffDoc';
+import { isMarkdownPath } from './render/fileKind';
+import { renderPlainText } from './render/plainText';
 import { installClickNav } from './render/clickNav';
 import { pickScrollTarget, fractionInBlock, hasSourcepos } from './render/scrollSync';
 import { markExternalLinks, parseExternalLinkMode } from './render/externalLinks';
@@ -302,8 +304,8 @@ async function boot() {
 
   // Link hover previews — the browser counterpart to markdown.nvim's
   // in-editor hover. Installed once rather than per render: the listeners are
-  // delegated on `container`, which survives the innerHTML swap inside
-  // renderMarkdown. Opt-out via ?hover=0.
+  // delegated on `container`, which survives the content swap inside
+  // renderDocument. Opt-out via ?hover=0.
   if (container && params.get('hover') !== '0') {
     installLinkHover(container, { key, token });
   }
@@ -367,36 +369,50 @@ async function boot() {
   // for the next push from Neovim.
   let lastText = '';
 
-  // Render markdown text through the WASM module (output already sanitized
-  // inside WASM — safe to assign to innerHTML) into the preview container.
-  const renderMarkdown = (text: string): void => {
+  // Whether the previewed document is Markdown (WASM comrak+ammonia render)
+  // or any other text file (syntax-highlighted read-only code view, only
+  // ever reachable when the Lua side's experimental.any_file pushed one).
+  const docIsMarkdown = isMarkdownPath(key);
+
+  // Render the current document into the preview container: through the WASM
+  // module for Markdown (output already sanitized inside WASM — safe to
+  // assign to innerHTML), or as a single highlighted code block for anything
+  // else (built via DOM APIs, not innerHTML — see render/plainText.ts).
+  const renderDocument = (text: string): void => {
     if (!container) return;
     lastText = text;
     try {
-      container.innerHTML = render_markdown(text, wantSourceMap);
-      // Make external links open in a new tab so a click doesn't navigate the
-      // preview away (default; see browser.external_links).
-      markExternalLinks(container, externalLinkMode);
-      // Relative image targets need the /asset route to actually load —
-      // see render/localImages.ts.
-      resolveLocalImages(container, key, token);
-      // Highlight fenced code after the sanitized HTML is in the DOM. Fire and
+      if (docIsMarkdown) {
+        container.innerHTML = render_markdown(text, wantSourceMap);
+        // Make external links open in a new tab so a click doesn't navigate
+        // the preview away (default; see browser.external_links).
+        markExternalLinks(container, externalLinkMode);
+        // Relative image targets need the /asset route to actually load —
+        // see render/localImages.ts.
+        resolveLocalImages(container, key, token);
+        // innerHTML above also wiped any blank-line spacers — reinsert them.
+        applyBlankLineSpacing(container, blankLinesEnabled);
+        // comrak emits task-list checkboxes disabled; re-enable them each
+        // render so they stay clickable (the delegated change handler is
+        // installed once). Skipped when sync is off (?sync=0) — then they
+        // stay read-only.
+        if (taskSyncEnabled) enableTaskCheckboxes(container);
+      } else {
+        renderPlainText(container, text, key);
+      }
+      // Highlight fenced/plain code after the DOM is in place. Fire and
       // forget (the highlighter is async for Shiki) — it only adds/replaces
       // markup on the trusted, already-rendered DOM and never throws.
       void highlight(highlighter, container);
-      // innerHTML above wiped the cursor marker element; re-place it.
+      // The render above wiped the cursor marker element; re-place it. For a
+      // plain-text document there's no data-sourcepos, so this is a no-op
+      // (see cursorMarker.ts's pickScrollTarget fallback).
       if (lastCursorLine >= 0) {
         updateCursorMarker(container, lastCursorLine, lastCursorCol >= 0 ? lastCursorCol : null, cursorMarkerMode);
       }
       // Overlays derive from the document (headings, positions) — let them
       // refresh against the new content.
       notifyOverlayRender();
-      // innerHTML above also wiped any blank-line spacers — reinsert them.
-      applyBlankLineSpacing(container, blankLinesEnabled);
-      // comrak emits task-list checkboxes disabled; re-enable them each render
-      // so they stay clickable (the delegated change handler is installed once).
-      // Skipped when sync is off (?sync=0) — then they stay read-only.
-      if (taskSyncEnabled) enableTaskCheckboxes(container);
       if (firstRender) {
         firstRender = false;
         clientLog(`first render ok (${text.length} bytes)`);
@@ -449,7 +465,7 @@ async function boot() {
         // Toggling caret changes whether the renderer must emit source-position
         // spans, so re-render the current document with the new setting.
         wantSourceMap = needSourceMap;
-        if (container) renderMarkdown(lastText);
+        if (container) renderDocument(lastText);
       } else if (container) {
         updateCursorMarker(
           container,
@@ -518,12 +534,12 @@ async function boot() {
     // (the next full snapshot resyncs), so we only re-render on real changes.
     if (isEnvelope(rawMessage)) {
       const text = doc.apply(rawMessage);
-      if (text !== null) renderMarkdown(text);
+      if (text !== null) renderDocument(text);
       return;
     }
 
-    // Default transport: the message IS the full markdown document.
-    renderMarkdown(rawMessage);
+    // Default transport: the message IS the full document.
+    renderDocument(rawMessage);
   });
 }
 
