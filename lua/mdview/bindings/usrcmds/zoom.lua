@@ -61,7 +61,21 @@ function M.run(arg)
 			return
 		end
 		-- accept either a factor (1.5) or a percentage (150)
-		next_zoom = clamp(n > 5 and n / 100 or n)
+		local wanted = n > 5 and n / 100 or n
+		next_zoom = clamp(wanted)
+		-- Clamping silently is how "zoom 500" became 300% with nothing said.
+		-- The value applied is not the one asked for, so say which and why.
+		if math.abs(next_zoom - wanted) > 0.001 then
+			notify(
+				("[mdview] zoom %d%% is outside %d-%d%%, using %d%%"):format(
+					math.floor(wanted * 100 + 0.5),
+					math.floor(MIN * 100 + 0.5),
+					math.floor(MAX * 100 + 0.5),
+					math.floor(next_zoom * 100 + 0.5)
+				),
+				vim.log.levels.WARN
+			)
+		end
 	end
 
 	browser.zoom = next_zoom

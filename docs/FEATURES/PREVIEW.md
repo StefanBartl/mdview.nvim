@@ -17,6 +17,24 @@ spawning a second relay.
 - **Usercmds:** `:MDView start`, `:MDView stop`, `:MDView toggle`, `:MDView open` — see [../BINDINGS.md#user-commands](../BINDINGS.md#user-commands)
 - **Config:** `server_port` (default `43219`; the relay picks the next free port if taken)
 
+### Forcing a port for one run (2026-08-24)
+
+`:MDView start port=43000` overrides `server_port` for that spawn only —
+closing the flag/option audit's entry. The config key exists, but it is the
+wrong tool when the reason is a firewall rule or a port-forward that has to
+match exactly, on one machine: editing a config everyone else shares to
+answer a local constraint.
+
+`port=` rather than `--port`, because `cwd=` is already this command's
+convention and one shape for both beats two.
+
+Applied to the live config and restored right after the spawn, since
+`adapter/server_args` reads `config.defaults.server_port` at spawn time and
+sits several layers down. Restoring is what keeps it a one-run override —
+otherwise the next plain `:MDView start` would silently inherit it. Out of
+range (1–65535) is refused; with a server already running it is ignored with
+a warning, exactly as `cwd=` is.
+
 ## Live push on edit and save
 
 `TextChanged`/`TextChangedI` push the full buffer to the relay so the preview
@@ -77,6 +95,13 @@ a relative step (`+`/`-`, 0.1 per press, clamped to 50%–300%), `reset` (back
 to 100%), or an explicit factor/percentage (`1.5` or `150` both mean 150%).
 Persists into the shared config so a reopened tab starts at the same zoom
 (`?zoom=`), and pushes a live update to an already-open tab.
+
+**An out-of-range number is clamped and says so** (2026-08-24). The value was
+always clamped — the audit's entry about "no visible clamping/validation"
+described where the check sits, not its absence — but `zoom 500` quietly
+applied 300%, so what happened differed from what was asked with nothing
+said. It now reports the requested value, the allowed range, and what it
+used. A non-number is refused, as before.
 
 - **Module:** `lua/mdview/bindings/usrcmds/zoom.lua`
 - **Usercmds:** `:MDView zoom [+|-|reset|<factor>]` (no argument reports the current zoom)

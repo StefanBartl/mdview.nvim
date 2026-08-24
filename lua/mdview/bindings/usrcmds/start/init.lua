@@ -32,16 +32,21 @@ local M = {}
 ---@param fargs string[]
 ---@return string|nil file, string|nil cwd
 local function parse_start_args(fargs)
-	local file, cwd
+	local file, cwd, port
 	for _, token in ipairs(fargs or {}) do
 		local cwd_val = token:match("^cwd=(.+)$")
+		local port_val = token:match("^port=(%d+)$")
 		if cwd_val then
 			cwd = cwd_val:gsub('^"(.*)"$', "%1"):gsub("^'(.*)'$", "%1")
+		elseif port_val then
+			-- `port=` rather than `--port`: `cwd=` is this command's existing
+			-- convention, and one shape for both beats two.
+			port = tonumber(port_val)
 		elseif not file then
 			file = token
 		end
 	end
-	return file, cwd
+	return file, cwd, port
 end
 
 -- initial_push_async: if an explicit path is provided (arg_path), prefer immediate try_push.
@@ -125,7 +130,31 @@ end
 function M.run(fargs)
 	notify("[mdview] start invoked", vim.log.levels.DEBUG)
 
-	local file_arg, cwd_arg = parse_start_args(fargs)
+	local file_arg, cwd_arg, port_arg = parse_start_args(fargs)
+
+	-- A fixed port for this run only, for the case the config key cannot
+	-- serve: a firewall rule or a port-forward that has to match exactly, on
+	-- one machine, without editing the config everyone else shares.
+	--
+	-- Applied to the live config rather than threaded through, because
+	-- `adapter.server_args` reads `config.defaults.server_port` at spawn time
+	-- and is several layers down. Restored after the spawn so it stays a
+	-- one-run override -- otherwise the next plain `:MDView start` would
+	-- silently inherit it.
+	local config = require("mdview.config")
+	local previous_port = config.defaults.server_port
+	local function restore_port()
+		if port_arg then
+			config.defaults.server_port = previous_port
+		end
+	end
+	if port_arg then
+		if port_arg < 1 or port_arg > 65535 then
+			notify(("[mdview] port=%d is out of range (1-65535)"):format(port_arg), vim.log.levels.WARN)
+			return
+		end
+		config.defaults.server_port = port_arg
+	end
 
 	-- Server already running: don't re-spawn. Re-open the preview surface
 	-- instead — the common reason to run :MDViewStart again is that the
@@ -137,6 +166,10 @@ function M.run(fargs)
 		if cwd_arg then
 			notify("[mdview] cwd=... ignored — server is already running", vim.log.levels.WARN)
 		end
+		if port_arg then
+			notify("[mdview] port=... ignored — server is already running", vim.log.levels.WARN)
+		end
+		restore_port()
 
 		-- optional explicit file arg: push that file's content first
 		local arg_path = file_arg and file_arg ~= "" and file_arg or nil
@@ -202,7 +235,10 @@ function M.run(fargs)
 	-- perform chosen initial push strategy (non-blocking)
 	initial_push_async(push_strategy, try_push_opts, wait_timeout, browser_opts, initial_target)
 
-	notify("[mdview] started", vim.log.levels.INFO)
+	-- The spawn has read server_port by now, so the override has done its job.
+	restore_port()
+
+	notify(port_arg and ("[mdview] started on port %d"):format(port_arg) or "[mdview] started", vim.log.levels.INFO)
 	log.debug("usercmds.start: MDView start completed wiring", nil, "usercmds.start", true)
 end
 
