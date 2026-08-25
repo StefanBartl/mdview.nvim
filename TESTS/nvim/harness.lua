@@ -5,9 +5,9 @@
 -- headlessly:
 --
 --   nvim --headless -u NONE -i NONE --cmd "set rtp+=." \
---     -c "luafile tests/nvim/harness.lua" -c "qa!"
+--     -c "luafile TESTS/nvim/harness.lua" -c "qa!"
 --
--- Discovers tests/nvim/*_spec.lua, runs them, prints a summary, and exits
+-- Discovers TESTS/nvim/*_spec.lua, runs them, prints a summary, and exits
 -- non-zero (via :cq) if anything failed so CI catches it.
 --
 -- mdview.nvim hard-requires lib.nvim (adapter/log.lua, bindings/usrcmds/
@@ -138,8 +138,8 @@ end
 -- "loop or previous error" module-load failures). Keeping the harness free of
 -- it makes the specs pure unit tests of the required modules.
 
--- Discover and run every tests/nvim/*_spec.lua.
-local specs = vim.fn.globpath("tests/nvim", "*_spec.lua", false, true)
+-- Discover and run every TESTS/nvim/*_spec.lua.
+local specs = vim.fn.globpath("TESTS/nvim", "*_spec.lua", false, true)
 table.sort(specs)
 for _, spec in ipairs(specs) do
 	print("== " .. spec .. " ==")

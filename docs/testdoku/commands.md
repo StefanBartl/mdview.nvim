@@ -91,10 +91,10 @@ new WebSocket(`ws://${location.host}/ws${location.search}`); // readyState === 1
 Headless-Smoke-Test (CI-nah), lädt lib.nvim ins rtp:
 
 ```sh
-# Spec unter tests/lua/smoke_spec.lua (plenary/busted-Stil)
+# Spec unter TESTS/lua/smoke_spec.lua (plenary/busted-Stil)
 "/c/Program Files/Neovim/bin/nvim" --headless -u NONE -i NONE \
   --cmd "set rtp+=.,../lib.nvim" \
-  -c "luafile tests/lua/smoke_spec.lua" -c "qa!"
+  -c "luafile TESTS/lua/smoke_spec.lua" -c "qa!"
 ```
 
 ### Go-Relay

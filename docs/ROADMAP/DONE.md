@@ -280,7 +280,7 @@
      `http(s)://`/`data:`-Quellen bleiben unangetastet. Aus
      `images.nvim`s `docs/ROADMAP/CROSS-PLUGIN.md` (mdview.nvim-Eintrag).
      Tests: `main_test.go` (Traversal/Allowlist/Token/Session), `registry_test.go`
-     (`SetDocDir`/`DocDir`), `tests/client/localImages.test.ts`.
+     (`SetDocDir`/`DocDir`), `TESTS/client/localImages.test.ts`.
 
 ---
 

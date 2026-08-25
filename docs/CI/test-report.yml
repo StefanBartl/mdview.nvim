@@ -36,7 +36,7 @@ jobs:
         with:
           artifact: test-results
           name: Vitest
-          path: 'tests/node/vitest.xml'
+          path: 'TESTS/node/vitest.xml'
           reporter: java-junit
           fail-on-empty: false
           only-summary: 'false'
@@ -48,7 +48,7 @@ jobs:
         with:
           artifact: test-results
           name: Busted
-          path: 'tests/lua/output/busted.xml'
+          path: 'TESTS/lua/output/busted.xml'
           reporter: java-junit
           fail-on-empty: false
           only-summary: 'true'

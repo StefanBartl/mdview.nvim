@@ -12,7 +12,7 @@
 ---
 --- Env vars honored (all optional, set by the callers):
 ---   $MDVIEW_PATH            mdview.nvim root (default: derived from this file)
----   $LIB_NVIM_PATH          lib.nvim root (same lookup order as tests/nvim/harness.lua)
+---   $LIB_NVIM_PATH          lib.nvim root (same lookup order as TESTS/nvim/harness.lua)
 ---   $MDVIEW_STANDALONE_BIN  relay binary for standalone mode (needs --watch,
 ---                           v0.3.0+); until a release ships, point this at a
 ---                           locally built native/server/mdview-server
@@ -32,7 +32,7 @@ local function mdview_root()
 	return vim.fs.normalize(vim.fn.fnamemodify(this, ":p:h:h"))
 end
 
---- Locate lib.nvim. Same candidate order as tests/nvim/harness.lua, plus the
+--- Locate lib.nvim. Same candidate order as TESTS/nvim/harness.lua, plus the
 --- sibling-of-mdview case that matters when mdview itself was found via
 --- $MDVIEW_PATH rather than the cwd.
 ---@param root string # mdview.nvim root

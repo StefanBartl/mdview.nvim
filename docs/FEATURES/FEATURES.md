@@ -219,4 +219,4 @@ inkl. der Sicherheitsgrenzen von `/asset` und `/preview`), `cargo test`
 (Renderer/Sanitizer), Lua. `npm run test:all` fasst die ersten drei
 zusammen.
 
-- **Modul:** `tests/client/`, `native/server/*_test.go`, `native/wasm-render/src/lib.rs` (`#[cfg(test)]`), `tests/lua/`
+- **Modul:** `TESTS/client/`, `native/server/*_test.go`, `native/wasm-render/src/lib.rs` (`#[cfg(test)]`), `TESTS/lua/`

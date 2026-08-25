@@ -43,15 +43,15 @@ jobs:
         run: npm run lint
 
       - name: Ensure vitest report dir exists
-        run: mkdir -p tests/node
+        run: mkdir -p TESTS/node
 
       - name: Run Vitest and output JUnit XML
-        run: npm test -- --reporter=junit --outputFile=tests/node/vitest.xml
+        run: npm test -- --reporter=junit --outputFile=TESTS/node/vitest.xml
 
       - name: Ensure busted output dir exists
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Path tests/lua/output -Force | Out-Null
+          New-Item -ItemType Directory -Path TESTS/lua/output -Force | Out-Null
 
       - name: Ensure Podman machine is running
         shell: pwsh
@@ -79,7 +79,7 @@ jobs:
           if ($tool -ne "") {
             Write-Host "Using container runtime: $tool"
             & $tool run --rm -v "${{ github.workspace }}:/work" -w /work ubuntu:22.04 bash -lc `
-              "apt-get update -qq && apt-get install -y -qq lua5.3 liblua5.3-dev luarocks build-essential && luarocks install --local busted && busted --pattern='*.spec.lua' --lpath='./?.lua' --output-junit=/work/tests/lua/output/busted.xml tests/lua || true"
+              "apt-get update -qq && apt-get install -y -qq lua5.3 liblua5.3-dev luarocks build-essential && luarocks install --local busted && busted --pattern='*.spec.lua' --lpath='./?.lua' --output-junit=/work/tests/lua/output/busted.xml TESTS/lua || true"
           }
 
       - name: Upload test-results artifact
@@ -88,8 +88,8 @@ jobs:
         with:
           name: test-results
           path: |
-            tests/node/vitest.xml
-            tests/lua/output/busted.xml
+            TESTS/node/vitest.xml
+            TESTS/lua/output/busted.xml
 
       - name: Build client
         run: npm run build

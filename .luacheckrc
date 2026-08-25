@@ -11,5 +11,5 @@ globals = {
 max_line_length = false
 
 -- busted (and the headless-nvim harness) provide describe/it/assert globals.
-files["tests/**/*_spec.lua"] = { std = "+busted" }
-files["tests/nvim/harness.lua"] = { std = "+busted" }
+files["TESTS/**/*_spec.lua"] = { std = "+busted" }
+files["TESTS/nvim/harness.lua"] = { std = "+busted" }

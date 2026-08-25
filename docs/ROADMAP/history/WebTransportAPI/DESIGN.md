@@ -31,7 +31,7 @@ default.
 - **Factory selection + fallback** — `transportFactory.ts` tries WebTransport
   first when `preferWebTransport` is set and the URL is provided, and falls
   back to WebSocket on any failure. Covered by
-  `tests/client/transportFactory.test.ts`.
+  `TESTS/client/transportFactory.test.ts`.
 - **Opt-in wiring** — `experimental.webtransport` (Lua config) →
   `&transport=webtransport` on the browser URL (`launcher.resolve_browser_url`)
   → `main.ts` reads `?transport=` and passes `preferWebTransport` +

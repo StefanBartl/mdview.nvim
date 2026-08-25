@@ -197,13 +197,13 @@ Die notwendigen Änderungen sind minimal:
 
 ## Test-Anleitung, Schritt für Schritt
 
-1. In Neovim in einem Markdown-Buffer `:edit tests/test.md` öffnen.
+1. In Neovim in einem Markdown-Buffer `:edit TESTS/test.md` öffnen.
 2. `:MDViewStart` ausführen.
    * Erwartung: `mdview: started` in :messages.
    * Browser sollte (innerhalb von ein paar Sekunden) ein Tab mit `http://localhost:43219` öffnen.
 3. Falls kein Browser erscheint:
    * Prüfen, ob `curl http://localhost:43219/health` `ok` zurückgibt. Wenn nicht, schauen: `:MDViewShowLogs` (oder `:messages`) für Fehler.
-   * Manuell im Terminal `curl -X POST "http://localhost:43219/render?key=test" -H "Content-Type: text/markdown" --data-binary "$(cat tests/test.md)"` ausführen — sollte JSON mit `html` zurückgeben.
+   * Manuell im Terminal `curl -X POST "http://localhost:43219/render?key=test" -H "Content-Type: text/markdown" --data-binary "$(cat TESTS/test.md)"` ausführen — sollte JSON mit `html` zurückgeben.
 4. In Neovim: `:w` (save) im Markdown-Buffer → Server sollte per `POST /render` die aktualisierte HTML an Clients broadcasten; Browser-Client (falls verbunden) zeigt Update.
 
 ---
@@ -233,13 +233,13 @@ Die notwendigen Änderungen sind minimal:
 
 ### Test-Anleitung, Schritt für Schritt
 
-1. In Neovim in einem Markdown-Buffer `:edit tests/test.md` öffnen.
+1. In Neovim in einem Markdown-Buffer `:edit TESTS/test.md` öffnen.
 2. `:MDViewStart` ausführen.
    * Erwartung: `mdview: started` in :messages.
    * Browser sollte (innerhalb von ein paar Sekunden) ein Tab mit `http://localhost:43219` öffnen.
 3. Falls kein Browser erscheint:
    * Prüfen, ob `curl http://localhost:43219/health` `ok` zurückgibt. Wenn nicht, schauen: `:MDViewShowLogs` (oder `:messages`) für Fehler.
-   * Manuell im Terminal `curl -X POST "http://localhost:43219/render?key=test" -H "Content-Type: text/markdown" --data-binary "$(cat tests/test.md)"` ausführen — sollte JSON mit `html` zurückgeben.
+   * Manuell im Terminal `curl -X POST "http://localhost:43219/render?key=test" -H "Content-Type: text/markdown" --data-binary "$(cat TESTS/test.md)"` ausführen — sollte JSON mit `html` zurückgeben.
 4. In Neovim: `:w` (save) im Markdown-Buffer → Server sollte per `POST /render` die aktualisierte HTML an Clients broadcasten; Browser-Client (falls verbunden) zeigt Update.
 
 ---
@@ -267,13 +267,13 @@ Die notwendigen Änderungen sind minimal:
 
 ### Test-Anleitung, Schritt für Schritt
 
-1. In Neovim in einem Markdown-Buffer `:edit tests/test.md` öffnen.
+1. In Neovim in einem Markdown-Buffer `:edit TESTS/test.md` öffnen.
 2. `:MDViewStart` ausführen.
    * Erwartung: `mdview: started` in :messages.
    * Browser sollte (innerhalb von ein paar Sekunden) ein Tab mit `http://localhost:43219` öffnen.
 3. Falls kein Browser erscheint:
    * Prüfen, ob `curl http://localhost:43219/health` `ok` zurückgibt. Wenn nicht, schauen: `:MDViewShowLogs` (oder `:messages`) für Fehler.
-   * Manuell im Terminal `curl -X POST "http://localhost:43219/render?key=test" -H "Content-Type: text/markdown" --data-binary "$(cat tests/test.md)"` ausführen — sollte JSON mit `html` zurückgeben.
+   * Manuell im Terminal `curl -X POST "http://localhost:43219/render?key=test" -H "Content-Type: text/markdown" --data-binary "$(cat TESTS/test.md)"` ausführen — sollte JSON mit `html` zurückgeben.
 4. In Neovim: `:w` (save) im Markdown-Buffer → Server sollte per `POST /render` die aktualisierte HTML an Clients broadcasten; Browser-Client (falls verbunden) zeigt Update.
 
 ---
