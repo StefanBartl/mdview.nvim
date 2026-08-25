@@ -340,6 +340,43 @@ var assetExts = map[string]bool{
 	".webp": true, ".bmp": true, ".svg": true,
 }
 
+// containedIn reports whether target is dir itself or lies underneath it. The
+// separator-terminated prefix avoids a "/docs-evil" vs "/docs" false positive
+// on a bare string prefix check.
+func containedIn(target, dir string) bool {
+	return target == dir || strings.HasPrefix(target, dir+string(filepath.Separator))
+}
+
+// withinDocDir reports whether reqPath, resolved against dir, stays inside it.
+//
+// Two checks, because filepath.Clean is purely lexical. The lexical one stops
+// "../.." and always applies. The second one exists because a *symlink* inside
+// the directory is lexically inside it while pointing anywhere at all, and
+// http.ServeFile / os.Open follow it without asking -- so a repo shipping
+// `logo.png -> ~/.ssh/id_rsa` would have had that served as an image. When the
+// path does not resolve the file does not exist, and the caller answers 404
+// without reading anything, so the lexical check alone is enough there.
+func withinDocDir(dir, reqPath string) (string, bool) {
+	resolved := filepath.Clean(filepath.Join(dir, reqPath))
+	if !containedIn(resolved, dir) {
+		return resolved, false
+	}
+
+	real, err := filepath.EvalSymlinks(resolved)
+	if err != nil {
+		return resolved, true
+	}
+
+	// The directory is resolved too: on macOS a temp dir sits under a
+	// symlinked /var, so comparing a resolved file against an unresolved
+	// directory would reject perfectly ordinary paths.
+	realDir, err := filepath.EvalSymlinks(dir)
+	if err != nil {
+		realDir = dir
+	}
+	return resolved, containedIn(real, realDir)
+}
+
 // handleAsset serves a local image file next to the currently-previewed
 // document, so a relative <img src="..."> target in the rendered HTML (the
 // WASM renderer already produces correct markup for `![alt](img.png)`,
@@ -381,11 +418,8 @@ func handleAsset(registry *relay.Registry, token string) http.HandlerFunc {
 			return
 		}
 
-		resolved := filepath.Clean(filepath.Join(dir, reqPath))
-		// Containment: resolved must be dir itself, or underneath it. The
-		// separator-terminated prefix avoids a "/docs-evil" vs "/docs"
-		// false-positive on a bare string prefix check.
-		if resolved != dir && !strings.HasPrefix(resolved, dir+string(filepath.Separator)) {
+		resolved, ok2 := withinDocDir(dir, reqPath)
+		if !ok2 {
 			http.Error(w, "path escapes document directory", http.StatusForbidden)
 			return
 		}
@@ -463,8 +497,8 @@ func handlePreview(registry *relay.Registry, token string) http.HandlerFunc {
 			return
 		}
 
-		resolved := filepath.Clean(filepath.Join(dir, reqPath))
-		if resolved != dir && !strings.HasPrefix(resolved, dir+string(filepath.Separator)) {
+		resolved, ok2 := withinDocDir(dir, reqPath)
+		if !ok2 {
 			http.Error(w, "path escapes document directory", http.StatusForbidden)
 			return
 		}

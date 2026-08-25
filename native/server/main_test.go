@@ -11,6 +11,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/StefanBartl/mdview.nvim/native/server/internal/relay"
@@ -148,5 +149,81 @@ func TestHandleAsset_RejectsNonGet(t *testing.T) {
 
 	if w.Code != http.StatusMethodNotAllowed {
 		t.Fatalf("expected 405 for a POST request, got %d", w.Code)
+	}
+}
+
+// A symlink inside the document directory is lexically inside it while
+// pointing anywhere at all, and ServeFile follows it without asking. A repo
+// shipping `logo.png -> ~/.ssh/id_rsa` would otherwise have had that served
+// as an image, past both the token check and the extension allowlist.
+//
+// Skipped on Windows unless the process holds SeCreateSymbolicLinkPrivilege,
+// which an ordinary developer shell does not; CI runs on Linux, where it does
+// execute.
+func TestHandleAsset_RejectsSymlinkOutOfDocDir(t *testing.T) {
+	dir := t.TempDir()
+	outside := t.TempDir()
+	secret := filepath.Join(outside, "secret.txt")
+	if err := os.WriteFile(secret, []byte("SECRET-CONTENTS"), 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	if err := os.Symlink(secret, filepath.Join(dir, "logo.png")); err != nil {
+		t.Skipf("symlinks unavailable in this environment: %v", err)
+	}
+
+	registry := relay.NewRegistry()
+	registry.SetDocDir("session-1", dir)
+
+	h := handleAsset(registry, testToken)
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, assetRequest("session-1", "logo.png", testToken))
+
+	if w.Code != http.StatusForbidden {
+		t.Fatalf("expected 403 for a symlink leaving the doc dir, got %d: %s", w.Code, w.Body.String())
+	}
+	if strings.Contains(w.Body.String(), "SECRET-CONTENTS") {
+		t.Fatalf("the file outside the doc dir was served")
+	}
+}
+
+// The counterpart: a symlink that stays inside the directory is ordinary and
+// must keep working, or the fix above would just be a different bug.
+func TestHandleAsset_AllowsSymlinkInsideDocDir(t *testing.T) {
+	dir := t.TempDir()
+	real := mustWriteFile(t, dir, "assets/photo.png", "fake-png-bytes")
+	if err := os.Symlink(real, filepath.Join(dir, "logo.png")); err != nil {
+		t.Skipf("symlinks unavailable in this environment: %v", err)
+	}
+
+	registry := relay.NewRegistry()
+	registry.SetDocDir("session-1", dir)
+
+	h := handleAsset(registry, testToken)
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, assetRequest("session-1", "logo.png", testToken))
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200 for a symlink inside the doc dir, got %d: %s", w.Code, w.Body.String())
+	}
+	if w.Body.String() != "fake-png-bytes" {
+		t.Fatalf("expected the linked file's contents, got %q", w.Body.String())
+	}
+}
+
+// A missing file still answers 404, not 403: EvalSymlinks fails on a path that
+// does not exist, and treating that as an escape would have turned every
+// typo'd image path into "path escapes document directory".
+func TestHandleAsset_MissingFileIsNotFoundNotForbidden(t *testing.T) {
+	dir := t.TempDir()
+
+	registry := relay.NewRegistry()
+	registry.SetDocDir("session-1", dir)
+
+	h := handleAsset(registry, testToken)
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, assetRequest("session-1", "nope.png", testToken))
+
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("expected 404 for a missing file, got %d: %s", w.Code, w.Body.String())
 	}
 }
