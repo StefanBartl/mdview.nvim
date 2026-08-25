@@ -310,6 +310,16 @@ browser.zoom ~
   runtime with |:MDView-zoom| (applies live). A non-default value is carried on
   the browser URL (`?zoom=`) so a reopened tab starts at the same zoom.
 
+browser.preserve_blank_lines ~
+  Whether a run of two or more blank lines between blocks renders as that much
+  vertical space (`true`) or collapses to a single paragraph gap (`false`, the
+  default -- what CommonMark specifies). The spacing is added by the client as
+  empty gap elements between the rendered blocks, not by rewriting the source,
+  so |mdview-scroll_sync| and the cursor caret still map to the right lines.
+  Blank lines inside a fenced code block are one block's content, not a gap
+  between blocks, and are unaffected either way. Carried on the browser URL as
+  `?blanklines=1`; toggle at runtime with |:MDView-blanklines|.
+
 browser.focus ~
   Whether the opened preview tab is allowed to take keyboard focus. `"browser"`
   (default) opens it in front as usual; `"nvim"` keeps focus in the editor so
@@ -554,6 +564,15 @@ pushes a control update over the socket.
   but is blurred by default, so third-party names/numbers stay hidden during a
   screen share. Reveal one block by clicking it, or all with this command.
   Live-only — a freshly opened tab always starts hidden.
+
+:MDView blanklines [action]                              *:MDView-blanklines*
+  Switches whether the preview shows every blank line between blocks as extra
+  vertical space, or collapses runs of them to a single paragraph gap --
+  CommonMark's own behavior, and the default. `on`|`off`|`toggle`, tab
+  completed; no argument toggles. Sets `browser.preserve_blank_lines` (so a
+  reopened tab keeps it) and, while a session runs, pushes a live `/control`
+  update so the open tab re-renders without a reload. See
+  `browser.preserve_blank_lines` in |mdview-config|.
 
 :MDView overlay [name] [action]                             *:MDView-overlay*
 :MDView overlay list                                   *:MDView-overlay-list*
