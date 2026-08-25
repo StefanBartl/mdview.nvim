@@ -98,9 +98,7 @@ turned into DOM content without passing through an allowlist-based sanitizer.
   dependencies = { "StefanBartl/lib.nvim" },
   ft = { "markdown" },
   cmd = { "MDView" },
-  config = function()
-    require("mdview").setup()
-  end,
+  opts = {},
 }
 ```
 
