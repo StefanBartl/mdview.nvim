@@ -1,222 +1,217 @@
-# mdview.nvim — was es gibt
+# mdview.nvim — what exists
 
-Der vollständige Katalog: **alles, was implementiert ist**, nicht nur das,
-was ein Nutzer direkt bedient. Die Mechanik darunter — Caches, Throttling,
-Diff-Transport, Lifecycle — steht hier gleichberechtigt, weil sie beim
-Weiterentwickeln genauso beantwortet werden muss wie „welches Kommando gibt
-es dafür".
+The complete catalogue: **everything that is implemented**, not only what a
+user operates directly. The machinery underneath — caches, throttling, the
+diff transport, lifecycle — is here on equal footing, because working on this
+plugin needs that answered just as often as "which command does that".
 
-| Wo | Inhalt |
+| Where | What |
 | --- | --- |
-| **diese Datei** | vollständiger Überblick, user- *und* dev-seitig |
-| [`PREVIEW.md`](PREVIEW.md) · [`RENDERING.md`](RENDERING.md) · [`OPERATIONS.md`](OPERATIONS.md) · [`SECURITY.md`](SECURITY.md) | die großen Themen im Detail, im [`FEATURES_FORMAT`](https://github.com/StefanBartl/documentation.nvim/blob/main/docs/FEATURES_FORMAT.md)-Schema |
-| [`../ROADMAP/DONE.md`](../ROADMAP/DONE.md) | *warum* etwas so gebaut wurde (Entscheidungs-Log) |
-| [`../ROADMAP/ROADMAP.md`](../ROADMAP/ROADMAP.md) | was noch offen ist |
+| **this file** | the full overview, user- *and* developer-facing |
+| [`PREVIEW.md`](PREVIEW.md) · [`RENDERING.md`](RENDERING.md) · [`OPERATIONS.md`](OPERATIONS.md) · [`SECURITY.md`](SECURITY.md) | the big topics in detail, in the [`FEATURES_FORMAT`](https://github.com/StefanBartl/documentation.nvim/blob/main/docs/FEATURES_FORMAT.md) schema |
+| [`../ROADMAP/DONE.md`](../ROADMAP/DONE.md) | *why* something was built the way it was (decision log) |
+| [`../ROADMAP/ROADMAP.md`](../ROADMAP/ROADMAP.md) | what is still open |
 
 ---
 
-## Architektur in einem Absatz
+## Architecture in one paragraph
 
-Vier Sprachen, klare Schnitte: **Lua** steuert (Kommandos, Autocmds,
-Prozess-Lifecycle), ein **Go**-Relay verteilt (HTTP-Endpoints +
-WebSocket/WebTransport-Fanout, kennt weder Dateien noch Puffer), ein
-**Rust/WASM**-Modul rendert (Markdown → sanitisiertes HTML, im Browser),
-**TypeScript** verdrahtet den Tab. Details:
+Four languages, clean cuts. **Lua** drives (commands, autocommands, process
+lifecycle), a **Go** relay distributes (HTTP endpoints plus
+WebSocket/WebTransport fan-out, and knows about neither files nor buffers), a
+**Rust/WASM** module renders (Markdown to sanitized HTML, in the browser), and
+**TypeScript** wires up the tab. Details in
 [`../architecture.md`](../architecture.md).
 
 ---
 
-## Preview & Synchronisation
+## Preview and synchronisation
 
-Ausführlich in [`PREVIEW.md`](PREVIEW.md).
+In detail in [`PREVIEW.md`](PREVIEW.md).
 
-- **Live-Preview im Browser** — Puffertext fließt über das Relay in einen
-  Browser-Tab, gerendert im Client.
-- **Live-Push bei Änderung und beim Speichern** — `TextChanged`/
-  `TextChangedI` plus `BufWritePost`.
-- **Scroll-Sync Neovim → Browser** und **Reverse-Scroll** Browser → Neovim.
-- **Cursor-Marker** — Position aus Neovim im gerenderten Dokument.
-- **Zoom**, **Pause/Resume** des Scroll-Syncs, **Overlays** (schwebendes
-  TOC), **Breadcrumbs** (Session-Outline).
-- **Click-to-Navigate** — Klick auf einen relativen Link öffnet die Datei in
-  Neovim statt den Tab wegzunavigieren.
-- **Link-Hover-Vorschau** — Bild, Textdatei-Anfang, geparste URL,
-  Anker-Abschnitt oder „nicht gefunden". Gegenstück zum In-Editor-Hover in
-  markdown.nvim.
-- **Standalone-Preview** — läuft ohne (bzw. über) die Neovim-Instanz hinaus,
-  auch aus dem Terminal startbar.
-- **In-Editor-Preview-Tab** — `:MDView preview-tab`, ganz ohne Relay und
-  Browser.
+- **Live preview in the browser** — buffer text flows through the relay into a
+  browser tab and is rendered client-side.
+- **Live push on change and on save** — `TextChanged`/`TextChangedI` plus
+  `BufWritePost`.
+- **Scroll sync Neovim → browser**, and **reverse scroll** browser → Neovim.
+- **Cursor marker** — Neovim's position, shown in the rendered document.
+- **Zoom**, **pause/resume** of the scroll sync, **overlays** (a floating TOC),
+  **breadcrumbs** (the session outline).
+- **Click to navigate** — clicking a relative link opens the file in Neovim
+  instead of navigating the tab away.
+- **Link hover preview** — an image, the start of a text file, a parsed URL, an
+  anchor's section, or "not found". The counterpart to markdown.nvim's
+  in-editor hover.
+- **Standalone preview** — runs without (or beyond) the Neovim instance, and
+  can be started from a terminal.
+- **In-editor preview tab** — `:MDView preview-tab`, with no relay and no
+  browser at all.
 
 ## Rendering
 
-Ausführlich in [`RENDERING.md`](RENDERING.md).
+In detail in [`RENDERING.md`](RENDERING.md).
 
-- **comrak + ammonia in einem WASM-Aufruf** — Rendering und Sanitisierung
-  sind untrennbar; kein Aufrufer kann HTML bekommen, das die Allowlist
-  umgangen hat.
-- **Themes**, lazy geladen — ein Theme ist eine CSS-Datei plus ein
-  Map-Eintrag.
-- **Code-Fence-Highlighting** über Shiki (mit hljs-Pfad), asynchron nach dem
-  Einfügen ins DOM.
-- **Private Blöcke** — ```` ```private ```` rendert unscharf, per Klick oder
-  `:MDView reveal` aufdeckbar.
-- **Lokale Bilder** — relative `<img src>` werden auf die `/asset`-Route
-  umgeschrieben.
-- **Blank-Line-Handling** — Leerzeilen-Abstände als eigene Spacer.
+- **comrak and ammonia in one WASM call** — rendering and sanitization are
+  inseparable; no caller can obtain HTML that bypassed the allowlist.
+- **Themes**, loaded lazily — a theme is a CSS file plus a map entry.
+- **Code-fence highlighting** via Shiki (with an hljs path), applied
+  asynchronously after insertion into the DOM.
+- **Private blocks** — a fence with the info string `private` renders blurred,
+  revealed by a click or by `:MDView reveal`.
+- **Local images** — relative `<img src>` is rewritten onto the `/asset` route.
+- **Blank-line handling** — blank-line gaps as their own spacers.
 
-## Betrieb & Diagnose
+## Operating and diagnosing
 
-Ausführlich in [`OPERATIONS.md`](OPERATIONS.md).
+In detail in [`OPERATIONS.md`](OPERATIONS.md).
 
-- **Installation ohne Toolchain** — vorgebaute Artefakte aus GitHub Releases.
-- **`:checkhealth mdview`**, **`:MDView diagnose`** (Vollreport),
-  **`:MDView log`** (Plugin-Log), **`:MDView file-log`** (persistentes
-  Relay-Log), **`:MDView weblogs`** (Relay-stdout).
-- **`lib.nvim` als harte Laufzeitabhängigkeit** — bewusst, kein
-  pcall-Fallback-Geflecht.
+- **Installation without a toolchain** — prebuilt artifacts from GitHub
+  Releases.
+- **`:checkhealth mdview`**, **`:MDView diagnose`** (full report),
+  **`:MDView log`** (plugin log), **`:MDView file-log`** (persistent relay
+  log), **`:MDView weblogs`** (relay stdout).
+- **`lib.nvim` as a hard runtime dependency** — deliberately, rather than a
+  tangle of pcall fallbacks.
 
-## Sicherheit
+## Security
 
-Ausführlich in [`SECURITY.md`](SECURITY.md).
+In detail in [`SECURITY.md`](SECURITY.md).
 
-- **Loopback-only Relay** mit Per-Session-Token und Origin-Prüfung.
-- **Race-freie Portwahl.**
-- **WebTransport-Zertifikats-Pinning.**
-- **`/asset` und `/preview`** — beide an das Dokumentverzeichnis gebunden,
-  mit Traversal-Prüfung und je eigener Endungs-Allowlist. `/preview` ist
-  enger als `/asset`, weil es Dateiinhalt zurückgibt statt Bytes, die der
-  Browser als Bild rendert.
+- **Loopback-only relay**, with a per-session token and an origin check.
+- **Race-free port selection.**
+- **WebTransport certificate pinning.**
+- **`/asset` and `/preview`** — both bound to the document directory, with a
+  traversal check and their own extension allowlist each. `/preview` is the
+  stricter of the two, because it returns file *content* rather than bytes the
+  browser renders as an image.
 
 ---
 
-# Für Entwickler
+# For developers
 
-Ab hier: Mechanik, die kein Kommando hat, aber jede Änderung beeinflusst.
+From here on: machinery that has no command of its own but affects every
+change.
 
-## Readiness-Cache im `ws_client`
+## The readiness cache in `ws_client`
 
-`live_push` wickelt **jedes** `TextChanged` in ein `wait_ready` ein. Ohne
-Cache hieße das ein `curl /health` pro Tastendruck. `M._ready` merkt sich
-einen einmal gesunden Server; `M.reset_ready()` verwirft das beim
-Stop/Respawn.
+`live_push` wraps **every** `TextChanged` in a `wait_ready`. Without a cache
+that would mean one `curl /health` per keystroke. `M._ready` remembers a server
+once it has been seen healthy; `M.reset_ready()` drops that on stop/respawn.
 
-- **Modul:** `lua/mdview/adapter/ws_client.lua` (`wait_ready`, `reset_ready`, `_ready`)
-- **Warum:** siehe [`../ROADMAP/DONE.md`](../ROADMAP/DONE.md), BUGS #5 — der
-  fehlende `cb(true)` machte den Cache-Bedarf überhaupt erst sichtbar.
+- **Module:** `lua/mdview/adapter/ws_client.lua` (`wait_ready`, `reset_ready`, `_ready`)
+- **Why:** see [`../ROADMAP/DONE.md`](../ROADMAP/DONE.md), BUGS #5 — the missing
+  `cb(true)` is what made the need for a cache visible in the first place.
 
-## Trailing-Throttle für Live-Pushes
+## Trailing throttle for live pushes
 
-Jeder Push startet einen `curl`-Prozess. Schnelle Edits werden zu **einem
-nachlaufenden** Push zusammengefasst statt einem pro Tastendruck.
+Every push starts a `curl` process. Fast edits collapse into **one trailing**
+push rather than one per keystroke.
 
-Wichtig und leicht falsch zu machen: Anders als der Scroll-Sync-Throttle,
-der ein Ping einfach fallen lässt, darf hier **nichts verworfen** werden —
-ein verschluckter Push hinterlässt eine Preview, die dauerhaft vom Puffer
-abweicht. Deshalb wird ein Push im Throttle-Fenster *verschoben*, nicht
-gestrichen.
+Important, and easy to get wrong: unlike the scroll-sync throttle, which simply
+drops a ping, **nothing may be discarded** here — a swallowed push leaves a
+preview permanently out of step with the buffer. So a push inside the throttle
+window is *deferred*, not dropped.
 
-- **Modul:** `lua/mdview/bindings/autocmds/live_push.lua` (`pending_timer`, `cancel_pending`)
-- **Config:** `live_push_throttle_ms`; `BufWritePost` wird nie gedrosselt.
+- **Module:** `lua/mdview/bindings/autocmds/live_push.lua` (`pending_timer`, `cancel_pending`)
+- **Config:** `live_push_throttle_ms`; `BufWritePost` is never throttled.
 
-## Zeilen-Diff-Transport (experimentell)
+## Line-diff transport (experimental)
 
-Statt des vollen Puffers kann eine Zeilen-Edit-Beschreibung übertragen
-werden. Voll-Snapshots bleiben der Normalweg; der Diff-Pfad ist opt-in.
+Instead of the whole buffer, a line-edit description can be transmitted. Full
+snapshots stay the normal path; the diff path is opt-in.
 
-- **Modul:** `lua/mdview/utils/line_diff.lua`, `utils/diff.lua`,
-  `utils/diff_granular.lua`; Client: `src/client/render/diffDoc.ts`
-- **Config:** `experimental.line_diff` (default aus)
-- **Vorsicht:** Ein Diff, der auf einem anderen Basiszustand aufsetzt als der
-  Client hat, rendert Unsinn — deshalb der Envelope mit Resync-Pfad.
+- **Module:** `lua/mdview/utils/line_diff.lua`, `utils/diff.lua`,
+  `utils/diff_granular.lua`; client: `src/client/render/diffDoc.ts`
+- **Config:** `experimental.line_diff` (off by default)
+- **Careful:** a diff applied to a different base state than the client holds
+  renders nonsense — hence the envelope with its resync path.
 
-## Plain-Text-Vorschau für Nicht-Markdown-Dateien (experimentell)
+## Plain-text preview for non-Markdown files (experimental)
 
-Mit `experimental.any_file` weitet `mdview.config.merge()` `ft_pattern` auf
-`{"*"}` — die Neovim-Glob-Ebene feuert dann für jeden benannten Buffer.
-`helper/previewable.lua` ist das eigentliche Gate danach (buftype leer,
-benannt, nicht binär, nicht mdviews eigener Log-Buffer); ohne
-`experimental.any_file` verlangt es zusätzlich `filetype == "markdown"/"md"`
-wie bisher. Der Client rendert eine Nicht-Markdown-Datei nicht durch den
-WASM-Renderer, sondern als einen einzigen, per Dateiendung eingefärbten
-Code-Block (dieselbe `<pre><code class="language-x">`-Form, die comrak für
-Fences erzeugt — kostenlos themed über `_base.css`, kostenlos gehighlightet
-über den bestehenden hljs/shiki-Dispatcher).
+With `experimental.any_file`, `mdview.config.merge()` widens `ft_pattern` to
+`{"*"}`, so Neovim's glob layer fires for every named buffer.
+`helper/previewable.lua` is the actual gate after that (empty buftype, named,
+not binary, not mdview's own log buffer); without `experimental.any_file` it
+additionally requires `filetype == "markdown"/"md"` as before. The client does
+not put a non-Markdown file through the WASM renderer, but renders it as a
+single code block coloured by file extension — the same
+`<pre><code class="language-x">` shape comrak produces for fences, themed for
+free through `_base.css` and highlighted for free by the existing hljs/shiki
+dispatcher.
 
-- **Modul:** `lua/mdview/helper/previewable.lua`; Client:
+- **Module:** `lua/mdview/helper/previewable.lua`; client:
   `src/client/render/fileKind.ts`, `src/client/highlight/languageForPath.ts`,
   `src/client/render/plainText.ts`
-- **Config:** `experimental.any_file` (default aus)
-- **Vorsicht:** Kein `data-sourcepos` für diese Dateien — Scroll-Sync fällt
-  auf die bestehende proportionale Schätzung zurück (siehe
-  `main.ts`'s `applyScrollPing`-Fallback), die Cursor-Zeilenleiste zeigt sich
-  nicht. Zeilengenaue Parität mit Markdown ist ein möglicher Folgeschritt.
+- **Config:** `experimental.any_file` (off by default)
+- **Careful:** no `data-sourcepos` for these files — scroll sync falls back to
+  the existing proportional estimate (see `main.ts`'s `applyScrollPing`
+  fallback), and the cursor line bar does not appear. Line-exact parity with
+  Markdown is a possible follow-up.
 
-## Dokumentmodell im Client
+## The document model in the client
 
-Ein gemeinsames Modell statt drei eigener Parser: Top-Level-Blöcke mit
-`data-sourcepos` (comrak-Sourcemap), daraus die Heading-Outline und die
-Zuordnung Zeile ↔ Block.
+One shared model instead of three separate parsers: top-level blocks carrying
+`data-sourcepos` (comrak's source map), and from those the heading outline and
+the line-to-block mapping.
 
-Genutzt von **TOC-Overlay**, **Scroll-Sync**, **Cursor-Marker** und
-**Link-Hover** (Anker-Auflösung). Es geht über `H1`–`H6`-Tags, **nicht**
-über `id`-Attribute — der WASM-Renderer erzeugt keine.
+Used by the **TOC overlay**, **scroll sync**, the **cursor marker** and
+**link hover** (anchor resolution). It works off `H1`–`H6` tags, **not** off
+`id` attributes — the WASM renderer emits none.
 
-- **Modul:** `src/client/render/docModel.ts` (`topLevelBlocks`, `headings`, `governingHeading`)
+- **Module:** `src/client/render/docModel.ts` (`topLevelBlocks`, `headings`, `governingHeading`)
 
-## Transport-Abstraktion
+## Transport abstraction
 
-WebSocket und WebTransport hinter einem Interface; die Fabrik wählt.
-WebSocketStream wurde geprüft und verworfen (kleine Text-Updates, kein
-Durchsatzproblem) — siehe [`../ROADMAP/DONE.md`](../ROADMAP/DONE.md) BUGS #3.
+WebSocket and WebTransport behind one interface; the factory picks.
+WebSocketStream was evaluated and rejected (small text updates, no throughput
+problem) — see [`../ROADMAP/DONE.md`](../ROADMAP/DONE.md) BUGS #3.
 
-- **Modul:** `src/client/transport/` (`transport.interface.ts`, `transportFactory.ts`, `websocket.transport.ts`, `webtransport.transport.ts`)
+- **Module:** `src/client/transport/` (`transport.interface.ts`, `transportFactory.ts`, `websocket.transport.ts`, `webtransport.transport.ts`)
 
-## Per-Dokument-Räume im Relay
+## Per-document rooms in the relay
 
-Das Relay kennt weder Dateien noch Puffer — nur „hier ist Text für Raum K,
-fächere ihn auf". Mehrere offene Dateien kontaminieren sich dadurch nicht
-gegenseitig. Live-Puffer und Standalone-Dateiwatcher münden in denselben
+The relay knows about neither files nor buffers — only "here is text for room
+K, fan it out". Several open files therefore cannot contaminate each other.
+Live buffers and the standalone file watcher both end up in the same
 `Broadcast`.
 
-- **Modul:** `native/server/internal/relay/registry.go`, `internal/source/watch.go`
+- **Module:** `native/server/internal/relay/registry.go`, `internal/source/watch.go`
 
-## Polling-Bridge Browser → Neovim
+## The polling bridge, browser → Neovim
 
-Neovim hat keinen WebSocket-Client, und das Relay bleibt ein dummer
-Byte-Weiterleiter. Für die Rückrichtung (Klick-Navigation,
-Reverse-Scroll) pollt Neovim das Relay im 250-ms-Takt — nur die aktivierten
-Endpoints, und der Timer läuft nur, wenn überhaupt einer aktiv ist.
+Neovim has no WebSocket client, and the relay stays a dumb byte forwarder. For
+the return direction (click navigation, reverse scroll) Neovim polls the relay
+every 250 ms — only the endpoints that are enabled, and the timer runs only
+while at least one of them is.
 
-Diese 250 ms sind der Grund, warum manche Browser-Features nicht sinnvoll
-sind (etwa PDF-Seitenrendering im Hover, siehe
+Those 250 ms are why some browser-side features do not make sense (PDF page
+rendering in the hover, for instance — see
 [`../ROADMAP/ROADMAP.md`](../ROADMAP/ROADMAP.md)).
 
-- **Modul:** `lua/mdview/adapter/inbound_poll.lua`; Server: `relay/nav.go`, `relay/scrollbox.go`
+- **Module:** `lua/mdview/adapter/inbound_poll.lua`; server: `relay/nav.go`, `relay/scrollbox.go`
 
-## Autocmd-Lifecycle
+## Autocommand lifecycle
 
-Autocmds haben echten Attach/Detach-Lifecycle, Usercmds **nicht** — die
-werden einmal bei `setup()` registriert und nie abgebaut. Grund: ein
-`:MDViewStop`, das seine eigenen Kommandos mitlöschte, war ein realer Bug.
+Autocommands have a real attach/detach lifecycle; user commands do **not** —
+they are registered once at `setup()` and never torn down. The reason: a
+`:MDViewStop` that deleted its own commands along the way was a real bug.
 
-- **Modul:** `lua/mdview/helper/autocmds_registry.lua`, `bindings/autocmds/init.lua`
-- **Warum:** [`../ROADMAP/DONE.md`](../ROADMAP/DONE.md), BUGS #4
+- **Module:** `lua/mdview/helper/autocmds_registry.lua`, `bindings/autocmds/init.lua`
+- **Why:** [`../ROADMAP/DONE.md`](../ROADMAP/DONE.md), BUGS #4
 
-## Session- und Prozesszustand
+## Session and process state
 
-Ein laufender Server wird wiederverwendet; Token-Rotation passiert nur beim
-tatsächlichen Spawn. Ein Neustart mit rotiertem Token gegen einen alten
-Prozess ergab sonst stille 403er (curl liefert Exit 0 bei HTTP-Fehlern).
+A running server is reused; token rotation happens only on an actual spawn.
+Restarting with a rotated token against an old process otherwise produced
+silent 403s (curl exits 0 on HTTP errors).
 
-- **Modul:** `lua/mdview/core/session.lua`, `core/state.lua`, `adapter/server_args.lua`
-- **Warum:** [`../ROADMAP/DONE.md`](../ROADMAP/DONE.md), BUGS #5
+- **Module:** `lua/mdview/core/session.lua`, `core/state.lua`, `adapter/server_args.lua`
+- **Why:** [`../ROADMAP/DONE.md`](../ROADMAP/DONE.md), BUGS #5
 
-## Testebenen
+## Test layers
 
-Vier Suiten, je Sprache eine: `vitest` (Client, jsdom), `go test` (Relay,
-inkl. der Sicherheitsgrenzen von `/asset` und `/preview`), `cargo test`
-(Renderer/Sanitizer), Lua. `npm run test:all` fasst die ersten drei
-zusammen.
+Four suites, one per language: `vitest` (client, jsdom), `go test` (relay,
+including the security boundaries of `/asset` and `/preview`), `cargo test`
+(renderer/sanitizer), and Lua. `npm run test:all` runs the first three.
 
-- **Modul:** `TESTS/client/`, `native/server/*_test.go`, `native/wasm-render/src/lib.rs` (`#[cfg(test)]`), `TESTS/lua/`
+- **Module:** `TESTS/client/`, `native/server/*_test.go`, `native/wasm-render/src/lib.rs` (`#[cfg(test)]`), `TESTS/lua/`
