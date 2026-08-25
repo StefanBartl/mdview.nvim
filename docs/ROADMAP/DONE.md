@@ -1,254 +1,255 @@
-# mdview.nvim — Log der erledigten Punkte
+# mdview.nvim — log of completed items
 
-> **Offene Aufgaben:** [`ROADMAP.md`](ROADMAP.md) · **Ideen ohne nahe
-> Umsetzung:** [`IDEAS/`](IDEAS/) · **Feature-Katalog:**
+> **Open tasks:** [`ROADMAP.md`](ROADMAP.md) · **Ideas with no near-term
+> implementation:** [`IDEAS/`](IDEAS/) · **Feature catalogue:**
 > [`../FEATURES/`](../FEATURES/)
 >
-> Diese Datei ist das **Entscheidungs-Log**: was gebaut wurde, warum es so
-> gebaut wurde, welche Abwägung dahinterstand. Sie ersetzt nicht
-> [`../FEATURES/FEATURES.md`](../FEATURES/FEATURES.md) — dort steht, *was*
-> es heute gibt; hier steht, *warum* es so geworden ist.
+> This file is the **decision log**: what was built, why it was built that
+> way, what the trade-off behind it was. It does not replace
+> [`../FEATURES/FEATURES.md`](../FEATURES/FEATURES.md) — that one says *what*
+> exists today; this one says *why* it turned out this way.
 >
-> Vor-Rewrite-Dokumente unter [`history/`](history/) tragen ein
-> OUTDATED-Banner und sind nur noch Historie.
+> Pre-rewrite documents under [`history/`](history/) carry an OUTDATED banner
+> and are history only.
 
 ## BUGS
 
-  1. ~~health-Modul: `require("mdview.health").check()` fehlte~~ — behoben.
-     Ursache: `lua/mdview/health.lua` exportierte nur `health_report`, nicht `check()`;
-     eine bessere `check()`-Implementierung lag ungenutzt in `plugin/health.lua`
-     (falscher Pfad, wird von `:checkhealth` nie geladen). Jetzt in
-     `lua/mdview/health.lua` zusammengeführt und an die native Go/Rust-Architektur
-     angepasst (prüft curl/tar statt Node/npm).
+  1. ~~health module: `require("mdview.health").check()` was missing~~ — fixed.
+     Cause: `lua/mdview/health.lua` only exported `health_report`, not `check()`;
+     a better `check()` implementation sat unused in `plugin/health.lua`
+     (wrong path, never loaded by `:checkhealth`). Now merged into
+     `lua/mdview/health.lua` and adapted to the native Go/Rust architecture
+     (checks curl/tar instead of Node/npm).
 
-  2. ~~Statt Browser "TempApp" soll aktuelle Browsersitzung genutzt werden~~ — behoben:
-     `build_args_for_browser.lua`'s Profilverzeichnis war bei jedem Aufruf ein frischer
-     `fn.tempname()` — jedes `:MDViewStart` erzeugte einen komplett neuen, isolierten
-     Browser-Prozess statt die laufende mdview-Session wiederzuverwenden. Jetzt ein fester,
-     persistenter Pfad unter `stdpath("data")/mdview/browser-profile`, über Aufrufe hinweg
-     wiederverwendet (Chrome/Firefox öffnen bei gleichem Profil i. d. R. einen neuen Tab im
-     bestehenden Fenster statt eines neuen Prozesses). Bleibt isoliert vom echten
-     Standard-Browserprofil des Nutzers — nur das eigene "Wegwerf-Session"-Verhalten bei
-     jedem einzelnen Aufruf ist behoben.
-  3. Abklären: Sollten wir nicht WebSocketStream nutzen? — Nein: WebSocketStream (Streams-API
-     über WebSocket, Backpressure-fähiges Lesen) lohnt sich für sehr hohen Durchsatz oder
-     große binäre Payloads. mdview.nvim überträgt kleine Text-Updates (ein Markdown-Puffer)
-     pro Broadcast — der bestehende einfache `ws.send`/`onmessage`-Pfad (Go: `gorilla`-artiges
-     WS über `nhooyr.io/websocket`, Client: natives `WebSocket`) ist hier ausreichend und
-     deutlich einfacher zu debuggen. Nicht weiter verfolgt.
-  4. ~~`:MDViewStop` löschte sich selbst + `:MDViewOpen`~~ — behoben, kritischer Bug.
-     `stop.lua`'s `M.stop()` rief `usercmds_registry.detach_all()` auf; `:MDViewOpen`
-     und `:MDViewStop` waren als "non-persistent" über diese Registry registriert
-     (`bindings/usrcmds/init.lua`'s `attach_non_persistent()`), aber nichts hat sie je
-     neu registriert. Nach dem ersten `:MDViewStop` waren beide Commands für den Rest
-     der Neovim-Session weg. Fix: alle vier Usercmds sind jetzt "persistent" (einmal
-     bei `setup()` registriert, nie torn down — Autocmds haben weiterhin einen
-     echten Attach/Detach-Lifecycle, Usercmds nicht). `usercmds_registry.lua`
-     dadurch komplett ungenutzt, gelöscht.
+  2. ~~Use the current browser session instead of a "TempApp" browser~~ — fixed:
+     `build_args_for_browser.lua`'s profile directory was a fresh `fn.tempname()`
+     on every call — every `:MDViewStart` created a completely new, isolated
+     browser process instead of reusing the running mdview session. Now a fixed,
+     persistent path under `stdpath("data")/mdview/browser-profile`, reused
+     across calls (with the same profile, Chrome/Firefox normally open a new tab
+     in the existing window rather than a new process). It stays isolated from
+     the user's real default browser profile — only the "throwaway session on
+     every single call" behaviour is fixed.
+  3. Clarify: shouldn't we use WebSocketStream? — No: WebSocketStream (the
+     Streams API over WebSocket, backpressure-capable reading) pays off for very
+     high throughput or large binary payloads. mdview.nvim transmits small text
+     updates (one markdown buffer) per broadcast — the existing simple
+     `ws.send`/`onmessage` path (Go: `gorilla`-style WS via `nhooyr.io/websocket`,
+     client: native `WebSocket`) is sufficient here and considerably easier to
+     debug. Not pursued.
+  4. ~~`:MDViewStop` deleted itself and `:MDViewOpen`~~ — fixed, critical bug.
+     `stop.lua`'s `M.stop()` called `usercmds_registry.detach_all()`; `:MDViewOpen`
+     and `:MDViewStop` were registered as "non-persistent" through that registry
+     (`bindings/usrcmds/init.lua`'s `attach_non_persistent()`), but nothing ever
+     re-registered them. After the first `:MDViewStop` both commands were gone
+     for the rest of the Neovim session. Fix: all four user commands are now
+     "persistent" (registered once at `setup()`, never torn down — autocommands
+     still have a real attach/detach lifecycle, user commands do not).
+     `usercmds_registry.lua` was thereby entirely unused, and deleted.
 
-  5. ~~`:MDViewStart` startete den Server, aber danach passierte nichts: kein Browser, kein
-     Initial-Push, und jede Buffer-Änderung spammte nur "server ready after X ms, attempt 1"~~ —
-     behoben, eine Kette von fünf Bugs (per E2E-Test gegen das echte Binary verifiziert):
-     - **`ws_client.wait_ready` rief im Erfolgsfall nie `cb(true)` auf** — nur ein Echo.
-       Der komplette On-Ready-Block im Launcher (Initial-Push + Browser-Open) und jeder
-       Live-Push liefen dadurch ins Leere; das Echo pro Tastendruck war der ganze Effekt.
-       Fix: `cb(true)` + Readiness-Cache (`M._ready`, kein curl /health pro Tastendruck mehr;
-       Reset via `reset_ready()` bei Stop/Respawn).
-     - **Launcher-On-Ready crashte an `live_push.attach()` ohne Gruppe** ("Invalid 'group': 0")
-       — direkt VOR Initial-Push und Browser-Open; wurde erst durch den cb-Fix überhaupt
-       erreichbar. Fix: redundanten Aufruf entfernt (Autocmds sind beim Spawn schon
-       registriert) + `live_push.attach(nil)` abgehärtet (kein `group or 0` mehr).
-     - **Token-Mismatch**: `launcher.start` rief `server_args.resolve()` erneut auf (rotiert
-       den Session-Token in state), während `runner.start_server` den BESTEHENDEN Prozess
-       (mit dem alten Token) zurückgab → alle /update- und /ws-Requests liefen als stille
-       403s (curl exit 0 bei HTTP-Fehlern). Fix: laufender Prozess wird wiederverwendet,
-       resolve/Token-Rotation nur beim tatsächlichen Spawn.
-     - **`state.proc_is_running()` prüfte das nichtexistente Feld `M.proc`** statt
-       `M.runner.proc` → immer false. Fix: korrektes Feld + Handle-Validität.
-     - **`resolve_browser_url` bevorzugte `browser.dev_server_port` (43220, Vite)
-       bedingungslos** — in Produktion lauscht dort nichts; selbst ein geöffneter Browser
-       hätte ins Leere gezeigt. Fix: echter Backend-Port (`vim.g.mdview_server_port`);
-       Dev-Port nur noch über `vim.g.mdview_dev_port` (wird ausschließlich gesetzt, wenn der
-       Runner eine echte Vite-Zeile in stdout geparst hat). `browser.dev_server_port` als
-       Config-Feld entfernt.
-     Außerdem: Debug-Defaults (`debug`, `debug_plugin`, `debug_preview`) von true auf false —
-     Server-stdout-Echos und Per-Push-Notifications sind jetzt opt-in statt Dauer-Spam.
+  5. ~~`:MDViewStart` started the server, but nothing happened afterwards: no browser, no
+     initial push, and every buffer change only spammed "server ready after X ms, attempt 1"~~ —
+     fixed, a chain of five bugs (verified by an E2E test against the real binary):
+     - **`ws_client.wait_ready` never called `cb(true)` on success** — only an echo.
+       The entire on-ready block in the launcher (initial push + browser open) and every
+       live push therefore ran into the void; the echo per keystroke was the whole effect.
+       Fix: `cb(true)` plus a readiness cache (`M._ready`, no more curl /health per
+       keystroke; reset via `reset_ready()` on stop/respawn).
+     - **The launcher's on-ready crashed at `live_push.attach()` without a group**
+       ("Invalid 'group': 0") — directly BEFORE the initial push and the browser open;
+       it only became reachable at all through the cb fix. Fix: redundant call removed
+       (autocommands are already registered at spawn) plus `live_push.attach(nil)`
+       hardened (no more `group or 0`).
+     - **Token mismatch**: `launcher.start` called `server_args.resolve()` again (rotating
+       the session token in state), while `runner.start_server` returned the EXISTING
+       process (with the old token) → all /update and /ws requests ran as silent
+       403s (curl exits 0 on HTTP errors). Fix: a running process is reused, and
+       resolve/token rotation happens only on an actual spawn.
+     - **`state.proc_is_running()` checked the nonexistent field `M.proc`** instead of
+       `M.runner.proc` → always false. Fix: correct field plus handle validity.
+     - **`resolve_browser_url` preferred `browser.dev_server_port` (43220, Vite)
+       unconditionally** — in production nothing listens there; even a browser that did
+       open would have pointed into the void. Fix: the real backend port
+       (`vim.g.mdview_server_port`); the dev port only through `vim.g.mdview_dev_port`
+       (which is set exclusively when the runner has parsed a real Vite line from stdout).
+       `browser.dev_server_port` removed as a config field.
+     Also: debug defaults (`debug`, `debug_plugin`, `debug_preview`) from true to false —
+     server stdout echoes and per-push notifications are now opt-in instead of constant spam.
 
-  6. ~~Nach dem obigen Fix: `:MDViewStart` → `:MDViewStop` → `:MDViewStart` crashte mit
-     "Invalid 'group': 216", und danach sagte jeder weitere `:MDViewStart` nur noch
-     "server already running" ohne Browser~~ — behoben, drei Folgebugs:
-     - **`autocmds.teardown()` löschte die Augroup per id, aber `lib.nvim`'s `get_augroup`
-       cached diese id** und gab sie beim Neustart erneut zurück — nun eine gelöschte,
-       ungültige id → `nvim_create_autocmd` crashte (`bufenter.lua`). Fix:
-       `autocmds.init` erzeugt die Augroup direkt via `nvim_create_augroup(name, {clear=true})`
-       (immer gültig, kein Stale-Cache); der redundante `_attached_groups`-Dedup in
-       `live_push` entfernt.
-     - **Half-State nach dem Crash**: `state.set_server(proc)` lief VOR `autocmds.attach()`,
-       das dann crashte → `server` blieb gesetzt → "already running" gegen eine nie fertig
-       gestartete Session. Fix: `set_server` erst nach erfolgreichem `attach`.
-     - **`:MDViewStart` bei laufendem Server tat nichts Sinnvolles** (nur "already running").
-       Häufigster Grund für erneutes `:MDViewStart` ist aber ein geschlossenes Browserfenster.
-       Fix: der "already running"-Zweig öffnet jetzt die Preview-Oberfläche neu
-       (`mdview.open()` bzw. Tab-Preview) statt nur zu meckern.
-  7. ~~Chrome öffnete ein "komisches" Fenster ohne Taskleisten-Icon und ohne Toolbar~~ —
-     `--app=`-Modus war schuld (chromeloses App-Fenster). Fix: `build_args_for_browser`
-     nutzt jetzt `--new-window` → normales Browserfenster (Taskleisten-Icon, Adressleiste).
-     Das isolierte Profil bleibt — es ist genau das, was `stop_on_browser_exit`/
-     `browser_autoclose` zuverlässig macht (ein Start in den bereits laufenden Browser des
-     Nutzers würde sofort forken+exiten, Schließen wäre nicht detektierbar).
-  > **AUFGELÖST (2026-07-26) für #8–#10: `:MDView detach` wurde entfernt.** Die drei Bugs
-  > waren allesamt Symptome desselben Grundproblems — ein detachter, headless, stdio-loser
-  > nvim ist ein schlechter Langzeit-Host: input-poll-getriebene Loop (→ #8 Timing), kein
-  > File-Watch/`--listen` (→ #9 kein Live-Push, statischer Snapshot), kein Tab-Close-Observer
-  > (→ #10). Da die detachte Instanz zudem nie editiert wird, existiert der behauptete
-  > Live-Buffer-Vorteil faktisch nicht → `detach` war von `:MDView standalone` vollständig
-  > dominiert. Konsequenz: `detach`, `detach.lua` und das `User MDViewSessionEnded`-Event
-  > entfernt; die Terminal-Wrapper (`mdview-bg.*`) feuern jetzt `:MDView standalone`. Die
-  > untenstehende Analyse bleibt als Begründung stehen. Siehe
-  > `docs/Roadmap/KONZEPT_headless_und_standalone.md` und `docs/standalone.md`.
+  6. ~~After the fix above: `:MDViewStart` → `:MDViewStop` → `:MDViewStart` crashed with
+     "Invalid 'group': 216", and after that every further `:MDViewStart` only said
+     "server already running" without a browser~~ — fixed, three follow-on bugs:
+     - **`autocmds.teardown()` deleted the augroup by id, but `lib.nvim`'s `get_augroup`
+       caches that id** and handed it back on restart — now a deleted, invalid id →
+       `nvim_create_autocmd` crashed (`bufenter.lua`). Fix:
+       `autocmds.init` creates the augroup directly via `nvim_create_augroup(name, {clear=true})`
+       (always valid, no stale cache); the redundant `_attached_groups` dedup in
+       `live_push` removed.
+     - **Half-state after the crash**: `state.set_server(proc)` ran BEFORE `autocmds.attach()`,
+       which then crashed → `server` stayed set → "already running" against a session that
+       never finished starting. Fix: `set_server` only after a successful `attach`.
+     - **`:MDViewStart` with a running server did nothing useful** (only "already running").
+       The most common reason for another `:MDViewStart` is, however, a closed browser window.
+       Fix: the "already running" branch now reopens the preview surface
+       (`mdview.open()` or the tab preview) instead of merely complaining.
+  7. ~~Chrome opened a "strange" window with no taskbar icon and no toolbar~~ —
+     `--app=` mode was to blame (a chromeless app window). Fix: `build_args_for_browser`
+     now uses `--new-window` → a normal browser window (taskbar icon, address bar).
+     The isolated profile stays — it is exactly what makes `stop_on_browser_exit`/
+     `browser_autoclose` reliable (a start into the user's already running browser would
+     fork and exit immediately, and closing would not be detectable).
+  > **RESOLVED (2026-07-26) for #8–#10: `:MDView detach` was removed.** All three bugs
+  > were symptoms of the same underlying problem — a detached, headless, stdio-less
+  > nvim is a poor long-term host: an input-poll-driven loop (→ #8 timing), no
+  > file watch and no `--listen` (→ #9 no live push, a static snapshot), no tab-close
+  > observer (→ #10). Since the detached instance is also never edited in, the claimed
+  > live-buffer advantage does not in fact exist → `detach` was completely dominated by
+  > `:MDView standalone`. Consequence: `detach`, `detach.lua` and the
+  > `User MDViewSessionEnded` event removed; the terminal wrappers (`mdview-bg.*`) now
+  > fire `:MDView standalone`. The analysis below stands as the rationale. See
+  > `docs/Roadmap/KONZEPT_headless_und_standalone.md` and `docs/standalone.md`.
 
-  8. **`:MDView detach` / `scripts/mdview-bg.ps1`: Browser-Tab öffnet sich gar nicht oder erst
-     mit mehreren Minuten Verzögerung** (beobachtet unter Windows), obwohl der Relay selbst
-     sauber hochkommt (Health-Check ok, initialer Push kommt an). ~~Noch offen~~ — nächster
-     Ansatzpunkt beim Wiederaufnehmen:
-     - Unterschied zu `:MDView standalone` (öffnet dort zuverlässig sofort): `standalone`s
-       Browser-Open läuft direkt im Go-Relay-Binary (`native/server/open.go`, einzelner
-       `rundll32.exe url.dll,FileProtocolHandler`-Aufruf, kein Neovim beteiligt). `detach`
-       und `mdview-bg.ps1` laufen beide über eine **headless, komplett stdio-lose, detachte**
-       Neovim-Instanz (`nvim --headless -u scripts/minimal_init.lua -c "MDView start"`), in
-       der sowohl der `/health`-Poll (`ws_client.lua`'s `http_get`, curl per
-       `vim.fn.jobstart`, alle 200ms bis zu 10s) als auch das eigentliche Öffnen
-       (`mdview.adapter.browser`'s `open_default`, ebenfalls `vim.fn.jobstart`) verkettet
-       über Neovims Job-Control laufen statt über einen einzelnen direkten Prozess-Spawn.
-     - Manuelle Nachstellung des exakten `detached.spawn`-Aufrufs (`uv.spawn` mit
-       `stdio = {nil,nil,nil}`, `detached = true`) hat in einem Testlauf funktioniert
-       (Health-Check, WebSocket-Connect, Render kamen durch) — der Code ist also nicht
-       grundsätzlich falsch, das Timing ist nur unzuverlässig.
-     - Verdacht: `vim.fn.jobstart()`-Aufrufe aus einer headless+detachten (kein Stdio,
-       keine Konsole) Neovim-Instanz auf Windows sind unter bestimmten Bedingungen deutlich
-       langsamer als aus einer normalen interaktiven Instanz — und `detach`/`mdview-bg.ps1`
-       verketten davon gleich drei (Health-Poll → Initial-Push → Browser-Open), statt wie
-       `standalone` mit einem einzigen nativen Spawn auszukommen. Noch nicht isoliert, woran
-       es genau liegt (auf der ursprünglichen Testmaschine so beobachtet, in einer anderen
-       Umgebung nicht reproduziert — also eher Neovim-Job-Control/Windows-spezifisch als ein
-       Logikfehler im Plugin-Code selbst).
-     - Möglicher Fix, falls sich das bestätigt: den Browser-Open-Schritt im `detach`-Pfad
-       genauso wie bei `standalone` direkt nativ spawnen (z.B. über ein kleines Go-Hilfsmittel
-       oder einen direkten `uv.spawn`-Aufruf aus Lua) statt über `vim.fn.jobstart` aus der
-       headless Instanz heraus.
-  9. **`:MDView detach`: Live-Push/Scroll-Sync erreichen die detachte Preview nicht, wenn die
-     Datei aus einer separaten/neuen Neovim-Instanz bearbeitet wird** — per Test verifiziert
-     (README.md von einer zweiten, unabhängigen headless-nvim-Instanz aus editiert+gespeichert;
-     im Relay-Log der detachten Session kam danach keinerlei neue Aktivität an). Ursache: die
-     detachte Instanz hält ihren eigenen Buffer-Stand ab dem Spawn-Zeitpunkt; es gibt keinen
-     Datei-Watcher (kein `vim.loop.new_fs_event`, kein `checktime`/`autoread`-Timer — geprüft,
-     nichts davon existiert im Code) und `detach.lua` startet den Kindprozess ohne `--listen`,
-     man kann sich also auch nicht nachträglich per `nvim --server`/`--remote` an genau diese
-     Instanz anhängen, um "in ihr" weiterzuschreiben. Damit ist der in der Modul-Doku
-     (`bindings/usrcmds/detach.lua`) beschriebene Kernunterschied zu `standalone` ("live buffer
-     push … weil ein echtes Neovim es treibt") im derzeit einzig erreichbaren Nutzungsmuster
-     (Datei extern weiterbearbeiten) faktisch nicht gegeben. Möglicher Fix: `detach.lua` einen
-     `--listen`-Socket mitgeben (Adresse in der Start-Notify ausgeben), damit man sich per
-     `nvim --server <addr> --remote` wieder anhängen kann — oder einen Datei-Watcher ergänzen,
-     der bei externer Änderung neu liest und pusht.
-  10. **`:MDView detach`: Schließen des Preview-Tabs beendet die detachte Neovim-Instanz NICHT
-      von selbst**, obwohl die Start-Notify genau das verspricht ("stop it by closing the
-      preview tab, or kill the pid"). Per Code-Analyse verifiziert: `User MDViewSessionEnded`
-      wird im gesamten Code nur an genau einer Stelle gefeuert (`bindings/usrcmds/stop.lua`,
-      innerhalb von `:MDViewStop`) — nichts beobachtet ein Tab-Close und feuert das Event
-      automatisch. Der Default-`browser.open_mode` ("default", von `minimal_init.lua` nicht
-      überschrieben) liefert laut `adapter/browser/init.lua` explizit "a handle with no
+  8. **`:MDView detach` / `scripts/mdview-bg.ps1`: the browser tab does not open at all, or
+     only after a delay of several minutes** (observed under Windows), even though the relay
+     itself comes up cleanly (health check ok, initial push arrives). ~~Still open~~ — the next
+     point of attack when picking this up again:
+     - The difference to `:MDView standalone` (which opens reliably and immediately): there,
+       the browser open runs directly inside the Go relay binary (`native/server/open.go`, a
+       single `rundll32.exe url.dll,FileProtocolHandler` call, no Neovim involved). `detach`
+       and `mdview-bg.ps1` both run through a **headless, completely stdio-less, detached**
+       Neovim instance (`nvim --headless -u scripts/minimal_init.lua -c "MDView start"`), in
+       which both the `/health` poll (`ws_client.lua`'s `http_get`, curl via
+       `vim.fn.jobstart`, every 200 ms for up to 10 s) and the actual open
+       (`mdview.adapter.browser`'s `open_default`, likewise `vim.fn.jobstart`) run chained
+       through Neovim's job control instead of through a single direct process spawn.
+     - Reproducing the exact `detached.spawn` call by hand (`uv.spawn` with
+       `stdio = {nil,nil,nil}`, `detached = true`) did work in one test run
+       (health check, WebSocket connect and render all came through) — so the code is not
+       fundamentally wrong, the timing is merely unreliable.
+     - Suspicion: `vim.fn.jobstart()` calls from a headless and detached (no stdio,
+       no console) Neovim instance on Windows are, under certain conditions, markedly
+       slower than from a normal interactive instance — and `detach`/`mdview-bg.ps1`
+       chain three of them (health poll → initial push → browser open) instead of getting
+       by with a single native spawn the way `standalone` does. Not yet isolated to an exact
+       cause (observed that way on the original test machine, not reproduced in another
+       environment — so more likely Neovim job control/Windows specific than a logic error
+       in the plugin code itself).
+     - Possible fix, should that be confirmed: spawn the browser-open step in the `detach`
+       path natively and directly, just as `standalone` does (e.g. through a small Go helper
+       or a direct `uv.spawn` call from Lua), instead of through `vim.fn.jobstart` from
+       inside the headless instance.
+  9. **`:MDView detach`: live push and scroll sync do not reach the detached preview when the
+     file is edited from a separate/new Neovim instance** — verified by test (README.md edited
+     and saved from a second, independent headless nvim instance; no new activity whatsoever
+     arrived in the detached session's relay log afterwards). Cause: the detached instance
+     holds its own buffer state as of the spawn moment; there is no file watcher (no
+     `vim.loop.new_fs_event`, no `checktime`/`autoread` timer — checked, none of that exists
+     in the code) and `detach.lua` starts the child process without `--listen`, so one cannot
+     attach to that particular instance afterwards via `nvim --server`/`--remote` in order to
+     go on writing "inside it" either. That means the core difference to `standalone` described
+     in the module documentation (`bindings/usrcmds/detach.lua`) ("live buffer push … because a
+     real Neovim drives it") does not in fact hold in the only usage pattern currently reachable
+     (editing the file externally). Possible fix: give `detach.lua` a
+     `--listen` socket (print the address in the start notification) so one can reattach via
+     `nvim --server <addr> --remote` — or add a file watcher that rereads and pushes on an
+     external change.
+  10. **`:MDView detach`: closing the preview tab does NOT end the detached Neovim instance
+      by itself**, even though the start notification promises exactly that ("stop it by closing
+      the preview tab, or kill the pid"). Verified by code analysis: `User MDViewSessionEnded`
+      is fired in the entire code base at exactly one place (`bindings/usrcmds/stop.lua`,
+      inside `:MDViewStop`) — nothing observes a tab close and fires the event
+      automatically. The default `browser.open_mode` ("default", not overridden by
+      `minimal_init.lua`) explicitly yields, per `adapter/browser/init.lua`, "a handle with no
       job_id: mdview can't programmatically close it" — `on_exit`/`stop_on_browser_exit`
-      sind dort No-Ops. Und selbst wenn man `:MDViewStop` manuell auslösen wollte: die
-      detachte Instanz hat keinen `--listen`-Socket, ist also von außen gar nicht erreichbar.
-      Fazit: aktuell bleibt als einziger funktionierender Weg, eine `:MDView detach`-Instanz
-      zu beenden, tatsächlich nur `Stop-Process`/`taskkill` auf die PID — der "Tab schließen"-
-      Teil der Notify-Message ist derzeit irreführend. Hängt mit Punkt 9 zusammen (`--listen`
-      wäre auch hier die Voraussetzung für einen sauberen Fix, z.B. per periodischem
-      Health-Poll gegen den Relay: wenn keine Clients mehr verbunden sind, selbst `:MDViewStop`
-      auslösen).
-  11. ~~`:MDView start` (der normale, nicht-standalone/detach-Pfad) hatte keine Möglichkeit,
-      eine lokal gebaute Relay/Client-Version zu verwenden~~ — behoben. `server_args.resolve()`
-      rief bislang immer `install.ensure_binary()`/`install.ensure_client_bundle()` auf (feste
-      Bindung an `install.version`, Default `v0.2.0`); es gab **keinen** Override, weder als
-      Config-Feld noch als Env-Var — obwohl genau das schon in einer früheren Doku-Notiz als
-      `dev = { binary_path, web_root }` beschrieben war (dieses Feld existierte nirgends im
-      Code). Da `install.version`s Pin älter ist als die `/control`-Route (Overlay/Zoom/Cursor
-      Live-Control), liefen diese Live-Befehle über den normalen Start-Pfad ins Leere — fire-
-      and-forget POST gegen eine Route, die die gepinnte Release-Binary noch nicht kennt, ohne
-      Fehler oder Effekt. Fix: neues `dev.binary_path` / `dev.web_root` (mit Fallback auf
-      `$MDVIEW_DEV_BINARY` / `$MDVIEW_DEV_WEB_ROOT`, aus demselben Grund wie bei `standalone`
-      — ein detachter Prozess lädt keine Lua-Config) in `lua/mdview/adapter/server_args.lua`;
-      dokumentiert in `docs/configuration.md`. End-to-End verifiziert: lokal gebaute Relay
-      (aktueller `main`-Branch) über `:MDView start` gestartet, `/control` mit Zoom-/Overlay-/
-      Cursor-Payloads direkt gepostet → alle drei `204`.
+      are no-ops there. And even if one wanted to trigger `:MDViewStop` manually: the
+      detached instance has no `--listen` socket, so it cannot be reached from outside at all.
+      Conclusion: at present the only working way to end a `:MDView detach` instance really is
+      `Stop-Process`/`taskkill` on the PID — the "close the tab" part of the notification
+      message is currently misleading. Related to point 9 (`--listen` would be the
+      precondition for a clean fix here too, e.g. via a periodic health poll against the relay:
+      when no clients are connected any more, trigger `:MDViewStop` itself).
+  11. ~~`:MDView start` (the normal, non-standalone/detach path) had no way to use a
+      locally built relay/client version~~ — fixed. `server_args.resolve()` used to
+      always call `install.ensure_binary()`/`install.ensure_client_bundle()` (a fixed
+      binding to `install.version`, default `v0.2.0`); there was **no** override, neither as
+      a config field nor as an env var — even though exactly that had already been described
+      in an earlier documentation note as `dev = { binary_path, web_root }` (a field that
+      existed nowhere in the code). Since `install.version`'s pin is older than the `/control`
+      route (overlay/zoom/cursor live control), those live commands ran into the void over the
+      normal start path — a fire-and-forget POST against a route the pinned release binary does
+      not know yet, without an error or an effect. Fix: new `dev.binary_path` / `dev.web_root`
+      (with a fallback to `$MDVIEW_DEV_BINARY` / `$MDVIEW_DEV_WEB_ROOT`, for the same reason as
+      with `standalone` — a detached process loads no Lua config) in
+      `lua/mdview/adapter/server_args.lua`; documented in `docs/configuration.md`. Verified
+      end to end: locally built relay (current `main` branch) started via `:MDView start`,
+      `/control` posted directly with zoom/overlay/cursor payloads → all three `204`.
 
-  1. `TODO-Comments` lösen
-  3. ~~Es muss sichergestellt sein, dass `npm` installiert und im Pfad verfügbar ist~~ — obsolet seit dem Go/Rust-Rewrite:
-     Endnutzer brauchen kein npm/Node mehr; `mdview.adapter.install` lädt die fertige
-     Server-Binary + Client-Bundle von GitHub Releases. `:checkhealth` prüft stattdessen
-     `curl`/`tar`.
-  4. ~~In mdview.config ein Feld open_on_start (default true) und open_url (overrides) hinzufügen.~~
-     `browser.browser_autostart` deckt `open_on_start` bereits ab (gleiche Semantik, existierte
-     schon). Neu hinzugefügt: `browser.open_url` — statische Override-URL, greift in
-     `launcher.resolve_browser_url()` nach dem per-call `opts.browser_url`, vor der
-     berechneten Key/Token-URL.
-  5. ~~Falls man feinere Kontrolle möchte: nur öffnen, wenn vim.fn.has("gui_running") == 1 oder
-     vim.env.DISPLAY gesetzt ist.~~ — behoben: `launcher.has_display()` (Windows/macOS immer
-     true, Unix prüft `DISPLAY`/`WAYLAND_DISPLAY`), gated hinter neuem
-     `browser.require_display` (default true). Ohne Display: Warnung statt sinnlosem
-     Browser-Spawn-Versuch.
-  6. ~~In Debug-Modus optional vim.notify("Opening browser: " .. url).~~ — behoben, `launcher.lua`
-     loggt das jetzt vor jedem `browser_adapter.open()`-Aufruf (`log.debug`, gated auf
-     `debug_preview` wie alle anderen Debug-Logs).
-  7. Fokus nach MDViewStart geht in den Browser — vermutlich bereits gegeben (neues
-     Chrome/Firefox `--app`-Fenster wird vom OS normalerweise automatisch fokussiert), aber
-     nicht zuverlässig aus Neovim heraus erzwingbar (kein plattformübergreifendes API dafür,
-     ohne fragile OS-spezifische Hacks wie `wmctrl`). Nicht weiter verfolgt.
-  8. Entschieden: Was kommt in die Logdatei, was wird in nvim ausgegeben? `adapter/log.lua`
-     hält zwei unabhängige Sinks: ein In-Memory-Ringpuffer (max. 2000 Zeilen, sichtbar via
-     `:MDViewShowWebLogs`) und optional eine Logdatei (nur wenn `log.setup({file_path=...})`
-     explizit gesetzt wird — nicht standardmäßig aktiv). UI-Echo (`vim.api.nvim_echo`) nur bei
+  1. Resolve `TODO` comments
+  3. ~~It has to be ensured that `npm` is installed and available on the path~~ — obsolete since the Go/Rust rewrite:
+     end users no longer need npm/Node; `mdview.adapter.install` downloads the finished
+     server binary plus client bundle from GitHub Releases. `:checkhealth` checks
+     `curl`/`tar` instead.
+  4. ~~Add a field open_on_start (default true) and open_url (overrides) to mdview.config.~~
+     `browser.browser_autostart` already covers `open_on_start` (same semantics, existed
+     already). Newly added: `browser.open_url` — a static override URL, taking effect in
+     `launcher.resolve_browser_url()` after the per-call `opts.browser_url` and before the
+     computed key/token URL.
+  5. ~~In case one wants finer control: only open when vim.fn.has("gui_running") == 1 or
+     vim.env.DISPLAY is set.~~ — fixed: `launcher.has_display()` (Windows/macOS always
+     true, Unix checks `DISPLAY`/`WAYLAND_DISPLAY`), gated behind the new
+     `browser.require_display` (default true). Without a display: a warning instead of a
+     pointless browser spawn attempt.
+  6. ~~In debug mode, optionally vim.notify("Opening browser: " .. url).~~ — fixed, `launcher.lua`
+     now logs that before every `browser_adapter.open()` call (`log.debug`, gated on
+     `debug_preview` like all the other debug logs).
+  7. Focus after MDViewStart goes to the browser — presumably already the case (a new
+     Chrome/Firefox `--app` window is normally focused by the OS automatically), but not
+     reliably enforceable from within Neovim (no cross-platform API for it, short of
+     fragile OS-specific hacks like `wmctrl`). Not pursued.
+  8. Decided: what goes into the log file, what is printed in nvim? `adapter/log.lua`
+     holds two independent sinks: an in-memory ring buffer (max. 2000 lines, visible via
+     `:MDViewShowWebLogs`) and optionally a log file (only when `log.setup({file_path=...})`
+     is set explicitly — not active by default). UI echo (`vim.api.nvim_echo`) only when
      `debug=true`.
-  9. ~~Wie soll sich der mdview-server-Prozess verhalten, wenn nvim geschlossen wurde, ohne dass
-     `MDViewStop` aufgerufen wurde?~~ — echter Bug gefunden und behoben: `vim_leave.lua`'s
-     `VimLeavePre`-Autocmd war mit `pattern = defaults.ft_pattern` registriert.
-     `VimLeavePre` ist aber ein globales Lifecycle-Event, kein Buffer-Event — Neovim matcht
-     `pattern` gegen den *aktuell fokussierten* Buffer im Moment des Events. War der zuletzt
-     aktive Buffer keine Markdown-Datei, feuerte die Cleanup-Logik NIE, und der
-     mdview-server-Prozess blieb verwaist. Fix: `pattern` entfernt — feuert jetzt immer.
-     Verifiziert (Test: aktueller Buffer = `.lua`-Datei, Autocmd feuert trotzdem).
-  10. ~~Es ist extrem wichtig, dass sich, wenn möglich, neue Tabs den bestehenden Prozess
-     anhängen.~~ — bereits durch die Architektur gegeben: der Go-Relay gruppiert Verbindungen
-     per Dokument-Pfad (`Registry` in `native/server/internal/relay/registry.go`), nicht per
-     Tab/Prozess. `:MDViewOpen` (siehe `mdview.open()`) verbindet sich immer mit der
-     laufenden Session statt einen neuen Server zu starten.
-  11. ~~Wenn man den Browser abschließt, muss damit umgegangen werden: Am besten schließt sich
-     auch die App.~~ — behoben: neues `browser.stop_on_browser_exit` (default true).
-     `launcher.lua`'s `on_exit`-Callback ruft jetzt `require("mdview.bindings.usrcmds.stop").stop()`
-     auf, wenn der Browser-Prozess endet (z. B. Fenster/Tab geschlossen). `stop()`'s
-     bestehende `state`-Guards machen einen doppelten Stop-Aufruf (z. B. wenn `:MDViewStop`
-     selbst den Browser schließt und dadurch erneut `on_exit` auslöst) ungefährlich.
-  12. ~~Ist es so bzw. möglich, dass ein Server mehrere CWD's hostet?~~ — ja, bereits gegeben.
-      Der laufende Relay-Prozess ist an keine CWD/Projekt-Root gebunden: Rooms werden per
-      absolutem Datei-Pfad geschlüsselt (`native/server/internal/relay/registry.go`), der
-      Server selbst liest nie Dateien vom Datenträger für den Markdown-Inhalt (der kommt per
-      HTTP-POST von Neovim) — nur der statische Client-Bundle-Pfad (`--web-root`) ist fix und
-      unabhängig davon, welche Datei gerade angezeigt wird. Ein einziger laufender Server kann
-      also Markdown-Dateien aus beliebig vielen, nicht verwandten Verzeichnissen gleichzeitig
-      bedienen, ohne Neustart. `server_cwd`/`cwd=...` betrifft nur das Arbeitsverzeichnis des
-      Server-*Prozesses* selbst, nicht welche Dateien er anzeigen kann.
+  9. ~~How should the mdview-server process behave when nvim was closed without
+     `MDViewStop` having been called?~~ — a real bug found and fixed: `vim_leave.lua`'s
+     `VimLeavePre` autocommand was registered with `pattern = defaults.ft_pattern`.
+     `VimLeavePre` is, however, a global lifecycle event, not a buffer event — Neovim matches
+     `pattern` against the *currently focused* buffer at the moment of the event. If the last
+     active buffer was not a markdown file, the cleanup logic NEVER fired and the
+     mdview-server process was left orphaned. Fix: `pattern` removed — it now always fires.
+     Verified (test: current buffer = a `.lua` file, the autocommand fires regardless).
+  10. ~~It is extremely important that new tabs attach to the existing process where
+     possible.~~ — already given by the architecture: the Go relay groups connections
+     per document path (`Registry` in `native/server/internal/relay/registry.go`), not per
+     tab or process. `:MDViewOpen` (see `mdview.open()`) always connects to the running
+     session instead of starting a new server.
+  11. ~~When one closes the browser, that has to be handled: ideally the app closes as
+     well.~~ — fixed: new `browser.stop_on_browser_exit` (default true).
+     `launcher.lua`'s `on_exit` callback now calls `require("mdview.bindings.usrcmds.stop").stop()`
+     when the browser process ends (e.g. window/tab closed). `stop()`'s
+     existing `state` guards make a double stop call (e.g. when `:MDViewStop` closes the
+     browser itself and thereby triggers `on_exit` again) harmless.
+  12. ~~Is it the case, or possible, that one server hosts several CWDs?~~ — yes, already given.
+      The running relay process is not bound to a CWD or project root: rooms are keyed by
+      absolute file path (`native/server/internal/relay/registry.go`), and the server itself
+      never reads files from disk for the markdown content (that arrives by HTTP POST from
+      Neovim) — only the static client bundle path (`--web-root`) is fixed, and independent
+      of which file is currently displayed. A single running server can therefore serve
+      markdown files from arbitrarily many unrelated directories at the same time, without a
+      restart. `server_cwd`/`cwd=...` concerns only the working directory of the server
+      *process* itself, not which files it can display.
 
 -
 
 ## Clean & Nice Code
 
-  1. jeder Parameter muss typisiert werden
-  2. Stark modularisieren
+  1. every parameter has to be typed
+  2. modularize heavily
 
 ## Testing
 
-  1. Line Diff: `tests\mdview\util\diff.md`
+  1. Line diff: `tests\mdview\util\diff.md`
 
 ---
 
@@ -258,28 +259,28 @@
 
 ## Server
 
-  1. ~~In server wss-Broadcast: vor dem client.send(payload) try/catch pro-client~~ — behoben in
-     `native/server/internal/relay/registry.go`: `Registry.Broadcast` sammelt Send-Fehler pro
-     Verbindung statt die Fan-out-Schleife abzubrechen (siehe `TestRegistry_BroadcastCollectsSendErrorsWithoutStoppingFanout`).
-  2. ~~Lokale Bildlinks im gerenderten HTML zeigen kaputte Icons~~ — behoben. Der
-     WASM-Renderer (`comrak`) erzeugte für `![alt](bild.png)` schon immer
-     korrektes `<img>`-Markup (siehe `source_map_does_not_pollute_image_alt`
-     in `native/wasm-render/src/lib.rs`), aber der einzige `http.FileServer`
-     zeigte auf `web_root` (das Client-Bundle), nie auf das Verzeichnis des
-     gerade angezeigten Dokuments — ein relativer Bildpfad daneben lief
-     serverseitig ins Leere. Neu: `GET /asset?key=&path=&token=` in
-     `native/server/main.go`, aufgelöst relativ zu dem Verzeichnis, das
-     `handleDoc` pro Session mitschreibt (`Registry.SetDocDir`/`DocDir`) —
-     die Basis kommt also ausschließlich vom vertrauenswürdigen lokalen
-     Neovim-Prozess, nie vom Browser-Tab. Pfad-Traversal-Schutz
-     (`filepath.Clean` + Containment-Check) und eine Endungs-Allowlist
-     (nur Bildformate) engen die Route bewusst ein, statt ein generischer
-     Datei-Server zu sein. Client-seitig schreibt `src/client/render/
-     localImages.ts` (`resolveLocalImages`, nach jedem Render aufgerufen,
-     analog zu `markExternalLinks`) relative `<img src>` auf diese Route um;
-     `http(s)://`/`data:`-Quellen bleiben unangetastet. Aus
-     `images.nvim`s `docs/ROADMAP/CROSS-PLUGIN.md` (mdview.nvim-Eintrag).
-     Tests: `main_test.go` (Traversal/Allowlist/Token/Session), `registry_test.go`
+  1. ~~In the server's wss broadcast: try/catch per client before the client.send(payload)~~ — fixed in
+     `native/server/internal/relay/registry.go`: `Registry.Broadcast` collects send errors per
+     connection instead of aborting the fan-out loop (see `TestRegistry_BroadcastCollectsSendErrorsWithoutStoppingFanout`).
+  2. ~~Local image links in the rendered HTML show broken icons~~ — fixed. The
+     WASM renderer (`comrak`) had always produced correct `<img>` markup for
+     `![alt](image.png)` (see `source_map_does_not_pollute_image_alt`
+     in `native/wasm-render/src/lib.rs`), but the only `http.FileServer`
+     pointed at `web_root` (the client bundle), never at the directory of
+     the document currently being displayed — a relative image path next
+     to it ran into the void server-side. New: `GET /asset?key=&path=&token=` in
+     `native/server/main.go`, resolved relative to the directory that
+     `handleDoc` records per session (`Registry.SetDocDir`/`DocDir`) —
+     so the base comes exclusively from the trusted local Neovim
+     process, never from the browser tab. Path-traversal protection
+     (`filepath.Clean` plus a containment check) and an extension allowlist
+     (image formats only) deliberately narrow the route down, instead of
+     it being a generic file server. Client-side, `src/client/render/
+     localImages.ts` (`resolveLocalImages`, called after every render,
+     analogous to `markExternalLinks`) rewrites relative `<img src>` onto that
+     route; `http(s)://` and `data:` sources are left untouched. From
+     `images.nvim`'s `docs/ROADMAP/CROSS-PLUGIN.md` (the mdview.nvim entry).
+     Tests: `main_test.go` (traversal/allowlist/token/session), `registry_test.go`
      (`SetDocDir`/`DocDir`), `TESTS/client/localImages.test.ts`.
 
 ---
@@ -310,138 +311,139 @@
   (per the personal plugin checklist). Nothing applicable found: mdview.nvim is a
   markdown preview tool with no file-tree/file-navigation surface of its own.
 
-- In filetree.nvim könnte man usrcmds / keymaps andenken,die wenn auf einer file node die markdown ist steht,dass man diese dann via mdview direkt aus dem filetree aus öffnen kann
+- In filetree.nvim one could consider user commands / keymaps that, when the cursor sits on a file node that is markdown, let one open that file via mdview straight from the file tree
 
 ## bonus features
 
-  1. ~~`open_preview_tab` ermöglichen um die Ausgabe im nvim-Tab anstatt im Browser
-     anzuzeigen~~ — umgesetzt, bewusst komplett entkoppelt von der Browser/WASM-Pipeline
-     (kein HTML, kein Relay/WebSocket, kein externes Tool wie `glow`):
-     - Neues `lua/mdview/adapter/preview_tab.lua`: öffnet einen eigenen Tab mit einem
-       read-only Mirror-Buffer des Quell-Buffers, gehighlighted via Neovims Markdown-
-       Treesitter-Parser (Fallback auf Vims mitgeliefertes `syntax=markdown`, falls der
-       Parser fehlt — nie ungehighlighted). Live-Sync über eine eigene, selbstständige
-       Autocmd-Gruppe (`bindings/autocmds/preview_tab_sync.lua`), komplett unabhängig vom
-       `:MDViewStart`/`:MDViewStop`-Lifecycle — funktioniert eigenständig ohne laufenden Server.
-     - Neuer Command `:MDViewPreviewTab` (Toggle, funktioniert standalone).
-     - Neues Config-Feld `open_preview_tab` (default false): wenn true, öffnet
-       `:MDViewStart` den Tab-Preview statt des Browsers (Relay/WASM-Pipeline läuft trotzdem
-       im Hintergrund weiter, `:MDViewOpen` kann den Browser jederzeit nachträglich öffnen).
-     - Bewusst gegen `glow`/externe Renderer entschieden: kein zusätzlicher optionaler
-       Toolchain-Kandidat, keine Subprozess-Ausführung für dieses Feature — passt besser
-       zum "minimale Angriffsfläche"-Ziel des Rewrites als ein weiteres opt-in External-Tool.
-     - End-to-End verifiziert (headless nvim: Toggle open/close, Treesitter-Highlighting,
-       Live-Sync bei Buffer-Änderung, korrektes Cleanup beim Schließen).
-  2. ~~Rendern einer Datei in einen übergebenen Pfad mit optionalem cwd:
-     `:MDViewStart C:/Users/bartl/test.md {cwd?}`~~ — behoben: `:MDViewStart` akzeptiert jetzt
-     `nargs="*"`, parsed Datei-Pfad + optionales `cwd=...` in beliebiger Reihenfolge.
-  3. ~~Starten einer Datei mit manuell gesetztem cwd: `:MDViewStart cwd="c:/Users/bartl/"`~~ —
-     behoben, gleicher Mechanismus wie oben (`cwd=` ohne Datei-Arg nutzt den aktuellen Buffer).
-  4. ~~Schließen des Browser Tabs soll auch MDView beenden~~ — behoben, siehe BUGS #11
+  1. ~~Provide `open_preview_tab` so the output is shown in an nvim tab instead of in the
+     browser~~ — implemented, deliberately decoupled entirely from the browser/WASM pipeline
+     (no HTML, no relay/WebSocket, no external tool such as `glow`):
+     - New `lua/mdview/adapter/preview_tab.lua`: opens its own tab with a read-only mirror
+       buffer of the source buffer, highlighted via Neovim's markdown treesitter
+       parser (falling back to Vim's bundled `syntax=markdown` if the parser is
+       missing — never unhighlighted). Live sync through its own, self-contained
+       autocommand group (`bindings/autocmds/preview_tab_sync.lua`), completely independent of
+       the `:MDViewStart`/`:MDViewStop` lifecycle — it works on its own without a running server.
+     - New command `:MDViewPreviewTab` (a toggle, works standalone).
+     - New config field `open_preview_tab` (default false): when true, `:MDViewStart`
+       opens the tab preview instead of the browser (the relay/WASM pipeline still runs
+       in the background, and `:MDViewOpen` can open the browser later at any time).
+     - Deliberately decided against `glow`/external renderers: no additional optional
+       toolchain candidate, no subprocess execution for this feature — that fits the
+       "minimal attack surface" goal of the rewrite better than another opt-in external tool.
+     - Verified end to end (headless nvim: toggle open/close, treesitter highlighting,
+       live sync on buffer change, correct cleanup on close).
+  2. ~~Render a file at a given path with an optional cwd:
+     `:MDViewStart C:/Users/bartl/test.md {cwd?}`~~ — fixed: `:MDViewStart` now accepts
+     `nargs="*"` and parses a file path plus an optional `cwd=...` in any order.
+  3. ~~Start a file with a manually set cwd: `:MDViewStart cwd="c:/Users/bartl/"`~~ —
+     fixed, the same mechanism as above (`cwd=` without a file argument uses the current buffer).
+  4. ~~Closing the browser tab should end MDView as well~~ — fixed, see BUGS #11
      (`browser.stop_on_browser_exit`).
-  5. Wie behandeln wir, wenn MDViewOpen bei mehreren Dateien ausgeführt wird? Sessions machen? —
-     bereits gelöst: jede Datei bekommt ihren eigenen WS-"Room" (Key = normalisierter Pfad) im
-     Go-Relay; `:MDViewOpen` öffnet für die aktuelle Datei einen Tab in genau diesem Room, ohne
-     andere offene Dateien/Tabs zu beeinflussen. Keine zusätzliche Session-Verwaltung nötig.
-  6. ~~Bidirektionales Scrolling, mindestens aber von nvim zu browser~~ — nvim-zu-Browser-Richtung
-     umgesetzt (Browser-zu-nvim bleibt offen, war nicht gefordert: "mindestens aber..."):
-     Neuer `POST /scroll?key=...&token=...`-Endpoint (Go), der Cursor-Zeile+Gesamtzeilen als
-     `"<line>/<total>"` per `Registry.BroadcastEphemeral` an die Raum-Mitglieder verteilt — bewusst
-     NICHT über `Broadcast`, da das `LastPayload` überschreiben und neu beitretende Tabs mit der
-     Scroll-Position statt dem echten Dokument seeden würde (getestet:
-     `TestRegistry_BroadcastEphemeralReachesRoomWithoutTouchingLastPayload`). Nachrichten sind mit
-     `\x01`-Präfix getaggt (nicht in getipptem Markdown möglich), damit der Client zwischen
-     Content-Update und Scroll-Ping unterscheiden kann, ohne einen JSON-Envelope einzuführen.
-     Neues `bindings/autocmds/scroll_sync.lua` sendet auf `CursorMoved`/`CursorMovedI`, throttled
-     (`scroll_sync_throttle_ms`, default 150ms), gated hinter `scroll_sync` (default true). Client
-     scrollt proportional (`line/total`-Verhältnis), kein Source-Line-Mapping in comrak nötig —
-     bewusst kein Pixel-genauer Abgleich, sondern ein robuster, einfacher erster Wurf.
-     Nebenbefund beim Verifizieren: `#mdview-root` hatte gar kein CSS und war dadurch nicht
-     scrollbar (wuchs nur mit dem Inhalt) — `index.html` bekam ein Minimal-Stylesheet
-     (`height:100vh; overflow-y:auto`), sonst wäre auch `scrollTop` grundsätzlich wirkungslos
-     gewesen. End-to-End mit echtem Browser (Playwright-Preview) verifiziert.
-  2. ~~`:MDView blanklines [on|off|toggle]`: Leerzeilen im Quelltext 1:1 als sichtbaren
-     Abstand in der Preview zeigen, statt CommonMarks Standardverhalten (jede Folge von
-     Leerzeilen wird zu genau einem Absatzabstand komprimiert)~~ — umgesetzt. Kein
-     Rust/Comrak-Änderungsbedarf: `data-sourcepos="startLine:col-endLine:col"` wird bereits
-     unbedingt auf jedem Top-Level-Block emittiert (`native/wasm-render/src/lib.rs`,
-     `options.render.sourcepos = true`), unabhängig vom Source-Map-Parameter fürs Caret.
-     Neue Client-Seite `src/client/render/blankLines.ts`: berechnet je zwei aufeinander-
-     folgenden Top-Level-Blöcken die tatsächliche Leerzeilen-Zahl aus der Sourcepos-Lücke
-     und fügt bei Bedarf einen reinen Spacer-`<div>` mit `height: Nem` VOR dem Block ein
-     (additiv, damit das Theme-eigene Absatz-/Heading-Margin unangetastet bleibt statt
-     überschrieben zu werden). `docModel.ts`s `BlockPos` um `endLine` erweitert. Wired wie
-     Zoom/Cursor/Overlay: `browser.preserve_blank_lines` (default `false`) in `DEFAULTS.lua`,
-     `?blanklines=1` in `launcher.lua`s URL-Aufbau (nur bei `true`, wie bei `zoom`), neues
-     `lua/mdview/bindings/usrcmds/blanklines.lua` + Route in `usrcmds/init.lua`, Live-Update
-     über denselben `/control`-Kanal (`{blankLines: bool}` — Wire-Key bleibt bewusst anders
-     als der Config-Feldname, wie bei `cursor_marker` → `cursor`). End-to-End verifiziert:
-     lokal gebaute Relay über `:MDView start` (mit dem neuen `dev.binary_path`/`dev.web_root`,
-     siehe „Allgemein"), `:MDView blanklines on` → Notify bestätigt + `/control` mit
-     `{"blankLines":true}` direkt gepostet → `204`. Lua-Testsuite (24/24) und ESLint auf den
-     neuen/geänderten Client-Dateien grün; `tsc --noEmit` bricht nur an der in diesem Worktree
-     fehlenden generierten `wasm-render`-Datei ab (nie gebaut, unabhängig von dieser Änderung)
-     — sonst keine Typfehler.
+  5. How do we handle MDViewOpen being run on several files? Introduce sessions? —
+     already solved: every file gets its own WS "room" (key = normalized path) in the
+     Go relay; `:MDViewOpen` opens a tab for the current file in exactly that room, without
+     affecting other open files/tabs. No additional session management needed.
+  6. ~~Bidirectional scrolling, but at minimum from nvim to browser~~ — the nvim-to-browser
+     direction implemented (browser to nvim remains open, it was not required: "but at minimum …"):
+     A new `POST /scroll?key=...&token=...` endpoint (Go) that distributes the cursor line plus
+     total lines as `"<line>/<total>"` to the room members via `Registry.BroadcastEphemeral` —
+     deliberately NOT via `Broadcast`, since that would overwrite `LastPayload` and seed newly
+     joining tabs with the scroll position instead of the real document (tested:
+     `TestRegistry_BroadcastEphemeralReachesRoomWithoutTouchingLastPayload`). Messages are tagged
+     with an `\x01` prefix (not possible in typed markdown) so that the client can tell a
+     content update from a scroll ping apart without introducing a JSON envelope.
+     A new `bindings/autocmds/scroll_sync.lua` sends on `CursorMoved`/`CursorMovedI`, throttled
+     (`scroll_sync_throttle_ms`, default 150 ms), gated behind `scroll_sync` (default true). The
+     client scrolls proportionally (the `line/total` ratio), no source-line mapping needed in
+     comrak — deliberately not a pixel-exact match, but a robust, simple first pass.
+     A side finding while verifying: `#mdview-root` had no CSS at all and was therefore not
+     scrollable (it merely grew with the content) — `index.html` got a minimal stylesheet
+     (`height:100vh; overflow-y:auto`), without which `scrollTop` would have been fundamentally
+     ineffective anyway. Verified end to end with a real browser (Playwright preview).
+  2. ~~`:MDView blanklines [on|off|toggle]`: show blank lines in the source 1:1 as visible
+     spacing in the preview, instead of CommonMark's standard behaviour (every run of
+     blank lines is compressed to exactly one paragraph gap)~~ — implemented. No
+     Rust/comrak change needed: `data-sourcepos="startLine:col-endLine:col"` is already
+     emitted unconditionally on every top-level block (`native/wasm-render/src/lib.rs`,
+     `options.render.sourcepos = true`), independent of the source-map parameter for the caret.
+     New on the client side, `src/client/render/blankLines.ts`: computes, for each two
+     consecutive top-level blocks, the actual number of blank lines from the sourcepos gap
+     and where needed inserts a pure spacer `<div>` with `height: Nem` BEFORE the block
+     (additively, so that the theme's own paragraph/heading margin is left untouched instead of
+     being overridden). `docModel.ts`'s `BlockPos` extended by `endLine`. Wired like
+     zoom/cursor/overlay: `browser.preserve_blank_lines` (default `false`) in `DEFAULTS.lua`,
+     `?blanklines=1` in `launcher.lua`'s URL construction (only when `true`, as with `zoom`), a
+     new `lua/mdview/bindings/usrcmds/blanklines.lua` plus a route in `usrcmds/init.lua`, live
+     update over the same `/control` channel (`{blankLines: bool}` — the wire key deliberately
+     stays different from the config field name, as with `cursor_marker` → `cursor`). Verified
+     end to end: locally built relay via `:MDView start` (with the new
+     `dev.binary_path`/`dev.web_root`, see "General"), `:MDView blanklines on` → notification
+     confirmed plus `/control` posted directly with `{"blankLines":true}` → `204`. Lua test
+     suite (24/24) and ESLint on the new/changed client files green; `tsc --noEmit` only breaks
+     on the generated `wasm-render` file missing in this worktree (never built, unrelated to
+     this change) — no type errors otherwise.
 
 ---
 
-## UX: Browser-Modi & Rendering-Look
+## UX: browser modes and the rendering look
 
-  1. ~~Preview öffnete in einem separaten Fenster (nicht als Tab im normalen Browser) und ohne
-     die Extensions/das Aussehen des Nutzers~~ — neues `browser.open_mode` (default `"default"`):
-     - `"default"`: öffnet die URL im Standard-Browser des Nutzers als neuer Tab (via
-       `vim.ui.open`, Fallback `start`/`open`/`xdg-open`) — seine Extensions, sein Theme, sein
-       Profil. Trade-off: mdview kann den Tab nicht programmatisch schließen, daher sind
-       `browser_autoclose`/`stop_on_browser_exit` in diesem Modus No-ops (markdown-preview.nvim-
-       Ansatz, siehe `markdown_preview/browser/tab.md`).
-     - `"isolated"`: bisheriges Verhalten (eigenes Profil, eigener Prozess) — Auto-Close
-       funktioniert zuverlässig, aber ohne die Extensions/Lesezeichen des Nutzers.
-     Kooperatives Schließen im default-Modus (WS-`close`-Event → `window.close()`) ist als
-     Mittel-Task in [`ROADMAP.md`](ROADMAP.md) erfasst.
-  2. ~~Gerendertes Markdown sah schlecht aus (Client-HTML hatte praktisch kein CSS)~~ — eingebautes
-     GitHub-artiges Theme (`src/client/themes/github.css`, Light/Dark automatisch via
-     `prefers-color-scheme`, plus `data-theme`-Pinning). Theme-Auswahl über `browser.theme`
-     (an den Client als `?theme=` übergeben) + lazy-geladene `THEME_LOADERS` in `main.ts` →
-     weitere Themes sind ein CSS-File + ein Map-Eintrag. End-to-End im echten Browser verifiziert
-     (Headings mit Border, Codeblöcke, Tabellen, Blockquotes, Dark-Mode). Die „externe
-     Renderer-Website"-Idee ist als opt-in-Task in [`ROADMAP.md`](ROADMAP.md) festgehalten (mit Privacy-Hinweis:
-     widerspricht dem loopback-only-Modell) — `browser.open_url` ist bereits die Escape-Hatch für
-     eine beliebige URL.
-  3. ~~GFM-Task-Listen (`- [ ]` / `- [x]`) wurden ohne Checkbox gerendert~~ — ammonia strippte die
-     `<input>`-Elemente (nicht in der Default-Allowlist). Sanitizer in
-     `native/wasm-render/src/lib.rs` erlaubt jetzt gezielt `<input>` mit nur `type`/`checked`/
-     `disabled` (Checkboxen können kein JS ausführen, kein Form-Kontext, `formaction`/Event-Handler
-     werden weiterhin entfernt — mit Test `strips_dangerous_input_attributes`).
+  1. ~~The preview opened in a separate window (not as a tab in the normal browser) and without
+     the user's extensions/appearance~~ — new `browser.open_mode` (default `"default"`):
+     - `"default"`: opens the URL in the user's default browser as a new tab (via
+       `vim.ui.open`, falling back to `start`/`open`/`xdg-open`) — their extensions, their
+       theme, their profile. Trade-off: mdview cannot close the tab programmatically, so
+       `browser_autoclose`/`stop_on_browser_exit` are no-ops in this mode (the
+       markdown-preview.nvim approach, see `markdown_preview/browser/tab.md`).
+     - `"isolated"`: the previous behaviour (own profile, own process) — auto-close
+       works reliably, but without the user's extensions/bookmarks.
+     Cooperative closing in default mode (a WS `close` event → `window.close()`) is recorded as
+     a medium task in [`ROADMAP.md`](ROADMAP.md).
+  2. ~~Rendered markdown looked bad (the client HTML had practically no CSS)~~ — a built-in
+     GitHub-like theme (`src/client/themes/github.css`, light/dark automatically via
+     `prefers-color-scheme`, plus `data-theme` pinning). Theme selection through `browser.theme`
+     (passed to the client as `?theme=`) plus lazily loaded `THEME_LOADERS` in `main.ts` →
+     further themes are a CSS file plus a map entry. Verified end to end in a real browser
+     (headings with a border, code blocks, tables, blockquotes, dark mode). The "external
+     renderer website" idea is recorded as an opt-in task in [`ROADMAP.md`](ROADMAP.md) (with a
+     privacy note: it contradicts the loopback-only model) — `browser.open_url` is already the
+     escape hatch for an arbitrary URL.
+  3. ~~GFM task lists (`- [ ]` / `- [x]`) were rendered without a checkbox~~ — ammonia stripped
+     the `<input>` elements (not in the default allowlist). The sanitizer in
+     `native/wasm-render/src/lib.rs` now specifically allows `<input>` with only
+     `type`/`checked`/`disabled` (checkboxes cannot execute JS, there is no form context, and
+     `formaction`/event handlers are still removed — with the test
+     `strips_dangerous_input_attributes`).
 
 ---
 
 ## Performance: `:MDView start` vs. `:MDView standalone`
 
-  1. ~~Entlastet `standalone` Neovim gegenüber dem normalen `start`-Pfad?~~ — ja, klar und
-     drastisch gemessen. Kontrollierter Benchmark: 150 diskrete Edits an einer Markdown-Datei,
-     einmal durch `:MDView start` (Edits über `nvim_buf_set_lines` in derselben Instanz, die auch
-     den Relay-Kindprozess hält), einmal durch `:MDView standalone` (dieselben 150 Edits extern
-     per `Add-Content` direkt auf die Datei, während die startende nvim-Instanz nur noch daneben
-     steht). Gemessen wurde die CPU-Zeit des nvim.exe-Prozesses selbst (`Get-Process
-     .TotalProcessorTime`-Delta, Windows).
-     - **`start`: 1875 ms CPU** für 150 Edits (~2.9s Wall-Zeit) — nvim war den Großteil der Zeit
-       aktiv CPU-beschäftigt.
-     - **`standalone`: 0 ms CPU** — komplett unverändert, obwohl dieselben 150 Edits an der
-       beobachteten Datei ankamen.
-     - Ursache gefunden: `bindings/autocmds/live_push.lua` throttelt **nicht** — jedes
-       `TextChanged`/`TextChangedI` (potenziell jeder Tastenanschlag im Insert-Modus) spawnt
-       sofort einen eigenen `curl`-Prozess via `vim.fn.jobstart` für den vollen Buffer-Push. Bei
-       `standalone` gibt es diesen Pfad überhaupt nicht — der Relay beobachtet die Datei mit
-       seinem eigenen (Go-seitigen) Watcher, komplett entkoppelt von Neovim.
-     - ~~Mögliche Folge-Optimierung: `live_push` throttlen (ähnlich `scroll_sync_throttle_ms`)~~ —
-       umgesetzt. Neues `live_push_throttle_ms` (default 150, wie `scroll_sync_throttle_ms`) in
-       `lua/mdview/bindings/autocmds/live_push.lua`. Anders als Scroll-Sync's Throttle (das einen
-       zu frühen Ping einfach verwirft — unkritisch für eine transiente Scroll-Position) darf ein
-       Content-Push nicht verworfen werden, sonst bliebe die Preview dauerhaft veraltet, ohne dass
-       etwas anderes einen Resync auslöst. Deshalb: Push innerhalb des Throttle-Fensters wird nicht
-       verworfen, sondern auf einen einzelnen Trailing-Timer verschoben (max. `throttle_ms`
-       Verzögerung, kein Neu-Terminieren bei jedem weiteren Tastenanschlag) — der letzte Stand
-       kommt garantiert an. `BufWritePost`s Full-Push beim Speichern bleibt bewusst ungedrosselt
-       (seltener, dient als Resync-Punkt). Verifiziert mit demselben Benchmark wie oben: 150 Edits
-       unter `:MDView start` fielen von 1875ms auf **937,5ms CPU** (−50%). Lua-Testsuite (24/24)
-       weiterhin grün.
+  1. ~~Does `standalone` relieve Neovim compared to the normal `start` path?~~ — yes, clearly and
+     drastically measured. Controlled benchmark: 150 discrete edits to a markdown file,
+     once through `:MDView start` (edits via `nvim_buf_set_lines` in the same instance that also
+     holds the relay child process), once through `:MDView standalone` (the same 150 edits made
+     externally via `Add-Content` directly on the file, while the nvim instance that started it
+     merely sits alongside). What was measured is the CPU time of the nvim.exe process itself
+     (`Get-Process .TotalProcessorTime` delta, Windows).
+     - **`start`: 1875 ms CPU** for 150 edits (~2.9 s wall time) — nvim was actively busy on the
+       CPU for most of that time.
+     - **`standalone`: 0 ms CPU** — completely unchanged, even though the same 150 edits
+       arrived at the observed file.
+     - Cause found: `bindings/autocmds/live_push.lua` does **not** throttle — every
+       `TextChanged`/`TextChangedI` (potentially every keystroke in insert mode) immediately
+       spawns its own `curl` process via `vim.fn.jobstart` for the full buffer push. With
+       `standalone` that path does not exist at all — the relay observes the file with
+       its own (Go-side) watcher, completely decoupled from Neovim.
+     - ~~Possible follow-up optimization: throttle `live_push` (similar to `scroll_sync_throttle_ms`)~~ —
+       implemented. New `live_push_throttle_ms` (default 150, like `scroll_sync_throttle_ms`) in
+       `lua/mdview/bindings/autocmds/live_push.lua`. Unlike the scroll-sync throttle (which simply
+       discards a ping that comes too early — uncritical for a transient scroll position), a
+       content push must not be discarded, or the preview would stay permanently out of date
+       without anything else triggering a resync. Hence: a push inside the throttle window is not
+       discarded but deferred onto a single trailing timer (at most `throttle_ms`
+       delay, no rescheduling on each further keystroke) — the latest state is guaranteed
+       to arrive. `BufWritePost`'s full push on save deliberately stays unthrottled
+       (rarer, and it serves as a resync point). Verified with the same benchmark as above: 150
+       edits under `:MDView start` fell from 1875 ms to **937.5 ms CPU** (−50%). Lua test suite
+       (24/24) still green.
