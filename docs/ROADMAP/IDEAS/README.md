@@ -8,7 +8,7 @@ verlorengeht.
 | **dieser** | Ideen ohne nahe Umsetzung: exotisch, noch nicht konkretisiert, oder bewusst zurückgestellt |
 | [`../ROADMAP.md`](../ROADMAP.md) | offene Punkte, die konkret genug zum Anfangen sind |
 | [`../DONE.md`](../DONE.md) | Entscheidungs-Log: was gebaut wurde und warum so |
-| [`../FEATURES/`](../FEATURES/) | Katalog dessen, was es heute gibt |
+| [`docs/FEATURES/`](../../FEATURES/) | Katalog dessen, was es heute gibt |
 
 Die Grenze zur Roadmap: **kann man morgen anfangen?** Wenn ja, gehört es in
 `ROADMAP.md`. Wenn zuerst noch Entwurfsarbeit, eine Grundsatzentscheidung
