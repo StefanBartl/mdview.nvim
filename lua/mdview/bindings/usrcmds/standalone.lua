@@ -202,7 +202,12 @@ function M.run(file_arg, no_browser)
 			vim.uri_encode(highlighter)
 		)
 
-		log.debug(("standalone: spawned pid %d for %s at %s"):format(pid, target, url), nil, "usercmds.standalone", true)
+		log.debug(
+			("standalone: spawned pid %d for %s at %s"):format(pid, target, url),
+			nil,
+			"usercmds.standalone",
+			true
+		)
 
 		local msg = ("[mdview] standalone preview started (pid %d) for %s\nNo Neovim involved — it follows the file on disk. Stop it by killing the pid."):format(
 			pid,
