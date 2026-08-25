@@ -1,33 +1,33 @@
-# Ideen
+# Ideas
 
-Was hier liegt, ist **nicht geplant** — es ist festgehalten, damit es nicht
-verlorengeht.
+What lies here is **not planned** — it is recorded so that it does not get
+lost.
 
-| Ordner | Inhalt |
+| Folder | What |
 | --- | --- |
-| **dieser** | Ideen ohne nahe Umsetzung: exotisch, noch nicht konkretisiert, oder bewusst zurückgestellt |
-| [`../ROADMAP.md`](../ROADMAP.md) | offene Punkte, die konkret genug zum Anfangen sind |
-| [`../DONE.md`](../DONE.md) | Entscheidungs-Log: was gebaut wurde und warum so |
-| [`docs/FEATURES/`](../../FEATURES/) | Katalog dessen, was es heute gibt |
+| **this one** | ideas with no near-term implementation: exotic, not yet made concrete, or deliberately deferred |
+| [`../ROADMAP.md`](../ROADMAP.md) | open items that are concrete enough to be started |
+| [`../DONE.md`](../DONE.md) | decision log: what was built and why that way |
+| [`docs/FEATURES/`](../../FEATURES/) | the catalogue of what exists today |
 
-Die Grenze zur Roadmap: **kann man morgen anfangen?** Wenn ja, gehört es in
-`ROADMAP.md`. Wenn zuerst noch Entwurfsarbeit, eine Grundsatzentscheidung
-oder ein konkreter Bedarfsfall fehlt, gehört es hierher.
+The line against the roadmap: **could one start tomorrow?** If yes, it
+belongs in `ROADMAP.md`. If design work, a matter of principle, or a concrete
+case for it is still missing, it belongs here.
 
-## Inhalt
+## Contents
 
-- **[KONZEPT_overlays.md](KONZEPT_overlays.md)** — generisches, erweiterbares
-  Overlay-System über der Preview (schwebendes TOC, Cursor-Lupe, Keycast) als
-  ein System statt loser Einzel-Features. Teile davon existieren inzwischen
-  (`src/client/render/overlays/`), das Gesamtkonzept ist offen.
-- **[KONZEPT_links_und_cursor.md](KONZEPT_links_und_cursor.md)** — Link-Verhalten
-  im Preview-Tab und Cursor-Overlay. Der Link-Teil ist inzwischen weitgehend
-  umgesetzt (`externalLinks.ts`, `clickNav.ts`, `linkHover.ts`); die
-  Cursor-Overlay-Stufen sind es nicht.
+- **[KONZEPT_overlays.md](KONZEPT_overlays.md)** — a generic, extensible
+  overlay system over the preview (a floating TOC, a cursor magnifier,
+  keycast) as one system instead of loose individual features. Parts of it
+  exist by now (`src/client/render/overlays/`), the overall concept is open.
+- **[KONZEPT_links_und_cursor.md](KONZEPT_links_und_cursor.md)** — link
+  behaviour in the preview tab, and the cursor overlay. The link part is
+  largely implemented by now (`externalLinks.ts`, `clickNav.ts`,
+  `linkHover.ts`); the cursor overlay stages are not.
 - **[KONZEPT_headless_und_standalone.md](KONZEPT_headless_und_standalone.md)** —
-  Preview ohne laufende Neovim-Instanz. `:MDView standalone` deckt den
-  Hauptfall ab; die weitergehenden Stufen sind offen.
+  a preview without a running Neovim instance. `:MDView standalone` covers
+  the main case; the further stages are open.
 
-> Diese drei Dokumente sind älter als der Go/Rust-Rewrite und nennen teils
-> Endpoints, die es nicht mehr gibt (z. B. `/render?key=`). Als Idee bleiben
-> sie gültig, die Umsetzung folgt der heutigen Architektur.
+> These three documents are older than the Go/Rust rewrite and name endpoints
+> that no longer exist in places (e.g. `/render?key=`). As ideas they remain
+> valid; the implementation follows today's architecture.
