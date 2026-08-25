@@ -4,7 +4,7 @@
 #   shared with the Node job via an artifact
 # - Node/TypeScript: install, lint, type-check, test, build client
 # - Go: vet, build, test the relay server
-# - Lua: luacheck + optional busted unit tests
+# - Lua: luacheck + optional busted unit TESTS
 # - Release (tag pushes only): cross-compile the relay server, package the
 #   client bundle, publish both to a GitHub Release for mdview.nvim's
 #   install.lua to download
@@ -122,7 +122,7 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           version: latest
-          args: --check lua tests
+          args: --check lua TESTS
 
   lua:
     name: Lua / Neovim quick checks
