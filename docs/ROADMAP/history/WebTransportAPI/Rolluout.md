@@ -1,29 +1,35 @@
-> ⚠️ **VERALTET / verworfen.** Beschreibt eine Transport-Abstraktion mit
-> `dev-config.ts` / `webtransport.transport.ts` (beide gelöscht). WebTransport
-> wurde nicht umgesetzt (siehe `../../DONE.md` BUGS #3). Nur Historie.
+> ⚠️ **OUTDATED / dropped.** Describes a transport abstraction with
+> `dev-config.ts` / `webtransport.transport.ts` (both deleted). WebTransport was
+> not implemented (see `../../DONE.md` BUGS #3). History only.
 
 ---
 
-## Zustimmung und Architekturvorschlag (Kurz)
+## Agreement and architecture proposal (short)
 
-Ja — dem Vorschlag zustimmen. Die sauberste, wartbare Lösung ist eine **Transport-Adapter-Abstraktion** mit klar getrennten Implementierungen in separaten Dateien (keine Vermischung von WebSocket und WebTransport in einer Datei). Der Auswahl-Mechanismus ist dev-kontrollierbar (Feature-Flag im Quellcode), der Client macht zusätzlich eine **Feature-Detect** auf `window.WebTransport`. Je nach Flag + Detektion wird genau **eine** Implementierung dynamisch geladen. Dadurch bleibt der Code modular, testbar und das Risiko gering.
-
----
-
-## Prinzipien / Anforderungen an die Implementierung
-
-* **Single Responsibility:** jede Transport-Implementierung in eigener Datei (`websocket.transport.ts`, `webtransport.transport.ts`).
-* **Transport-Interface:** ein gemeinsames TypeScript-Interface (`Transport`) beschreibt die API (sendMessage, onMessage, sendDatagram optional, openStream optional, close).
-* **Factory/Bootstrap:** `transportFactory.ts` entscheidet (dev-flag + feature-detect) und lädt per dynamic `import()` genau die benötigte Implementierung.
-* **Dev opt-in:** Flag `DEV_USE_WEBTRANSPORT = true|false` in `src/client/dev-config.ts` (nur für Entwickler im Source, nicht in user config).
-* **Fallback:** wenn Flag true, aber Browser nicht unterstützt oder Server nicht WebTransport-ready, Fallback auf WebSocket.
-* **No-mix:** Nie in einer Implementationsdatei WebSocket- und WebTransport-APIs mischen.
-* **Tests & Mocks:** Unit-Tests für `transportFactory` + Mock-Implementierungen, E2E mit Playwright/Headless für beide Transports.
-* **Docs:** README-Abschnitt: Wie man opt-in setzt, wie man die WebTransport-POC-Datei implementiert.
+Yes — agree with the proposal. The cleanest, maintainable solution is a
+**transport adapter abstraction** with clearly separated implementations in
+separate files (no mixing of WebSocket and WebTransport in one file). The
+selection mechanism is dev-controllable (a feature flag in the source), and the
+client additionally does a **feature detect** on `window.WebTransport`. Depending
+on the flag + detection, exactly **one** implementation is loaded dynamically.
+That keeps the code modular and testable, and the risk low.
 
 ---
 
-## Empfohlene Dateistruktur (Client)
+## Principles / requirements for the implementation
+
+* **Single responsibility:** every transport implementation in its own file (`websocket.transport.ts`, `webtransport.transport.ts`).
+* **Transport interface:** a shared TypeScript interface (`Transport`) describes the API (sendMessage, onMessage, sendDatagram optional, openStream optional, close).
+* **Factory/bootstrap:** `transportFactory.ts` decides (dev flag + feature detect) and loads exactly the needed implementation via a dynamic `import()`.
+* **Dev opt-in:** the flag `DEV_USE_WEBTRANSPORT = true|false` in `src/client/dev-config.ts` (for developers in the source only, not in the user config).
+* **Fallback:** if the flag is true but the browser does not support it or the server is not WebTransport-ready, fall back to WebSocket.
+* **No mixing:** never mix WebSocket and WebTransport APIs in one implementation file.
+* **Tests & mocks:** unit tests for `transportFactory` + mock implementations, E2E with Playwright/headless for both transports.
+* **Docs:** a README section: how to set the opt-in, how to implement the WebTransport PoC file.
+
+---
+
+## Recommended file structure (client)
 
 ```
 src/
@@ -40,7 +46,7 @@ src/
 
 ---
 
-## Transport Interface (TypeScript)
+## The transport interface (TypeScript)
 
 ```ts
 // src/client/transport/transport.interface.ts
@@ -77,7 +83,7 @@ export interface Transport {
 
 ---
 
-## WebSocket Implementation (TS)
+## WebSocket implementation (TS)
 
 ```ts
 // src/client/transport/websocket.transport.ts
@@ -128,7 +134,7 @@ export class WebSocketTransport implements Transport {
 
 ---
 
-## WebTransport Implementation (TS stub / placeholder)
+## WebTransport implementation (TS stub / placeholder)
 
 ```ts
 // src/client/transport/webtransport.transport.ts
@@ -205,11 +211,11 @@ function concat(chunks: Uint8Array[]): Uint8Array {
 }
 ```
 
-> Hinweis: Obige WebTransport-Implementierung ist ein POC-Skeleton. Server-seitig ist HTTP/3 + TLS erforderlich — daher ist die Datei vorerst ein Stub, die beim opt-in aktiviert wird.
+> Note: the WebTransport implementation above is a PoC skeleton. On the server side HTTP/3 + TLS is required — hence the file is a stub for now, activated on opt-in.
 
 ---
 
-## Transport Factory (dynamischer Loader)
+## The transport factory (dynamic loader)
 
 ```ts
 // src/client/transportFactory.ts
@@ -248,7 +254,7 @@ export async function createTransport(url: string): Promise<Transport> {
 
 ---
 
-## Dev opt-in Flag (dev only)
+## The dev opt-in flag (dev only)
 
 ```ts
 // src/client/dev-config.ts
@@ -261,7 +267,7 @@ export const DEV_USE_WEBTRANSPORT = false;
 
 ---
 
-## Integration in `main.ts`
+## Integration into `main.ts`
 
 ```ts
 // src/client/main.ts
@@ -287,56 +293,54 @@ boot().catch((err) => console.error("boot failed:", err));
 
 ---
 
-## Anpassungen auf Server-Seite (Kurz)
+## Server-side adjustments (short)
 
-* Server muss langfristig **dual-stack** sein: expose both `/ws` (WebSocket) and `/wt` (WebTransport) endpoints. Für jetzt reicht `/ws`.
-* WebTransport-Endpoint erfordert anfangs ein **separates server binary** (Rust/QUIC or Edge runtime) oder experimentelle Node lib. Deshalb: implement WebTransport endpoint später als separater process `webtransport.server.*` und document how to run it.
+* In the long run the server has to be **dual stack**: expose both a `/ws` (WebSocket) and a `/wt` (WebTransport) endpoint. For now `/ws` is enough.
+* The WebTransport endpoint initially requires a **separate server binary** (Rust/QUIC or an edge runtime) or an experimental Node lib. Therefore: implement the WebTransport endpoint later as a separate process `webtransport.server.*` and document how to run it.
 * Keep the existing WebSocket server unchanged.
 
 ---
 
-## Vorteile dieses Vorgehens
+## Advantages of this approach
 
-* **Minimaler initialer Aufwand:** nur Factory + separate stub file; keine Änderung an bestehenden WebSocket-code nötig.
-* **Sauberer Code:** keine Vermischung von transports; jede Implementierung bleibt übersichtlich.
-* **Feature-toggle:** Entwickler können WebTransport lokal testen ohne User-Konfiguration oder Breaking Changes.
-* **Futuresafe:** Bereit für echtes WebTransport-POC später, ohne Refactor-Pain.
-
----
-
-## Risiken / Nachteile
-
-* **Dynamische Imports erhöhen Bundle-Komplexität:** Vite will bundlen beide Dateien, aber lazy loading hält runtime-kosten niedrig. Dokumentation für CI/Build beachten.
-* **Server-Komplexität später:** Betrieb eines HTTP/3 WebTransport servers ist aufwändiger (TLS, QUIC). Für now: keep WebSocket default.
-* **Testaufwand:** Zusätzliche Tests nötig (mocks, integration).
+* **Minimal initial effort:** only the factory + a separate stub file; no change to the existing WebSocket code is needed.
+* **Clean code:** no mixing of transports; every implementation stays readable.
+* **Feature toggle:** developers can test WebTransport locally without user configuration or breaking changes.
+* **Future-safe:** ready for a real WebTransport PoC later, without refactoring pain.
 
 ---
 
-## Test- & Implementierungscheckliste (aufgabenorientiert, checkbox)
+## Risks / disadvantages
 
-* [ ] `src/client/transport/transport.interface.ts` anlegen
-* [ ] `src/client/transport/websocket.transport.ts` anlegen (fertigstellen / Unit-tests)
-* [ ] `src/client/transport/webtransport.transport.ts` als POC-stub anlegen (keine server-abhängigkeit yet)
-* [ ] `src/client/transportFactory.ts` anlegen (dev opt-in logic + dynamic import)
-* [ ] `src/client/dev-config.ts` anlegen mit `DEV_USE_WEBTRANSPORT = false`
-* [ ] `src/client/main.ts` anpassen um `createTransport` zu benutzen
-* [ ] Unit-tests für `transportFactory` (mock window.WebTransport + mock imports)
-* [ ] Integration test for WebSocket path (existing server)
-* [ ] Documentation: README section „Dev opt-in WebTransport (how to)“
-* [ ] Create server stub notes: `src/server/webtransport.server.*` (todo) and document requirements (HTTP/3, TLS)
-* [ ] Add CI job entry (optional) to run transport factory unit tests
+* **Dynamic imports increase bundle complexity:** Vite bundles both files, but lazy loading keeps the runtime cost low. Keep the CI/build documentation in mind.
+* **Server complexity later:** running an HTTP/3 WebTransport server is more work (TLS, QUIC). For now: keep WebSocket as the default.
+* **Testing effort:** additional tests are needed (mocks, integration).
 
 ---
 
-## Weiteres: Hinweise für Build / Vite
+## Test & implementation checklist (task-oriented, with checkboxes)
 
-* Dynamic `import()` funktioniert mit Vite; beide Implementierungen werden gebündelt, doch nur die tatsächlich importierte Klasse instanziiert. Falls man die WebTransport-implementierung später angesichts Node-API/Types zu groß findet, kann man separate chunking/conditional build-strategy nutzen.
-* Achte auf `tsconfig` und linter: referenzen zu DOM-types (`WebTransport`) sind Browser-only — typedefs sollten nur in client-ts files auftauchen (kein `lib: ["DOM"]` in server tsconfig).
+* [ ] Create `src/client/transport/transport.interface.ts`
+* [ ] Create `src/client/transport/websocket.transport.ts` (finish it / unit tests)
+* [ ] Create `src/client/transport/webtransport.transport.ts` as a PoC stub (no server dependency yet)
+* [ ] Create `src/client/transportFactory.ts` (dev opt-in logic + dynamic import)
+* [ ] Create `src/client/dev-config.ts` with `DEV_USE_WEBTRANSPORT = false`
+* [ ] Adapt `src/client/main.ts` to use `createTransport`
+* [ ] Unit tests for `transportFactory` (mock window.WebTransport + mock imports)
+* [ ] Integration test for the WebSocket path (existing server)
+* [ ] Documentation: a README section "Dev opt-in WebTransport (how to)"
+* [ ] Create server stub notes: `src/server/webtransport.server.*` (todo) and document the requirements (HTTP/3, TLS)
+* [ ] Add a CI job entry (optional) to run the transport factory unit tests
 
 ---
 
-## Fazit
+## Further: notes for the build / Vite
 
-Der vorgeschlagene Weg ist robust, minimal invasiv und zukunftssicher: eine kleine Factory + dev flag + separate Implementationsdateien geben genau die gewünschte Trennung. Es entstehen keine großen Risiken, solange WebTransport zunächst nur als dev-opt-in stub verbleibt und WebSocket Standard bleibt.
+* Dynamic `import()` works with Vite; both implementations are bundled, but only the class actually imported gets instantiated. If the WebTransport implementation later turns out to be too large given the Node APIs/types, a separate chunking/conditional build strategy can be used.
+* Watch out for `tsconfig` and the linter: references to DOM types (`WebTransport`) are browser-only — the typedefs should appear only in client TS files (no `lib: ["DOM"]` in the server tsconfig).
 
-Wenn gewünscht, erstelle ich jetzt die konkreten Dateien (TS-Templates + Teststubs + README-Abschnitt) als Patch/Copypaste, damit man sie direkt ins Repo legen kann. Welche Dateien sollen zuerst generiert werden?
+---
+
+## Conclusion
+
+The proposed route is robust, minimally invasive and future-proof: a small factory + a dev flag + separate implementation files give exactly the separation wanted. No large risks arise as long as WebTransport remains only a dev-opt-in stub at first and WebSocket stays the default.

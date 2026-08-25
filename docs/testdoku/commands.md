@@ -1,116 +1,115 @@
-# mdview — Test-, Log- & Prüfkonzept
+# mdview — testing, logging & inspection concept
 
-> **Stand: Go-Relay + Rust/WASM-Client.** Serverseitiges Rendering, der
-> Node-Dev-Server (`npm run dev:server`), der Vite-Proxy auf `43220` und der
-> `/render`-Endpoint existieren **nicht mehr**. Dieses Dokument beschreibt, wie
-> man die einzelnen Komponenten testet und wie die Logs/Diagnose an Dritte (oder
-> an einen Assistenten) übergeben werden können.
+> **Status: Go relay + Rust/WASM client.** Server-side rendering, the Node dev
+> server (`npm run dev:server`), the Vite proxy on `43220` and the `/render`
+> endpoint **no longer exist**. This document describes how to test the
+> individual components and how the logs/diagnostics can be handed to a third
+> party (or to an assistant).
 
-Die Komponenten:
+The components:
 
-1. **Neovim-Plugin (Lua)** — startet/stoppt den Relay, öffnet den Browser,
-   sendet Buffer-Updates und Scroll-Pings.
-2. **Go-Relay** (`native/server/`) — Transport von Rohtext, token-gated,
-   bindet nur an `127.0.0.1`.
-3. **Rust/WASM-Client** (`src/client/` + `native/wasm-render/`) — rendert und
-   sanitisiert Markdown im Browser.
+1. **The Neovim plugin (Lua)** — starts/stops the relay, opens the browser,
+   sends buffer updates and scroll pings.
+2. **The Go relay** (`native/server/`) — transports raw text, token-gated,
+   binds only to `127.0.0.1`.
+3. **The Rust/WASM client** (`src/client/` + `native/wasm-render/`) — renders and
+   sanitises markdown in the browser.
 
 ---
 
-## 1. Schnellster Weg: `:MDView diagnose`
+## 1. The quickest route: `:MDView diagnose`
 
-Ein einziger Befehl erzeugt einen vollständigen Zustandsbericht **über alle
-Komponenten** und öffnet ihn in einem neuen Tab. Die Datei kann direkt
-weitergegeben / eingelesen werden.
+A single command produces a complete state report **across all components** and
+opens it in a new tab. The file can be handed on / read in directly.
 
 ```vim
-:MDView diagnose               " schreibt nach stdpath('log')/mdview-diagnostics.txt
-:MDView diagnose C:\tmp\d.txt  " optional: eigener Pfad
+:MDView diagnose               " writes to stdpath('log')/mdview-diagnostics.txt
+:MDView diagnose C:\tmp\d.txt  " optional: your own path
 ```
 
-Der Bericht enthält:
+The report contains:
 
-- **Environment** — nvim-Version, OS, `is_windows`, Display/GUI vorhanden
-- **Dependencies** — `lib.nvim` (hard dependency), `curl`, `tar`, `vim.ui.open`
-- **Install cache** — ob Server-Binary und Client-Bundle gecached sind (+ Pfade)
+- **Environment** — nvim version, OS, `is_windows`, whether a display/GUI exists
+- **Dependencies** — `lib.nvim` (a hard dependency), `curl`, `tar`, `vim.ui.open`
+- **Install cache** — whether the server binary and client bundle are cached (+ paths)
 - **Config** — `server_port`, `open_preview_tab`, `scroll_sync`,
   `browser.open_mode/theme/browser_autostart/require_display`
-- **Running session** — läuft der Prozess? attached? Token gesetzt? erkannter
-  Port? **Live-`GET /health`-Probe**
-- **Browser-URL**, die geöffnet würde (inkl. `key`/`token`/`theme`)
-- **Recent internal log** — die letzten Einträge des `mdview.log`-Ring-Buffers
+- **Running session** — is the process running? attached? is the token set? the
+  detected port? a **live `GET /health` probe**
+- **The browser URL** that would be opened (including `key`/`token`/`theme`)
+- **Recent internal log** — the last entries of the `mdview.log` ring buffer
 
-> Der interne Ring läuft über `lib.nvim.logger` (`mdview.log`). `notify`-Level
-> ist per Default aus; Debug-Notifications erscheinen nur bei
+> The internal ring runs through `lib.nvim.logger` (`mdview.log`). The `notify`
+> level is off by default; debug notifications appear only with
 > `config.debug_preview = true`.
 
 ---
 
-## 2. Browser-Logs ohne DevTools: `/clientlog`
+## 2. Browser logs without DevTools: `/clientlog`
 
-Der Client meldet seine eigenen Diagnosen (fehlendes key/token,
-Verbindungsfortschritt, Transport-Fehler, erster erfolgreicher Render,
-Render-Fehler) per `POST /clientlog?token=…` an den Relay. Der Relay druckt
-jede Zeile als `[client] …` auf stdout — und die Lua-Runner-Schicht fängt den
-Relay-stdout ein, sodass die Zeilen in **`:MDView weblogs`** und im
-`:MDView diagnose`-Bericht auftauchen. Kein DevTools-Öffnen nötig.
+The client reports its own diagnostics (a missing key/token, connection
+progress, transport errors, the first successful render, render errors) to the
+relay via `POST /clientlog?token=…`. The relay prints every line as
+`[client] …` to stdout — and the Lua runner layer captures the relay's stdout,
+so the lines show up in **`:MDView weblogs`** and in the `:MDView diagnose`
+report. No need to open DevTools.
 
 ```vim
-:MDView weblogs   " Relay-stdout inkl. [client]-Zeilen
+:MDView weblogs   " relay stdout including the [client] lines
 ```
 
-Manueller Smoke-Test des Sinks (Relay muss laufen):
+A manual smoke test of the sink (the relay must be running):
 
 ```sh
 curl -s -o /dev/null -w "%{http_code}\n" \
-  -X POST "http://localhost:<port>/clientlog?token=<token>" --data "hallo"
-# 204, und im Relay-stdout / :MDView weblogs:  [client] hallo
+  -X POST "http://localhost:<port>/clientlog?token=<token>" --data "hello"
+# 204, and in the relay stdout / :MDView weblogs:  [client] hello
 ```
 
-Optionale manuelle Browser-Konsolen-Checks (nur zur Fehlersuche):
+Optional manual browser-console checks (for troubleshooting only):
 
 ```js
-console.log("location", location.href);          // key/token/theme in der URL?
+console.log("location", location.href);          // key/token/theme in the URL?
 new WebSocket(`ws://${location.host}/ws${location.search}`); // readyState === 1 ?
 ```
 
 ---
 
-## 3. Komponenten einzeln testen
+## 3. Testing the components individually
 
-### Neovim / Plugin
+### Neovim / the plugin
 
 ```vim
-:checkhealth mdview   " Runtime-Infos, Dependency-Status
-:MDView start         " Relay starten + Browser öffnen
-:MDView stop          " Relay stoppen
-:MDView weblogs       " Relay-stdout + [client]-Logs
-:MDView diagnose      " Vollbericht (siehe oben)
+:checkhealth mdview   " runtime info, dependency status
+:MDView start         " start the relay + open the browser
+:MDView stop          " stop the relay
+:MDView weblogs       " relay stdout + [client] logs
+:MDView diagnose      " the full report (see above)
 ```
 
-Headless-Smoke-Test (CI-nah), lädt lib.nvim ins rtp:
+A headless smoke test (close to CI), loading lib.nvim into the rtp:
 
 ```sh
-# Spec unter TESTS/lua/smoke_spec.lua (plenary/busted-Stil)
+# Spec under TESTS/lua/smoke_spec.lua (plenary/busted style)
 "/c/Program Files/Neovim/bin/nvim" --headless -u NONE -i NONE \
   --cmd "set rtp+=.,../lib.nvim" \
   -c "luafile TESTS/lua/smoke_spec.lua" -c "qa!"
 ```
 
-### Go-Relay
+### The Go relay
 
-Siehe [../server/Testanweisugen.md](../server/Testanweisugen.md) für
-Endpoint-für-Endpoint-Tests. Automatisiert:
+See [../server/Testanweisugen.md](../server/Testanweisugen.md) for
+endpoint-by-endpoint tests. Automated:
 
 ```sh
 cd native/server && go vet ./... && go test ./...
 ```
 
-### Rust/WASM-Client
+### The Rust/WASM client
 
 ```sh
-cd native/wasm-render && cargo test        # Rendering + XSS-Payload-Tests
-# Root: Client-Bundle bauen (Rust -> WASM -> Vite)
+cd native/wasm-render && cargo test        # rendering + XSS payload tests
+# From the root: build the client bundle (Rust -> WASM -> Vite)
 export CARGO="$HOME/.cargo/bin/cargo.exe"; export PATH="$HOME/.cargo/bin:$PATH"
 npm run build
 npx tsc -p tsconfig.json && npx eslint "src/**/*.{ts,tsx,js}"
@@ -118,7 +117,7 @@ npx tsc -p tsconfig.json && npx eslint "src/**/*.{ts,tsx,js}"
 
 ---
 
-## 4. Prozess auf einem Port beenden
+## 4. Killing a process on a port
 
 ```powershell
 # Windows (PowerShell)
@@ -132,6 +131,6 @@ Get-NetTCPConnection -LocalPort 43219 -ErrorAction SilentlyContinue |
 lsof -i :43219 && kill -9 <PID>
 ```
 
-> Es laufen keine `node.exe`-Prozesse mehr — der Relay ist eine einzelne native
-> Binary. `EADDRINUSE`/Zombie-Node-Hinweise aus älteren Doku-Ständen sind
-> obsolet; bei belegtem Port genügt das Beenden der obigen Binary.
+> There are no `node.exe` processes any more — the relay is a single native
+> binary. The `EADDRINUSE`/zombie-Node notes from older documentation states are
+> obsolete; if the port is occupied, terminating the binary above is enough.

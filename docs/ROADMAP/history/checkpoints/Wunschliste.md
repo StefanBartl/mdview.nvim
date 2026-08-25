@@ -1,39 +1,39 @@
-# Wunschliste / Features (Architektur-Vorschläge)
+# Wishlist / features (architecture proposals)
 
-> **Brainstorm-/Quelldokument.** Die konsolidierte, aktuelle Aufgabenliste steht
-> in [`../../ROADMAP.md`](../../ROADMAP.md); erledigte Punkte samt Begründung in
-> [`../../DONE.md`](../../DONE.md). Einige Vorschläge hier stammen aus der Zeit
-> vor dem Go/Rust-Rewrite und nennen alte Endpoints (z. B. `/render?key=`), die
-> es nicht mehr gibt — als Idee bleiben sie gültig, die Umsetzung folgt aber der
-> heutigen Architektur (Go-Relay + Rust/WASM-Client).
+> **A brainstorming/source document.** The consolidated, current task list is in
+> [`../../ROADMAP.md`](../../ROADMAP.md); finished items including their rationale
+> are in [`../../DONE.md`](../../DONE.md). Some proposals here date from before
+> the Go/Rust rewrite and name old endpoints (e.g. `/render?key=`) that no longer
+> exist — as ideas they remain valid, but the implementation follows today's
+> architecture (Go relay + Rust/WASM client).
 
-1. MDViewStart mit Datei-Argumenten
-   * Man kann `:MDViewStart /path/to/file.md` erlauben; der Launcher/initial_push ruft dann eine initiale `render?key=<normalized>` oder startet eine gezielte Push-Action.
+1. MDViewStart with file arguments
+   * `:MDViewStart /path/to/file.md` could be allowed; the launcher/initial_push then calls an initial `render?key=<normalized>` or starts a targeted push action.
    * API: `nvim_create_user_command("MDViewStart", fn, { nargs = "?", complete = "file" })`.
 
-1. Verhalten beim Buffer-Wechsel (aktualisieren vs. neuer Tab vs. kein Update)
-   * Konfigurationsoptionen (already present): `browser_behavior = "reuse" | "new_tab" | "manual"`.
-   * Implementation: Beim BufferChange entscheidet `live_push` ob es `push_buffer` ausführt und zusätzlich ob `launcher` den Browserhandle benutzt, um eine neue URL zu öffnen (new tab) oder nur `ws_client.send_markdown` für den vorhandenen preview.
+1. Behaviour on a buffer switch (update vs. new tab vs. no update)
+   * Configuration options (already present): `browser_behavior = "reuse" | "new_tab" | "manual"`.
+   * Implementation: on a buffer change, `live_push` decides whether it runs `push_buffer` and additionally whether the `launcher` uses the browser handle to open a new URL (new tab) or only `ws_client.send_markdown` for the existing preview.
 
-3. Click-to-navigate (Links/anchors im Browser navigieren zu anderen files)
-   Drei mögliche Implementierungen, mit Vor/Nachteilen:
+3. Click-to-navigate (links/anchors in the browser navigate to other files)
+   Three possible implementations, with pros and cons:
 
-   * A) Server dient Dateisystem (static file serving) und Client wandelt links in `/render?key=normalized_path` um.
-     * Vorteil: simpel, server braucht nur Leserechte im CWD.
-     * Nachteil: evtl. Sicherheitsaspekte (nur serve unter projekt-root), eventuell viele Dateien.
+   * A) The server serves the filesystem (static file serving) and the client rewrites links to `/render?key=normalized_path`.
+     * Advantage: simple, the server needs only read access in the CWD.
+     * Disadvantage: possible security aspects (only serve below the project root), possibly many files.
 
-    * B) Client auf Link-Klick sendet WebSocket-Nachricht an die Neovim-Extension/Daemon, welche dann die Datei lädt und per `/render?key=...` pusht.
-         * Vorteil: keine zusätzlichen Date-Server nötig, Neovim bleibt single source of truth.
-         * Nachteil: benötigt ein bidirektionales Protokoll zwischen Client ↔ Neovim (WS already present to server, aber server → Neovim bridge muss implementiert oder Runner erweitert werden).
+    * B) On a link click the client sends a WebSocket message to the Neovim extension/daemon, which then loads the file and pushes it via `/render?key=...`.
+         * Advantage: no additional file server needed, Neovim stays the single source of truth.
+         * Disadvantage: needs a bidirectional protocol between client ↔ Neovim (the WS to the server already exists, but a server → Neovim bridge has to be implemented or the runner extended).
 
-    * C) Kombiniert: Server kennt workspace-root und liefert `/file?path=...` beschränkt auf cwd. Client klickt Link -> fetch `/file?path=...` -> server liest file and responds with markdown or redirect to `/render?key=...`.
-         * Empfehlung: B oder C sind am flexibelsten; C ist einfacher, wenn server bereits im Projekt-CWD gestartet wird.
+    * C) Combined: the server knows the workspace root and serves `/file?path=...` restricted to the cwd. The client clicks a link -> fetches `/file?path=...` -> the server reads the file and responds with markdown or redirects to `/render?key=...`.
+         * Recommendation: B or C are the most flexible; C is simpler if the server is already started in the project CWD.
 
 ---
 
-## Sicherheits- und UX-Hinweise
+## Security and UX notes
 
-* Bei Server-Seiten-Serving: man kann den erlaubten Root einschränken (nur project root), und Pfad-Normalisierung verwenden, um Directory-Traversal zu vermeiden.
-* Bei automatischem Öffnen neuer Browser-Tabs: man kann eine Nutzer-Option anbieten, da viele Nutzer nur ein Tab wollen.
+* For server-side serving: the permitted root can be restricted (project root only), and path normalisation used to avoid directory traversal.
+* For automatically opening new browser tabs: a user option can be offered, since many users want only one tab.
 
 ---

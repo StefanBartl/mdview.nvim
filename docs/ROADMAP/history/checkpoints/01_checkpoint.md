@@ -1,8 +1,8 @@
-> ⚠️ **VERALTET (Vor-Rewrite).** Test-Checkpoint aus der Node-Ära:
-> referenziert den `/render`-Endpoint (jetzt `/update`), den Vite-Dev-Port
-> 43220 als Preview-Quelle und markdown-it-Rendering. Aktueller Health-/
-> Smoke-Ablauf: `curl http://localhost:43219/health` und `:checkhealth mdview`.
-> Nur Historie. **Aktuelle Aufgaben: [`../../ROADMAP.md`](../../ROADMAP.md).**
+> ⚠️ **OUTDATED (pre-rewrite).** A test checkpoint from the Node era:
+> it references the `/render` endpoint (now `/update`), the Vite dev port
+> 43220 as the preview source and markdown-it rendering. The current health/
+> smoke procedure: `curl http://localhost:43219/health` and `:checkhealth mdview`.
+> History only. **Current tasks: [`../../ROADMAP.md`](../../ROADMAP.md).**
 
 ---
 
@@ -10,63 +10,63 @@
 
 ## Table of content
 
-  - [Prüfliste + gezielte Aktionen (Deutsch).](#prfliste-gezielte-aktionen-deutsch)
-  - [Verhalten, das man möchte](#verhalten-das-man-mchte)
-  - [Test-Anleitung, Schritt für Schritt](#test-anleitung-schritt-fr-schritt)
-  - [Hinweise / Randfälle](#hinweise-randflle)
-    - [Verhalten, das man möchte](#verhalten-das-man-mchte-1)
-    - [Test-Anleitung, Schritt für Schritt](#test-anleitung-schritt-fr-schritt-1)
-    - [Hinweise / Randfälle](#hinweise-randflle-1)
-    - [Verhalten, das man möchte](#verhalten-das-man-mchte-2)
-    - [Test-Anleitung, Schritt für Schritt](#test-anleitung-schritt-fr-schritt-2)
-    - [Hinweise / Randfälle](#hinweise-randflle-2)
+  - [Checklist + targeted actions](#checklist--targeted-actions)
+  - [The behaviour we want](#the-behaviour-we-want)
+  - [Test instructions, step by step](#test-instructions-step-by-step)
+  - [Notes / edge cases](#notes--edge-cases)
+    - [The behaviour we want](#the-behaviour-we-want-1)
+    - [Test instructions, step by step](#test-instructions-step-by-step-1)
+    - [Notes / edge cases](#notes--edge-cases-1)
+    - [The behaviour we want](#the-behaviour-we-want-2)
+    - [Test instructions, step by step](#test-instructions-step-by-step-2)
+    - [Notes / edge cases](#notes--edge-cases-2)
 
 ---
 
-## Prüfliste + gezielte Aktionen (Deutsch).
+## Checklist + targeted actions
 
-1. Schnell prüfen, ob Server + Client erreichbar sind
+1. Quickly check whether the server + client are reachable
 
-* Server-Health:
+* Server health:
 
 ```
 curl -sS http://localhost:43219/health
-# Erwartet: ok
+# Expected: ok
 ```
 
-* Server-Index prüfen (liefert HTML / client bootstrap):
+* Check the server index (returns HTML / the client bootstrap):
 
 ```
 curl -sS http://localhost:43219/ | sed -n '1,40p'
 ```
 
-* Vite-dev-client prüfen (übliches dev-Setup verwendet Port 43220):
+* Check the Vite dev client (the usual dev setup uses port 43220):
 
 ```
 curl -sS http://localhost:43220/ | sed -n '1,40p'
 ```
 
-Wenn `http://localhost:43219/` nur „mdview loading…“ zeigt, bedeutet das: der HTML-Client wurde geladen, aber der Browser-Client hat keine WS-Verbindung oder wartet auf Inhalte (oder der dev-client muss auf Port 43220 geöffnet werden).
+If `http://localhost:43219/` only shows "mdview loading…", that means: the HTML client was loaded, but the browser client has no WS connection or is waiting for content (or the dev client has to be opened on port 43220).
 
-1. Warum sieht man „mdview loading…“ im Browser?
-2. Die Client-HTML zeigt initial nur einen Platzhalter (`<div id="mdview-root">mdview loading…</div>`).
-3. Der Browser lädt anschließend das JS (Vite dev oder gebündelte `dist`) und eröffnet eine WebSocket-Verbindung zu `/ws`. Erst wenn der Client verbunden ist, empfängt er `render_update`-Nachrichten und zeigt gerendertes HTML.
-4. Wenn kein Browser-Tab geöffnet ist oder der Browser nicht verbunden ist, sieht man weiter nur „loading…“.
+1. Why do you see "mdview loading…" in the browser?
+2. The client HTML initially shows only a placeholder (`<div id="mdview-root">mdview loading…</div>`).
+3. The browser then loads the JS (Vite dev or the bundled `dist`) and opens a WebSocket connection to `/ws`. Only once the client is connected does it receive `render_update` messages and show rendered HTML.
+4. If no browser tab is open or the browser is not connected, you keep seeing only "loading…".
 
-3. Kurztest: manueller Render-POST (funktioniert bereits — aus Deinem Output)
+3. Quick test: a manual render POST (this already works — from your output)
 
 ```
 curl -sS -X POST "http://localhost:43219/render?key=test" -H "Content-Type: text/markdown" --data-binary "# Hello"
-# Erwartet: JSON mit html
+# Expected: JSON with html
 ```
 
-Wenn das JSON kommt, rendert der Server korrekt. Fehlt im Browser die Darstellung, liegt es an Client/WS-Verbindung oder an falscher URL im Browser.
+If the JSON comes back, the server renders correctly. If nothing shows in the browser, it is the client/WS connection or a wrong URL in the browser.
 
-4. Browser automatisch öffnen: zwei Strategien
-* Simple: immer `http://localhost:<server_port>` öffnen (bereits implementiert, aber im Dev-Setup evtl. nicht ideal).
-* Besser fürs Dev-Setup: bevorzugt die Client-URL öffnen (Vite dev server), falls erreichbar (typisch 43220). Fallback auf Server-URL, falls kein dev-client läuft.
+4. Opening the browser automatically: two strategies
+* Simple: always open `http://localhost:<server_port>` (already implemented, but perhaps not ideal in a dev setup).
+* Better for the dev setup: prefer opening the client URL (the Vite dev server) if reachable (typically 43220). Fall back to the server URL if no dev client is running.
 
-5. Schnelle Befehle in Neovim, um Browser manuell zu öffnen
+5. Quick commands in Neovim to open the browser manually
 
 * macOS:
 
@@ -86,7 +86,7 @@ Wenn das JSON kommt, rendert der Server korrekt. Fehlt im Browser die Darstellun
 :lua vim.fn.jobstart({"cmd", "/c", "start", "", "http://localhost:43219"})
 ```
 
-6. Kleiner, sicherer Benutzerbefehl: füge `MDViewOpen` hinzu (nur das kleine Snippet, in english comments, EmmyLua not required here):
+6. A small, safe user command: add `MDViewOpen` (just the small snippet, comments in English, EmmyLua not required here):
 
 ```lua
 -- add to lua/mdview/usercommands.lua or plugin file
@@ -114,7 +114,7 @@ vim.api.nvim_create_user_command("MDViewOpen", function()
 end, { desc = "[mdview] Open preview in browser (tries vite dev then server)" })
 ```
 
-7. Automatische Open-on-start: bessere Variante (füge in `lua/mdview/init.lua` in `M.start()` das folgende kleine Stück ein, es prüft zuerst Vite dev port 43220, dann server 43219):
+7. Automatic open-on-start: the better variant (add the following small piece to `M.start()` in `lua/mdview/init.lua`; it probes the Vite dev port 43220 first, then the server on 43219):
 
 ```lua
 -- after session.init() and events.attach()
@@ -157,132 +157,131 @@ local vite_url = "http://localhost:43220/"
 vim.defer_fn(function() probe_and_open({ vite_url, server_url }) end, 1000)
 ```
 
-Hinweis: `sh -c` probe ist plattformabhängig; für Windows muss man alternative Behandlung (PowerShell or cmd test) einbauen. Wenn Port-Probe zu kompliziert ist, einfach `open(server_url)` ohne Probe ist OK.
+Note: the `sh -c` probe is platform-dependent; on Windows an alternative handling (a PowerShell or cmd test) has to be built in. If the port probe is too complicated, simply calling `open(server_url)` without a probe is fine.
 
-8. Warum Browser evtl. nicht automatisch kam bei Dir
+8. Why the browser possibly did not come up automatically for you
 
-* Logs zeigen `EADDRINUSE` dann nodemon restart — während des ersten Startversuchs war Port belegt, nodemon restartete; vielleicht wurde `wait_ready()` ausgeführt bevor nodemon final neu gestartet hat. `wait_ready()` pollt /health; ggf. Timeout überbrücken. Lösung: `wait_ready()` Timeout erhöhen (z. B. 10s) oder erst nach erfolgreichem "server running" Log öffnen.
-* Dev-client (Vite) könnte nicht laufen — öffnet man server URL, client JS evtl. verweist auf vite dev URL, so Client nicht funktioniert. Deshalb Prefer-Vite-URL-Probe sinnvoll.
+* The logs show `EADDRINUSE` and then a nodemon restart — during the first start attempt the port was occupied and nodemon restarted; possibly `wait_ready()` ran before nodemon had finally restarted. `wait_ready()` polls /health; the timeout may need bridging. Fix: raise the `wait_ready()` timeout (e.g. to 10 s) or only open after a successful "server running" log line.
+* The dev client (Vite) may not be running — if you open the server URL, the client JS may point at the Vite dev URL, so the client does not work. Hence the prefer-Vite-URL probe makes sense.
 
-9. Wie bestätigen, dass Browser-Client live Updates sieht
+9. How to confirm that the browser client sees live updates
 
-* Öffne Browser manuell auf der gewählten URL (siehe oben).
-* In Neovim: ändere Markdown, speichere (`:w`). Beobachte Browser; wenn WS-Verbindung aktiv, sollte Inhalt automatisch updaten.
-* In Logs: `mdview` server log zeigt Broadcasts oder in mdview client console (Browser DevTools -> Console) sieht man WS open / messages.
+* Open the browser manually on the chosen URL (see above).
+* In Neovim: change the markdown, save (`:w`). Watch the browser; if the WS connection is active, the content should update automatically.
+* In the logs: the `mdview` server log shows broadcasts, or in the mdview client console (browser DevTools -> Console) you see WS open / messages.
 
-10. Wenn nichts hilft — Debug-Hilfe:
+10. If nothing helps — debugging aid:
 
-* Schalte debug=true in `lua/mdview/config.lua` und `:MDViewShowLogs` öffnen.
-* Setze `vim.g.mdview_server_port` falls custom port.
-* Prüfe ob Vite dev server läuft: suche Prozess `vite` oder test `curl http://localhost:43220/`.
+* Set debug=true in `lua/mdview/config.lua` and open `:MDViewShowLogs`.
+* Set `vim.g.mdview_server_port` for a custom port.
+* Check whether the Vite dev server is running: look for a `vite` process or test `curl http://localhost:43220/`.
 
-Zusammenfassung (konkret, was jetzt tun):
-* `curl http://localhost:43219/health` -> ok (ist so)
-* `curl http://localhost:43219/` -> prüfe HTML (zeigt client bootstrap)
-* Falls vite dev vorhanden, öffne `http://localhost:43220/` statt server-url.
-* Einen schnellen `:MDViewOpen`-Befehl anlegen (Code oben) — so kann man manuell ein Tab öffnen.
-* Wenn automatische Open-on-start gewünscht: patch `M.start()` wie oben, erhöhe `wait_ready` timeout falls nodemon restart problematisch ist.
+Summary (concretely, what to do now):
+* `curl http://localhost:43219/health` -> ok (it is)
+* `curl http://localhost:43219/` -> check the HTML (shows the client bootstrap)
+* If Vite dev is present, open `http://localhost:43220/` instead of the server URL.
+* Create a quick `:MDViewOpen` command (code above) — so you can open a tab manually.
+* If automatic open-on-start is wanted: patch `M.start()` as above, and raise the `wait_ready` timeout if the nodemon restart is problematic.
 
-## Verhalten, das man möchte
+## The behaviour we want
 
-1. `:MDViewStart` startet still den Server.
-2. Sobald Server bereit ist, öffnet sich ein Browser-Tab (einmalig) auf der Server-URL.
-3. Der aktuell geöffnete Markdown-Buffer wird einmalig an den Server gesendet (initial render), danach bei jedem `BufWritePost` erneut.
+1. `:MDViewStart` starts the server silently.
+2. As soon as the server is ready, a browser tab opens (once) on the server URL.
+3. The currently open markdown buffer is sent to the server once (the initial render), and again on every `BufWritePost`.
 
-Die notwendigen Änderungen sind minimal:
-* eine kleine, plattformübergreifende `open_browser(url)`-Routine hinzufügen, die `start()` einmal aufruft, wenn Server ready ist;
-* sicherstellen, dass `send_current_buffer()` nach `wait_ready()` ausgeführt wird (das ist bereits integriert).
-
----
-
-## Test-Anleitung, Schritt für Schritt
-
-1. In Neovim in einem Markdown-Buffer `:edit TESTS/test.md` öffnen.
-2. `:MDViewStart` ausführen.
-   * Erwartung: `mdview: started` in :messages.
-   * Browser sollte (innerhalb von ein paar Sekunden) ein Tab mit `http://localhost:43219` öffnen.
-3. Falls kein Browser erscheint:
-   * Prüfen, ob `curl http://localhost:43219/health` `ok` zurückgibt. Wenn nicht, schauen: `:MDViewShowLogs` (oder `:messages`) für Fehler.
-   * Manuell im Terminal `curl -X POST "http://localhost:43219/render?key=test" -H "Content-Type: text/markdown" --data-binary "$(cat TESTS/test.md)"` ausführen — sollte JSON mit `html` zurückgeben.
-4. In Neovim: `:w` (save) im Markdown-Buffer → Server sollte per `POST /render` die aktualisierte HTML an Clients broadcasten; Browser-Client (falls verbunden) zeigt Update.
+The necessary changes are minimal:
+* add a small, cross-platform `open_browser(url)` routine that `start()` calls once when the server is ready;
+* make sure `send_current_buffer()` runs after `wait_ready()` (that is already wired up).
 
 ---
 
-## Hinweise / Randfälle
+## Test instructions, step by step
 
-* Dev-Workflow: Wenn der client-dev (Vite) separat läuft, könnte man statt `http://localhost:43219` die dev-client-URL (`http://localhost:43220`) öffnen — das ist optional und hängt von Setup ab. Für Prod/distribution ist `http://localhost:<server_port>` korrekt. Wenn man Vite benutzt, lässt sich das Verhalten über `mdview.config` konfigurieren (z. B. `open_url`).
-* Wenn `start` in einem Headless-Server (z. B. WSL ohne GUI) ausgeführt wird, schlägt `open_browser` still fehl; man kann `vim.env.MDVIEW_OPEN_CMD` setzen (z. B. `"/mnt/c/Windows/System32/cmd.exe /c start"`), oder `debug = true` nutzen und Logs prüfen.
-* `ws_client.wait_ready()` benutzt `/health`-Polling; das sorgt dafür, dass initialer POST erst passiert, wenn HTTP-Server reagiert — dennoch enqueued `send_markdown()` Nachrichten und retryt, falls nötig.
-
----
-
-
-
-
-### Verhalten, das man möchte
-
-1. `:MDViewStart` startet still den Server.
-2. Sobald Server bereit ist, öffnet sich ein Browser-Tab (einmalig) auf der Server-URL.
-3. Der aktuell geöffnete Markdown-Buffer wird einmalig an den Server gesendet (initial render), danach bei jedem `BufWritePost` erneut.
-
-Die notwendigen Änderungen sind minimal:
-* eine kleine, plattformübergreifende `open_browser(url)`-Routine hinzufügen, die `start()` einmal aufruft, wenn Server ready ist;
-* sicherstellen, dass `send_current_buffer()` nach `wait_ready()` ausgeführt wird (das ist bereits integriert).
+1. In Neovim, open a markdown buffer with `:edit TESTS/test.md`.
+2. Run `:MDViewStart`.
+   * Expectation: `mdview: started` in :messages.
+   * The browser should open a tab on `http://localhost:43219` (within a few seconds).
+3. If no browser appears:
+   * Check whether `curl http://localhost:43219/health` returns `ok`. If not, look at `:MDViewShowLogs` (or `:messages`) for errors.
+   * Run `curl -X POST "http://localhost:43219/render?key=test" -H "Content-Type: text/markdown" --data-binary "$(cat TESTS/test.md)"` manually in a terminal — it should return JSON with `html`.
+4. In Neovim: `:w` (save) in the markdown buffer → the server should broadcast the updated HTML to the clients via `POST /render`; the browser client (if connected) shows the update.
 
 ---
 
-### Test-Anleitung, Schritt für Schritt
+## Notes / edge cases
 
-1. In Neovim in einem Markdown-Buffer `:edit TESTS/test.md` öffnen.
-2. `:MDViewStart` ausführen.
-   * Erwartung: `mdview: started` in :messages.
-   * Browser sollte (innerhalb von ein paar Sekunden) ein Tab mit `http://localhost:43219` öffnen.
-3. Falls kein Browser erscheint:
-   * Prüfen, ob `curl http://localhost:43219/health` `ok` zurückgibt. Wenn nicht, schauen: `:MDViewShowLogs` (oder `:messages`) für Fehler.
-   * Manuell im Terminal `curl -X POST "http://localhost:43219/render?key=test" -H "Content-Type: text/markdown" --data-binary "$(cat TESTS/test.md)"` ausführen — sollte JSON mit `html` zurückgeben.
-4. In Neovim: `:w` (save) im Markdown-Buffer → Server sollte per `POST /render` die aktualisierte HTML an Clients broadcasten; Browser-Client (falls verbunden) zeigt Update.
-
----
-
-### Hinweise / Randfälle
-
-* Dev-Workflow: Wenn der client-dev (Vite) separat läuft, könnte man statt `http://localhost:43219` die dev-client-URL (`http://localhost:43220`) öffnen — das ist optional und hängt von Setup ab. Für Prod/distribution ist `http://localhost:<server_port>` korrekt. Wenn man Vite benutzt, lässt sich das Verhalten über `mdview.config` konfigurieren (z. B. `open_url`).
-* Wenn `start` in einem Headless-Server (z. B. WSL ohne GUI) ausgeführt wird, schlägt `open_browser` still fehl; man kann `vim.env.MDVIEW_OPEN_CMD` setzen (z. B. `"/mnt/c/Windows/System32/cmd.exe /c start"`), oder `debug = true` nutzen und Logs prüfen.
-* `ws_client.wait_ready()` benutzt `/health`-Polling; das sorgt dafür, dass initialer POST erst passiert, wenn HTTP-Server reagiert — dennoch enqueued `send_markdown()` Nachrichten und retryt, falls nötig.
+* Dev workflow: if the client dev server (Vite) runs separately, you could open the dev client URL (`http://localhost:43220`) instead of `http://localhost:43219` — that is optional and depends on the setup. For prod/distribution `http://localhost:<server_port>` is correct. If you use Vite, the behaviour can be configured via `mdview.config` (e.g. `open_url`).
+* If `start` runs on a headless server (e.g. WSL without a GUI), `open_browser` fails silently; you can set `vim.env.MDVIEW_OPEN_CMD` (e.g. `"/mnt/c/Windows/System32/cmd.exe /c start"`), or use `debug = true` and check the logs.
+* `ws_client.wait_ready()` uses `/health` polling; that makes sure the initial POST only happens once the HTTP server responds — nevertheless `send_markdown()` enqueues messages and retries if necessary.
 
 ---
 
 
-### Verhalten, das man möchte
 
-1. `:MDViewStart` startet still den Server.
-2. Sobald Server bereit ist, öffnet sich ein Browser-Tab (einmalig) auf der Server-URL.
-3. Der aktuell geöffnete Markdown-Buffer wird einmalig an den Server gesendet (initial render), danach bei jedem `BufWritePost` erneut.
 
-Die notwendigen Änderungen sind minimal:
-* eine kleine, plattformübergreifende `open_browser(url)`-Routine hinzufügen, die `start()` einmal aufruft, wenn Server ready ist;
-* sicherstellen, dass `send_current_buffer()` nach `wait_ready()` ausgeführt wird (das ist bereits integriert).
+### The behaviour we want
 
----
+1. `:MDViewStart` starts the server silently.
+2. As soon as the server is ready, a browser tab opens (once) on the server URL.
+3. The currently open markdown buffer is sent to the server once (the initial render), and again on every `BufWritePost`.
 
-### Test-Anleitung, Schritt für Schritt
-
-1. In Neovim in einem Markdown-Buffer `:edit TESTS/test.md` öffnen.
-2. `:MDViewStart` ausführen.
-   * Erwartung: `mdview: started` in :messages.
-   * Browser sollte (innerhalb von ein paar Sekunden) ein Tab mit `http://localhost:43219` öffnen.
-3. Falls kein Browser erscheint:
-   * Prüfen, ob `curl http://localhost:43219/health` `ok` zurückgibt. Wenn nicht, schauen: `:MDViewShowLogs` (oder `:messages`) für Fehler.
-   * Manuell im Terminal `curl -X POST "http://localhost:43219/render?key=test" -H "Content-Type: text/markdown" --data-binary "$(cat TESTS/test.md)"` ausführen — sollte JSON mit `html` zurückgeben.
-4. In Neovim: `:w` (save) im Markdown-Buffer → Server sollte per `POST /render` die aktualisierte HTML an Clients broadcasten; Browser-Client (falls verbunden) zeigt Update.
+The necessary changes are minimal:
+* add a small, cross-platform `open_browser(url)` routine that `start()` calls once when the server is ready;
+* make sure `send_current_buffer()` runs after `wait_ready()` (that is already wired up).
 
 ---
 
-### Hinweise / Randfälle
+### Test instructions, step by step
 
-* Dev-Workflow: Wenn der client-dev (Vite) separat läuft, könnte man statt `http://localhost:43219` die dev-client-URL (`http://localhost:43220`) öffnen — das ist optional und hängt von Setup ab. Für Prod/distribution ist `http://localhost:<server_port>` korrekt. Wenn man Vite benutzt, lässt sich das Verhalten über `mdview.config` konfigurieren (z. B. `open_url`).
-* Wenn `start` in einem Headless-Server (z. B. WSL ohne GUI) ausgeführt wird, schlägt `open_browser` still fehl; man kann `vim.env.MDVIEW_OPEN_CMD` setzen (z. B. `"/mnt/c/Windows/System32/cmd.exe /c start"`), oder `debug = true` nutzen und Logs prüfen.
-* `ws_client.wait_ready()` benutzt `/health`-Polling; das sorgt dafür, dass initialer POST erst passiert, wenn HTTP-Server reagiert — dennoch enqueued `send_markdown()` Nachrichten und retryt, falls nötig.
+1. In Neovim, open a markdown buffer with `:edit TESTS/test.md`.
+2. Run `:MDViewStart`.
+   * Expectation: `mdview: started` in :messages.
+   * The browser should open a tab on `http://localhost:43219` (within a few seconds).
+3. If no browser appears:
+   * Check whether `curl http://localhost:43219/health` returns `ok`. If not, look at `:MDViewShowLogs` (or `:messages`) for errors.
+   * Run `curl -X POST "http://localhost:43219/render?key=test" -H "Content-Type: text/markdown" --data-binary "$(cat TESTS/test.md)"` manually in a terminal — it should return JSON with `html`.
+4. In Neovim: `:w` (save) in the markdown buffer → the server should broadcast the updated HTML to the clients via `POST /render`; the browser client (if connected) shows the update.
 
 ---
 
+### Notes / edge cases
+
+* Dev workflow: if the client dev server (Vite) runs separately, you could open the dev client URL (`http://localhost:43220`) instead of `http://localhost:43219` — that is optional and depends on the setup. For prod/distribution `http://localhost:<server_port>` is correct. If you use Vite, the behaviour can be configured via `mdview.config` (e.g. `open_url`).
+* If `start` runs on a headless server (e.g. WSL without a GUI), `open_browser` fails silently; you can set `vim.env.MDVIEW_OPEN_CMD` (e.g. `"/mnt/c/Windows/System32/cmd.exe /c start"`), or use `debug = true` and check the logs.
+* `ws_client.wait_ready()` uses `/health` polling; that makes sure the initial POST only happens once the HTTP server responds — nevertheless `send_markdown()` enqueues messages and retries if necessary.
+
+---
+
+
+### The behaviour we want
+
+1. `:MDViewStart` starts the server silently.
+2. As soon as the server is ready, a browser tab opens (once) on the server URL.
+3. The currently open markdown buffer is sent to the server once (the initial render), and again on every `BufWritePost`.
+
+The necessary changes are minimal:
+* add a small, cross-platform `open_browser(url)` routine that `start()` calls once when the server is ready;
+* make sure `send_current_buffer()` runs after `wait_ready()` (that is already wired up).
+
+---
+
+### Test instructions, step by step
+
+1. In Neovim, open a markdown buffer with `:edit TESTS/test.md`.
+2. Run `:MDViewStart`.
+   * Expectation: `mdview: started` in :messages.
+   * The browser should open a tab on `http://localhost:43219` (within a few seconds).
+3. If no browser appears:
+   * Check whether `curl http://localhost:43219/health` returns `ok`. If not, look at `:MDViewShowLogs` (or `:messages`) for errors.
+   * Run `curl -X POST "http://localhost:43219/render?key=test" -H "Content-Type: text/markdown" --data-binary "$(cat TESTS/test.md)"` manually in a terminal — it should return JSON with `html`.
+4. In Neovim: `:w` (save) in the markdown buffer → the server should broadcast the updated HTML to the clients via `POST /render`; the browser client (if connected) shows the update.
+
+---
+
+### Notes / edge cases
+
+* Dev workflow: if the client dev server (Vite) runs separately, you could open the dev client URL (`http://localhost:43220`) instead of `http://localhost:43219` — that is optional and depends on the setup. For prod/distribution `http://localhost:<server_port>` is correct. If you use Vite, the behaviour can be configured via `mdview.config` (e.g. `open_url`).
+* If `start` runs on a headless server (e.g. WSL without a GUI), `open_browser` fails silently; you can set `vim.env.MDVIEW_OPEN_CMD` (e.g. `"/mnt/c/Windows/System32/cmd.exe /c start"`), or use `debug = true` and check the logs.
+* `ws_client.wait_ready()` uses `/health` polling; that makes sure the initial POST only happens once the HTTP server responds — nevertheless `send_markdown()` enqueues messages and retries if necessary.
+
+---

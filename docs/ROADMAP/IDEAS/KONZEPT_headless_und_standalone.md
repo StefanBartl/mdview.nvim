@@ -1,195 +1,277 @@
-# Konzept: Preview ohne Server, Hintergrund-Instanz und Standalone-Binary
+# Concept: preview without a server, a background instance and a standalone binary
 
-> **Status: umgesetzt — mit einer Korrektur nach Praxistest.** Nutzerdoku:
-> [`docs/standalone.md`](../../standalone.md). Gebaut wurden:
+> **Status: implemented — with one correction after a practical test.** User docs:
+> [`docs/standalone.md`](../../standalone.md). What was built:
 > `native/server/internal/source` (`--watch`/`--open`), `:MDView standalone`,
-> `standalone.binary_path`, `scripts/minimal_init.lua` und
+> `standalone.binary_path`, `scripts/minimal_init.lua` and
 > `scripts/mdview-bg.{sh,ps1}`.
 >
-> **`:MDView detach` (Abschnitt 4, Hintergrund-nvim) wurde nach dem Test wieder
-> entfernt.** Der Praxistest zeigte zwei Probleme, die im Konzept unterschätzt
-> waren: (a) der detachte headless-nvim öffnete den Browser mal sofort, mal
-> erst nach 10–15 Min, mal nie — die input-getriebene headless-Main-Loop
-> verarbeitet anstehende libuv-Events unzuverlässig, wenn sie ohne stdin idle
-> läuft; (b) grundsätzlicher: die detachte Instanz hält einen **statischen
-> Buffer** (kein autoread, kein fs-watch), also erreicht Live-Push sie nie —
-> der behauptete Mehrwert „volle Editor-Features im Hintergrund" existiert
-> faktisch nicht, weil in einer headless-Instanz niemand editiert. Damit war
-> `detach` von `standalone` in jeder praktischen Hinsicht dominiert (statischer
-> Snapshot + unzuverlässig vs. live-dem-File-folgend + robust). Der
-> Terminal-Wrapper zeigt jetzt auf `standalone`.
+> **`:MDView detach` (section 4, background nvim) was removed again after the
+> test.** The practical test showed two problems the concept had underestimated:
+> (a) the detached headless nvim opened the browser sometimes immediately,
+> sometimes only after 10–15 min, sometimes never — the input-driven headless main
+> loop processes pending libuv events unreliably when it idles without stdin;
+> (b) more fundamentally: the detached instance holds a **static buffer** (no
+> autoread, no fs watch), so a live push never reaches it — the claimed benefit
+> "full editor features in the background" does not in fact exist, because nobody
+> edits in a headless instance. `detach` was thereby dominated by `standalone` in
+> every practical respect (a static snapshot + unreliable vs. following the file
+> live + robust). The terminal wrapper now points at `standalone`.
 >
-> Offen geblieben: Abschnitt 1 Option A (statischer HTML-Export) und
-> Abschnitt 3.4/Stufe B (eigenes Single-Binary mit `go:embed`).
+> Left open: section 1 option A (static HTML export) and section 3.4/stage B (an
+> own single binary with `go:embed`).
 >
-> Dieses Dokument bleibt als Entscheidungsgrundlage bestehen — inklusive des
-> überschätzten Abschnitts 4, damit die Lehre dokumentiert ist. Der Text unten
-> ist der ursprüngliche Konzeptstand.
+> This document remains as the basis for the decision — including the
+> overestimated section 4, so that the lesson is documented. The text below is the
+> original state of the concept.
 
-> Beantwortet drei zusammenhängende Fragen:
-> (1) Lässt sich das Hauptfeature ohne Serverstart anbieten? (2) Lässt sich
-> mdview als Hintergrundprozess aus einem Terminal starten
-> (`nvim --headless ... file.md`), wahlweise mit Browser-Tab oder als
-> separierte, minimale nvim-Instanz? (3) Ist ein experimentelles,
-> nvim-unabhängiges Standalone-mdview realistisch, cross-platform, in
-> Lua/Go/WASM? Alle drei Antworten bauen auf der bestehenden Architektur auf
-> (siehe `docs/architecture.md`) — keine davon erfordert einen Rewrite.
+> It answers three related questions:
+> (1) Can the main feature be offered without starting a server? (2) Can mdview be
+> started as a background process from a terminal
+> (`nvim --headless ... file.md`), optionally with a browser tab or as a separate,
+> minimal nvim instance? (3) Is an experimental, nvim-independent standalone mdview
+> realistic, cross-platform, in Lua/Go/WASM? All three answers build on the
+> existing architecture (see `docs/architecture.md`) — none of them requires a
+> rewrite.
 
 ---
 
-## 0. Ausgangslage (Ist-Zustand)
+## 0. Starting point (current state)
 
-Zur Einordnung, was schon existiert und was neu wäre:
+For context, what already exists and what would be new:
 
-| Baustein | Status heute |
+| Building block | Status today |
 |---|---|
-| Go-Relay (`native/server`) | Reiner Byte-Relay: nimmt Markdown-Text per `POST /update` von nvim entgegen, broadcastet per WebSocket. Rendert nichts selbst. Kennt nur die eine Content-Quelle „nvim schickt POST". |
-| Rendering (`native/wasm-render`) | Rust/comrak+ammonia → WASM, läuft **im Browser**, ist von der Content-Quelle komplett entkoppelt (bekommt rohen Markdown-Text über WS, ist ihm egal woher). |
-| `:MDView preview-tab` | Rendert **ohne** Relay/Browser/WASM — Treesitter-Highlighting einer Spiegel-Buffer in einem neuen nvim-Tab. Einzige heute existierende serverlose Variante. |
-| Prozess-Spawning | `lua/mdview/adapter/runner.lua:M.start_server` nutzt `vim.loop.spawn` (libuv), nicht `jobstart`/`vim.system`. Kein `detached`-Flag im Einsatz. |
-| Cross-Build | `native/server/.goreleaser.yml` baut den Go-Relay bereits für linux/darwin/windows × amd64/arm64. Reine Build-Infrastruktur, kein Standalone-Produkt. |
+| Go relay (`native/server`) | A pure byte relay: it takes markdown text via `POST /update` from nvim and broadcasts it over WebSocket. It renders nothing itself. It knows only the one content source "nvim sends a POST". |
+| Rendering (`native/wasm-render`) | Rust/comrak+ammonia → WASM, runs **in the browser**, and is completely decoupled from the content source (it receives raw markdown text over WS and does not care where it came from). |
+| `:MDView preview-tab` | Renders **without** relay/browser/WASM — treesitter highlighting of a mirror buffer in a new nvim tab. The only serverless variant that exists today. |
+| Process spawning | `lua/mdview/adapter/runner.lua:M.start_server` uses `vim.loop.spawn` (libuv), not `jobstart`/`vim.system`. No `detached` flag in use. |
+| Cross-build | `native/server/.goreleaser.yml` already builds the Go relay for linux/darwin/windows × amd64/arm64. Pure build infrastructure, not a standalone product. |
 
-Wichtigster Befund: **der Relay weiß nichts von Dateien.** Er kennt nur „hier ist Text für Key X, verteil ihn". Das ist der Hebel für alle drei Punkte unten — die Content-Quelle ist austauschbar, ohne Client oder WASM-Renderer anzufassen.
-
----
-
-## 1. Hauptfeature ohne Serverstart
-
-**Frage:** Gibt es eine Möglichkeit, das Hauptfeature anzubieten, ohne einen Server zu starten?
-
-**Kurz:** Teilweise ja, schon vorhanden (`:MDView preview-tab`), aber mit reduziertem Funktionsumfang. Eine vollwertige serverlose Variante mit identischem Rendering ist möglich, aber nur mit Kompromissen — WASM braucht zwingend einen Host mit JS-Engine (Browser oder Node), und Websocket-Live-Sync braucht zwingend einen Prozess, der zuhört.
-
-### 1.1 Was „ohne Server" tatsächlich bedeutet
-
-Drei Ebenen, die oft in einen Topf geworfen werden:
-
-1. **Kein eigener Serverprozess** (kein `mdview-server.exe` als Kindprozess) — aber ggf. trotzdem ein Browser-Tab.
-2. **Kein Browser** — Rendering bleibt im Terminal/in nvim.
-3. **Kein Live-Update-Kanal** — statisches Rendering, das bei jeder Änderung neu angestoßen werden muss.
-
-`preview-tab` erfüllt alle drei: kein Serverprozess, kein Browser, aber auch kein WASM/CSS-Theming — nur Treesitter-Markdown-Highlighting in einem Spiegel-Buffer. Für schnelles Gegenlesen reicht das; für das eigentliche „Hauptfeature" (sauber gerendertes HTML mit Theme, Sanitizing, Scroll-Sync) nicht.
-
-### 1.2 Option A — Statischer Einmal-Export (kein Server, aber Browser)
-
-Der bereits vorhandene Rust/comrak-Renderer läuft aktuell nur als WASM im Browser. Comrak selbst ist aber eine normale Rust-Bibliothek — ein zweites, kleines Rust- oder Go-CLI-Target (`render-once`) könnte Markdown direkt zu einer selbstständigen HTML-Datei rendern (Client-CSS/JS inline gebündelt, kein `<script>`, das auf WebSocket wartet) und diese per `file://` im Standardbrowser öffnen. Kein Serverprozess, kein offener Port, kein Token — aber auch kein Live-Reload: jede Änderung braucht einen neuen Export-Aufruf.
-
-- Aufwand: klein bis mittel (neues Cargo- oder Go-Binary-Target, das den vorhandenen comrak/ammonia-Pfad wiederverwendet, plus ein „inline statt WS" Renderpfad im TS-Client oder ein separates, minimales statisches Template).
-- Passt gut als `:MDView export [path]` — nützlich für Sharing/Doku-Export, nicht als Ersatz für die Live-Preview.
-
-### 1.3 Option B — `preview-tab` aufwerten statt neu bauen
-
-Näherliegend: `preview-tab` schrittweise näher an die Browser-Preview heranbringen, ohne die Serverpflicht:
-
-- Aktuell nur Treesitter-Highlighting. Perspektivisch könnte derselbe comrak-Renderer (nativ kompiliert, nicht als WASM) verwendet werden, um zusätzliche Metadaten (z. B. aufgelöste Links, Tabellen-Spaltenbreiten) vorzuberechnen und im Spiegel-Buffer per `extmarks`/virtual text darzustellen — ohne echtes HTML/CSS, aber näher am Endergebnis als reines Syntax-Highlighting.
-- Terminal-Grafikprotokolle (Kitty Graphics Protocol, Sixel) wären ein größerer Sprung (eingebettete Bilder/Diagramme im Terminal), aber das ist ein separates, deutlich aufwändigeres Konzept und lohnt nur, falls „ohne Browser" (nicht nur „ohne Server") ein hartes Ziel ist.
-
-**Empfehlung:** Für die gestellte Frage ist `preview-tab` bereits die Antwort „Hauptfeature ohne Server"; wenn mehr Rendering-Treue gewünscht ist, ist Option A (statischer Export) der pragmatischere nächste Schritt, da er den vorhandenen comrak-Pfad direkt wiederverwendet.
+The most important finding: **the relay knows nothing about files.** It only knows
+"here is text for key X, distribute it". That is the lever for all three points
+below — the content source is exchangeable without touching the client or the WASM
+renderer.
 
 ---
 
-## 2. Hintergrundprozess-API aus dem Terminal
+## 1. The main feature without starting a server
 
-**Frage:** `nvim +MDView --background "C:\TEST.md"` — mdview als eigenständigen Hintergrundprozess starten, wahlweise mit Browser-Tab oder als separierte, minimale nvim-Instanz (nur nvim + mdview installiert).
+**Question:** is there a way to offer the main feature without starting a server?
 
-Wichtig vorab: `nvim +MDView --background file.md` ist keine gültige nvim-CLI-Syntax (`+cmd` nimmt keine Folge-Flags). Die reale Grundlage ist `nvim --headless -c "<cmd>" file.md`, kombiniert mit einer minimalen Config und einem Detach-Mechanismus. Das lässt sich aber sauber in ein Wrapper-Kommando fassen.
+**Short answer:** partly yes, and it already exists (`:MDView preview-tab`), but
+with reduced functionality. A full serverless variant with identical rendering is
+possible, but only with compromises — WASM necessarily needs a host with a JS
+engine (browser or Node), and websocket live sync necessarily needs a process that
+listens.
 
-### 2.1 Warum das heute schon fast funktioniert
+### 1.1 What "without a server" actually means
 
-`:MDView start` startet den Relay bereits als Kindprozess und kann headless laufen — der Server braucht kein GUI, `browser.require_display` blendet den `open`-Schritt bei fehlendem Display bereits kontrolliert aus (siehe `docs/checkpoints/01_checkpoint.md`). Was fehlt, ist nicht neue Funktionalität im Relay, sondern:
+Three levels that often get lumped together:
 
-1. Ein **Startkommando von außen** (aus einem Terminal, nicht aus einer laufenden nvim-Instanz).
-2. Eine **minimale, isolierte Config**, die nur `mdview.nvim` (+ dessen `lib.nvim`-Abhängigkeit) lädt, statt der vollen Nutzer-Config.
-3. Ein **Detach**, damit der Prozess den startenden Terminal überlebt.
+1. **No dedicated server process** (no `mdview-server.exe` as a child process) —
+   but possibly still a browser tab.
+2. **No browser** — rendering stays in the terminal / in nvim.
+3. **No live-update channel** — static rendering that has to be triggered anew on
+   every change.
 
-### 2.2 Vorgeschlagene Invocation
+`preview-tab` fulfils all three: no server process, no browser, but also no
+WASM/CSS theming — only treesitter markdown highlighting in a mirror buffer. That
+is enough for a quick proofread; not for the actual "main feature" (cleanly
+rendered HTML with a theme, sanitising, scroll sync).
+
+### 1.2 Option A — a static one-off export (no server, but a browser)
+
+The existing Rust/comrak renderer currently runs only as WASM in the browser.
+comrak itself, though, is an ordinary Rust library — a second, small Rust or Go CLI
+target (`render-once`) could render markdown directly into a self-contained HTML
+file (client CSS/JS bundled inline, no `<script>` waiting on a WebSocket) and open
+it via `file://` in the default browser. No server process, no open port, no token
+— but also no live reload: every change needs another export call.
+
+- Effort: small to medium (a new cargo or Go binary target that reuses the existing
+  comrak/ammonia path, plus an "inline instead of WS" render path in the TS client
+  or a separate, minimal static template).
+- Fits well as `:MDView export [path]` — useful for sharing/doc export, not as a
+  replacement for the live preview.
+
+### 1.3 Option B — upgrade `preview-tab` instead of building anew
+
+More obvious: bring `preview-tab` step by step closer to the browser preview,
+without the server requirement:
+
+- Currently only treesitter highlighting. In perspective the same comrak renderer
+  (natively compiled, not as WASM) could be used to precompute additional metadata
+  (e.g. resolved links, table column widths) and display it in the mirror buffer
+  via `extmarks`/virtual text — no real HTML/CSS, but closer to the final result
+  than pure syntax highlighting.
+- Terminal graphics protocols (Kitty graphics protocol, Sixel) would be a bigger
+  leap (embedded images/diagrams in the terminal), but that is a separate,
+  considerably more expensive concept and only pays off if "without a browser" (not
+  just "without a server") is a hard goal.
+
+**Recommendation:** for the question as asked, `preview-tab` is already the answer
+"the main feature without a server"; if more rendering fidelity is wanted, option A
+(static export) is the more pragmatic next step, since it reuses the existing
+comrak path directly.
+
+---
+
+## 2. A background-process API from the terminal
+
+**Question:** `nvim +MDView --background "C:\TEST.md"` — start mdview as a
+standalone background process, optionally with a browser tab or as a separate,
+minimal nvim instance (only nvim + mdview installed).
+
+Important up front: `nvim +MDView --background file.md` is not valid nvim CLI
+syntax (`+cmd` takes no following flags). The real basis is
+`nvim --headless -c "<cmd>" file.md`, combined with a minimal config and a detach
+mechanism. That can be wrapped cleanly in a wrapper command, though.
+
+### 2.1 Why this almost works today already
+
+`:MDView start` already starts the relay as a child process and can run headless —
+the server needs no GUI, and `browser.require_display` already suppresses the
+`open` step in a controlled way when there is no display (see
+`docs/checkpoints/01_checkpoint.md`). What is missing is not new functionality in
+the relay, but:
+
+1. A **start command from outside** (from a terminal, not from a running nvim
+   instance).
+2. A **minimal, isolated config** that loads only `mdview.nvim` (+ its `lib.nvim`
+   dependency) instead of the full user config.
+3. A **detach**, so that the process outlives the terminal that started it.
+
+### 2.2 Proposed invocation
 
 ```sh
-# Minimalform: eigener, isolierter Prozess, headless, mit fester Minimal-Config
+# Minimal form: a dedicated, isolated process, headless, with a fixed minimal config
 nvim --headless -u <mdview-repo>/scripts/minimal_init.lua \
      -c "MDView start" "C:\TEST.md"
 
-# Äquivalent als schlanker Wrapper (neues, optionales CLI-Skript im Repo):
-mdview-bg "C:\TEST.md"                 # Browser-Tab (default open_mode)
-mdview-bg --no-browser "C:\TEST.md"    # nur Relay, kein Tab (z. B. für externe Clients)
+# The equivalent as a slim wrapper (a new, optional CLI script in the repo):
+mdview-bg "C:\TEST.md"                 # browser tab (default open_mode)
+mdview-bg --no-browser "C:\TEST.md"    # relay only, no tab (e.g. for external clients)
 ```
 
-`scripts/minimal_init.lua` wäre eine ~10-Zeilen-Datei: `rtp` nur um `mdview.nvim` und `lib.nvim` erweitern, `require("mdview").setup({})`, fertig — genau die „eigene isolierte Instanz, wo nur nvim und mdview installiert sind" aus der Anfrage. Das ist im Kern identisch zum bereits vorhandenen Testharness-Pattern (`b1151c1 test(harness): resolve lib.nvim instead of requiring it on the invocation's rtp` — dort existiert schon eine funktionierende Minimal-RTP-Auflösung, die sich wiederverwenden lässt).
+`scripts/minimal_init.lua` would be a ~10-line file: extend `rtp` only by
+`mdview.nvim` and `lib.nvim`, `require("mdview").setup({})`, done — exactly the
+"own isolated instance where only nvim and mdview are installed" from the request.
+At its core that is identical to the existing test-harness pattern
+(`b1151c1 test(harness): resolve lib.nvim instead of requiring it on the
+invocation's rtp` — a working minimal-RTP resolution already exists there and can
+be reused).
 
-`mdview-bg` selbst wäre ein dünnes Shell/PowerShell-Skript (analog zu `dev:server` in `package.json`), das:
+`mdview-bg` itself would be a thin shell/PowerShell script (analogous to
+`dev:server` in `package.json`) that:
 
-- die Zieldatei zu einem absoluten Pfad auflöst,
-- `nvim --headless -u minimal_init.lua -c "MDView start" <file>` **detached** startet (Unix: `setsid ... &`; Windows: `Start-Process -WindowStyle Hidden`),
-- optional `--no-browser` als `browser.browser_autostart=false` in die minimal_init durchreicht.
+- resolves the target file to an absolute path,
+- starts `nvim --headless -u minimal_init.lua -c "MDView start" <file>` **detached**
+  (Unix: `setsid ... &`; Windows: `Start-Process -WindowStyle Hidden`),
+- optionally passes `--no-browser` through as `browser.browser_autostart=false` into
+  the minimal_init.
 
-### 2.3 Zwei Betriebsarten für den Hintergrundprozess
+### 2.3 Two operating modes for the background process
 
-| Modus | Verhalten | Anwendungsfall |
+| Mode | Behaviour | Use case |
 |---|---|---|
-| **Mit Browser-Tab** (default) | Headless-nvim startet Relay + öffnet Browser-Tab wie gewohnt, läuft danach im Hintergrund weiter und pusht Änderungen (`live_push` Autocmd funktioniert headless identisch). | Schnelles „einmal aufrufen, danach vergessen" — Preview bleibt offen, Terminal ist wieder frei. |
-| **Ohne Browser** (`browser.browser_autostart=false`) | Nur Relay + WS-Endpoint laufen; kein Tab wird geöffnet. | Fernzugriff (Preview von einem anderen Rechner im selben Netz öffnen), oder Vorstufe für den Standalone-Client aus Abschnitt 3. |
+| **With a browser tab** (default) | The headless nvim starts the relay + opens the browser tab as usual, then keeps running in the background and pushes changes (the `live_push` autocmd works identically headless). | Quick "call it once and forget it" — the preview stays open, the terminal is free again. |
+| **Without a browser** (`browser.browser_autostart=false`) | Only the relay + WS endpoint run; no tab is opened. | Remote access (open the preview from another machine on the same network), or a precursor to the standalone client from section 3. |
 
-### 2.4 Was technisch neu wäre
+### 2.4 What would technically be new
 
-- **Detach-Flag beim Spawn**: `runner.lua`s `vim.loop.spawn` müsste um `detached = true` erweitert werden, *wenn* der Detach aus einer laufenden nvim-Instanz heraus passieren soll (Abschnitt 4). Für den externen Terminal-Aufruf (`mdview-bg`) übernimmt das Betriebssystem/die Shell den Detach, nvim selbst braucht dafür nichts Neues.
-- **`minimal_init.lua`**: neue, kleine Datei im Repo (kein Plugin-Code, nur Bootstrap).
-- **Wrapper-Skript(e)**: `scripts/mdview-bg.sh` + `scripts/mdview-bg.ps1`, dünn, keine Logik dupliziert — ruft nur `nvim` mit den richtigen Flags auf.
-- **Kein Eingriff in den Relay/Client nötig** — die gesamte Änderung ist Prozessorchestrierung, keine Protokolländerung.
+- **A detach flag on the spawn**: `runner.lua`'s `vim.loop.spawn` would need
+  `detached = true` *if* the detach is supposed to happen from a running nvim
+  instance (section 4). For the external terminal call (`mdview-bg`) the operating
+  system/shell handles the detach and nvim itself needs nothing new.
+- **`minimal_init.lua`**: a new, small file in the repo (no plugin code, only
+  bootstrap).
+- **Wrapper script(s)**: `scripts/mdview-bg.sh` + `scripts/mdview-bg.ps1`, thin,
+  duplicating no logic — they only call `nvim` with the right flags.
+- **No intervention in the relay/client needed** — the entire change is process
+  orchestration, not a protocol change.
 
 ---
 
-## 3. Experimentelles Standalone-mdview (ohne nvim)
+## 3. An experimental standalone mdview (without nvim)
 
-**Frage:** Machbarkeit eines eigenständigen, cross-platform mdview — Lua, Go, WASM als Kandidaten.
+**Question:** the feasibility of a standalone, cross-platform mdview — Lua, Go,
+WASM as the candidates.
 
-### 3.1 Kernidee: den Relay um eine zweite Content-Quelle erweitern
+### 3.1 Core idea: give the relay a second content source
 
-Der Relay kennt heute genau eine Content-Quelle: `POST /update` von nvim. Für Standalone-Betrieb braucht er eine zweite, alternative Quelle — **Filesystem-Watching** — die intern denselben `registry.Broadcast(key, content)`-Pfad füttert, den `handleUpdate` in `native/server/main.go:171` heute per HTTP füllt. Client, WASM-Renderer, WebSocket-Framing, Sanitizing — alles bleibt unverändert, weil die Registry nicht weiß (und nicht wissen muss), ob der Text von nvim oder von einem Dateisystem-Watcher kommt.
+The relay today knows exactly one content source: `POST /update` from nvim. For
+standalone operation it needs a second, alternative source — **filesystem watching**
+— that internally feeds the same `registry.Broadcast(key, content)` path that
+`handleUpdate` in `native/server/main.go:171` fills over HTTP today. The client,
+the WASM renderer, the WebSocket framing, the sanitising — all stay unchanged,
+because the registry does not know (and does not need to know) whether the text
+came from nvim or from a filesystem watcher.
 
 ```
-Heute:      nvim (Buffer-Events) --HTTP POST /update--> Registry --WS--> Browser/WASM
-Standalone: fsnotify (Datei-Events) --Go-Funktionsaufruf--> Registry --WS--> Browser/WASM
+Today:      nvim (buffer events) --HTTP POST /update--> registry --WS--> browser/WASM
+Standalone: fsnotify (file events) --Go function call--> registry --WS--> browser/WASM
 ```
 
-### 3.2 Sprachwahl: Go, Lua, WASM im Vergleich
+### 3.2 Language choice: Go, Lua, WASM compared
 
-| Kandidat | Eignung als CLI-Host für Standalone-mdview |
+| Candidate | Suitability as the CLI host for a standalone mdview |
 |---|---|
-| **Go** | Bereits die Implementierungssprache des Relays. Hat mit `internal/relay` schon 90 % der nötigen Logik (Registry, WS, Auth, Static-File-Serving). `fsnotify` ist eine etablierte, cross-platform Bibliothek (linux/darwin/windows). `go:embed` erlaubt, den gebauten Client (`dist/client/`) **in die Binary einzubetten** — echtes Single-Binary-Deployment ohne externe Assets. Cross-Compile-Pipeline (`goreleaser`) existiert bereits für alle drei Zielplattformen. **Klarer Favorit.** |
-| **Lua** | Kein produktionsreifer, cross-platform Lua-Standalone-HTTP-Server+Filewatcher-Stack ohne externe Runtime (LuaJIT+luv, OpenResty, o. ä.) — das wäre faktisch eine neue Abhängigkeitskette parallel zu Go, ohne etwas wiederzuverwenden. Innerhalb von nvim ist Lua bereits die richtige Wahl (das ist der Plugin-Code selbst); als *nvim-unabhängiger* Prozess bringt Lua keinen Vorteil gegenüber Go, nur zusätzlichen Betriebsaufwand. **Nicht empfohlen als Host.** |
-| **WASM** | WASM ist kein CLI-Host — es braucht selbst einen Host-Runtime (Browser, Node, oder ein WASI-Runtime wie Wasmtime als zusätzliche Abhängigkeit). Der bestehende WASM-Renderer bleibt aber unverändert im Spiel: er läuft weiterhin *im Browser*, den der Standalone-Go-Prozess bedient — nur die Content-Zulieferung ändert sich, nicht das Rendering. Eine WASI-Variante des Relays selbst wäre nur relevant für Sandbox-/Plugin-Host-Szenarien (z. B. Einbettung in einen anderen Editor), die hier nicht gefragt sind. **Bleibt wie heute: Rendering-Layer, nicht Prozess-Host.** |
+| **Go** | Already the implementation language of the relay. With `internal/relay` it already has 90 % of the necessary logic (registry, WS, auth, static file serving). `fsnotify` is an established, cross-platform library (linux/darwin/windows). `go:embed` allows the built client (`dist/client/`) to be embedded **into the binary** — real single-binary deployment without external assets. A cross-compile pipeline (`goreleaser`) already exists for all three target platforms. **A clear favourite.** |
+| **Lua** | There is no production-ready, cross-platform Lua standalone HTTP server + file watcher stack without an external runtime (LuaJIT+luv, OpenResty, or similar) — that would in effect be a new dependency chain parallel to Go, reusing nothing. Inside nvim, Lua is already the right choice (that is the plugin code itself); as an *nvim-independent* process, Lua brings no advantage over Go, only extra operational overhead. **Not recommended as the host.** |
+| **WASM** | WASM is not a CLI host — it needs a host runtime itself (browser, Node, or a WASI runtime such as Wasmtime as an additional dependency). The existing WASM renderer stays in play unchanged, though: it still runs *in the browser* that the standalone Go process serves — only the content supply changes, not the rendering. A WASI variant of the relay itself would only matter for sandbox/plugin-host scenarios (e.g. embedding in another editor), which are not asked for here. **Stays as it is today: a rendering layer, not a process host.** |
 
-### 3.3 Vorgeschlagene Architektur
+### 3.3 Proposed architecture
 
-Neues Build-Target `mdview-standalone` (eigenes `main` in `native/server/cmd/standalone/` oder ein `--watch`-Flag direkt am bestehenden `mdview-server`, siehe 3.4), das:
+A new build target `mdview-standalone` (its own `main` in
+`native/server/cmd/standalone/`, or a `--watch` flag directly on the existing
+`mdview-server`, see 3.4) that:
 
-1. **Datei-Argument statt Token/nvim-Kopplung**: `mdview <file.md> [--port 43219] [--theme dark] [--no-open]`.
-2. **fsnotify-Watcher** auf die Datei (und optional deren Verzeichnis für relative Links/Bilder), der bei Änderungen den Dateiinhalt liest und `registry.Broadcast(key, content)` direkt aufruft — kein HTTP-Hop, da alles im selben Prozess läuft.
-3. **`go:embed` für `dist/client/`**: Client-Bundle + WASM-Renderer werden zur Build-Zeit in die Binary eingebettet, `--web-root` entfällt für den Standalone-Fall. Ergebnis: eine einzelne ausführbare Datei pro Plattform, kein `dist/`-Verzeichnis nötig.
-4. **Token**: lokal generiert wie heute (`gen_token`-Äquivalent in Go), da weiterhin loopback-only — keine Sicherheitsabweichung vom bestehenden Modell.
-5. **Browser-Öffnen**: dieselbe Cross-Platform-`xdg-open`/`open`/`start`-Logik, die aktuell in Lua (`lua/mdview/adapter/browser/`) liegt, bräuchte ein kleines Go-Äquivalent (paketierte Libraries wie `pkg/browser` existieren dafür bereits).
+1. **Takes a file argument instead of a token/nvim coupling**:
+   `mdview <file.md> [--port 43219] [--theme dark] [--no-open]`.
+2. **Runs an fsnotify watcher** on the file (and optionally on its directory for
+   relative links/images) that, on changes, reads the file content and calls
+   `registry.Broadcast(key, content)` directly — no HTTP hop, since everything runs
+   in the same process.
+3. **Uses `go:embed` for `dist/client/`**: the client bundle + WASM renderer are
+   embedded into the binary at build time, and `--web-root` becomes unnecessary for
+   the standalone case. Result: one single executable per platform, no `dist/`
+   directory needed.
+4. **Token**: generated locally as today (a `gen_token` equivalent in Go), since it
+   remains loopback-only — no security deviation from the existing model.
+5. **Opening the browser**: the same cross-platform `xdg-open`/`open`/`start` logic
+   that currently sits in Lua (`lua/mdview/adapter/browser/`) would need a small Go
+   equivalent (packaged libraries such as `pkg/browser` already exist for it).
 
-### 3.4 Zwei Ausbaustufen (Aufwand vs. Nutzen)
+### 3.4 Two build-out stages (effort vs. benefit)
 
-| Stufe | Beschreibung | Aufwand |
+| Stage | Description | Effort |
 |---|---|---|
-| **A — Flag am bestehenden Relay** | `mdview-server --watch <file>` als zusätzlicher Modus neben `--token`-basiertem nvim-Betrieb. Kein neues Binary, minimal-invasiv. | Klein: neues `internal/source`-Package (fsnotify-Watcher → `registry.Broadcast`), ein neues Flag, keine bestehenden Codepfade angefasst. |
-| **B — Eigenes `mdview` Single-Binary** | Separates Build-Target mit `go:embed`, eigenem Browser-Opener, eigenem CLI-Interface (`mdview file.md`, kein nvim-Vokabular wie `--token`). Klar als eigenständiges Produkt vermarktbar/dokumentierbar. | Mittel: neues `cmd/`-Verzeichnis, `goreleaser`-Konfig um ein zweites Artefakt erweitern, eigene Doku (`docs/standalone.md`). |
+| **A — a flag on the existing relay** | `mdview-server --watch <file>` as an additional mode next to the `--token`-based nvim operation. No new binary, minimally invasive. | Small: a new `internal/source` package (fsnotify watcher → `registry.Broadcast`), one new flag, no existing code paths touched. |
+| **B — an own `mdview` single binary** | A separate build target with `go:embed`, its own browser opener, its own CLI interface (`mdview file.md`, no nvim vocabulary such as `--token`). Clearly marketable/documentable as a standalone product. | Medium: a new `cmd/` directory, extending the `goreleaser` config by a second artefact, its own docs (`docs/standalone.md`). |
 
-**Empfehlung:** mit Stufe A als experimentellem Flag beginnen (schnell verifizierbar, nichts Bestehendes gefährdet), bei Bewährung nach Stufe B überführen.
+**Recommendation:** start with stage A as an experimental flag (quickly verifiable,
+nothing existing endangered), and move to stage B once it has proven itself.
 
-### 3.5 Was explizit gleich bleibt
+### 3.5 What explicitly stays the same
 
-- Relay-Protokoll (WS-Framing, `\x01`–`\x05`-Präfixe), Client, WASM-Renderer: **unverändert.**
-- Sicherheitsmodell (loopback-only, Token, Origin-Check): **unverändert**, nur die Token-Erzeugung wandert von Lua nach Go für den Standalone-Fall.
-- Kein Einfluss auf den nvim-Plugin-Pfad — Standalone ist ein zusätzliches Build-Target, kein Ersatz.
+- The relay protocol (WS framing, the `\x01`–`\x05` prefixes), the client, the WASM
+  renderer: **unchanged.**
+- The security model (loopback-only, token, origin check): **unchanged**, only the
+  token generation moves from Lua to Go for the standalone case.
+- No impact on the nvim plugin path — standalone is an additional build target, not
+  a replacement.
 
 ---
 
-## 4. Beide Startarten aus einer laufenden nvim-Instanz heraus
+## 4. Both start modes from a running nvim instance
 
-**Frage:** Beide Möglichkeiten (Hintergrund-nvim, Standalone-Binary) sollen auch aus einer laufenden nvim-Instanz per Usercmd auslösbar sein — „starte das Gleiche eben in einer neuen Instanz".
+**Question:** both possibilities (background nvim, standalone binary) should also be
+triggerable from a running nvim instance via a usercmd — "start the same thing in a
+new instance".
 
-Naheliegend als zwei neue Routen im bestehenden `:MDView`-Routing (`lua/mdview/bindings/usrcmds/init.lua:54`), analog zu `start`/`stop`:
+The obvious form is two new routes in the existing `:MDView` routing
+(`lua/mdview/bindings/usrcmds/init.lua:54`), analogous to `start`/`stop`:
 
 ```lua
 { path = { "detach" },
@@ -201,19 +283,34 @@ Naheliegend als zwei neue Routen im bestehenden `:MDView`-Routing (`lua/mdview/b
   run  = function(ctx) standalone.run(ctx.rest) end },
 ```
 
-- **`:MDView detach`**: baut auf `runner.lua`s Spawn-Pattern auf, aber mit `detached = true` im `vim.loop.spawn`-Options-Table (libuv unterstützt das nativ) und dem Kommando aus Abschnitt 2.2 (`nvim --headless -u minimal_init.lua -c "MDView start" <aktuelle Datei>`). Die aufrufende Instanz bleibt unverändert weiterlaufen — es wird ein komplett zweiter, unabhängiger Prozess, der auch nach `:qa` der ersten Instanz weiterläuft.
-- **`:MDView standalone`**: sobald 3.4/Stufe A oder B existiert, ein einfacher `vim.loop.spawn` auf den `mdview-standalone`-Binary-Pfad (neues Config-Feld `standalone.binary_path`, Auto-Download analog zum bestehenden `install.lua`-Mechanismus für `mdview-server.exe`) — kein nvim in der Prozesskette mehr, sobald der Aufruf abgesetzt ist.
-- Gemeinsame Voraussetzung: der Spawn-Helper in `adapter/runner.lua` bräuchte ein `detached`-Options-Feld (heute nicht gesetzt, da der Relay-Kindprozess bewusst an die aktuelle nvim-Instanz gebunden ist und beim `VimLeavePre`-Autocmd mitbeendet wird — für `detach`/`standalone` ist genau das *nicht* gewünscht, daher eigener Codepfad statt Wiederverwendung von `start_server`).
+- **`:MDView detach`**: builds on `runner.lua`'s spawn pattern, but with
+  `detached = true` in the `vim.loop.spawn` options table (libuv supports it
+  natively) and the command from section 2.2 (`nvim --headless -u minimal_init.lua
+  -c "MDView start" <current file>`). The calling instance keeps running unchanged —
+  a completely second, independent process is created that keeps running even after
+  `:qa` in the first instance.
+- **`:MDView standalone`**: as soon as 3.4/stage A or B exists, a simple
+  `vim.loop.spawn` on the `mdview-standalone` binary path (a new config field
+  `standalone.binary_path`, auto-download analogous to the existing `install.lua`
+  mechanism for `mdview-server.exe`) — no nvim in the process chain any more once
+  the call has been issued.
+- A shared prerequisite: the spawn helper in `adapter/runner.lua` would need a
+  `detached` options field (not set today, since the relay child process is
+  deliberately bound to the current nvim instance and is terminated with it by the
+  `VimLeavePre` autocmd — for `detach`/`standalone` that is exactly what is *not*
+  wanted, hence a dedicated code path instead of reusing `start_server`).
 
 ---
 
-## 5. Zusammenfassung / Priorisierung
+## 5. Summary / prioritisation
 
-| # | Vorhaben | Aufwand | Risiko für Bestehendes |
+| # | Undertaking | Effort | Risk to what exists |
 |---|---|---|---|
-| 1 | `preview-tab` bleibt die serverlose Antwort; ggf. Option A (statischer Export) ergänzen | klein–mittel | keins (additiv) |
-| 2 | `mdview-bg`-Wrapper + `minimal_init.lua` für externen Terminal-Start | klein | keins (reine Prozessorchestrierung, kein Protokoll-/Codepfad-Eingriff) |
-| 3 | `--watch`-Flag am Relay (Stufe A) als Fundament für Standalone | klein–mittel | keins, wenn als separater Codepfad (`internal/source`) implementiert |
-| 4 | `:MDView detach` / `:MDView standalone` als neue Routen | klein (Detach-Flag im Spawn-Helper) | gering, sofern als eigener Codepfad neben `start_server` gehalten |
+| 1 | `preview-tab` stays the serverless answer; possibly add option A (static export) | small–medium | none (additive) |
+| 2 | An `mdview-bg` wrapper + `minimal_init.lua` for an external terminal start | small | none (pure process orchestration, no protocol/code-path intervention) |
+| 3 | A `--watch` flag on the relay (stage A) as the foundation for standalone | small–medium | none, if implemented as a separate code path (`internal/source`) |
+| 4 | `:MDView detach` / `:MDView standalone` as new routes | small (a detach flag in the spawn helper) | low, as long as it is kept as its own code path next to `start_server` |
 
-Reihenfolge 2 → 4(detach) → 3 → 4(standalone) ergibt bei jedem Schritt ein eigenständig nutzbares, verifizierbares Zwischenergebnis, ohne dass ein Schritt die vorherigen Architekturentscheidungen revidiert.
+The order 2 → 4(detach) → 3 → 4(standalone) yields an independently usable,
+verifiable intermediate result at every step, without any step revising the
+architectural decisions of the previous ones.

@@ -1,198 +1,196 @@
-# Konzept: Overlay-System für die Preview
+# Concept: an overlay system for the preview
 
-> Konzept, noch nicht umgesetzt. Ziel: aus Neovim heraus **beliebige,
-> ein-/ausschaltbare Overlays** über der Browser-Preview steuern — schwebendes
-> TOC, Cursor-Lupe, Keycast u. a. — als **ein generisches, erweiterbares
-> System**, nicht als lose Einzel-Features. Baut auf dem bereits vorhandenen
-> Live-Control-Kanal (`\x05` `/control` → `adapter/control.lua` → Client
-> `applyControl`) auf, mit dem `:MDViewCursor`/`:MDViewZoom`/`:MDViewReveal`
-> schon heute den offenen Tab ohne Reload verändern.
-
----
-
-## 1. Grundprinzip
-
-Ein **Overlay** ist eine unabhängige, ein-/ausschaltbare UI-Schicht über dem
-gerenderten Dokument. Es zeichnet nur, greift nicht in den Content ein, und
-mehrere Overlays können gleichzeitig aktiv sein. Getoggelt wird live aus nvim.
-
-Faktisch gibt es schon Overlays: `cursor_marker` (line/caret/section), der
-`⇅ scroll enabled`-Badge, `zoom`. Das Konzept **verallgemeinert** das zu einem
-Manager mit Registry, damit neue Overlays billig dazukommen und sich nicht
-gegenseitig ins Gehege kommen (gemeinsame Layer + Z-Index-Ordnung).
+> A concept, not implemented yet. Goal: control **arbitrary, switchable overlays**
+> over the browser preview from Neovim — a floating TOC, a cursor magnifier,
+> keycast and others — as **one generic, extensible system**, not as loose
+> individual features. It builds on the existing live control channel
+> (`\x05` `/control` → `adapter/control.lua` → client `applyControl`), with which
+> `:MDViewCursor`/`:MDViewZoom`/`:MDViewReveal` already change the open tab today
+> without a reload.
 
 ---
 
-## 2. Architektur
+## 1. Basic principle
 
-### 2.1 Client — Overlay-Manager + Registry
+An **overlay** is an independent, switchable UI layer over the rendered document.
+It only draws, it does not touch the content, and several overlays can be active at
+once. It is toggled live from nvim.
 
-Eine gemeinsame Overlay-Ebene im DOM:
+In fact overlays already exist: `cursor_marker` (line/caret/section), the
+`⇅ scroll enabled` badge, `zoom`. The concept **generalises** that into a manager
+with a registry, so that new overlays are cheap to add and do not get in each
+other's way (a shared layer + z-index ordering).
+
+---
+
+## 2. Architecture
+
+### 2.1 Client — overlay manager + registry
+
+A shared overlay level in the DOM:
 
 ```
 #mdview-overlays   position: fixed; inset: 0; pointer-events: none; z-index: 20
-  └─ pro Overlay ein Container; einzelne Overlays opten via pointer-events:auto
-     wieder ein (klickbares TOC etc.)
+  └─ one container per overlay; individual overlays opt back in via
+     pointer-events:auto (a clickable TOC etc.)
 ```
 
-Ein Overlay implementiert ein schlankes Interface:
+An overlay implements a slim interface:
 
 ```ts
 interface Overlay {
   name: string;
-  mount(ctx: OverlayCtx): void;     // DOM anlegen, Listener setzen
-  unmount(): void;                  // alles wieder entfernen
-  onCursor?(line: number, col: number): void;  // pro Scroll-/Cursor-Ping
-  onRender?(): void;                // nach jedem Re-Render (innerHTML gewiped)
-  onControl?(data: unknown): void;  // overlay-spezifisches Control-Payload
+  mount(ctx: OverlayCtx): void;     // create DOM, set listeners
+  unmount(): void;                  // remove everything again
+  onCursor?(line: number, col: number): void;  // per scroll/cursor ping
+  onRender?(): void;                // after every re-render (innerHTML wiped)
+  onControl?(data: unknown): void;  // overlay-specific control payload
 }
 
 interface OverlayCtx {
-  root: HTMLElement;          // #mdview-root (der Content)
-  layer: HTMLElement;         // #mdview-overlays (die Overlay-Ebene)
-  headings(): HeadingInfo[];  // aus dem DOM (h1..h6 + data-sourcepos)
-  caretPixel(line, col): {x,y,h} | null; // wiederverwendet aus cursorMarker
-  governingHeading(line): HeadingInfo | null; // aus der Section-Spotlight-Logik
+  root: HTMLElement;          // #mdview-root (the content)
+  layer: HTMLElement;         // #mdview-overlays (the overlay level)
+  headings(): HeadingInfo[];  // from the DOM (h1..h6 + data-sourcepos)
+  caretPixel(line, col): {x,y,h} | null; // reused from cursorMarker
+  governingHeading(line): HeadingInfo | null; // from the section-spotlight logic
 }
 ```
 
-Der **Manager** hält die aktiven Overlays, ruft die Hooks (`onCursor` beim
-Scroll-Ping, `onRender` nach jedem `renderMarkdown`, `onControl` bei
-overlay-adressierten Control-Nachrichten) und mountet/unmountet auf Toggle. Die
-Helfer in `OverlayCtx` bündeln, was mehrere Overlays brauchen — v. a. die
-schon existierende Caret-Pixel-Berechnung (`caretPixelBox`) und die
-„governing heading"-Logik aus dem Section-Spotlight, damit TOC & Co. sie
-wiederverwenden statt zu duplizieren.
+The **manager** holds the active overlays, calls the hooks (`onCursor` on the
+scroll ping, `onRender` after every `renderMarkdown`, `onControl` on
+overlay-addressed control messages) and mounts/unmounts on a toggle. The helpers in
+`OverlayCtx` bundle what several overlays need — above all the already existing
+caret pixel computation (`caretPixelBox`) and the "governing heading" logic from the
+section spotlight, so that the TOC & co. reuse them instead of duplicating them.
 
 ### 2.2 Transport
 
-- **Toggle & niederfrequente Updates** über den bestehenden Control-Kanal:
-  `{overlay: {name, on}}`, batchbar als `{overlays: {toc:true, keycast:false}}`.
-  `applyControl` reicht das an den Manager weiter.
-- **Hochfrequente Datenströme** (Keycast!) bekommen einen **eigenen ephemeren
-  Kanal** analog zu `/scroll` (`\x01`): neuer `/keys`-Endpoint mit Prefix
-  `\x06`, nvim-seitig gebatcht/debounced — nicht jeden Tastendruck als eigenen
-  HTTP-POST. Overlays, die nur getoggelt werden, brauchen das nicht.
-- **Initialzustand** beim Öffnen via URL-Param `&overlays=toc,keycast`, damit
-  ein wieder geöffneter Tab (`:MDViewOpen`) die aktiven Overlays wiederherstellt
-  — gleiches Muster wie `?cursor=` / `?zoom=`.
+- **Toggles & low-frequency updates** go over the existing control channel:
+  `{overlay: {name, on}}`, batchable as `{overlays: {toc:true, keycast:false}}`.
+  `applyControl` passes that on to the manager.
+- **High-frequency data streams** (keycast!) get **their own ephemeral channel**
+  analogous to `/scroll` (`\x01`): a new `/keys` endpoint with the prefix `\x06`,
+  batched/debounced on the nvim side — not one HTTP POST per keystroke. Overlays
+  that are only toggled do not need this.
+- **The initial state** on open via the URL param `&overlays=toc,keycast`, so that a
+  reopened tab (`:MDViewOpen`) restores the active overlays — the same pattern as
+  `?cursor=` / `?zoom=`.
 
 ### 2.3 Neovim
 
-- **Ein generisches Command**: `:MDViewOverlay <name> [on|off|toggle]` plus
-  `:MDViewOverlay list` (zeigt registrierte Overlays + Zustand). Tab-Completion
-  über die Namen. (Optional dünne Aliase `:MDViewTOC`, `:MDViewKeycast`.)
-- **Config**: `browser.overlays = { toc=false, magnifier=false, keycast=false }`
-  als Default + Merker für Reopen.
-- **Keymaps**: mdview liefert keine, aber Doku-Beispiele — der Wunsch war ja
-  „schnell togglen":
+- **One generic command**: `:MDViewOverlay <name> [on|off|toggle]` plus
+  `:MDViewOverlay list` (shows registered overlays + their state). Tab completion
+  over the names. (Optionally thin aliases `:MDViewTOC`, `:MDViewKeycast`.)
+- **Config**: `browser.overlays = { toc=false, magnifier=false, keycast=false }` as
+  the default + a memo for reopening.
+- **Keymaps**: mdview ships none, but the docs give examples — the wish was, after
+  all, "toggle quickly":
   ```lua
   map("n", "<leader>ot", "<cmd>MDViewOverlay toc toggle<cr>")
   map("n", "<leader>om", "<cmd>MDViewOverlay magnifier toggle<cr>")
   map("n", "<leader>ok", "<cmd>MDViewOverlay keycast toggle<cr>")
   ```
-- **Datenquellen-Manifest** in Lua: pro Overlay, welche nvim-Seite es braucht.
-  So registriert z. B. Keycast `vim.on_key()` **nur**, wenn es aktiv ist, und
-  hängt es beim Ausschalten wieder ab (kein Dauerkostenpunkt).
+- **A data-source manifest** in Lua: per overlay, which nvim side it needs. That way
+  keycast registers `vim.on_key()` **only** while it is active and detaches it again
+  when switched off (no permanent cost).
 
-### 2.4 Lifecycle & Persistenz
+### 2.4 Lifecycle & persistence
 
-Overlays sind rein Preview-seitig und live-getoggelt. `browser.overlays` ist
-Default + Reopen-Merker. **Keycast defaultet aus** (Privacy, s. u.).
-
----
-
-## 3. Die konkreten Overlays
-
-### 3.1 Floating TOC (Mini-Outline)  — klein–mittel
-
-- **Datenquelle**: rein client-seitig aus dem DOM (`h1..h6` + `data-sourcepos`).
-  Keine neue nvim-Seite nötig.
-- **UI**: schwebendes Panel in einer Ecke; Liste der Überschriften eingerückt
-  nach Level; der **aktuelle Abschnitt hervorgehoben** — nutzt die Cursor-Zeile
-  (kommt schon über den Scroll-Ping) + dieselbe „governing heading"-Logik wie
-  der Section-Spotlight. Dazu ein Fortschrittshinweis („Abschnitt 3/12" oder ein
-  dünner Balken), damit der Zuschauer sieht, wo im Dokument man ist.
-- **Interaktion**: Klick auf einen Eintrag scrollt die Preview dorthin. Optional
-  (Entscheidung s. u.): den nvim-Cursor mitziehen (über den vorhandenen
-  reverse-scroll-Bridge-Mechanismus).
-- **Warum zuerst**: höchster Nutzen für den Coaching-Fall, baut fast komplett
-  auf Vorhandenem auf.
-
-### 3.2 Cursor-Lupe / Magnifier  — mittel
-
-- **Datenquelle**: die Caret-Pixelposition (schon vorhanden via `caretPixelBox`;
-  exakt mit den `source_map`-Spans, grob über die Blockposition ohne sie).
-- **UI (echte Linse)**: runde `position:fixed`-Linse mit einem **geklonten,
-  skalierten** Ausschnitt von `#mdview-root` — Text bleibt vektorscharf (kein
-  Pixel-Sampling à la html2canvas). Bei Cursor-Ping neu positionieren, bei
-  Re-Render das Klon-`innerHTML` synchronisieren.
-- **UI (einfachere Variante „Focus-Zoom")**: statt Linse den Block/Absatz unter
-  dem Cursor sanft vergrößern (Fisheye-light). Weniger Code, gut für „schau
-  genau hier".
-- **Empfehlung**: Focus-Zoom als v1, echte Linse als Ausbau.
-
-### 3.3 Keycast (Tastatureingaben anzeigen)  — mittel
-
-- **Datenquelle**: `vim.on_key()` in nvim → Ringpuffer der letzten N Tasten,
-  **debounced** (~120 ms) → POST `/keys` → `\x06`-Broadcast an den Client.
-- **UI**: transientes Pill unten (wie *screenkey*), zeigt die zuletzt gedrückten
-  Tasten und faded nach ~1,5 s aus.
-- **Übersetzung**: rohe Bytes → lesbare Namen (`j`, `<C-w>`, `<Esc>`, `:w<CR>`)
-  via `vim.fn.keytrans()` — nvim-seitig, der Client zeigt nur an.
-- **Privacy** (wichtig): Insert-Mode-Tasten würden getippten Text zeigen. Config
-  `keycast_scope = "non_insert" | "all"` (Default `non_insert`: nur Normal-/
-  Command-/Operator-Tasten) und Keycast **komplett per Default aus**. So sieht
-  der Zuschauer die *Bedienung* (Motions, Commands), nicht zwingend jeden
-  Buchstaben.
-
-### 3.4 Weitere Ideen (gleich mitdenken)
-
-- **Reading-Progress-Bar**: dünner Balken oben, Position im Dokument.
-- **Attention-Ping / „Laserpointer"**: `:MDViewPing` löst einen kurzen
-  Highlight-Puls am Caret aus — Blick lenken ohne Maus. (Winziges Overlay,
-  großer Effekt bei Calls.)
-- **Presenter-Notes**: `speaker`-Fences (analog zu `private`), die **nur** als
-  nvim-seitiges Overlay/Panel erscheinen, nicht im geteilten Tab — Stichpunkte
-  für dich, unsichtbar für den Zuschauer. (Größer; eigenes Konzept wert.)
-- **Minimap** des Dokuments am Rand.
+Overlays are purely preview-side and toggled live. `browser.overlays` is the default
++ the reopen memo. **Keycast defaults to off** (privacy, see below).
 
 ---
 
-## 4. Verhältnis zu bestehenden Features
+## 3. The concrete overlays
 
-`cursor_marker`, der rscroll-Badge und `zoom` sind faktisch schon Overlays.
-Vorschlag: **neue** Overlays laufen über den Manager; die bestehenden Marker
-bleiben zunächst wie sie sind und werden **optional später** unter das
-Overlay-Dach gezogen (reiner Refactor, kein Muss). Der einzige harte Punkt jetzt:
-eine gemeinsame Overlay-Ebene + klare Z-Index-Ordnung einführen, damit sich
-TOC / Lupe / Keycast / Marker sauber stapeln statt chaotisch zu überlappen.
+### 3.1 Floating TOC (mini outline)  — small–medium
+
+- **Data source**: purely client-side from the DOM (`h1..h6` + `data-sourcepos`).
+  No new nvim side needed.
+- **UI**: a floating panel in a corner; a list of the headings indented by level;
+  the **current section highlighted** — it uses the cursor line (already arriving
+  via the scroll ping) + the same "governing heading" logic as the section
+  spotlight. Plus a progress indicator ("section 3/12" or a thin bar), so the
+  viewer sees where in the document you are.
+- **Interaction**: clicking an entry scrolls the preview there. Optionally (decision
+  below): drag the nvim cursor along (via the existing reverse-scroll bridge
+  mechanism).
+- **Why first**: the highest benefit for the coaching case, and it builds almost
+  entirely on what exists.
+
+### 3.2 Cursor magnifier  — medium
+
+- **Data source**: the caret pixel position (already available via `caretPixelBox`;
+  exact with the `source_map` spans, coarse via the block position without them).
+- **UI (a real lens)**: a round `position:fixed` lens with a **cloned, scaled**
+  cut-out of `#mdview-root` — the text stays vector-sharp (no pixel sampling à la
+  html2canvas). Reposition on the cursor ping, synchronise the clone's `innerHTML`
+  on a re-render.
+- **UI (the simpler "focus zoom" variant)**: instead of a lens, gently enlarge the
+  block/paragraph under the cursor (fisheye-light). Less code, good for "look right
+  here".
+- **Recommendation**: focus zoom as v1, the real lens as an extension.
+
+### 3.3 Keycast (showing keyboard input)  — medium
+
+- **Data source**: `vim.on_key()` in nvim → a ring buffer of the last N keys,
+  **debounced** (~120 ms) → POST `/keys` → a `\x06` broadcast to the client.
+- **UI**: a transient pill at the bottom (like *screenkey*), showing the most
+  recently pressed keys and fading out after ~1.5 s.
+- **Translation**: raw bytes → readable names (`j`, `<C-w>`, `<Esc>`, `:w<CR>`) via
+  `vim.fn.keytrans()` — on the nvim side, the client only displays.
+- **Privacy** (important): insert-mode keys would show the typed text. A config
+  `keycast_scope = "non_insert" | "all"` (default `non_insert`: only
+  normal/command/operator keys) and keycast **entirely off by default**. That way
+  the viewer sees the *operation* (motions, commands), not necessarily every letter.
+
+### 3.4 Further ideas (worth thinking through now)
+
+- **A reading progress bar**: a thin bar at the top, the position in the document.
+- **An attention ping / "laser pointer"**: `:MDViewPing` triggers a short highlight
+  pulse at the caret — directing the gaze without a mouse. (A tiny overlay, a large
+  effect on calls.)
+- **Presenter notes**: `speaker` fences (analogous to `private`) that appear **only**
+  as an nvim-side overlay/panel, not in the shared tab — bullet points for you,
+  invisible to the viewer. (Bigger; worth its own concept.)
+- **A minimap** of the document at the edge.
 
 ---
 
-## 5. Phasen
+## 4. Relationship to the existing features
 
-1. **Fundament**: Overlay-Manager + Registry + `#mdview-overlays`-Ebene +
-   `:MDViewOverlay` + `browser.overlays` + Control-/URL-Routing.
-2. **Floating TOC** (nutzt Section-Logik + Headings).
-3. **Focus-Zoom / Lupe**.
-4. **Keycast** (neuer `/keys`-Kanal + `vim.on_key` + `keytrans`).
-5. **Zugaben**: Progress-Bar, Attention-Ping.
-
-Jede Phase ist eigenständig lauffähig und testbar (Manager + je Overlay:
-vitest/jsdom für die Client-Logik, headless-nvim für die Command-/Datenquelle,
-Browser-Probe für Pixel-Positionen — wie bei Caret & Section).
+`cursor_marker`, the rscroll badge and `zoom` are already overlays in effect.
+Proposal: **new** overlays run through the manager; the existing markers stay as
+they are for now and are **optionally** pulled under the overlay umbrella **later**
+(a pure refactor, not a must). The only hard point now: introduce a shared overlay
+level + a clear z-index ordering, so that TOC / lens / keycast / marker stack
+cleanly instead of overlapping chaotically.
 
 ---
 
-## 6. Offene Entscheidungen für dich
+## 5. Phases
 
-- **Command-Form**: ein generisches `:MDViewOverlay <name> [on|off|toggle]`
-  (+ `list`) — Empfehlung — oder je Overlay ein eigenes Command? (Beides geht;
-  generisch + optionale Aliase ist am flexibelsten.)
-- **TOC-Klick**: nur die Preview scrollen, oder auch den nvim-Cursor mitziehen?
-- **Keycast**: Default-Umfang `non_insert` vs. `all`, und ob überhaupt
-  standardmäßig anbietbar (bleibt in jedem Fall opt-in).
-- **Lupe**: pragmatischer Focus-Zoom zuerst, oder gleich die echte Klon-Linse?
-- **Migration**: sollen `cursor_marker`/Badge/`zoom` perspektivisch unter den
-  Overlay-Manager wandern, oder dauerhaft getrennt bleiben?
+1. **Foundation**: overlay manager + registry + the `#mdview-overlays` level +
+   `:MDViewOverlay` + `browser.overlays` + control/URL routing.
+2. **The floating TOC** (uses the section logic + headings).
+3. **Focus zoom / lens**.
+4. **Keycast** (a new `/keys` channel + `vim.on_key` + `keytrans`).
+5. **Extras**: progress bar, attention ping.
+
+Every phase is independently runnable and testable (the manager + per overlay:
+vitest/jsdom for the client logic, headless nvim for the command/data source, a
+browser probe for pixel positions — as with the caret and the section).
+
+---
+
+## 6. Open decisions for you
+
+- **Command form**: one generic `:MDViewOverlay <name> [on|off|toggle]` (+ `list`) —
+  the recommendation — or one command per overlay? (Both work; generic + optional
+  aliases is the most flexible.)
+- **TOC click**: scroll only the preview, or drag the nvim cursor along too?
+- **Keycast**: default scope `non_insert` vs. `all`, and whether it can be offered
+  by default at all (it stays opt-in in any case).
+- **Lens**: the pragmatic focus zoom first, or the real clone lens right away?
+- **Migration**: should `cursor_marker`/badge/`zoom` eventually move under the
+  overlay manager, or stay separate permanently?

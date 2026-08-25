@@ -1,117 +1,117 @@
-# Test Harness für Line-Diff-Funktion in mdview.nvim
+# Test harness for the line-diff function in mdview.nvim
 
-Dieses kleine Markdown-Dokument beschreibt, wie man das `diff_harness.lua` ausführt, um die Line-Diff-Funktion (`mdview.util.diff`) zu testen und die Ergebnisse zu verifizieren.
+This short markdown document describes how to run `diff_harness.lua` in order to test the line-diff function (`mdview.util.diff`) and verify the results.
 
 ---
 
 ## Table of content
 
-- [1. Voraussetzungen](#1-voraussetzungen)
-- [2. Ziel](#2-ziel)
-- [3. Test-Szenarien](#3-test-szenarien)
-- [4. Ausführung](#4-ausfhrung)
-- [5. Analyse der Ergebnisse](#5-analyse-der-ergebnisse)
-- [6. Hinweise](#6-hinweise)
+- [1. Prerequisites](#1-prerequisites)
+- [2. Goal](#2-goal)
+- [3. Test scenarios](#3-test-scenarios)
+- [4. Running it](#4-running-it)
+- [5. Analysing the results](#5-analysing-the-results)
+- [6. Notes](#6-notes)
 - [7. Debugging](#7-debugging)
-- [8. Zusammenfassung](#8-zusammenfassung)
-- [Literatur](#literatur)
+- [8. Summary](#8-summary)
+- [Literature](#literature)
 
 ---
 
-## 1. Voraussetzungen
+## 1. Prerequisites
 
-- Neovim 0.9+ (für `vim.loop` / luv)
+- Neovim 0.9+ (for `vim.loop` / luv)
 
 - Lua 5.1+ (LuaJIT)
 
-- Das `mdview.nvim` Repository ausgecheckt und lauffähig
+- The `mdview.nvim` repository checked out and runnable
 
-- Die Module:
-  - `mdview.util.diff` (Line-Diff Funktion)
-  - `mdview.util.apply` (Hilfsfunktion `apply_patch` zum Testen der Patches)
-
----
-
-## 2. Ziel
-
-- Verifizieren, dass die Line-Diff-Funktion korrekte Patch-Informationen liefert.
-- Benchmark der Laufzeit für verschiedene Szenarien.
-- Testen der Konsistenz, indem die Patches auf den ursprünglichen Inhalt angewendet werden und das Ergebnis mit dem neuen Inhalt verglichen wird.
+- The modules:
+  - `mdview.util.diff` (the line-diff function)
+  - `mdview.util.apply` (the helper `apply_patch` for testing the patches)
 
 ---
 
-## 3. Test-Szenarien
+## 2. Goal
 
-Im Harness sind mehrere Szenarien vordefiniert:
+- Verify that the line-diff function delivers correct patch information.
+- Benchmark the runtime for various scenarios.
+- Test consistency by applying the patches to the original content and comparing the result with the new content.
 
-| Szenario               | Beschreibung                                      |
+---
+
+## 3. Test scenarios
+
+Several scenarios are predefined in the harness:
+
+| Scenario               | Description                                       |
 | ---------------------- | ------------------------------------------------- |
-| `empty_to_small`       | Leere Datei → kleine Datei (10 Zeilen)            |
-| `no_change`            | Keine Änderung zwischen `old` und `new`           |
-| `single_insert_middle` | Eine Zeile wird mittig eingefügt                  |
-| `single_delete_middle` | Eine Zeile wird mittig gelöscht                   |
-| `replace_block`        | Block von Zeilen wird ersetzt                     |
-| `large_append`         | Anhängen vieler Zeilen am Ende                    |
-| `many_small_changes`   | Viele kleine Änderungen verteilt über 1000 Zeilen |
+| `empty_to_small`       | An empty file → a small file (10 lines)           |
+| `no_change`            | No change between `old` and `new`                 |
+| `single_insert_middle` | One line is inserted in the middle                |
+| `single_delete_middle` | One line is deleted in the middle                 |
+| `replace_block`        | A block of lines is replaced                      |
+| `large_append`         | Appending many lines at the end                   |
+| `many_small_changes`   | Many small changes spread over 1000 lines         |
 
 ---
 
-## 4. Ausführung
+## 4. Running it
 
-1. Öffne Neovim im Root-Verzeichnis von `mdview.nvim`.
-1. Lade die Datei `diff_harness.lua` über `:luafile`:
+1. Open Neovim in the root directory of `mdview.nvim`.
+1. Load the file `diff_harness.lua` via `:luafile`:
 
 ```vim
 :luafile lua/mdview/test/diff_harness.lua
 ```
 
-3. Alternativ direkt aus Lua starten:
+3. Alternatively, start it directly from Lua:
 
 ```bash
 nvim --headless -c "luafile lua/mdview/test/diff_harness.lua" -c "qa"
 ```
 
-4. Die Konsole zeigt für jedes Szenario:
+4. The console shows, for every scenario:
 
 ```
-[test] <Szenario>: ok=true diffs=<Anzahl> time_ms=<Millisekunden> changed=<Zeilen> ratio=<Verhältnis>
+[test] <scenario>: ok=true diffs=<count> time_ms=<milliseconds> changed=<lines> ratio=<ratio>
 ```
 
-5. Am Ende eine Zusammenfassung:
+5. And a summary at the end:
 
 ```
-[summary] cases=<Anzahl> total_time_ms=<Millisekunden>
+[summary] cases=<count> total_time_ms=<milliseconds>
 ```
 
 ---
 
-## 5. Analyse der Ergebnisse
+## 5. Analysing the results
 
-- `ok=true`: Der Patch hat das `old_lines` korrekt zu `new_lines` transformiert.
-- `diffs=<Anzahl>`: Anzahl der Patch-Operationen.
-- `time_ms`: Dauer der Berechnung in Millisekunden.
-- `changed`: Anzahl der geänderten Zeilen.
-- `ratio`: Verhältnis geänderter Zeilen zu Gesamtzeilen (0–1).
+- `ok=true`: the patch transformed `old_lines` into `new_lines` correctly.
+- `diffs=<count>`: the number of patch operations.
+- `time_ms`: the computation time in milliseconds.
+- `changed`: the number of changed lines.
+- `ratio`: the ratio of changed lines to total lines (0–1).
 
 ---
 
-## 6. Hinweise
+## 6. Notes
 
-- Bei Fehlern werden Lua-Errors mit Details zur gescheiterten Operation ausgegeben.
-- Um die Diff-Funktion zu verbessern, kann man alternative Algorithmen wie LCS (Myers) verwenden.
-- Die Funktion `apply_patch` muss korrekt implementiert sein, um die Patches auf `old_lines` anzuwenden.
+- On failure, Lua errors are printed with details about the failed operation.
+- To improve the diff function, alternative algorithms such as LCS (Myers) can be used.
+- The function `apply_patch` has to be implemented correctly in order to apply the patches to `old_lines`.
 
 ---
 
 ## 7. Debugging
 
-- Aktivierung von detailliertem Logging in `diff.lua`:
+- Enable detailed logging in `diff.lua`:
 
 ```lua
 print(vim.inspect(diffs))
 ```
 
-- Prüfen, ob `patched` exakt dem neuen Inhalt entspricht:
+- Check that `patched` matches the new content exactly:
 
 ```lua
 for i, line in ipairs(new_lines) do
@@ -121,20 +121,20 @@ end
 
 ---
 
-## 8. Zusammenfassung
+## 8. Summary
 
-Mit `diff_harness.lua` lassen sich:
+With `diff_harness.lua` you can:
 
-- Funktionalität und Korrektheit der Line-Diff-Funktion prüfen.
-- Performance messen und Optimierungen ableiten.
-- Regressionen erkennen, wenn sich die Diff-Logik ändert.
+- check the functionality and correctness of the line-diff function.
+- measure performance and derive optimisations.
+- detect regressions when the diff logic changes.
 
 ---
 
-## Literatur
+## Literature
 
-- Lua `vim.loop` / luv Dokumentation
-- EmmyLua Typannotation für Tables und Arrays
-- Myers diff Algorithmus als Referenzimplementierung
+- Lua `vim.loop` / luv documentation
+- EmmyLua type annotations for tables and arrays
+- The Myers diff algorithm as a reference implementation
 
 ---

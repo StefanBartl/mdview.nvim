@@ -1,12 +1,11 @@
-# Test-Tasks für dich (manuell, im echten Neovim)
+# Manual test tasks (in a real Neovim)
 [testlink](.\docs\PoC.md)
-1. `browser.behavior`: mit zwei MD-Dateien testen — `reuse` (ein Tab folgt), `new_tab`, `manual`.
-    **Opt-in-Features einzeln aktivieren** (`setup({ experimental = { … = true } })`)
-1. `click_navigate = true` → auf einen relativen Link `[x](other.md)` klicken → nvim öffnet `other.md`, Preview folgt.
-2. `reverse_scroll = true` → im Browser scrollen → nvim-Cursor folgt (mit ~250 ms Lag — **hier bitte auf „fühlt sich ok an" achten**, das konnte ich headless nicht beurteilen).
-3. `webtransport = true` → sollte transparent auf WebSocket zurückfallen (kein HTTP/3-Backend), Preview funktioniert normal.
-    **Cross-Platform (falls möglich)**
-1. Einmal auf Linux `:MDViewStart` testen — mein Shim sollte den lib.nvim-Bug abfangen; wenn du lib.nvim selbst fixt, kann der Shim später raus.
+1. `browser.behavior`: test with two MD files — `reuse` (one tab follows), `new_tab`, `manual`.
+    **Enable the opt-in features one by one** (`setup({ experimental = { … = true } })`)
+1. `click_navigate = true` → click a relative link `[x](other.md)` → nvim opens `other.md`, the preview follows.
+2. `reverse_scroll = true` → scroll in the browser → the nvim cursor follows (with ~250 ms lag — **please judge here whether it "feels ok"**, that could not be assessed headless).
+3. `webtransport = true` → should fall back to WebSocket transparently (no HTTP/3 backend), the preview works normally.
+    **Cross-platform (if possible)**
+1. Test `:MDViewStart` once on Linux — the shim should catch the lib.nvim bug; once lib.nvim itself is fixed, the shim can go.
 
 ---
-

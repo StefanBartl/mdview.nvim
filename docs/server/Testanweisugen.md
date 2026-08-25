@@ -1,31 +1,31 @@
-# Server-Testanweisungen (Go-Relay)
+# Server test instructions (Go relay)
 
-> **Architektur-Hinweis.** mdview rendert Markdown **nicht** mehr serverseitig.
-> Der Go-Relay (`native/server/`, ausgeliefert als plattformspezifische Binary)
-> transportiert nur **Rohtext** an die Browser-Tabs; gerendert und sanitisiert
-> wird ausschließlich im Rust/WASM-Client. Es gibt daher **keinen `/render`-
-> Endpoint** mehr und **keinen Node-Dev-Server** (`npm run dev:server`, Vite-
-> Proxy auf 43220 sind entfernt). Alte Anleitungen, die JSON-`{ html }`-
-> Antworten erwarten, sind ungültig.
+> **Architecture note.** mdview **no longer** renders markdown server-side.
+> The Go relay (`native/server/`, shipped as a platform-specific binary)
+> transports only **raw text** to the browser tabs; rendering and sanitising
+> happen exclusively in the Rust/WASM client. There is therefore **no `/render`
+> endpoint** any more and **no Node dev server** (`npm run dev:server` and the
+> Vite proxy on 43220 are removed). Older instructions expecting JSON
+> `{ html }` responses are invalid.
 
 ## Endpoints
 
-Alle Nutz-Endpoints sind **token-gated** (`?token=<session>`), außer `/health`
-und dem statischen Client. Der Token wird pro Session in Lua generiert
-(`mdview.adapter.server_args`) und als `--token` an die Binary übergeben.
+All functional endpoints are **token-gated** (`?token=<session>`), except
+`/health` and the static client. The token is generated per session in Lua
+(`mdview.adapter.server_args`) and passed to the binary as `--token`.
 
-| Methode | Pfad         | Auth           | Zweck                                             |
-|---------|--------------|----------------|---------------------------------------------------|
-| GET     | `/health`    | —              | Liveness-Probe, liefert `ok`                      |
-| POST    | `/update`    | token + `key`  | Rohtext eines Dokuments an alle Tabs des `key`    |
-| POST    | `/scroll`    | token + `key`  | Scroll-Ping `"<line>/<total>"` (ephemer)          |
-| POST    | `/clientlog` | token          | Browser-Diagnose → stdout `[client] …`            |
-| GET     | `/ws`        | token + `key` + Origin | WebSocket-Upgrade, Room pro `key`         |
-| GET     | `/`          | —              | statisches Client-Bundle (HTML/JS/WASM)           |
+| Method | Path         | Auth           | Purpose                                            |
+|--------|--------------|----------------|----------------------------------------------------|
+| GET    | `/health`    | —              | Liveness probe, returns `ok`                       |
+| POST   | `/update`    | token + `key`  | The raw text of a document to all tabs of the `key`|
+| POST   | `/scroll`    | token + `key`  | Scroll ping `"<line>/<total>"` (ephemeral)         |
+| POST   | `/clientlog` | token          | Browser diagnostics → stdout `[client] …`          |
+| GET    | `/ws`        | token + `key` + Origin | WebSocket upgrade, one room per `key`      |
+| GET    | `/`          | —              | The static client bundle (HTML/JS/WASM)            |
 
-## 1) Relay-Binary manuell starten
+## 1) Starting the relay binary manually
 
-Die Binary liegt nach dem ersten `:MDViewStart` im Install-Cache:
+After the first `:MDViewStart` the binary lives in the install cache:
 
 ```
 # Windows
@@ -34,54 +34,54 @@ $env:LOCALAPPDATA\nvim-data\mdview\bin\v0.1.0\mdview-server_windows_amd64.exe
 ~/.local/share/nvim/mdview/bin/v0.1.0/mdview-server_<os>_<arch>
 ```
 
-Direkt aus dem Repo bauen und mit festem Port + Token starten:
+Build it straight from the repo and start it with a fixed port + token:
 
 ```sh
 cd native/server && go build -o mdview-server.exe .
 ./mdview-server.exe --port 45999 --token testtok123 --web-root ../../dist/client
-# stdout: "Running on http://localhost:45999"  (Lua matcht genau diese Zeile)
+# stdout: "Running on http://localhost:45999"  (Lua matches exactly this line)
 ```
 
-## 2) Health prüfen
+## 2) Checking health
 
 ```sh
-curl -sS http://localhost:45999/health   # erwartet: ok
+curl -sS http://localhost:45999/health   # expected: ok
 ```
 
-## 3) Rohtext an einen Room senden (`/update`)
+## 3) Sending raw text to a room (`/update`)
 
-`key` identifiziert das Dokument (in der Praxis der absolute Dateipfad).
-Mehrere Browser-Tabs mit demselben `key` bilden einen Room.
+`key` identifies the document (in practice the absolute file path).
+Several browser tabs with the same `key` form one room.
 
 ```sh
 curl -sS -X POST "http://localhost:45999/update?token=testtok123&key=test1" \
-  --data-binary "# Hallo aus dem Relay"
-# erwartet: HTTP 204 No Content; verbundene Tabs des key rendern den Text neu
+  --data-binary "# Hello from the relay"
+# expected: HTTP 204 No Content; connected tabs of the key re-render the text
 ```
 
-Falscher/fehlender Token ⇒ **403**, fehlender `key` ⇒ **400**.
+A wrong/missing token ⇒ **403**, a missing `key` ⇒ **400**.
 
-## 4) Browser-Diagnose-Sink prüfen (`/clientlog`)
+## 4) Checking the browser diagnostics sink (`/clientlog`)
 
 ```sh
 curl -sS -o /dev/null -w "%{http_code}\n" \
   -X POST "http://localhost:45999/clientlog?token=testtok123" --data "hello"
-# erwartet: 204, und auf dem Relay-stdout erscheint:  [client] hello
+# expected: 204, and on the relay stdout:  [client] hello
 ```
 
-## 5) WebSocket-Room-Isolation
+## 5) WebSocket room isolation
 
-Zwei Clients mit unterschiedlichem `key` dürfen sich **nicht** gegenseitig sehen.
-Automatisiert deckt das `go test ./...` in `native/server/internal/relay` ab
-(Room-Zuordnung, Origin-Ablehnung, Token-Validierung). Manuell mit `websocat`:
+Two clients with different `key`s must **not** see each other.
+`go test ./...` in `native/server/internal/relay` covers that automatically
+(room assignment, origin rejection, token validation). Manually with `websocat`:
 
 ```sh
 websocat "ws://localhost:45999/ws?token=testtok123&key=test1" \
   -H "Origin: http://localhost:45999"
-# ohne gültige Origin-Header -> "forbidden origin" (DNS-Rebinding-Schutz)
+# without a valid Origin header -> "forbidden origin" (DNS rebinding protection)
 ```
 
-## 6) Aufräumen / Port belegt
+## 6) Cleaning up / port occupied
 
 ```sh
 # Windows (PowerShell)
@@ -92,5 +92,5 @@ Get-NetTCPConnection -LocalPort 45999 -ErrorAction SilentlyContinue |
 lsof -i :45999 && kill -9 <PID>
 ```
 
-> Der Relay bindet ausschließlich an `127.0.0.1`, daher gibt es keine
-> Firewall-/Interface-Sonderfälle wie beim alten Node-Server.
+> The relay binds exclusively to `127.0.0.1`, so there are no firewall/interface
+> special cases as there were with the old Node server.

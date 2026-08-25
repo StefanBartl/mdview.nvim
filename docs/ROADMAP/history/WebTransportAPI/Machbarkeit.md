@@ -1,82 +1,82 @@
-> ⚠️ **VERALTET / verworfen.** Diese WebTransport-Evaluation bezieht sich auf
-> den alten Node/TS-Stack (`dev-config.ts`, `webtransport.transport.ts` — beide
-> gelöscht). Entscheidung gefallen (siehe `../../DONE.md` BUGS #3): WebTransport
-> bringt für kleine Text-Updates keinen Mehrwert und erzwingt TLS auf
-> localhost. **Nicht weiter verfolgt.** Nur als Recherche-Historie aufbewahrt.
+> ⚠️ **OUTDATED / dropped.** This WebTransport evaluation refers to the old
+> Node/TS stack (`dev-config.ts`, `webtransport.transport.ts` — both deleted).
+> The decision has been made (see `../../DONE.md` BUGS #3): WebTransport brings
+> no benefit for small text updates and forces TLS on localhost. **Not pursued
+> further.** Kept only as research history.
 
 ---
 
-# Theoretische Upgrade-Evaluation: Von WebSocket zu WebTransport
+# Theoretical upgrade evaluation: from WebSocket to WebTransport
 
 ## Table of content
 
-  - [Kurzfassung (ein Satz)](#kurzfassung-ein-satz)
-  - [Was ist WebTransport — kurz technisch](#was-ist-webtransport-kurz-technisch)
-  - [Wichtige Auswirkungen für mdview.nvim — Was man gewinnen würde](#wichtige-auswirkungen-fr-mdviewnvim-was-man-gewinnen-wrde)
-  - [Was man (konkret) verlieren oder kompliziert wird](#was-man-konkret-verlieren-oder-kompliziert-wird)
-  - [Welche Änderungen am bisherigen Code wären nötig — grober Leitfaden](#welche-nderungen-am-bisherigen-code-wren-ntig-grober-leitfaden)
-    - [1) Architektur & API-Schicht: Protokoll-Abstraktion einführen](#1-architektur-api-schicht-protokoll-abstraktion-einfhren)
-    - [2) Server: HTTP/3 + WebTransport-Server bereitstellen](#2-server-http3-webtransport-server-bereitstellen)
-    - [3) Client (Browser/TS): Replace WebSocket usage with WebTransport API + fallback](#3-client-browserts-replace-websocket-usage-with-webtransport-api-fallback)
-    - [4) Neovim Lua Plugin: keine großen API-Änderungen, aber Ops-Switch](#4-neovim-lua-plugin-keine-groen-api-nderungen-aber-ops-switch)
-    - [5) Protocol evolution & backward compatibility](#5-protocol-evolution-backward-compatibility)
-  - [Praktische Änderungen am Stack und Dev/Deploy Checklist](#praktische-nderungen-am-stack-und-devdeploy-checklist)
-  - [Security, Privacy, and Operational Considerations](#security-privacy-and-operational-considerations)
-  - [Fazit & Empfehlung (konkret für mdview.nvim)](#fazit-empfehlung-konkret-fr-mdviewnvim)
-  - [Quellen / weiterführende Lektüre](#quellen-weiterfhrende-lektre)
+  - [Short version (one sentence)](#short-version-one-sentence)
+  - [What WebTransport is — briefly, technically](#what-webtransport-is--briefly-technically)
+  - [Important effects for mdview.nvim — what you would gain](#important-effects-for-mdviewnvim--what-you-would-gain)
+  - [What you would (concretely) lose or complicate](#what-you-would-concretely-lose-or-complicate)
+  - [Which changes to the existing code would be needed — a rough guide](#which-changes-to-the-existing-code-would-be-needed--a-rough-guide)
+    - [1) Architecture & API layer: introduce a protocol abstraction](#1-architecture--api-layer-introduce-a-protocol-abstraction)
+    - [2) Server: provide HTTP/3 + a WebTransport server](#2-server-provide-http3--a-webtransport-server)
+    - [3) Client (browser/TS): replace WebSocket usage with the WebTransport API + fallback](#3-client-browserts-replace-websocket-usage-with-the-webtransport-api--fallback)
+    - [4) Neovim Lua plugin: no big API changes, but an ops switch](#4-neovim-lua-plugin-no-big-api-changes-but-an-ops-switch)
+    - [5) Protocol evolution & backward compatibility](#5-protocol-evolution--backward-compatibility)
+  - [Practical changes to the stack and a dev/deploy checklist](#practical-changes-to-the-stack-and-a-devdeploy-checklist)
+  - [Security, privacy, and operational considerations](#security-privacy-and-operational-considerations)
+  - [Conclusion & recommendation (concretely for mdview.nvim)](#conclusion--recommendation-concretely-for-mdviewnvim)
+  - [Sources / further reading](#sources--further-reading)
 
 ---
 
-## Kurzfassung (ein Satz)
+## Short version (one sentence)
 
-Man kann mdview.nvim von WebSocket auf WebTransport portieren, um HTTP/3/QUIC-Features (multiplexed streams, unreliable datagrams, bessere congestion control) zu nutzen — es erfordert jedoch nichttriviale Änderungen an Server-Stack, TLS/HTTP-3-Bereitstellung, Fallback-Handling und Tests; netter Nebeneffekt sind potenziell niedrigere Latenz und native Stream/Daten-Semantik. ([developer.mozilla.org][1])
-
----
-
-## Was ist WebTransport — kurz technisch
-
-WebTransport ist eine moderne Web-API für bidirektionalen Low-Latency-Datentransport, aufgebaut auf HTTP/3/QUIC. Es bietet multiplexed reliable streams (like TCP), unidirectional streams und *unreliable* datagrams (like UDP) über denselben Verbindungskanal, alles verschlüsselt und mit moderner Stau-Kontrolle. ([developer.mozilla.org][1])
+mdview.nvim can be ported from WebSocket to WebTransport in order to use HTTP/3/QUIC features (multiplexed streams, unreliable datagrams, better congestion control) — but it requires non-trivial changes to the server stack, TLS/HTTP-3 provisioning, fallback handling and tests; a nice side effect is potentially lower latency and native stream/data semantics. ([developer.mozilla.org][1])
 
 ---
 
-## Wichtige Auswirkungen für mdview.nvim — Was man gewinnen würde
+## What WebTransport is — briefly, technically
 
-* **Multiplexing ohne Head-of-Line Blocking:** mehrere logische Streams (z. B. Renderer-stream, control-stream, file-diff-stream) laufen parallel ohne gegenseitige Verzögerung bei Paketverlust. Das reduziert wahrnehmbare Latenz bei großen Updates. ([developer.mozilla.org][1])
-* **Unreliable Datagrams:** man kann optional kleine, latenzkritische Updates (z. B. cursor positions, scroll deltas, telemetry pings) als Datagramme senden, ohne Retransmit-Overhead. Geeignet für UI-snappiness. ([gocodeo.com][2])
-* **Bessere Netz-Performance in mobilen/wireless Umgebungen:** QUIC hat modernere Stau-Kontrolle und schnelleres Recovery als TCP/TLS. → niedrigere RTT / bessere interaktive Erfahrung. ([DEV Community][3])
-* **Security / TLS out-of-the-box:** WebTransport läuft über HTTP/3 (QUIC) und nutzt die gleiche TLS-Unterlage wie HTTPS; kein plain-TCP downgrade möglich. ([developer.mozilla.org][1])
+WebTransport is a modern web API for bidirectional low-latency data transport, built on HTTP/3/QUIC. It offers multiplexed reliable streams (like TCP), unidirectional streams and *unreliable* datagrams (like UDP) over the same connection channel, all encrypted and with modern congestion control. ([developer.mozilla.org][1])
 
 ---
 
-## Was man (konkret) verlieren oder kompliziert wird
+## Important effects for mdview.nvim — what you would gain
 
-* **Server-Support und Reife:** Node.js hat (Stand 2025) keine robuste native, weit verbreitete WebTransport-Core-API; Lösungen sind experimentell, Rust/C++/Cloud-provider-Implementierungen sind stabiler. Das bedeutet mehr Ops-Aufwand (HTTP/3, QUIC, Zertifikate) oder Abhängigkeit auf Cloud-Provider (Cloudflare, Fastly, etc.). ([videosdk.live][4])
-* **Browser-Kompatibilität:** moderne Chromium-Browsers (Chrome/Edge) führen WebTransport früher/robuster ein; andere Browser ziehen nach — man muss Feature-Detect + Fallback auf WebSocket einbauen. ([developer.mozilla.org][1])
-* **Deploy/Network Complexity:** HTTP/3/QUIC kann Schwierigkeiten mit Middleboxes/Proxy/TLS-MitM haben; bei lokalen Dev-Setups muss man oft TLS-Zertifikate & Chrome Flags/Trust einrichten oder einen Cloud-Proxy nutzen. ([videosdk.live][5])
-* **Ecosystem und Libraries:** viele Node-Libs/hosting Plattformen erwarten HTTP/1.1/2 — WebTransport erfordert spezifische server-stack oder Worker-runtimes (z. B. Cloudflare Workers, Rust based servers), oder experimentelle Node-libs. ([videosdk.live][4])
+* **Multiplexing without head-of-line blocking:** several logical streams (e.g. a renderer stream, a control stream, a file-diff stream) run in parallel without delaying each other on packet loss. That reduces perceptible latency on large updates. ([developer.mozilla.org][1])
+* **Unreliable datagrams:** small, latency-critical updates (e.g. cursor positions, scroll deltas, telemetry pings) can optionally be sent as datagrams, without retransmit overhead. Suitable for UI snappiness. ([gocodeo.com][2])
+* **Better network performance in mobile/wireless environments:** QUIC has more modern congestion control and faster recovery than TCP/TLS. → lower RTT / a better interactive experience. ([DEV Community][3])
+* **Security / TLS out of the box:** WebTransport runs over HTTP/3 (QUIC) and uses the same TLS underpinning as HTTPS; no plain-TCP downgrade is possible. ([developer.mozilla.org][1])
 
 ---
 
-## Welche Änderungen am bisherigen Code wären nötig — grober Leitfaden
+## What you would (concretely) lose or complicate
 
-### 1) Architektur & API-Schicht: Protokoll-Abstraktion einführen
+* **Server support and maturity:** as of 2025, Node.js has no robust, native, widely used WebTransport core API; solutions are experimental, while Rust/C++/cloud-provider implementations are more stable. That means more ops effort (HTTP/3, QUIC, certificates) or a dependency on a cloud provider (Cloudflare, Fastly, etc.). ([videosdk.live][4])
+* **Browser compatibility:** modern Chromium browsers (Chrome/Edge) adopt WebTransport earlier/more robustly; other browsers follow — feature detection + a fallback to WebSocket has to be built in. ([developer.mozilla.org][1])
+* **Deploy/network complexity:** HTTP/3/QUIC can struggle with middleboxes/proxies/TLS MitM; in local dev setups you often have to set up TLS certificates & Chrome flags/trust or use a cloud proxy. ([videosdk.live][5])
+* **Ecosystem and libraries:** many Node libs/hosting platforms expect HTTP/1.1/2 — WebTransport requires a specific server stack or worker runtimes (e.g. Cloudflare Workers, Rust-based servers), or experimental Node libs. ([videosdk.live][4])
 
-* **Warum:** Der bisherige Code ist direkt an WebSocket-API (`ws`) gebunden. Man braucht eine **Transport-Adapter-Schicht**, die beide Implementierungen (WebSocket / WebTransport) exponiert und dieselben Events/Primitiven liefert: `open`, `close`, `sendMessage`, `sendDatagram`, `openStream`, `closeStream`, `onStreamData`, `onDatagram`.
-* **Konkretes:** Neues Modul `adapter/transport.ts` (JS/TS) mit Interface `Transport` und zwei Implementierungen `WebSocketTransport` + `WebTransportAdapter`. Neovim-Lua ruft weiterhin dieselben HTTP/JSON endpoints / control endpoints an; nur der client/server benutzt die Transport-Adapter intern.
+---
 
-### 2) Server: HTTP/3 + WebTransport-Server bereitstellen
+## Which changes to the existing code would be needed — a rough guide
 
-* **Warum:** WebTransport läuft über HTTP/3. Node-native Server fehlen; man braucht:
+### 1) Architecture & API layer: introduce a protocol abstraction
 
-  * Option A: Rust/C++ HTTP/3 Server (e.g. `quinn`, `wtransport` crates) als separate process — sehr performant. ([GitHub][6])
-  * Option B: Cloudflare Worker / Edge runtime mit WebTransport support (Cloud provider) — einfache Deployment, TLS & HTTP/3 out of box. ([The Cloudflare Blog][7])
-  * Option C: Experimentelle Node libraries implementing WebTransport (if available) — higher maintenance risk. ([videosdk.live][4])
-* **Konkretes:** `src/server/webtransport.server.(ts|rs)` — Server implementiert WebTransport session handling, maps sessions → client IDs, stellt HTTP endpoint `/render` for compatibility, und kann server-initiated streams to client. Server exportiert same WS-style JSON events for backwards compatibility.
+* **Why:** the existing code is bound directly to the WebSocket API (`ws`). What is needed is a **transport adapter layer** that exposes both implementations (WebSocket / WebTransport) and delivers the same events/primitives: `open`, `close`, `sendMessage`, `sendDatagram`, `openStream`, `closeStream`, `onStreamData`, `onDatagram`.
+* **Concretely:** a new module `adapter/transport.ts` (JS/TS) with an interface `Transport` and two implementations, `WebSocketTransport` + `WebTransportAdapter`. The Neovim Lua side keeps calling the same HTTP/JSON endpoints / control endpoints; only the client/server uses the transport adapters internally.
 
-### 3) Client (Browser/TS): Replace WebSocket usage with WebTransport API + fallback
+### 2) Server: provide HTTP/3 + a WebTransport server
 
-* **Was ändern:** Replace `const ws = new WebSocket(url)` with `const transport = new WebTransport(url)`. Use `transport.datagrams` (optional) and `transport.incomingUnidirectionalStreams`/`outgoing...` for stream semantics. Implement fallback to WebSocket when `WebTransport` is not available. ([developer.mozilla.org][1])
-* **Beispiel (TypeScript) — simplified:**
+* **Why:** WebTransport runs over HTTP/3. Node-native servers are missing; what is needed is:
+
+  * Option A: a Rust/C++ HTTP/3 server (e.g. the `quinn`, `wtransport` crates) as a separate process — very performant. ([GitHub][6])
+  * Option B: a Cloudflare Worker / edge runtime with WebTransport support (a cloud provider) — simple deployment, TLS & HTTP/3 out of the box. ([The Cloudflare Blog][7])
+  * Option C: experimental Node libraries implementing WebTransport (if available) — a higher maintenance risk. ([videosdk.live][4])
+* **Concretely:** `src/server/webtransport.server.(ts|rs)` — the server implements WebTransport session handling, maps sessions → client IDs, provides the HTTP endpoint `/render` for compatibility, and can open server-initiated streams to the client. The server exports the same WS-style JSON events for backwards compatibility.
+
+### 3) Client (browser/TS): replace WebSocket usage with the WebTransport API + fallback
+
+* **What to change:** replace `const ws = new WebSocket(url)` with `const transport = new WebTransport(url)`. Use `transport.datagrams` (optional) and `transport.incomingUnidirectionalStreams`/`outgoing...` for stream semantics. Implement a fallback to WebSocket when `WebTransport` is not available. ([developer.mozilla.org][1])
+* **Example (TypeScript) — simplified:**
 
 ```ts
 // transport-adapter.ts
@@ -145,24 +145,24 @@ export async function createTransport(url: string): Promise<Transport> {
 }
 ```
 
-(Anmerkung: `WebTransport` URLs are `https` scheme and require HTTP/3 on server.)
+(Note: `WebTransport` URLs use the `https` scheme and require HTTP/3 on the server.)
 
-### 4) Neovim Lua Plugin: keine großen API-Änderungen, aber Ops-Switch
+### 4) Neovim Lua plugin: no big API changes, but an ops switch
 
-* **Was tun:**
+* **What to do:**
 
-  * Plugin konfig bietet `server_transport: "websocket" | "webtransport"`.
-  * Start/stop logic spawn entweder `node server` (ws) oder `webtransport server` (Rust/Bun wrapper) abhängig von config.
-  * Keep control endpoint `/api/control` over HTTPS/HTTP for out-of-band commands (still REST).
-* **Zusatz:** für lokale dev: document TLS cert setup or use a proxy (ngrok/Cloudflare Tunnel) that terminates TLS + provides HTTP/3.
+  * The plugin config offers `server_transport: "websocket" | "webtransport"`.
+  * The start/stop logic spawns either `node server` (ws) or the `webtransport server` (a Rust/Bun wrapper) depending on the config.
+  * Keep the control endpoint `/api/control` over HTTPS/HTTP for out-of-band commands (still REST).
+* **In addition:** for local dev: document the TLS cert setup, or use a proxy (ngrok/Cloudflare Tunnel) that terminates TLS + provides HTTP/3.
 
 ### 5) Protocol evolution & backward compatibility
 
-* **Dual-stack:** Server sollte sowohl WebSocket endpoint (legacy) als auch WebTransport endpoint (modern) anbieten; client does feature detect and pick. So existing users not forced to upgrade. ([WebSocket.org][8])
+* **Dual stack:** the server should offer both a WebSocket endpoint (legacy) and a WebTransport endpoint (modern); the client feature-detects and picks. That way existing users are not forced to upgrade. ([WebSocket.org][8])
 
 ---
 
-## Praktische Änderungen am Stack und Dev/Deploy Checklist
+## Practical changes to the stack and a dev/deploy checklist
 
 1. **Decide server implementation**
 
@@ -193,7 +193,7 @@ export async function createTransport(url: string): Promise<Transport> {
 
 ---
 
-## Security, Privacy, and Operational Considerations
+## Security, privacy, and operational considerations
 
 * **TLS mandatory:** WebTransport requires HTTP/3/TLS; certificate management is mandatory. For local dev one must accept self-signed certs or use a trusted dev proxy. ([JavaScript Development Space][9])
 * **CORS & SameOrigin:** WebTransport session establishment follows HTTP rules; server must allow origins and handle credentials appropriately.
@@ -202,20 +202,20 @@ export async function createTransport(url: string): Promise<Transport> {
 
 ---
 
-## Fazit & Empfehlung (konkret für mdview.nvim)
+## Conclusion & recommendation (concretely for mdview.nvim)
 
-* **Kurzfristig:** Beibehalten von WebSocket als Default; implementiere eine **Transport Adapter**-Abstraktion und schaffe eine opt-in WebTransport-Adapter-Implementierung für experimentelle Branches. Dadurch bleibt die Codebasis stabil und man hat testbaren Fortschritt. ([WebSocket.org][8])
-* **Mittelfristig:** Implementiere und dokumentiere ein Rust-basierendes WebTransport-Server-POC (z. B. mit `wtransport`), inklusive Local-TLS-Setup und Playwright E2E Tests. Vergleiche Performance mit WebSocket. ([GitHub][6])
-* **Langfristig:** Wenn Browser-Support und Node-ecosystem stabil bleiben, mache WebTransport zum Default in einer Major-Version; bis dahin dual-stack anbieten.
+* **Short term:** keep WebSocket as the default; implement a **transport adapter** abstraction and create an opt-in WebTransport adapter implementation for experimental branches. That keeps the codebase stable and gives testable progress. ([WebSocket.org][8])
+* **Medium term:** implement and document a Rust-based WebTransport server PoC (e.g. with `wtransport`), including a local TLS setup and Playwright E2E tests. Compare the performance with WebSocket. ([GitHub][6])
+* **Long term:** if browser support and the Node ecosystem stay stable, make WebTransport the default in a major version; until then, offer a dual stack.
 
 ---
 
-## Quellen / weiterführende Lektüre
+## Sources / further reading
 
-* MDN — WebTransport API (Overview & usage). ([developer.mozilla.org][1])
+* MDN — WebTransport API (overview & usage). ([developer.mozilla.org][1])
 * WebTransport concepts: streams, datagrams, QUIC/HTTP3 basics. ([gocodeo.com][2])
-* Status / caveats in Node.js ecosystem (server support still limited / experimental). ([videosdk.live][4])
-* Rust community WebTransport server examples & POC libs (wtransport). ([GitHub][6])
+* Status / caveats in the Node.js ecosystem (server support still limited / experimental). ([videosdk.live][4])
+* Rust community WebTransport server examples & PoC libs (wtransport). ([GitHub][6])
 
 ---
 

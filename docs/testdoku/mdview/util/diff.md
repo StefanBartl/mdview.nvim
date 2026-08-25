@@ -1,32 +1,32 @@
-# Wie man die Line-Diff-Funktion bewertet und testet
+# How to evaluate and test the line-diff function
 
-Kurz: testet Korrektheit (funktional), Robustheit (Edge-Cases), Performanz (große Dateien), und Nutzwert (wie gut Patches die reale Änderung abbilden). Die folgenden Abschnitte liefern konkrete Testfälle, Metriken, Beispiel-Harnesses in Lua und Wege zur automatischen Bewertung.
+In short: test correctness (functional), robustness (edge cases), performance (large files), and usefulness (how well the patches represent the real change). The sections below provide concrete test cases, metrics, example harnesses in Lua and ways to evaluate automatically.
 
 ---
 
 ## Table of content
 
-- [1 — Was man messen / prüfen sollte](#1-was-man-messen-prfen-sollte)
-- [2 — Konkrete Testfälle (Unit Tests)](#2-konkrete-testflle-unit-tests)
-- [3 — Test-Harness in Lua (busted oder plain)](#3-test-harness-in-lua-busted-oder-plain)
-- [4 — Automatisierung / CI](#4-automatisierung-ci)
-- [5 — Manuelle interaktive Tests (Dev workflow)](#5-manuelle-interaktive-tests-dev-workflow)
-- [6 — Heuristiken und Schwellenwerte dokumentieren](#6-heuristiken-und-schwellenwerte-dokumentieren)
-- [7 — Beispiel-Auswertungstabelle (Klartext)](#7-beispiel-auswertungstabelle-klartext)
-- [8 — Fazit / Checklist (Kurz)](#8-fazit-checklist-kurz)
+- [1 — What to measure / check](#1--what-to-measure--check)
+- [2 — Concrete test cases (unit tests)](#2--concrete-test-cases-unit-tests)
+- [3 — A test harness in Lua (busted or plain)](#3--a-test-harness-in-lua-busted-or-plain)
+- [4 — Automation / CI](#4--automation--ci)
+- [5 — Manual interactive tests (dev workflow)](#5--manual-interactive-tests-dev-workflow)
+- [6 — Document the heuristics and thresholds](#6--document-the-heuristics-and-thresholds)
+- [7 — Example evaluation table (plain text)](#7--example-evaluation-table-plain-text)
+- [8 — Conclusion / checklist (short)](#8--conclusion--checklist-short)
 
 ---
 
-## 1 — Was man messen / prüfen sollte
+## 1 — What to measure / check
 
-- Korrektheit: erzeugt die Diff-Routine erwartete Edit-Operationen für definierte Paare (old, new)?
-- Idempotenz/Recovery: aus `old + diffs` ergibt sich `new` nach Patch-Anwendung (round-trip).
-- Minimalität: sind die Änderungen kompakt (nicht unnötig große Replace-Blöcke)?
-- Stabilität: bei kleinen Änderungen bleiben Diffs klein (keine große Schock-Änderung).
-- Performanz: Laufzeit und Speicher für typische und große Dateien (1k, 10k, 100k Zeilen).
-- Heuristische Güte: Prozent geänderter Zeilen vs. Gesamtdokument, Schwellwerte für Patch-vs-Full.
+- Correctness: does the diff routine produce the expected edit operations for defined (old, new) pairs?
+- Idempotence/recovery: `old + diffs` yields `new` after applying the patch (round trip).
+- Minimality: are the changes compact (no unnecessarily large replace blocks)?
+- Stability: for small changes the diffs stay small (no large shock change).
+- Performance: runtime and memory for typical and large files (1k, 10k, 100k lines).
+- Heuristic quality: the percentage of changed lines vs. the whole document, thresholds for patch vs. full.
 
-Metriken:
+Metrics:
 
 - passes / fails (unit tests)
 - avg changed lines per write
@@ -36,9 +36,9 @@ Metriken:
 
 ---
 
-## 2 — Konkrete Testfälle (Unit Tests)
+## 2 — Concrete test cases (unit tests)
 
-Testkandidaten (sollte alle in Unit-Tests abgedeckt sein):
+Test candidates (all of these should be covered by unit tests):
 
 1. Empty → Full (old=nil, new non-empty) → single replace diff covering whole file.
 1. No change → diffs == {}.
@@ -53,13 +53,13 @@ Testkandidaten (sollte alle in Unit-Tests abgedeckt sein):
 1. Very large file (10k+ lines) performance measurement.
 1. Frequent tiny edits (typing scenario) — stability check.
 
-Für jede Test gilt: wende diffs auf `old` an und überprüfe, ob result == `new`.
+For every test: apply the diffs to `old` and check whether the result == `new`.
 
 ---
 
-## 3 — Test-Harness in Lua (busted oder plain)
+## 3 — A test harness in Lua (busted or plain)
 
-Folgendes ist ein eigenständiger Test-/benchmark-runner in Lua, der die `compute_line_diff` annimmt und verschiedene Szenarien prüft.
+The following is a standalone test/benchmark runner in Lua that assumes `compute_line_diff` and checks various scenarios.
 
 ```lua
 ---@module 'mdview.test.diff_harness'
@@ -142,7 +142,7 @@ for _, r in ipairs(results) do total_time = total_time + r.time_ms end
 print(("[summary] cases=%d total_time_ms=%.3f"):format(#results, total_time))
 ```
 
-Erforderliche Hilfsfunktion `apply_patch` (einfach, implementiert die prefix/suffix heuristic):
+The required helper function `apply_patch` (simple, implementing the prefix/suffix heuristic):
 
 ```lua
 ---@module 'mdview.util.apply'
@@ -204,26 +204,26 @@ return M
 
 ---
 
-## 4 — Automatisierung / CI
+## 4 — Automation / CI
 
-- Füge die Tests als `lua` Testscript hinzu und führen es in CI (GitHub Actions) aus.
-- Sammle Metriken per Testlauf (Zeit, ratio) und fail die PRs, wenn z. B. `time_ms` > threshold oder `ratio` > 0.6 für small edits.
-- Option: fuzz-testing: generiere random edits (insert/delete/replace) und prüfe round-trip invariants.
-
----
-
-## 5 — Manuelle interaktive Tests (Dev workflow)
-
-- Öffne große Markdown (1k+ Zeilen) in Neovim.
-- Ändere einzelne Zeilen (simulate typing) und messe: time to compute diff (instrumentiere mit `uv.now()` around compute), bytes sent (size of payload).
-- Ändere große Blöcke (copy/paste) und prüfe, ob heuristic send full instead of patch.
-- Simuliere lost-patch: drop first patch on server and check recovery (server requests full resend or client falls back).
+- Add the tests as a `lua` test script and run it in CI (GitHub Actions).
+- Collect metrics per test run (time, ratio) and fail PRs when e.g. `time_ms` > threshold or `ratio` > 0.6 for small edits.
+- Option: fuzz testing — generate random edits (insert/delete/replace) and check the round-trip invariants.
 
 ---
 
-## 6 — Heuristiken und Schwellenwerte dokumentieren
+## 5 — Manual interactive tests (dev workflow)
 
-Vorschlag (notiere im README):
+- Open a large markdown file (1k+ lines) in Neovim.
+- Change individual lines (simulating typing) and measure: the time to compute the diff (instrument with `uv.now()` around the computation), the bytes sent (payload size).
+- Change large blocks (copy/paste) and check whether the heuristic sends the full content instead of a patch.
+- Simulate a lost patch: drop the first patch on the server and check the recovery (the server requests a full resend or the client falls back).
+
+---
+
+## 6 — Document the heuristics and thresholds
+
+Proposal (note it in the README):
 
 - If changed_lines / total_lines > 0.5 → send full content.
 - If number_of_diffs > 5 → send full content.
@@ -232,7 +232,7 @@ Vorschlag (notiere im README):
 
 ---
 
-## 7 — Beispiel-Auswertungstabelle (Klartext)
+## 7 — Example evaluation table (plain text)
 
 | Test case            | diffs | changed lines | time ms | change_ratio |
 | -------------------- | ----: | ------------: | ------: | -----------: |
@@ -243,11 +243,11 @@ Vorschlag (notiere im README):
 
 ---
 
-## 8 — Fazit / Checklist (Kurz)
+## 8 — Conclusion / checklist (short)
 
-- Implementiere `apply_patch` und Unit-Tests (round-trip).
-- Teste Edge-Cases (empty, huge files, many small edits).
-- Sammle metriken (time, ratio, patch size) und definiere thresholds.
-- Optional: fuzz tests und CI-gating.
+- Implement `apply_patch` and unit tests (round trip).
+- Test the edge cases (empty, huge files, many small edits).
+- Collect metrics (time, ratio, patch size) and define thresholds.
+- Optional: fuzz tests and CI gating.
 
 ---
