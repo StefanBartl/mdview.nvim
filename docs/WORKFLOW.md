@@ -108,6 +108,61 @@ render in the same tab, not three settings for the same thing. `:MDView
 overlay list` is the fast way to check what's currently mounted before
 assuming a missing outline means the feature is broken rather than just off.
 
+## The preview writes back now — checkboxes and text fields, not just scroll position
+
+Two things in the preview are editable and persist to the source rather than
+reverting on the next re-render.
+
+**GFM task-list checkboxes.** Ticking one in the browser flips the marker
+character in the source, so the document itself agrees and every open tab
+reflects it. That makes the preview usable as the checklist rather than as a
+picture of one — worth knowing before you go back to the buffer to tick the box
+you just ticked.
+
+**Raw-HTML text fields** written in the Markdown source with a `name` —
+`<input type="text" name="title">`, `<textarea name="notes">` — render editable
+and write their value back. Commits happen on change/blur, never per keystroke,
+so a re-render cannot yank the field out from under you mid-typing.
+
+Who applies the write depends on who owns the document: in standalone
+(`--watch`) the relay owns the file and edits it directly; from Neovim the
+buffer is the owner. That is the same ownership split the rest of the plugin
+uses, and it is why the feature behaves identically from either side.
+
+## `port=` on the spawn, not in the config, when the reason is local
+
+`server_port` is the right key for "this is the port I use". It is the wrong
+one for a firewall rule or a port-forward that has to match exactly on one
+machine — editing a config everyone else shares to answer a local constraint.
+
+`:MDView start port=N` overrides it for that spawn only. The `key=value` shape
+matches `cwd=`, which this command already uses.
+
+## The URL is always printed — use it before assuming the preview is broken
+
+`:MDView start` notifies `[mdview] preview: <url>` when it opens the tab. If
+the OS opener silently fails to raise a window — a `browser.*` setting sending
+the open down a different path, a stubborn default handler, focus mode — the
+preview is still there and you can open it by hand.
+
+It also makes the fastest diagnostic answerable from the notification alone:
+*was the URL built correctly, key and token present?* That separates an
+open-failure from a content or room-key problem before you reach for
+`:checkhealth mdview` at all.
+
+## `experimental.any_file` previews non-Markdown — as a code block, deliberately
+
+Off by default. Turned on, the autocmds fire for any normal text buffer and a
+non-Markdown document renders as a single syntax-highlighted, read-only code
+block rather than through the Markdown renderer, reusing the existing
+highlighter dispatch and the proportional scroll-sync fallback.
+
+Reach for it when you want a second window on a file you are editing — a
+config, a log, a source file — not when you expect Markdown features. It is the
+first step toward a general preview rather than a finished one, and it has not
+yet been exercised through real Neovim use, so treat surprises as reportable
+rather than as the design.
+
 ## Standalone mode trades interactivity for persistence — know the trade before reaching for it
 
 `:MDView standalone` (or the `mdview-bg` scripts, which just automate
