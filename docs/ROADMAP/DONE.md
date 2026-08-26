@@ -6,7 +6,7 @@
 >
 > This file is the **decision log**: what was built, why it was built that
 > way, what the trade-off behind it was. It does not replace
-> [`../FEATURES/FEATURES.md`](../FEATURES/FEATURES.md) — that one says *what*
+> [`../FEATURES/README.md`](../FEATURES/README.md) — that one says *what*
 > exists today; this one says *why* it turned out this way.
 >
 > Pre-rewrite documents under [`history/`](history/) carry an OUTDATED banner

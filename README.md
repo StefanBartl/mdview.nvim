@@ -131,7 +131,7 @@ work, for turning it off without touching any plugin's config.
 - [Companion plugins](docs/companion-plugins.md) — optional plugins that pair well with the live preview.
 - [Development](docs/development.md) — building mdview.nvim from source and running its test suites.
 - [Architecture](docs/architecture.md) — the Lua/Go/TypeScript/Rust components and how they communicate.
-- [Features](docs/FEATURES/FEATURES.md) — the complete catalog, user-facing *and* internal (caches, throttling, diff transport). Per-theme depth in [preview](docs/FEATURES/PREVIEW.md) (incl. link hover previews), [rendering](docs/FEATURES/RENDERING.md), [operations](docs/FEATURES/OPERATIONS.md), [security](docs/FEATURES/SECURITY.md).
+- [Features](docs/FEATURES/README.md) — the catalog. The overview and what each theme covers, then per-theme depth in [preview](docs/FEATURES/PREVIEW.md) (incl. link hover previews), [rendering](docs/FEATURES/RENDERING.md), [operations](docs/FEATURES/OPERATIONS.md), [security](docs/FEATURES/SECURITY.md) and the [machinery](docs/FEATURES/FEATURES.md) underneath (caches, throttling, diff transport).
 - [Roadmap](docs/ROADMAP/ROADMAP.md) — open items; [`docs/ROADMAP/DONE.md`](docs/ROADMAP/DONE.md) records what was built and why. [`docs/ROADMAP/IDEAS/`](docs/ROADMAP/IDEAS/) holds what is not planned.
 
 ---

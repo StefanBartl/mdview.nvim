@@ -1,35 +1,94 @@
-# mdview.nvim features
+# mdview.nvim — what exists
 
-mdview.nvim is a browser-based live Markdown preview: a Go relay streams raw
-buffer text over WebSocket, and a Rust module compiled to WebAssembly renders
-and sanitizes it entirely inside the browser tab.
+The complete catalogue: **everything that is implemented**, not only what a
+user operates directly. The machinery underneath — caches, throttling, the
+diff transport, lifecycle — is here on equal footing, because working on this
+plugin needs that answered just as often as "which command does that".
 
-**Start here: [FEATURES.md](FEATURES.md)** — the complete catalog, covering
-both what a user operates and the machinery underneath (caches, throttling,
-the diff transport, lifecycle rules). The four theme files below go into
-depth on the big areas, in the
-[`FEATURES_FORMAT`](https://github.com/StefanBartl/documentation.nvim/blob/main/docs/FEATURES_FORMAT.md)
-shape (`## feature`, then `- **Key:** value` metadata):
+| Where | What |
+| --- | --- |
+| **this file** | the full overview, user- *and* developer-facing |
+| [`PREVIEW.md`](PREVIEW.md) · [`RENDERING.md`](RENDERING.md) · [`OPERATIONS.md`](OPERATIONS.md) · [`SECURITY.md`](SECURITY.md) | the big topics in detail, in the [`FEATURES_FORMAT`](https://github.com/StefanBartl/documentation.nvim/blob/main/docs/FEATURES_FORMAT.md) schema |
+| [`../ROADMAP/DONE.md`](../ROADMAP/DONE.md) | *why* something was built the way it was (decision log) |
+| [`../ROADMAP/ROADMAP.md`](../ROADMAP/ROADMAP.md) | what is still open |
 
-- [PREVIEW.md](PREVIEW.md) — getting a document on screen and keeping it in
-  sync: starting/stopping a session, live push, scroll sync, standalone mode,
-  the no-server preview tab, click-navigate, reverse scroll.
-- [RENDERING.md](RENDERING.md) — what happens to the Markdown between "text
-  in Neovim" and "HTML in the browser": the comrak/ammonia pipeline, themes,
-  code highlighting, local image assets, private blocks, blank-line handling.
-- [SECURITY.md](SECURITY.md) — the trust boundary: loopback-only binding,
-  per-session tokens, Origin checks, and the sanitizer as the second half of
-  that boundary.
-- [OPERATIONS.md](OPERATIONS.md) — everything for running and debugging a
-  session day to day: installation/asset download, logging, diagnostics,
-  breadcrumbs, `:checkhealth`.
+---
 
-See [docs/commands.md](../commands.md) / [docs/BINDINGS.md](../BINDINGS.md)
-for the full `:MDView` subcommand reference and
-[docs/architecture.md](../architecture.md) for how the four components
-(Lua/Go/TypeScript/Rust) fit together.
+## Architecture in one paragraph
 
-Neighbouring folders: [`../ROADMAP/ROADMAP.md`](../ROADMAP/ROADMAP.md) (open
-items), [`../ROADMAP/DONE.md`](../ROADMAP/DONE.md) (why things were built the
-way they were), [`../ROADMAP/IDEAS/`](../ROADMAP/IDEAS/) (nothing planned, kept so it is not
-lost).
+Four languages, clean cuts. **Lua** drives (commands, autocommands, process
+lifecycle), a **Go** relay distributes (HTTP endpoints plus
+WebSocket/WebTransport fan-out, and knows about neither files nor buffers), a
+**Rust/WASM** module renders (Markdown to sanitized HTML, in the browser), and
+**TypeScript** wires up the tab. Details in
+[`../architecture.md`](../architecture.md).
+
+---
+
+## Preview and synchronisation
+
+In detail in [`PREVIEW.md`](PREVIEW.md).
+
+- **Live preview in the browser** — buffer text flows through the relay into a
+  browser tab and is rendered client-side.
+- **Live push on change and on save** — `TextChanged`/`TextChangedI` plus
+  `BufWritePost`.
+- **Scroll sync Neovim → browser**, and **reverse scroll** browser → Neovim.
+- **Cursor marker** — Neovim's position, shown in the rendered document.
+- **Zoom**, **pause/resume** of the scroll sync, **overlays** (a floating TOC),
+  **breadcrumbs** (the session outline).
+- **Click to navigate** — clicking a relative link opens the file in Neovim
+  instead of navigating the tab away.
+- **Link hover preview** — an image, the start of a text file, a parsed URL, an
+  anchor's section, or "not found". The counterpart to markdown.nvim's
+  in-editor hover.
+- **Standalone preview** — runs without (or beyond) the Neovim instance, and
+  can be started from a terminal.
+- **In-editor preview tab** — `:MDView preview-tab`, with no relay and no
+  browser at all.
+
+## Rendering
+
+In detail in [`RENDERING.md`](RENDERING.md).
+
+- **comrak and ammonia in one WASM call** — rendering and sanitization are
+  inseparable; no caller can obtain HTML that bypassed the allowlist.
+- **Themes**, loaded lazily — a theme is a CSS file plus a map entry.
+- **Code-fence highlighting** via Shiki (with an hljs path), applied
+  asynchronously after insertion into the DOM.
+- **Private blocks** — a fence with the info string `private` renders blurred,
+  revealed by a click or by `:MDView reveal`.
+- **Local images** — relative `<img src>` is rewritten onto the `/asset` route.
+- **Blank-line handling** — blank-line gaps as their own spacers.
+
+## Operating and diagnosing
+
+In detail in [`OPERATIONS.md`](OPERATIONS.md).
+
+- **Installation without a toolchain** — prebuilt artifacts from GitHub
+  Releases.
+- **`:checkhealth mdview`**, **`:MDView diagnose`** (full report),
+  **`:MDView log`** (plugin log), **`:MDView file-log`** (persistent relay
+  log), **`:MDView weblogs`** (relay stdout).
+- **`lib.nvim` as a hard runtime dependency** — deliberately, rather than a
+  tangle of pcall fallbacks.
+
+## Security
+
+In detail in [`SECURITY.md`](SECURITY.md).
+
+- **Loopback-only relay**, with a per-session token and an origin check.
+- **Race-free port selection.**
+- **WebTransport certificate pinning.**
+- **`/asset` and `/preview`** — both bound to the document directory, with a
+  traversal check and their own extension allowlist each. `/preview` is the
+  stricter of the two, because it returns file *content* rather than bytes the
+  browser renders as an image.
+
+---
+
+> **Only theme files live in this folder.** The Features tab's parser reads
+> every `##` here as a feature, so the five section summaries above — which
+> group features rather than being ones — belong in this intro rather than in
+> a theme file. They were `##` headings in `FEATURES.md` until 2026-08-26 and
+> were counted as five features that do not exist.

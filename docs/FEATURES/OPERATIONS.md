@@ -112,3 +112,6 @@ wasm-render/` (the Rust crate compiled to WASM — comrak + ammonia, see
 browser bundle that loads the WASM module and drives the preview page — see
 `src/vite.config.ts`, `src/client/main.ts`). `dist/` and `doc/` at the repo
 root are build output and Vimdoc respectively, not source.
+
+- **Module:** `lua/mdview/` (Lua), `native/server/` (Go), `native/wasm-render/` (Rust/WASM), `src/client/` (TypeScript)
+- **Docs:** [RENDERING.md](RENDERING.md) for the WASM half, [`../../src/vite.config.ts`](../../src/vite.config.ts) for the bundle
