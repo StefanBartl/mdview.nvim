@@ -209,7 +209,7 @@ function M.check()
 		deps_health.report_for("mdview.nvim")
 	end
 
-	require("lib.nvim.usercmd.composer").checkhealth("MDView")
+	require("lib.nvim.bindings.usercmd.composer").checkhealth("MDView")
 end
 
 return M

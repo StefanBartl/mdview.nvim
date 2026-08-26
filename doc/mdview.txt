@@ -425,7 +425,7 @@ experimental.reverse_scroll ~
 5. COMMANDS                                                   *mdview-commands*
 
 mdview.nvim registers one command, :MDView, built via lib.nvim's subcommand
-composer (`lib.nvim.usercmd.composer`): every subcommand below completes on
+composer (`lib.nvim.bindings.usercmd.composer`): every subcommand below completes on
 <Tab>, including the typed arguments.                              *:MDView*
 
 :MDView start [file] [cwd=...]                                *:MDView-start*
@@ -703,7 +703,7 @@ are downloaded automatically the first time |:MDView-start| runs.
                                    |:MDView-preview-tab|)
     bindings/
       usrcmds/                     :MDView <subcommand>, built via
-                                   lib.nvim.usercmd.composer — one action
+                                   lib.nvim.bindings.usercmd.composer — one action
                                    module per subcommand (start, stop, open,
                                    toggle, theme, log, file_log, diagnose, …)
       autocmds/                    BufEnter, TextChanged*, BufWritePost,

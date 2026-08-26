@@ -1,6 +1,6 @@
 ---@module 'mdview.bindings.usrcmds'
 --- Registers the unified :MDView <subcommand> user command via
---- lib.nvim.usercmd.composer — one route tree drives dispatch, <Tab>
+--- lib.nvim.bindings.usercmd.composer — one route tree drives dispatch, <Tab>
 --- completion, and (via composer.document()) a Markdown command reference, so
 --- the ten formerly-separate :MDViewX commands can't drift out of sync with
 --- their own docs. See docs/commands.md for the generated-by-hand reference
@@ -12,7 +12,7 @@
 --- Only autocommands (mdview.bindings.autocmds) have a real attach/detach
 --- lifecycle, since those genuinely need to stop firing once a session ends.
 
-local composer = require("lib.nvim.usercmd.composer")
+local composer = require("lib.nvim.bindings.usercmd.composer")
 
 local start = require("mdview.bindings.usrcmds.start")
 local stop = require("mdview.bindings.usrcmds.stop")

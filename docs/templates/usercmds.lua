@@ -6,7 +6,7 @@
 --- ADD: Annotaions
 
 local log = require("mdview.helper.log")
-local libusercmd = require("lib.nvim.usercmd")
+local libusercmd = require("lib.nvim.bindings.usercmd")
 
 local M = {}
 

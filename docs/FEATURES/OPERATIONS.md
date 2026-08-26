@@ -46,7 +46,7 @@ running (and if so, whether `GET /health` on the relay actually returns
 Unlike the companion plugins above, `lib.nvim` is a **hard** dependency,
 not optional — mdview.nvim uses it for cross-platform path/OS helpers
 (`is_windows`, separators), the `:MDView` compound-usercommand
-infrastructure (`lib.nvim.usercmd.composer`), and structured logging.
+infrastructure (`lib.nvim.bindings.usercmd.composer`), and structured logging.
 `:checkhealth mdview` errors (not warns) if it's missing.
 
 - **Module:** referenced throughout `lua/mdview/` — see `lua/mdview/health.lua` for the representative probe

@@ -3,7 +3,7 @@
 ## User commands
 
 mdview.nvim registers a single `:MDView <subcommand>` command (built via
-[`lib.nvim.usercmd.composer`](https://github.com/StefanBartl/lib.nvim)), with
+[`lib.nvim.bindings.usercmd.composer`](https://github.com/StefanBartl/lib.nvim)), with
 `<Tab>` completion for every subcommand and typed argument below.
 
 | Command | Args | Description |
