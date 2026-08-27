@@ -90,6 +90,18 @@
 ---@field standalone mdview.config.StandaloneDefaults
 ---@field experimental mdview.config.ExperimentalDefaults
 ---@field deps_popup boolean show the lib.nvim.deps "declared tools" popup once, ever, on first setup() after install (default true; needs lib.nvim.deps — a no-op without it)
+---@field transport mdview.config.TransportDefaults
+
+--- Timing against the relay process. One block, because these are one
+--- decision -- how patient to be with a relay that is slow to answer -- and
+--- raising the retry count without the timeout just means retrying inside a
+--- window that already expired.
+---@class mdview.config.TransportDefaults
+---@field health_poll_ms integer how often the relay is polled while waiting for it to come up (default 200)
+---@field health_timeout_ms integer total wait for the relay to become healthy (default 10000)
+---@field max_retries integer retry attempts for a single message (default 5)
+---@field base_retry_ms integer initial retry delay; backs off exponentially from here (default 150)
+---@field inbound_poll_ms integer how often the browser is polled for checkbox/field/navigate events (default 250)
 
 ---@type mdview.config.Defaults
 return {
@@ -121,6 +133,17 @@ return {
 	dev_server_port = 43220,
 
 	live_push_throttle_ms = 150,
+
+	-- Timing against the relay process. The defaults suit a local relay on a
+	-- normal machine; a first-run binary being scanned by antivirus, a busy CI
+	-- box, or a relay over a slow link all want more of every one of them.
+	transport = {
+		health_poll_ms = 200,
+		health_timeout_ms = 10000,
+		max_retries = 5,
+		base_retry_ms = 150,
+		inbound_poll_ms = 250,
+	},
 
 	scroll_sync = true,
 	scroll_sync_throttle_ms = 150,

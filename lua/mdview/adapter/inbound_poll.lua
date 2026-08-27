@@ -14,7 +14,19 @@ local notify = require("lib.nvim.notify").create("").notify
 
 local M = {}
 
-local INTERVAL_MS = 250
+--- How often the browser is polled for inbound events (checkbox ticks, field
+--- edits, click-to-navigate). `transport.inbound_poll_ms`: every tick is a
+--- request, so this is latency against traffic.
+---@return integer
+local function interval_ms()
+	local ok, config = pcall(require, "mdview.config")
+	if not ok then
+		return 250
+	end
+	local cfg = (type(config.get) == "function" and config.get() or config.options or {})
+	local n = (cfg.transport or {}).inbound_poll_ms
+	return (type(n) == "number" and n > 0) and n or 250
+end
 local timer = nil
 local nav_inflight = false
 local scroll_inflight = false
@@ -437,7 +449,8 @@ function M.start()
 		return
 	end
 	timer = uv.new_timer()
-	timer:start(INTERVAL_MS, INTERVAL_MS, vim.schedule_wrap(tick))
+	local interval = interval_ms()
+	timer:start(interval, interval, vim.schedule_wrap(tick))
 end
 
 --- Stop polling. Safe to call when not started.

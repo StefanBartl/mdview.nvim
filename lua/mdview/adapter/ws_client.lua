@@ -17,10 +17,38 @@ local log = require("mdview.helper.log")
 local M = {}
 
 local DEFAULT_PORT = 43219
-local HEALTH_POLL_MS = 200 -- polling interval
-local HEALTH_TIMEOUT_MS = 10000 -- total wait time
-local MAX_RETRIES = 5 -- number of retry attempts for a single message
-local BASE_RETRY_MS = 150 -- initial retry delay (exponential backoff)
+--- Timing against the relay process, as one `transport` block rather than
+--- four separate keys: they are one decision -- how patient to be with a
+--- relay that is slow to answer -- and tuning one without the others is how
+--- you end up retrying five times inside a timeout that already expired.
+---
+--- The defaults suit a local relay on a normal machine. A first-run binary
+--- being scanned by antivirus, a busy CI box, or a relay reached over a slow
+--- link all want more of every one of them.
+---@return { health_poll_ms: integer, health_timeout_ms: integer, max_retries: integer, base_retry_ms: integer }
+local function transport()
+	local defaults = {
+		health_poll_ms = 200,
+		health_timeout_ms = 10000,
+		max_retries = 5,
+		base_retry_ms = 150,
+	}
+	local ok, config = pcall(require, "mdview.config")
+	if not ok then
+		return defaults
+	end
+	local cfg = (type(config.get) == "function" and config.get() or config.options or {})
+	local t = cfg.transport
+	if type(t) ~= "table" then
+		return defaults
+	end
+	local out = {}
+	for key, fallback in pairs(defaults) do
+		local n = t[key]
+		out[key] = (type(n) == "number" and n > 0) and n or fallback
+	end
+	return out
+end
 -- Per-call readiness wait (used by the launcher). 15s, not the old 2s: a
 -- freshly built or first-run relay binary can take several seconds to bind
 -- while the OS/antivirus scans it, and the launcher gates the browser open on
@@ -93,7 +121,8 @@ function M.wait_ready(cb, timeout_ms)
 		return
 	end
 
-	local timeout = timeout_ms or HEALTH_TIMEOUT_MS
+	local tcfg = transport()
+	local timeout = timeout_ms or tcfg.health_timeout_ms
 	---@diagnostic disable-next-line LSP-Problems with lib.uv
 	local start_time = uv.now()
 	local attempt = 0
@@ -127,7 +156,7 @@ function M.wait_ready(cb, timeout_ms)
 							{}
 						)
 					end
-					vim.defer_fn(poll, HEALTH_POLL_MS)
+					vim.defer_fn(poll, tcfg.health_poll_ms)
 				else
 					api.nvim_echo(
 						{ { "[mdview] server health-check timed out after " .. tostring(timeout) .. "ms", "ErrorMsg" } },
@@ -321,8 +350,8 @@ local function try_send_pending(path)
 					)
 				end)
 			end
-			if entry.tries < (entry.max_retries or MAX_RETRIES) then
-				local delay = (BASE_RETRY_MS * (2 ^ (entry.tries - 1)))
+			if entry.tries < (entry.max_retries or transport().max_retries) then
+				local delay = (transport().base_retry_ms * (2 ^ (entry.tries - 1)))
 				vim.defer_fn(function()
 					try_send_pending(path)
 				end, delay)
@@ -391,7 +420,7 @@ function M.send_markdown(path, markdown, opts)
 	M._pending[path] = {
 		markdown = markdown,
 		tries = 0,
-		max_retries = opts.max_retries or MAX_RETRIES,
+		max_retries = opts.max_retries or transport().max_retries,
 	}
 
 	try_send_pending(path)
