@@ -33,13 +33,15 @@ function M.attach()
 		return
 	end
 
-	-- Create the augroup directly instead of via lib.nvim's get_augroup:
-	-- that helper caches the augroup id by name and keeps handing back the
-	-- SAME id even after M.teardown() deleted it (nvim_del_augroup_by_id).
-	-- The next attach then passed a stale/deleted id to nvim_create_autocmd
-	-- ("Invalid 'group': N"), aborting the whole start. nvim_create_augroup
-	-- with clear=true always returns a valid, freshly-cleared augroup.
-	M.augroup_id = api.nvim_create_augroup("MdviewAutocmds", { clear = true })
+	-- `group()`, not `get_augroup()`: the latter caches the augroup id by name
+	-- and keeps handing back the SAME id after M.teardown() deleted it
+	-- (nvim_del_augroup_by_id), so the next attach passed a stale id to
+	-- nvim_create_autocmd ("Invalid 'group': N") and aborted the whole start.
+	-- `group()` verifies its cache against Neovim and re-creates a group that
+	-- was deleted behind it; clearing through it also drops the previous
+	-- session's records, which the raw API cannot do -- so a restart used to
+	-- leave dead rows in the generated bindings table.
+	M.augroup_id = require("lib.nvim.bindings.autocmd").group("MdviewAutocmds", true)
 
 	bufenter.attach(M.augroup_id) -- BufEnter snapshot
 	buffer_switch.attach(M.augroup_id) -- Apply browser.behavior on buffer switch

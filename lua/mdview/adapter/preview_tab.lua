@@ -194,14 +194,15 @@ function M.open(source_bufnr)
 	-- Clean up bookkeeping if the preview buffer disappears some other way
 	-- (:bwipeout, :tabclose, etc.) so is_open()/sync() don't operate on a
 	-- stale mapping afterwards.
-	api.nvim_create_autocmd("BufWipeout", {
+	require("lib.nvim.bindings.autocmd").create("BufWipeout", function()
+		source_to_preview[source_bufnr] = nil
+		preview_to_source[preview_bufnr] = nil
+		preview_tabpage[preview_bufnr] = nil
+	end, {
+		group = "MdviewPreviewTab",
 		buffer = preview_bufnr,
 		once = true,
-		callback = function()
-			source_to_preview[source_bufnr] = nil
-			preview_to_source[preview_bufnr] = nil
-			preview_tabpage[preview_bufnr] = nil
-		end,
+		desc = "[mdview] Forget a tab preview's mapping when its buffer is wiped",
 	})
 
 	return true

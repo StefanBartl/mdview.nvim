@@ -3,10 +3,10 @@
 -- Dormant — not attached (see bindings/autocmds/init.lua); superseded by
 -- bindings/autocmds/live_push.lua. Kept for reference.
 
-local api = vim.api
 local push_buffer = require("mdview.core.events").push_buffer
 local log = require("mdview.helper.log")
 local defaults = require("mdview.config").defaults
+local autocmd = require("lib.nvim.bindings.autocmd")
 local autocmd_registry = require("mdview.helper.autocmds_registry")
 
 local M = {}
@@ -24,17 +24,15 @@ function M.attach(group)
 	local opts = {
 		desc = "[mdview] Push on insert/change",
 		pattern = defaults.ft_pattern,
-		callback = function(args)
-			on_text_changed(args.buf)
-		end,
 	}
 	if group then
 		opts.group = group
 	end
 
-	local id = api.nvim_create_autocmd({ "TextChanged", "TextChangedI" }, opts)
+	local id = autocmd.create({ "TextChanged", "TextChangedI" }, function(args)
+		on_text_changed(args.buf)
+	end, opts)
 	if group then
-		M._autocmd_ids[group] = M._autocmd_ids[group] or {}
 		autocmd_registry.register(group, id)
 	end
 end

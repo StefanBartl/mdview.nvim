@@ -16,6 +16,7 @@ local log = require("mdview.helper.log")
 local normalize = require("mdview.helper.normalize")
 local target_key = require("mdview.helper.target_key")
 local defaults = require("mdview.config").defaults
+local autocmd = require("lib.nvim.bindings.autocmd")
 local autocmd_registry = require("mdview.helper.autocmds_registry")
 
 local M = {}
@@ -128,62 +129,66 @@ function M.attach(group)
 		end, ws_client.WAIT_READY_TIMEOUT)
 	end
 
+	local function on_text_changed(args)
+		local throttle_ms = defaults.live_push_throttle_ms or 150
+		local t = now_ms()
+		if t - last_sent_at >= throttle_ms then
+			cancel_pending()
+			last_sent_at = t
+			push_now(args.buf)
+			return
+		end
+
+		-- Within the throttle window: remember the latest buffer and make
+		-- sure exactly one trailing push is scheduled for when the window
+		-- ends (don't reschedule on every keystroke, or continuous typing
+		-- would never actually fire one).
+		pending_bufnr = args.buf
+		if not pending_timer then
+			local remaining = throttle_ms - (t - last_sent_at)
+			pending_timer = (vim.uv or vim.loop).new_timer()
+			pending_timer:start(
+				math.max(0, remaining),
+				0,
+				vim.schedule_wrap(function()
+					cancel_pending()
+					last_sent_at = now_ms()
+					push_now(pending_bufnr)
+				end)
+			)
+		end
+	end
+
 	local opts_a = {
 		pattern = defaults.ft_pattern,
-		callback = function(args)
-			local throttle_ms = defaults.live_push_throttle_ms or 150
-			local t = now_ms()
-			if t - last_sent_at >= throttle_ms then
-				cancel_pending()
-				last_sent_at = t
-				push_now(args.buf)
-				return
-			end
-
-			-- Within the throttle window: remember the latest buffer and make
-			-- sure exactly one trailing push is scheduled for when the window
-			-- ends (don't reschedule on every keystroke, or continuous typing
-			-- would never actually fire one).
-			pending_bufnr = args.buf
-			if not pending_timer then
-				local remaining = throttle_ms - (t - last_sent_at)
-				pending_timer = (vim.uv or vim.loop).new_timer()
-				pending_timer:start(
-					math.max(0, remaining),
-					0,
-					vim.schedule_wrap(function()
-						cancel_pending()
-						last_sent_at = now_ms()
-						push_now(pending_bufnr)
-					end)
-				)
-			end
-		end,
+		desc = "[mdview] Push buffer changes to the browser preview (throttled)",
 	}
 	if group then
 		opts_a.group = group
 	end
-	local id_a = api.nvim_create_autocmd({ "TextChanged", "TextChangedI" }, opts_a)
+	local id_a = autocmd.create({ "TextChanged", "TextChangedI" }, on_text_changed, opts_a)
 	autocmd_registry.register(group, id_a)
+
+	local function on_write(args)
+		ws_client.wait_ready(function(ok)
+			if not ok then
+				return
+			end
+			log.debug("BufWritePost fired, full push, buf: " .. args.buf, nil, "livepush", true)
+			-- Force a full snapshot on save: cheap resync point that reseeds
+			-- the relay's LastPayload and heals any diff desync.
+			M.push_buffer_changes(args.buf, { full = true })
+		end, ws_client.WAIT_READY_TIMEOUT)
+	end
 
 	local opts_b = {
 		pattern = defaults.ft_pattern,
-		callback = function(args)
-			ws_client.wait_ready(function(ok)
-				if not ok then
-					return
-				end
-				log.debug("BufWritePost fired, full push, buf: " .. args.buf, nil, "livepush", true)
-				-- Force a full snapshot on save: cheap resync point that reseeds
-				-- the relay's LastPayload and heals any diff desync.
-				M.push_buffer_changes(args.buf, { full = true })
-			end, ws_client.WAIT_READY_TIMEOUT)
-		end,
+		desc = "[mdview] Push a full buffer snapshot to the browser preview on write",
 	}
 	if group then
 		opts_b.group = group
 	end
-	local id_b = api.nvim_create_autocmd("BufWritePost", opts_b)
+	local id_b = autocmd.create("BufWritePost", on_write, opts_b)
 	autocmd_registry.register(group, id_b)
 end
 

@@ -16,6 +16,7 @@ local normalize = require("mdview.helper.normalize")
 local previewable = require("mdview.helper.previewable")
 local log = require("mdview.helper.log")
 local defaults = require("mdview.config").defaults
+local autocmd = require("lib.nvim.bindings.autocmd")
 local autocmd_registry = require("mdview.helper.autocmds_registry")
 
 local M = {}
@@ -131,14 +132,13 @@ function M.attach(group)
 	local opts = {
 		desc = "[mdview] Apply browser.behavior on markdown buffer switch",
 		pattern = defaults.ft_pattern,
-		callback = function(args)
-			on_switch(args.buf)
-		end,
 	}
 	if group then
 		opts.group = group
 	end
-	local id = api.nvim_create_autocmd("BufEnter", opts)
+	local id = autocmd.create("BufEnter", function(args)
+		on_switch(args.buf)
+	end, opts)
 	autocmd_registry.register(group, id)
 end
 

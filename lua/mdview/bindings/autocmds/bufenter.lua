@@ -10,6 +10,7 @@ local copy_lines = require("mdview.helper.copy_lines")
 local normalize = require("mdview.helper.normalize")
 local log = require("mdview.helper.log")
 local defaults = require("mdview.config").defaults
+local autocmd = require("lib.nvim.bindings.autocmd")
 local autocmds_registry = require("mdview.helper.autocmds_registry")
 
 local M = {}
@@ -48,15 +49,14 @@ function M.attach(group)
 	local opts = {
 		desc = "[mdview] Snapshot on enter",
 		pattern = defaults.ft_pattern,
-		callback = function(args)
-			on_buf_enter(args.buf)
-		end,
 	}
 	if group then
 		opts.group = group
 	end
 
-	local id = api.nvim_create_autocmd("BufEnter", opts)
+	local id = autocmd.create("BufEnter", function(args)
+		on_buf_enter(args.buf)
+	end, opts)
 	if group then
 		autocmds_registry.register(group, id)
 	end

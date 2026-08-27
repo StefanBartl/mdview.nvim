@@ -10,6 +10,7 @@ local ws_client = require("mdview.adapter.ws_client")
 local previewable = require("mdview.helper.previewable")
 local target_key = require("mdview.helper.target_key")
 local defaults = require("mdview.config").defaults
+local autocmd = require("lib.nvim.bindings.autocmd")
 local autocmd_registry = require("mdview.helper.autocmds_registry")
 
 local M = {}
@@ -108,30 +109,31 @@ function M.attach(group)
 		return
 	end
 
+	local function on_cursor_moved(args)
+		if paused then
+			return -- :MDViewSync pause — don't drag the preview along
+		end
+		local throttle_ms = defaults.scroll_sync_throttle_ms or 150
+		local t = now_ms()
+		if t < suppress_until then
+			return -- cursor moved by reverse-scroll; don't echo it back
+		end
+		if t - last_sent_at < throttle_ms then
+			return
+		end
+		last_sent_at = t
+		M.send_current_position(args.buf)
+	end
+
 	local opts = {
 		desc = "[mdview] Send cursor position to browser preview (scroll sync)",
 		pattern = defaults.ft_pattern,
-		callback = function(args)
-			if paused then
-				return -- :MDViewSync pause — don't drag the preview along
-			end
-			local throttle_ms = defaults.scroll_sync_throttle_ms or 150
-			local t = now_ms()
-			if t < suppress_until then
-				return -- cursor moved by reverse-scroll; don't echo it back
-			end
-			if t - last_sent_at < throttle_ms then
-				return
-			end
-			last_sent_at = t
-			M.send_current_position(args.buf)
-		end,
 	}
 	if group then
 		opts.group = group
 	end
 
-	local id = api.nvim_create_autocmd({ "CursorMoved", "CursorMovedI" }, opts)
+	local id = autocmd.create({ "CursorMoved", "CursorMovedI" }, on_cursor_moved, opts)
 	if group then
 		autocmd_registry.register(group, id)
 	end

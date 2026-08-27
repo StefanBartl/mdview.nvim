@@ -2,9 +2,9 @@
 --- Autocmd: BufWritePost full-push handling
 
 ---@diagnostic disable: undefined-global, unused-local
-local api = vim.api
 local events = require("mdview.core.events")
 local log = require("mdview.helper.log")
+local autocmd = require("lib.nvim.bindings.autocmd")
 local autocmd_registry = require("mdview.helper.autocmds_registry")
 
 local M = {}
@@ -24,17 +24,15 @@ function M.attach(group)
 
 	local opts = {
 		desc = "[mdview] Push full buffer on write",
-		callback = function(args)
-			on_buf_write(args.buf)
-		end,
 	}
 	if group then
 		opts.group = group
 	end
 
-	local id = api.nvim_create_autocmd({ "BufWritePost" }, opts)
+	local id = autocmd.create({ "BufWritePost" }, function(args)
+		on_buf_write(args.buf)
+	end, opts)
 	if group then
-		M._autocmd_ids[group] = M._autocmd_ids[group] or {}
 		autocmd_registry.register(group, id)
 	end
 end
