@@ -5,7 +5,7 @@
 -- so partial-line diff pushing is not compatible with the current
 -- architecture (line-diff transport may be reintroduced later as a
 -- bandwidth optimization once the client can reconstruct full text from
--- diffs — see docs/ROADMAP/DONE.md).
+-- diffs).
 -- Adds debug logging controlled via mdview.config.defaults.debug_preview
 
 local api = vim.api

@@ -15,8 +15,8 @@ that would mean one `curl /health` per keystroke. `M._ready` remembers a server
 once it has been seen healthy; `M.reset_ready()` drops that on stop/respawn.
 
 - **Module:** `lua/mdview/adapter/ws_client.lua` (`wait_ready`, `reset_ready`, `_ready`)
-- **Why:** see [`../ROADMAP/DONE.md`](../ROADMAP/DONE.md), BUGS #5 — the missing
-  `cb(true)` is what made the need for a cache visible in the first place.
+- **Why:** the missing `cb(true)` is what made the need for a cache visible in
+  the first place.
 
 ## Trailing throttle for live pushes
 
@@ -80,7 +80,7 @@ Used by the **TOC overlay**, **scroll sync**, the **cursor marker** and
 
 WebSocket and WebTransport behind one interface; the factory picks.
 WebSocketStream was evaluated and rejected (small text updates, no throughput
-problem) — see [`../ROADMAP/DONE.md`](../ROADMAP/DONE.md) BUGS #3.
+problem).
 
 - **Module:** `src/client/transport/` (`transport.interface.ts`, `transportFactory.ts`, `websocket.transport.ts`, `webtransport.transport.ts`)
 
@@ -101,8 +101,7 @@ every 250 ms — only the endpoints that are enabled, and the timer runs only
 while at least one of them is.
 
 Those 250 ms are why some browser-side features do not make sense (PDF page
-rendering in the hover, for instance — see
-[`../ROADMAP/ROADMAP.md`](../ROADMAP/ROADMAP.md)).
+rendering in the hover, for instance).
 
 - **Module:** `lua/mdview/adapter/inbound_poll.lua`; server: `relay/nav.go`, `relay/scrollbox.go`
 
@@ -113,7 +112,6 @@ they are registered once at `setup()` and never torn down. The reason: a
 `:MDViewStop` that deleted its own commands along the way was a real bug.
 
 - **Module:** `lua/mdview/helper/autocmds_registry.lua`, `bindings/autocmds/init.lua`
-- **Why:** [`../ROADMAP/DONE.md`](../ROADMAP/DONE.md), BUGS #4
 
 ## Session and process state
 
@@ -122,7 +120,6 @@ Restarting with a rotated token against an old process otherwise produced
 silent 403s (curl exits 0 on HTTP errors).
 
 - **Module:** `lua/mdview/core/session.lua`, `core/state.lua`, `adapter/server_args.lua`
-- **Why:** [`../ROADMAP/DONE.md`](../ROADMAP/DONE.md), BUGS #5
 
 ## Test layers
 

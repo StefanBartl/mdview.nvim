@@ -1,6 +1,6 @@
 ---@module 'mdview.adapter.preview_tab'
--- Standalone "preview in an nvim tab instead of the browser" feature (see
--- docs/ROADMAP/DONE.md's bonus features). Deliberately decoupled from the
+-- Standalone "preview in an nvim tab instead of the browser" feature.
+-- Deliberately decoupled from the
 -- browser/WASM rendering pipeline (native/wasm-render, native/server) —
 -- there is no HTML rendering here at all, no relay server, no WebSocket, no
 -- external tool dependency (no `glow`/`mdcat` subprocess). It mirrors the

@@ -9,8 +9,6 @@ plugin needs that answered just as often as "which command does that".
 | --- | --- |
 | **this file** | the full overview, user- *and* developer-facing |
 | [`PREVIEW.md`](PREVIEW.md) · [`RENDERING.md`](RENDERING.md) · [`OPERATIONS.md`](OPERATIONS.md) · [`SECURITY.md`](SECURITY.md) | the big topics in detail, in the [`FEATURES_FORMAT`](https://github.com/StefanBartl/documentation.nvim/blob/main/docs/FEATURES_FORMAT.md) schema |
-| [`../ROADMAP/DONE.md`](../ROADMAP/DONE.md) | *why* something was built the way it was (decision log) |
-| [`../ROADMAP/ROADMAP.md`](../ROADMAP/ROADMAP.md) | what is still open |
 
 ---
 

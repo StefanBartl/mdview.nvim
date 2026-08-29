@@ -78,7 +78,7 @@ function M.stop(close_browser_override)
 	-- registered once at setup() and stays available for the whole Neovim
 	-- session; tearing it down here previously deleted :MDViewStop and
 	-- :MDViewOpen (this plugin's now-retired flat commands) from existence
-	-- the first time :MDViewStop ran (fixed — see docs/ROADMAP/DONE.md).
+	-- the first time :MDViewStop ran (since fixed).
 	require("mdview.helper.autocmds_registry").detach_all()
 	notify("[mdview] stopped", vim.log.levels.INFO)
 end

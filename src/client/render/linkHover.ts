@@ -13,7 +13,7 @@
 //   pdf              -> name only. Rendering a page needs pdfport, which
 //                       lives in Neovim; reaching it from here means a
 //                       poll-queue round trip (~250ms) plus rasterization,
-//                       too slow for a hover. See docs/ROADMAP.
+//                       too slow for a hover.
 //   url              -> host / path / query, parsed locally. Never fetched:
 //                       a hover that issued requests would disclose every
 //                       link brushed past, exactly as in markdown.nvim.

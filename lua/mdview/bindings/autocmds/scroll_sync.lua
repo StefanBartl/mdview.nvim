@@ -1,8 +1,7 @@
 ---@module 'mdview.bindings.autocmds.scroll_sync'
 -- Sends the cursor's current line (and total line count) to the relay on
 -- CursorMoved/CursorMovedI, throttled, so the browser preview can scroll to
--- follow — the nvim-to-browser half of bidirectional scrolling (see
--- docs/ROADMAP/DONE.md's bonus features). Gated behind
+-- follow — the nvim-to-browser half of bidirectional scrolling. Gated behind
 -- mdview.config.defaults.scroll_sync (default true).
 
 local api = vim.api

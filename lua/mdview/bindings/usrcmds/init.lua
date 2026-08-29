@@ -3,8 +3,7 @@
 --- lib.nvim.bindings.usercmd.composer — one route tree drives dispatch, <Tab>
 --- completion, and (via composer.document()) a Markdown command reference, so
 --- the ten formerly-separate :MDViewX commands can't drift out of sync with
---- their own docs. See docs/commands.md for the generated-by-hand reference
---- and docs/ROADMAP (lib.nvim) for the composer's design.
+--- their own docs. See docs/commands.md for the generated-by-hand reference.
 ---
 --- All user commands are registered once at setup() and never torn down —
 --- they are the plugin's permanent command surface (like every other Neovim

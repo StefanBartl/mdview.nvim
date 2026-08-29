@@ -8,7 +8,7 @@
 --                handle with no job_id: mdview can't programmatically close
 --                it, so browser_autoclose / stop_on_browser_exit are no-ops
 --                in this mode. This is the markdown-preview.nvim-style
---                approach (see docs/ROADMAP/history/markdown_preview/browser/tab.md).
+--                approach.
 --
 --   "isolated" — spawn a dedicated browser process against a persistent
 --                mdview-only profile (see build_args_for_browser). A separate
