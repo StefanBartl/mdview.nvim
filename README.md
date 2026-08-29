@@ -1,4 +1,6 @@
-🔧 Alpha stage – this project is highly experimental and under active development. Don't expect this plugin is working with your system yet.
+> **Active development.** This repository is in its development phase — breaking changes are to be expected at any time. Pin a commit or tag if you depend on it.
+
+> Alpha stage: highly experimental. Do not expect this plugin to work on your system yet.
 
 ```sh
    ##     ## ########  ##     ## #### ######## ##      ##           ##    ## ##     ## #### ##     ##
