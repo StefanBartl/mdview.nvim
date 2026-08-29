@@ -7,7 +7,7 @@ local log = require("mdview.adapter.log")
 local M = {}
 
 function M.run()
-	log.show()
+  log.show()
 end
 
 return M

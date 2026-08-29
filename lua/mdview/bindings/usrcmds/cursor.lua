@@ -26,51 +26,48 @@ M.modes = { "line", "caret", "section", "off", "toggle" }
 ---@param v string
 ---@return boolean
 local function is_valid(v)
-	for _, m in ipairs(M.modes) do
-		if m == v then
-			return true
-		end
-	end
-	return false
+  for _, m in ipairs(M.modes) do
+    if m == v then
+      return true
+    end
+  end
+  return false
 end
 
 ---@param mode string|nil
 ---@return nil
 function M.run(mode)
-	local browser = require("mdview.config.browser").defaults
-	mode = mode and vim.trim(mode) or ""
+  local browser = require("mdview.config.browser").defaults
+  mode = mode and vim.trim(mode) or ""
 
-	if mode == "" then
-		notify(
-			("[mdview] cursor marker: %s (choices: %s)"):format(
-				tostring(browser.cursor_marker),
-				table.concat(M.modes, ", ")
-			),
-			vim.log.levels.INFO
-		)
-		return
-	end
+  if mode == "" then
+    notify(
+      ("[mdview] cursor marker: %s (choices: %s)"):format(tostring(browser.cursor_marker), table.concat(M.modes, ", ")),
+      vim.log.levels.INFO
+    )
+    return
+  end
 
-	if mode == "toggle" then
-		mode = (browser.cursor_marker == "section") and "off" or "section"
-	end
+  if mode == "toggle" then
+    mode = (browser.cursor_marker == "section") and "off" or "section"
+  end
 
-	if not is_valid(mode) then
-		notify(
-			("[mdview] unknown cursor mode %q — choose one of: %s"):format(mode, table.concat(M.modes, ", ")),
-			vim.log.levels.WARN
-		)
-		return
-	end
+  if not is_valid(mode) then
+    notify(
+      ("[mdview] unknown cursor mode %q — choose one of: %s"):format(mode, table.concat(M.modes, ", ")),
+      vim.log.levels.WARN
+    )
+    return
+  end
 
-	---@cast mode "line"|"caret"|"section"|"off"
-	browser.cursor_marker = mode
+  ---@cast mode "line"|"caret"|"section"|"off"
+  browser.cursor_marker = mode
 
-	if state.get_server() and control.send({ cursor = mode }) then
-		notify("[mdview] cursor marker: " .. mode, vim.log.levels.INFO)
-	else
-		notify("[mdview] cursor marker: " .. mode .. " (applies on next :MDView start)", vim.log.levels.INFO)
-	end
+  if state.get_server() and control.send({ cursor = mode }) then
+    notify("[mdview] cursor marker: " .. mode, vim.log.levels.INFO)
+  else
+    notify("[mdview] cursor marker: " .. mode .. " (applies on next :MDView start)", vim.log.levels.INFO)
+  end
 end
 
 return M

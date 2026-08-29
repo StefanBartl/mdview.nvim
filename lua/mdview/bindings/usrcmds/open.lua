@@ -8,7 +8,7 @@ local mdview = require("mdview")
 local M = {}
 
 function M.run()
-	mdview.open()
+  mdview.open()
 end
 
 return M

@@ -15,22 +15,22 @@ local M = {}
 ---@param fields table # e.g. { cursor = "caret" } or { zoom = 1.2 }
 ---@return boolean sent
 function M.send(fields)
-	if type(fields) ~= "table" or vim.tbl_isempty(fields) then
-		return false
-	end
-	if not require("mdview.core.state").get_server() then
-		return false
-	end
-	local key = target_key.resolve(0)
-	if not key then
-		return false
-	end
-	local ok, json = pcall(vim.json.encode, fields)
-	if not ok or type(json) ~= "string" then
-		return false
-	end
-	ws_client.send_control(key, json)
-	return true
+  if type(fields) ~= "table" or vim.tbl_isempty(fields) then
+    return false
+  end
+  if not require("mdview.core.state").get_server() then
+    return false
+  end
+  local key = target_key.resolve(0)
+  if not key then
+    return false
+  end
+  local ok, json = pcall(vim.json.encode, fields)
+  if not ok or type(json) ~= "string" then
+    return false
+  end
+  ws_client.send_control(key, json)
+  return true
 end
 
 return M

@@ -105,195 +105,195 @@
 
 ---@type mdview.config.Defaults
 return {
-	ft_pattern = { ".markdown", "*.md", "*.mdx" },
+  ft_pattern = { ".markdown", "*.md", "*.mdx" },
 
-	server_port = 43219,
-	server_cwd = nil,
+  server_port = 43219,
+  server_cwd = nil,
 
-	dev_local = true,
-	-- Debug flags are opt-in: with `debug = true` every relay stdout line is
-	-- echoed into Neovim, and `debug_preview = true` notifies on every push
-	-- (i.e. per keystroke). Enable via setup({ debug = true, ... }) when
-	-- actually debugging.
-	debug = false,
-	log_buffer_name = "mdview://logs",
+  dev_local = true,
+  -- Debug flags are opt-in: with `debug = true` every relay stdout line is
+  -- echoed into Neovim, and `debug_preview = true` notifies on every push
+  -- (i.e. per keystroke). Enable via setup({ debug = true, ... }) when
+  -- actually debugging.
+  debug = false,
+  log_buffer_name = "mdview://logs",
 
-	-- Persistent file logging is opt-in: with `file_log = false` (the default)
-	-- mdview never touches the disk, so starting a preview no longer creates a
-	-- `logs/` directory in whatever the cwd happens to be. Turn it on via
-	-- setup({ file_log = true }) or at runtime with :MDViewFileLog on.
-	file_log = false,
-	-- nil -> stdpath("log")/mdview/relay-<timestamp>.log (resolved lazily, so
-	-- the file is only created once file logging is actually enabled).
-	file_log_path = nil,
+  -- Persistent file logging is opt-in: with `file_log = false` (the default)
+  -- mdview never touches the disk, so starting a preview no longer creates a
+  -- `logs/` directory in whatever the cwd happens to be. Turn it on via
+  -- setup({ file_log = true }) or at runtime with :MDViewFileLog on.
+  file_log = false,
+  -- nil -> stdpath("log")/mdview/relay-<timestamp>.log (resolved lazily, so
+  -- the file is only created once file logging is actually enabled).
+  file_log_path = nil,
 
-	debug_plugin = false,
-	debug_preview = false,
+  debug_plugin = false,
+  debug_preview = false,
 
-	dev_server_port = 43220,
+  dev_server_port = 43220,
 
-	live_push_throttle_ms = 150,
+  live_push_throttle_ms = 150,
 
-	-- Timing against the relay process. The defaults suit a local relay on a
-	-- normal machine; a first-run binary being scanned by antivirus, a busy CI
-	-- box, or a relay over a slow link all want more of every one of them.
-	transport = {
-		health_poll_ms = 200,
-		health_timeout_ms = 10000,
-		max_retries = 5,
-		base_retry_ms = 150,
-		inbound_poll_ms = 250,
-	},
+  -- Timing against the relay process. The defaults suit a local relay on a
+  -- normal machine; a first-run binary being scanned by antivirus, a busy CI
+  -- box, or a relay over a slow link all want more of every one of them.
+  transport = {
+    health_poll_ms = 200,
+    health_timeout_ms = 10000,
+    max_retries = 5,
+    base_retry_ms = 150,
+    inbound_poll_ms = 250,
+  },
 
-	scroll_sync = true,
-	scroll_sync_throttle_ms = 150,
-	-- Where the cursor line lands in the browser viewport:
-	--   "top"    — near the top (scroll_sync_top_offset controls how far down,
-	--              0 = glued to the very top).
-	--   "cursor" — mirror Neovim: place the line at the same relative height as
-	--              the cursor sits in the nvim window (middle stays middle).
-	scroll_sync_mode = "top",
-	scroll_sync_top_offset = 0.08,
+  scroll_sync = true,
+  scroll_sync_throttle_ms = 150,
+  -- Where the cursor line lands in the browser viewport:
+  --   "top"    — near the top (scroll_sync_top_offset controls how far down,
+  --              0 = glued to the very top).
+  --   "cursor" — mirror Neovim: place the line at the same relative height as
+  --              the cursor sits in the nvim window (middle stays middle).
+  scroll_sync_mode = "top",
+  scroll_sync_top_offset = 0.08,
 
-	breadcrumbs = true,
+  breadcrumbs = true,
 
-	-- Ticking a task-list checkbox in the preview writes `[ ]`<->`[x]` back to
-	-- the source. Standalone rewrites the file directly (in the relay); :MDView
-	-- start edits the buffer, which — since Neovim has no WebSocket client —
-	-- needs the browser->Neovim poll (inbound_poll) running. Default on; set
-	-- false to keep checkboxes read-only and avoid that poll in start mode.
-	sync_checkboxes = true,
+  -- Ticking a task-list checkbox in the preview writes `[ ]`<->`[x]` back to
+  -- the source. Standalone rewrites the file directly (in the relay); :MDView
+  -- start edits the buffer, which — since Neovim has no WebSocket client —
+  -- needs the browser->Neovim poll (inbound_poll) running. Default on; set
+  -- false to keep checkboxes read-only and avoid that poll in start mode.
+  sync_checkboxes = true,
 
-	-- Editing a raw-HTML text field (`<input name="x">` / `<textarea
-	-- name="y">`) in the preview writes its value back to the source, located
-	-- by the `name` attribute (raw HTML carries no source position, so unlike
-	-- checkboxes there is no line to target — the name is the anchor).
-	-- Standalone rewrites the file; :MDView start edits the buffer via the same
-	-- browser->Neovim poll. Default on; false renders such fields read-only.
-	sync_fields = true,
+  -- Editing a raw-HTML text field (`<input name="x">` / `<textarea
+  -- name="y">`) in the preview writes its value back to the source, located
+  -- by the `name` attribute (raw HTML carries no source position, so unlike
+  -- checkboxes there is no line to target — the name is the anchor).
+  -- Standalone rewrites the file; :MDView start edits the buffer via the same
+  -- browser->Neovim poll. Default on; false renders such fields read-only.
+  sync_fields = true,
 
-	open_preview_tab = false,
+  open_preview_tab = false,
 
-	-- One-time "which CLI tools does this plugin want, and why" popup on
-	-- first setup() after install (via lib.nvim.deps). false disables it
-	-- for this plugin specifically, right here in the spec passed to
-	-- setup() — no vim.g needed. See README "Requirements".
-	deps_popup = true,
+  -- One-time "which CLI tools does this plugin want, and why" popup on
+  -- first setup() after install (via lib.nvim.deps). false disables it
+  -- for this plugin specifically, right here in the spec passed to
+  -- setup() — no vim.g needed. See README "Requirements".
+  deps_popup = true,
 
-	browser = {
-		open_mode = "default",
-		autodetect_browser = true,
-		browser = "",
-		browser_cmd = "",
-		browser_autoclose = true,
-		browser_autostart = true,
-		resolved_browser_cmd = nil,
-		browser_args = nil,
-		open_url = nil,
-		require_display = true,
-		stop_on_browser_exit = true,
-		theme = "github",
-		behavior = "reuse",
-		highlighter = "hljs",
-		focus = "browser",
-		external_links = "new_tab",
-		cursor_marker = "line",
-		zoom = 1.0,
-		-- Preview overlays (see :MDViewOverlay). Off by default — they're for
-		-- presenting/screen-sharing, not for everyday editing.
-		overlays = {
-			toc = false,
-		},
-		-- Off by default: CommonMark's own behavior (any run of blank lines
-		-- collapses to one paragraph gap) is what most people expect. See
-		-- :MDView blanklines.
-		preserve_blank_lines = false,
-	},
+  browser = {
+    open_mode = "default",
+    autodetect_browser = true,
+    browser = "",
+    browser_cmd = "",
+    browser_autoclose = true,
+    browser_autostart = true,
+    resolved_browser_cmd = nil,
+    browser_args = nil,
+    open_url = nil,
+    require_display = true,
+    stop_on_browser_exit = true,
+    theme = "github",
+    behavior = "reuse",
+    highlighter = "hljs",
+    focus = "browser",
+    external_links = "new_tab",
+    cursor_marker = "line",
+    zoom = 1.0,
+    -- Preview overlays (see :MDViewOverlay). Off by default — they're for
+    -- presenting/screen-sharing, not for everyday editing.
+    overlays = {
+      toc = false,
+    },
+    -- Off by default: CommonMark's own behavior (any run of blank lines
+    -- collapses to one paragraph gap) is what most people expect. See
+    -- :MDView blanklines.
+    preserve_blank_lines = false,
+  },
 
-	start = {
-		push_strategy = "launcher",
-		try_push_opts = nil,
-		wait_timeout_ms = nil,
-	},
+  start = {
+    push_strategy = "launcher",
+    try_push_opts = nil,
+    wait_timeout_ms = nil,
+  },
 
-	install = {
-		repo = "StefanBartl/mdview.nvim",
-		version = "v0.3.0",
-	},
+  install = {
+    repo = "StefanBartl/mdview.nvim",
+    version = "v0.3.0",
+  },
 
-	dev = {
-		-- Relay binary + client bundle `:MDView start` uses. nil = whatever
-		-- `install` resolves (downloaded/cached from GitHub Releases). Set both
-		-- to test a locally built relay/client, e.g.
-		--   dev = {
-		--     binary_path = "~/repos/mdview.nvim/native/server/mdview-server",
-		--     web_root    = "~/repos/mdview.nvim/dist/client",
-		--   }
-		-- `npm run build:go` writes that name literally — no .exe on Windows —
-		-- and `web_root` needs `npm run build` (wasm-pack + vite) to exist.
-		-- Neither falls back to the release if the path is missing.
-		-- Falls back to $MDVIEW_DEV_BINARY / $MDVIEW_DEV_WEB_ROOT when unset —
-		-- the only way to reach a detached instance (scripts/minimal_init.lua
-		-- loads none of this Lua config), since those are real OS env vars
-		-- inherited by the spawned child rather than Lua-level state.
-		binary_path = nil,
-		web_root = nil,
-	},
+  dev = {
+    -- Relay binary + client bundle `:MDView start` uses. nil = whatever
+    -- `install` resolves (downloaded/cached from GitHub Releases). Set both
+    -- to test a locally built relay/client, e.g.
+    --   dev = {
+    --     binary_path = "~/repos/mdview.nvim/native/server/mdview-server",
+    --     web_root    = "~/repos/mdview.nvim/dist/client",
+    --   }
+    -- `npm run build:go` writes that name literally — no .exe on Windows —
+    -- and `web_root` needs `npm run build` (wasm-pack + vite) to exist.
+    -- Neither falls back to the release if the path is missing.
+    -- Falls back to $MDVIEW_DEV_BINARY / $MDVIEW_DEV_WEB_ROOT when unset —
+    -- the only way to reach a detached instance (scripts/minimal_init.lua
+    -- loads none of this Lua config), since those are real OS env vars
+    -- inherited by the spawned child rather than Lua-level state.
+    binary_path = nil,
+    web_root = nil,
+  },
 
-	standalone = {
-		-- Relay binary `:MDView standalone` spawns. nil = whatever `install`
-		-- resolved. Standalone mode needs a relay with --watch support
-		-- (v0.3.0+); until `install.version` points at such a release, set this
-		-- to a locally built one, e.g.
-		--   standalone = { binary_path = "~/repos/mdview.nvim/native/server/mdview-server" }
-		-- :MDView standalone probes the binary and says so if it's too old,
-		-- rather than spawning a process that dies silently.
-		binary_path = nil,
-	},
+  standalone = {
+    -- Relay binary `:MDView standalone` spawns. nil = whatever `install`
+    -- resolved. Standalone mode needs a relay with --watch support
+    -- (v0.3.0+); until `install.version` points at such a release, set this
+    -- to a locally built one, e.g.
+    --   standalone = { binary_path = "~/repos/mdview.nvim/native/server/mdview-server" }
+    -- :MDView standalone probes the binary and says so if it's too old,
+    -- rather than spawning a process that dies silently.
+    binary_path = nil,
+  },
 
-	experimental = {
-		-- Opt in to the WebTransport (HTTP/3) client transport instead of
-		-- WebSocket. When on, the relay also serves a /wt endpoint (HTTP/3 over
-		-- UDP on the same port, self-signed cert pinned via the printed hash)
-		-- and the client tries WebTransport first, falling back to WebSocket on
-		-- any failure — so it never breaks the preview. On loopback there is no
-		-- real benefit over WebSocket; kept as opt-in "future tech". Requires a
-		-- relay binary built with WebTransport support (v0.2.0+). Default false.
-		webtransport = false,
+  experimental = {
+    -- Opt in to the WebTransport (HTTP/3) client transport instead of
+    -- WebSocket. When on, the relay also serves a /wt endpoint (HTTP/3 over
+    -- UDP on the same port, self-signed cert pinned via the printed hash)
+    -- and the client tries WebTransport first, falling back to WebSocket on
+    -- any failure — so it never breaks the preview. On loopback there is no
+    -- real benefit over WebSocket; kept as opt-in "future tech". Requires a
+    -- relay binary built with WebTransport support (v0.2.0+). Default false.
+    webtransport = false,
 
-		-- Opt in to the line-diff transport: send only the changed lines on each
-		-- edit (versioned \x03 envelopes, client reassembles full text) instead
-		-- of the whole document. Saves bandwidth on large files; rendering still
-		-- processes the whole document client-side, so on loopback the win is
-		-- modest. The default full-text push stays the verified path. On any
-		-- diff desync the client resyncs from the next full snapshot (sent on
-		-- save and every 25 edits). Default false.
-		line_diff = false,
+    -- Opt in to the line-diff transport: send only the changed lines on each
+    -- edit (versioned \x03 envelopes, client reassembles full text) instead
+    -- of the whole document. Saves bandwidth on large files; rendering still
+    -- processes the whole document client-side, so on loopback the win is
+    -- modest. The default full-text push stays the verified path. On any
+    -- diff desync the client resyncs from the next full snapshot (sent on
+    -- save and every 25 edits). Default false.
+    line_diff = false,
 
-		-- Opt in to click-to-navigate: clicking a relative link in the preview
-		-- tells Neovim (via the relay's /nav bridge, polled while a session is
-		-- active) to open the linked document, which then flows back into the
-		-- preview. Resolved relative to the source document; external links,
-		-- in-page anchors and absolute paths are left to the browser. Changes
-		-- how link clicks behave. On by default (relative links to other docs
-		-- should open them); set false to let the browser follow links itself.
-		click_navigate = true,
+    -- Opt in to click-to-navigate: clicking a relative link in the preview
+    -- tells Neovim (via the relay's /nav bridge, polled while a session is
+    -- active) to open the linked document, which then flows back into the
+    -- preview. Resolved relative to the source document; external links,
+    -- in-page anchors and absolute paths are left to the browser. Changes
+    -- how link clicks behave. On by default (relative links to other docs
+    -- should open them); set false to let the browser follow links itself.
+    click_navigate = true,
 
-		-- Opt in to reverse scroll (browser -> Neovim): scrolling the preview
-		-- moves Neovim's cursor to the matching position (the complement of the
-		-- always-on nvim -> browser scroll_sync). Implemented by polling, so it
-		-- follows with a small lag rather than instantly. Default false.
-		reverse_scroll = false,
+    -- Opt in to reverse scroll (browser -> Neovim): scrolling the preview
+    -- moves Neovim's cursor to the matching position (the complement of the
+    -- always-on nvim -> browser scroll_sync). Implemented by polling, so it
+    -- follows with a small lag rather than instantly. Default false.
+    reverse_scroll = false,
 
-		-- Opt in to previewing any normal text buffer, not just Markdown. When
-		-- true, mdview.config.merge() widens `ft_pattern` to `{"*"}` so every
-		-- autocmd that drives the preview fires for any named, normal-buftype
-		-- buffer (see helper/previewable.lua for the actual gate); the client
-		-- renders non-Markdown documents as a syntax-highlighted read-only code
-		-- view (extension -> language, see src/client/highlight/languageForPath.ts)
-		-- instead of through the Markdown WASM renderer. Scroll-sync falls back
-		-- to proportional positioning for these files (no per-line sourcepos yet,
-		-- so the cursor line-bar doesn't show). Default false.
-		any_file = false,
-	},
+    -- Opt in to previewing any normal text buffer, not just Markdown. When
+    -- true, mdview.config.merge() widens `ft_pattern` to `{"*"}` so every
+    -- autocmd that drives the preview fires for any named, normal-buftype
+    -- buffer (see helper/previewable.lua for the actual gate); the client
+    -- renders non-Markdown documents as a syntax-highlighted read-only code
+    -- view (extension -> language, see src/client/highlight/languageForPath.ts)
+    -- instead of through the Markdown WASM renderer. Scroll-sync falls back
+    -- to proportional positioning for these files (no per-line sourcepos yet,
+    -- so the cursor line-bar doesn't show). Default false.
+    any_file = false,
+  },
 }

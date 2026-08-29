@@ -22,51 +22,51 @@ M.defaults = vim.deepcopy(DEFAULTS)
 ---@param override table
 ---@return nil
 local function deep_merge_in_place(target, override)
-	for k, v in pairs(override) do
-		if type(v) == "table" and type(target[k]) == "table" then
-			deep_merge_in_place(target[k], v)
-		else
-			target[k] = v
-		end
-	end
+  for k, v in pairs(override) do
+    if type(v) == "table" and type(target[k]) == "table" then
+      deep_merge_in_place(target[k], v)
+    else
+      target[k] = v
+    end
+  end
 end
 
 -- Keys that legitimately default to nil, so they're absent from the DEFAULTS
 -- table and can't be discovered by iterating it. Keyed by dotted table path.
 local KNOWN_NIL_KEYS = {
-	[""] = { server_cwd = true, file_log_path = true },
-	browser = { open_url = true, resolved_browser_cmd = true, browser_args = true },
-	start = { try_push_opts = true, wait_timeout_ms = true },
-	dev = { binary_path = true, web_root = true },
-	standalone = { binary_path = true },
+  [""] = { server_cwd = true, file_log_path = true },
+  browser = { open_url = true, resolved_browser_cmd = true, browser_args = true },
+  start = { try_push_opts = true, wait_timeout_ms = true },
+  dev = { binary_path = true, web_root = true },
+  standalone = { binary_path = true },
 }
 
 -- Collect every valid leaf key name across all levels (for "did you mean").
 ---@internal
 ---@return table<string, string>
 local function collect_known_names()
-	local names = {}
-	---@internal
-	---@param tbl table
-	---@param path string
-	---@return nil
-	local function walk(tbl, path)
-		for k, v in pairs(tbl) do
-			if type(k) == "string" then
-				names[k] = path == "" and k or (path .. "." .. k)
-				if type(v) == "table" then
-					walk(v, path == "" and k or (path .. "." .. k))
-				end
-			end
-		end
-	end
-	walk(M.defaults, "")
-	for path, keys in pairs(KNOWN_NIL_KEYS) do
-		for k in pairs(keys) do
-			names[k] = path == "" and k or (path .. "." .. k)
-		end
-	end
-	return names
+  local names = {}
+  ---@internal
+  ---@param tbl table
+  ---@param path string
+  ---@return nil
+  local function walk(tbl, path)
+    for k, v in pairs(tbl) do
+      if type(k) == "string" then
+        names[k] = path == "" and k or (path .. "." .. k)
+        if type(v) == "table" then
+          walk(v, path == "" and k or (path .. "." .. k))
+        end
+      end
+    end
+  end
+  walk(M.defaults, "")
+  for path, keys in pairs(KNOWN_NIL_KEYS) do
+    for k in pairs(keys) do
+      names[k] = path == "" and k or (path .. "." .. k)
+    end
+  end
+  return names
 end
 
 --- Warn about config keys the user passed that mdview doesn't recognize — the
@@ -76,37 +76,37 @@ end
 ---@param opts table|nil
 ---@return nil
 function M.validate(opts)
-	if type(opts) ~= "table" then
-		return
-	end
-	local known_names = collect_known_names()
-	local unknown = {}
+  if type(opts) ~= "table" then
+    return
+  end
+  local known_names = collect_known_names()
+  local unknown = {}
 
-	---@internal
-	---@param user_tbl table
-	---@param default_tbl table
-	---@param path string
-	---@param nil_keys table<string, boolean>|nil
-	---@return nil
-	local function check(user_tbl, default_tbl, path, nil_keys)
-		for k, v in pairs(user_tbl) do
-			local valid = (default_tbl[k] ~= nil) or (nil_keys and nil_keys[k])
-			if not valid then
-				local full = path == "" and tostring(k) or (path .. "." .. tostring(k))
-				local suggestion = known_names[k]
-				unknown[#unknown + 1] = suggestion and (("%s (did you mean `%s`?)"):format(full, suggestion)) or full
-			elseif type(v) == "table" and type(default_tbl[k]) == "table" then
-				local sub = path == "" and tostring(k) or (path .. "." .. tostring(k))
-				check(v, default_tbl[k], sub, KNOWN_NIL_KEYS[sub])
-			end
-		end
-	end
+  ---@internal
+  ---@param user_tbl table
+  ---@param default_tbl table
+  ---@param path string
+  ---@param nil_keys table<string, boolean>|nil
+  ---@return nil
+  local function check(user_tbl, default_tbl, path, nil_keys)
+    for k, v in pairs(user_tbl) do
+      local valid = (default_tbl[k] ~= nil) or (nil_keys and nil_keys[k])
+      if not valid then
+        local full = path == "" and tostring(k) or (path .. "." .. tostring(k))
+        local suggestion = known_names[k]
+        unknown[#unknown + 1] = suggestion and (("%s (did you mean `%s`?)"):format(full, suggestion)) or full
+      elseif type(v) == "table" and type(default_tbl[k]) == "table" then
+        local sub = path == "" and tostring(k) or (path .. "." .. tostring(k))
+        check(v, default_tbl[k], sub, KNOWN_NIL_KEYS[sub])
+      end
+    end
+  end
 
-	check(opts, M.defaults, "", KNOWN_NIL_KEYS[""])
+  check(opts, M.defaults, "", KNOWN_NIL_KEYS[""])
 
-	if #unknown > 0 then
-		notify("[mdview] unknown setup() config key(s):\n  - " .. table.concat(unknown, "\n  - "), vim.log.levels.WARN)
-	end
+  if #unknown > 0 then
+    notify("[mdview] unknown setup() config key(s):\n  - " .. table.concat(unknown, "\n  - "), vim.log.levels.WARN)
+  end
 end
 
 --- Merge user-provided options into M.defaults in place (nested tables like
@@ -122,21 +122,21 @@ end
 ---@param opts table|nil
 ---@return mdview.config.Defaults
 function M.merge(opts)
-	if opts and not vim.tbl_isempty(opts) then
-		deep_merge_in_place(M.defaults, opts)
-	end
+  if opts and not vim.tbl_isempty(opts) then
+    deep_merge_in_place(M.defaults, opts)
+  end
 
-	-- any_file widens preview scope from Markdown-only to every normal text
-	-- buffer; that needs the autocmd glob itself (ft_pattern) to match
-	-- everything, not just *.md/*.markdown/*.mdx. Takes precedence over a
-	-- hand-set ft_pattern (see DEFAULTS.lua's `any_file` doc comment) — the
-	-- per-buffer buftype/filetype gate that actually excludes non-previewable
-	-- buffers (terminal, help, quickfix, …) lives in helper/previewable.lua.
-	if M.defaults.experimental and M.defaults.experimental.any_file == true then
-		M.defaults.ft_pattern = { "*" }
-	end
+  -- any_file widens preview scope from Markdown-only to every normal text
+  -- buffer; that needs the autocmd glob itself (ft_pattern) to match
+  -- everything, not just *.md/*.markdown/*.mdx. Takes precedence over a
+  -- hand-set ft_pattern (see DEFAULTS.lua's `any_file` doc comment) — the
+  -- per-buffer buftype/filetype gate that actually excludes non-previewable
+  -- buffers (terminal, help, quickfix, …) lives in helper/previewable.lua.
+  if M.defaults.experimental and M.defaults.experimental.any_file == true then
+    M.defaults.ft_pattern = { "*" }
+  end
 
-	return M.defaults
+  return M.defaults
 end
 
 return M

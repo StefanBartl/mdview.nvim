@@ -24,52 +24,52 @@ M.known = { "github", "dark-dimmed", "plain", "tokyonight", "catppuccin" }
 ---@param name string
 ---@return boolean
 local function is_known(name)
-	local base = name:match("^(.-)-light$") or name:match("^(.-)-dark$") or name
-	for _, k in ipairs(M.known) do
-		if k == base then
-			return true
-		end
-	end
-	return false
+  local base = name:match("^(.-)-light$") or name:match("^(.-)-dark$") or name
+  for _, k in ipairs(M.known) do
+    if k == base then
+      return true
+    end
+  end
+  return false
 end
 
 ---@param name string|nil
 function M.run(name)
-	name = name and vim.trim(name) or ""
-	if name == "" then
-		local current = require("mdview.config.browser").defaults.theme
-		notify(
-			("[mdview] current theme: %s (known: %s)"):format(tostring(current), table.concat(M.known, ", ")),
-			vim.log.levels.INFO
-		)
-		return
-	end
+  name = name and vim.trim(name) or ""
+  if name == "" then
+    local current = require("mdview.config.browser").defaults.theme
+    notify(
+      ("[mdview] current theme: %s (known: %s)"):format(tostring(current), table.concat(M.known, ", ")),
+      vim.log.levels.INFO
+    )
+    return
+  end
 
-	if not is_known(name) then
-		notify(
-			("[mdview] unknown theme %q — known: %s (optionally suffixed -light/-dark)"):format(
-				name,
-				table.concat(M.known, ", ")
-			),
-			vim.log.levels.WARN
-		)
-		return
-	end
+  if not is_known(name) then
+    notify(
+      ("[mdview] unknown theme %q — known: %s (optionally suffixed -light/-dark)"):format(
+        name,
+        table.concat(M.known, ", ")
+      ),
+      vim.log.levels.WARN
+    )
+    return
+  end
 
-	-- Shared table with mdview.config.defaults.browser, so this is picked up
-	-- by launcher.resolve_browser_url on the next open.
-	require("mdview.config.browser").defaults.theme = name
+  -- Shared table with mdview.config.defaults.browser, so this is picked up
+  -- by launcher.resolve_browser_url on the next open.
+  require("mdview.config.browser").defaults.theme = name
 
-	if state.get_server() and state.is_attached() then
-		-- Re-open so the new theme applies now. Tab-preview mode has no
-		-- browser theme, so only the browser path needs re-opening.
-		if not require("mdview.config").defaults.open_preview_tab then
-			require("mdview").open()
-		end
-		notify("[mdview] theme set to " .. name .. " (re-opened preview)", vim.log.levels.INFO)
-	else
-		notify("[mdview] theme set to " .. name .. " (applies on next :MDView start)", vim.log.levels.INFO)
-	end
+  if state.get_server() and state.is_attached() then
+    -- Re-open so the new theme applies now. Tab-preview mode has no
+    -- browser theme, so only the browser path needs re-opening.
+    if not require("mdview.config").defaults.open_preview_tab then
+      require("mdview").open()
+    end
+    notify("[mdview] theme set to " .. name .. " (re-opened preview)", vim.log.levels.INFO)
+  else
+    notify("[mdview] theme set to " .. name .. " (applies on next :MDView start)", vim.log.levels.INFO)
+  end
 end
 
 return M

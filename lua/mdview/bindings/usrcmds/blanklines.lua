@@ -21,29 +21,29 @@ M.actions = { "on", "off", "toggle" }
 ---@param action string|nil
 ---@return nil
 function M.run(action)
-	local browser = require("mdview.config.browser").defaults
-	action = action and vim.trim(action):lower() or "toggle"
+  local browser = require("mdview.config.browser").defaults
+  action = action and vim.trim(action):lower() or "toggle"
 
-	local on
-	if action == "on" then
-		on = true
-	elseif action == "off" then
-		on = false
-	elseif action == "toggle" or action == "" then
-		on = browser.preserve_blank_lines ~= true
-	else
-		notify(("[mdview] blanklines: expected one of: %s"):format(table.concat(M.actions, ", ")), vim.log.levels.WARN)
-		return
-	end
+  local on
+  if action == "on" then
+    on = true
+  elseif action == "off" then
+    on = false
+  elseif action == "toggle" or action == "" then
+    on = browser.preserve_blank_lines ~= true
+  else
+    notify(("[mdview] blanklines: expected one of: %s"):format(table.concat(M.actions, ", ")), vim.log.levels.WARN)
+    return
+  end
 
-	browser.preserve_blank_lines = on
-	local label = on and "showing all blank lines" or "compressed (default)"
+  browser.preserve_blank_lines = on
+  local label = on and "showing all blank lines" or "compressed (default)"
 
-	if state.get_server() and control.send({ blankLines = on }) then
-		notify("[mdview] preview blank lines: " .. label, vim.log.levels.INFO)
-	else
-		notify("[mdview] preview blank lines: " .. label .. " (applies on next :MDView start)", vim.log.levels.INFO)
-	end
+  if state.get_server() and control.send({ blankLines = on }) then
+    notify("[mdview] preview blank lines: " .. label, vim.log.levels.INFO)
+  else
+    notify("[mdview] preview blank lines: " .. label .. " (applies on next :MDView start)", vim.log.levels.INFO)
+  end
 end
 
 return M

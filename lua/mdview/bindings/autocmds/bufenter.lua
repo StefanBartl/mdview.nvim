@@ -20,46 +20,46 @@ local M = {}
 ---@param bufnr integer
 ---@return nil
 local function on_buf_enter(bufnr)
-	if not previewable.is(bufnr) then
-		return
-	end
+  if not previewable.is(bufnr) then
+    return
+  end
 
-	local path = api.nvim_buf_get_name(bufnr)
-	if path == "" then
-		return
-	end
+  local path = api.nvim_buf_get_name(bufnr)
+  if path == "" then
+    return
+  end
 
-	local norm_path = normalize.path(path)
-	if not norm_path then
-		log.debug("normalized path is nil", vim.log.levels.ERROR, "events", true)
-		return
-	end
+  local norm_path = normalize.path(path)
+  if not norm_path then
+    log.debug("normalized path is nil", vim.log.levels.ERROR, "events", true)
+    return
+  end
 
-	-- only store snapshot if we don't already have it
-	if not session.get(norm_path) then
-		local lines = api.nvim_buf_get_lines(bufnr, 0, -1, false)
-		session.store(norm_path, copy_lines(lines))
-		log.debug("BufEnter snapshot stored for path: " .. norm_path, nil, "bufenter", true)
-	end
+  -- only store snapshot if we don't already have it
+  if not session.get(norm_path) then
+    local lines = api.nvim_buf_get_lines(bufnr, 0, -1, false)
+    session.store(norm_path, copy_lines(lines))
+    log.debug("BufEnter snapshot stored for path: " .. norm_path, nil, "bufenter", true)
+  end
 end
 
 --- Setup BufEnter autocmd in the given augroup.
 --- @param group integer|nil  # nvim augroup id (optional). If nil, autocmd will be created without group.
 function M.attach(group)
-	local opts = {
-		desc = "[mdview] Snapshot on enter",
-		pattern = defaults.ft_pattern,
-	}
-	if group then
-		opts.group = group
-	end
+  local opts = {
+    desc = "[mdview] Snapshot on enter",
+    pattern = defaults.ft_pattern,
+  }
+  if group then
+    opts.group = group
+  end
 
-	local id = autocmd.create("BufEnter", function(args)
-		on_buf_enter(args.buf)
-	end, opts)
-	if group then
-		autocmds_registry.register(group, id)
-	end
+  local id = autocmd.create("BufEnter", function(args)
+    on_buf_enter(args.buf)
+  end, opts)
+  if group then
+    autocmds_registry.register(group, id)
+  end
 end
 
 return M

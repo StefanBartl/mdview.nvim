@@ -15,29 +15,29 @@ local M = {}
 
 --- @param group integer|nil
 function M.attach(group)
-	local function on_leave()
-		if state.get_proc() ~= nil then
-			-- Once Neovim exits the preview is frozen (no more sync), so close
-			-- the browser tab too. The close signal travels over the relay, so
-			-- send it BEFORE killing the process — send_close() is a short
-			-- blocking curl, which also guarantees it completes before nvim
-			-- exits (an async post would be lost to the shutdown).
-			pcall(require("mdview.adapter.ws_client").send_close)
-			require("mdview.adapter.runner").stop_server(state.get_proc())
-		end
-	end
+  local function on_leave()
+    if state.get_proc() ~= nil then
+      -- Once Neovim exits the preview is frozen (no more sync), so close
+      -- the browser tab too. The close signal travels over the relay, so
+      -- send it BEFORE killing the process — send_close() is a short
+      -- blocking curl, which also guarantees it completes before nvim
+      -- exits (an async post would be lost to the shutdown).
+      pcall(require("mdview.adapter.ws_client").send_close)
+      require("mdview.adapter.runner").stop_server(state.get_proc())
+    end
+  end
 
-	local opts = {
-		desc = "[mdview] Stop mdview server if running before exiting Neovim",
-	}
-	if group then
-		opts.group = group
-	end
+  local opts = {
+    desc = "[mdview] Stop mdview server if running before exiting Neovim",
+  }
+  if group then
+    opts.group = group
+  end
 
-	local id = autocmd.create("VimLeavePre", on_leave, opts)
-	if group then
-		autocmds_registry.register(group, id)
-	end
+  local id = autocmd.create("VimLeavePre", on_leave, opts)
+  if group then
+    autocmds_registry.register(group, id)
+  end
 end
 
 return M

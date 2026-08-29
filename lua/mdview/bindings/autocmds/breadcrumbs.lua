@@ -16,35 +16,35 @@ local last_at = 0
 
 ---@param group integer|nil
 function M.attach(group)
-	if defaults.breadcrumbs == false then
-		return
-	end
+  if defaults.breadcrumbs == false then
+    return
+  end
 
-	local crumbs = require("mdview.core.breadcrumbs")
-	crumbs.clear() -- fresh session
+  local crumbs = require("mdview.core.breadcrumbs")
+  crumbs.clear() -- fresh session
 
-	local function record(args)
-		local now = (vim.uv or vim.loop).now()
-		if now - last_at < 300 then
-			return
-		end
-		last_at = now
-		pcall(crumbs.record, args.buf)
-	end
+  local function record(args)
+    local now = (vim.uv or vim.loop).now()
+    if now - last_at < 300 then
+      return
+    end
+    last_at = now
+    pcall(crumbs.record, args.buf)
+  end
 
-	local opts = {
-		desc = "[mdview] Record session breadcrumbs (document + heading over time)",
-		pattern = defaults.ft_pattern,
-	}
-	if group then
-		opts.group = group
-	end
-	local id = autocmd.create({ "CursorMoved", "CursorMovedI", "BufEnter" }, record, opts)
-	autocmd_registry.register(group, id)
+  local opts = {
+    desc = "[mdview] Record session breadcrumbs (document + heading over time)",
+    pattern = defaults.ft_pattern,
+  }
+  if group then
+    opts.group = group
+  end
+  local id = autocmd.create({ "CursorMoved", "CursorMovedI", "BufEnter" }, record, opts)
+  autocmd_registry.register(group, id)
 
-	-- Seed the first breadcrumb for the current buffer (no BufEnter fires when a
-	-- session starts on the already-current buffer).
-	pcall(crumbs.record, api.nvim_get_current_buf())
+  -- Seed the first breadcrumb for the current buffer (no BufEnter fires when a
+  -- session starts on the already-current buffer).
+  pcall(crumbs.record, api.nvim_get_current_buf())
 end
 
 return M

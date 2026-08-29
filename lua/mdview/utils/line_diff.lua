@@ -18,22 +18,22 @@
 ---@param new string[]|nil current lines
 ---@return { start: integer, count: integer, lines: string[] }|nil  # nil when unchanged
 return function(old, new)
-	old = old or {}
-	new = new or {}
+  old = old or {}
+  new = new or {}
 
-	local region = require("lib.lua.diff.lines").diff(old, new)
-	if not region then
-		return nil
-	end
+  local region = require("lib.lua.diff.lines").diff(old, new)
+  if not region then
+    return nil
+  end
 
-	local lines = {}
-	for k = region.start, region.b_end do
-		lines[#lines + 1] = new[k]
-	end
+  local lines = {}
+  for k = region.start, region.b_end do
+    lines[#lines + 1] = new[k]
+  end
 
-	return {
-		start = region.start - 1, -- 0-based for the client's Array.splice
-		count = math.max(0, region.a_end - region.start + 1), -- old lines removed
-		lines = lines, -- replacement lines
-	}
+  return {
+    start = region.start - 1, -- 0-based for the client's Array.splice
+    count = math.max(0, region.a_end - region.start + 1), -- old lines removed
+    lines = lines, -- replacement lines
+  }
 end

@@ -18,11 +18,11 @@ local M = {}
 ---@param tag string? # optional sub-tag recorded as context / notify prefix
 ---@param debug boolean? # when true (and debug_preview on), also vim.notify
 function M.debug(msg, level, tag, debug)
-	level = level or vim.log.levels.INFO
-	tag = tag or ""
+  level = level or vim.log.levels.INFO
+  tag = tag or ""
 
-	local want_notify = (debug == true) and (cfg.defaults.debug_preview == true)
-	mlog.instance.log(level, ("[%s] %s"):format(tag, msg), { tag = tag }, { notify = want_notify })
+  local want_notify = (debug == true) and (cfg.defaults.debug_preview == true)
+  mlog.instance.log(level, ("[%s] %s"):format(tag, msg), { tag = tag }, { notify = want_notify })
 end
 
 return M

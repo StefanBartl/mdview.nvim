@@ -1,7 +1,3 @@
-
-
-
-
 ---@module 'mdview.bindings.usrcmds.'
 --- ADD: Annotaions
 

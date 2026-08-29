@@ -8,7 +8,7 @@ local preview_tab = require("mdview.adapter.preview_tab")
 local M = {}
 
 function M.run()
-	preview_tab.toggle()
+  preview_tab.toggle()
 end
 
 return M

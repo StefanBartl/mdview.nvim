@@ -14,32 +14,29 @@ M.actions = { "pause", "resume", "toggle" }
 ---@param action string|nil
 ---@return nil
 function M.run(action)
-	local scroll_sync = require("mdview.bindings.autocmds.scroll_sync")
-	action = action and vim.trim(action):lower() or ""
+  local scroll_sync = require("mdview.bindings.autocmds.scroll_sync")
+  action = action and vim.trim(action):lower() or ""
 
-	if action == "" then
-		notify(
-			("[mdview] scroll sync is %s"):format(scroll_sync.is_paused() and "paused" or "active"),
-			vim.log.levels.INFO
-		)
-		return
-	end
+  if action == "" then
+    notify(("[mdview] scroll sync is %s"):format(scroll_sync.is_paused() and "paused" or "active"), vim.log.levels.INFO)
+    return
+  end
 
-	local paused
-	if action == "pause" then
-		scroll_sync.set_paused(true)
-		paused = true
-	elseif action == "resume" then
-		scroll_sync.set_paused(false)
-		paused = false
-	elseif action == "toggle" then
-		paused = scroll_sync.toggle_paused()
-	else
-		notify(("[mdview] sync: expected one of: %s"):format(table.concat(M.actions, ", ")), vim.log.levels.WARN)
-		return
-	end
+  local paused
+  if action == "pause" then
+    scroll_sync.set_paused(true)
+    paused = true
+  elseif action == "resume" then
+    scroll_sync.set_paused(false)
+    paused = false
+  elseif action == "toggle" then
+    paused = scroll_sync.toggle_paused()
+  else
+    notify(("[mdview] sync: expected one of: %s"):format(table.concat(M.actions, ", ")), vim.log.levels.WARN)
+    return
+  end
 
-	notify("[mdview] scroll sync " .. (paused and "paused" or "resumed"), vim.log.levels.INFO)
+  notify("[mdview] scroll sync " .. (paused and "paused" or "resumed"), vim.log.levels.INFO)
 end
 
 return M

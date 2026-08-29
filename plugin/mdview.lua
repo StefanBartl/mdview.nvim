@@ -9,6 +9,6 @@
 --- loading.
 
 if vim.g.loaded_mdview then
-	return
+  return
 end
 vim.g.loaded_mdview = true

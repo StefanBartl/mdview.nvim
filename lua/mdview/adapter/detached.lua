@@ -25,20 +25,20 @@ local M = {}
 ---@param extra table<string, string>|nil
 ---@return string[]|nil # nil when there is nothing to add (inherit as-is)
 function M.build_env(extra)
-	if not extra or vim.tbl_isempty(extra) then
-		return nil
-	end
+  if not extra or vim.tbl_isempty(extra) then
+    return nil
+  end
 
-	local merged = vim.fn.environ()
-	for k, v in pairs(extra) do
-		merged[k] = v
-	end
+  local merged = vim.fn.environ()
+  for k, v in pairs(extra) do
+    merged[k] = v
+  end
 
-	local out = {}
-	for k, v in pairs(merged) do
-		out[#out + 1] = ("%s=%s"):format(k, v)
-	end
-	return out
+  local out = {}
+  for k, v in pairs(merged) do
+    out[#out + 1] = ("%s=%s"):format(k, v)
+  end
+  return out
 end
 
 --- Spawn `cmd` with `args` fully detached: it survives `:qa` of this instance,
@@ -50,37 +50,37 @@ end
 ---@param extra_env table<string, string>|nil # vars added on top of the inherited environment
 ---@return integer|nil pid, string|nil err
 function M.spawn(cmd, args, cwd, extra_env)
-	if type(cmd) ~= "string" or cmd == "" then
-		return nil, "invalid command: " .. tostring(cmd)
-	end
+  if type(cmd) ~= "string" or cmd == "" then
+    return nil, "invalid command: " .. tostring(cmd)
+  end
 
-	local handle, pid = uv.spawn(cmd, {
-		args = args or {},
-		cwd = cwd,
-		env = M.build_env(extra_env),
-		-- detached: the child gets its own process group, so it is not killed
-		-- with us and is not attached to our terminal's signals.
-		detached = true,
-		-- No pipes: the child's output goes nowhere. Background instances log
-		-- to a file instead (minimal_init.lua turns file_log on for exactly
-		-- this reason), which is readable after the fact.
-		stdio = { nil, nil, nil },
-	}, function() end)
+  local handle, pid = uv.spawn(cmd, {
+    args = args or {},
+    cwd = cwd,
+    env = M.build_env(extra_env),
+    -- detached: the child gets its own process group, so it is not killed
+    -- with us and is not attached to our terminal's signals.
+    detached = true,
+    -- No pipes: the child's output goes nowhere. Background instances log
+    -- to a file instead (minimal_init.lua turns file_log on for exactly
+    -- this reason), which is readable after the fact.
+    stdio = { nil, nil, nil },
+  }, function() end)
 
-	if not handle then
-		-- uv.spawn returns (nil, "ENOENT: ...") — the second value is the error.
-		return nil, tostring(pid)
-	end
+  if not handle then
+    -- uv.spawn returns (nil, "ENOENT: ...") — the second value is the error.
+    return nil, tostring(pid)
+  end
 
-	-- unref, then close: unref drops the handle from the event loop's refcount
-	-- so it can't keep this instance alive at exit, and closing it releases our
-	-- side without signalling the (already independent) child.
-	pcall(function()
-		handle:unref()
-		handle:close()
-	end)
+  -- unref, then close: unref drops the handle from the event loop's refcount
+  -- so it can't keep this instance alive at exit, and closing it releases our
+  -- side without signalling the (already independent) child.
+  pcall(function()
+    handle:unref()
+    handle:close()
+  end)
 
-	return pid, nil
+  return pid, nil
 end
 
 --- Resolve the file a standalone preview should target: the explicit argument
@@ -89,21 +89,21 @@ end
 ---@param arg string|nil
 ---@return string|nil path, string|nil err
 function M.resolve_target(arg)
-	local path
-	if arg and arg ~= "" then
-		path = vim.fn.fnamemodify(vim.fn.expand(arg), ":p")
-	else
-		path = vim.api.nvim_buf_get_name(vim.api.nvim_get_current_buf())
-		if path == "" then
-			return nil, "current buffer has no file — pass a path, e.g. :MDView standalone README.md"
-		end
-		path = vim.fn.fnamemodify(path, ":p")
-	end
+  local path
+  if arg and arg ~= "" then
+    path = vim.fn.fnamemodify(vim.fn.expand(arg), ":p")
+  else
+    path = vim.api.nvim_buf_get_name(vim.api.nvim_get_current_buf())
+    if path == "" then
+      return nil, "current buffer has no file — pass a path, e.g. :MDView standalone README.md"
+    end
+    path = vim.fn.fnamemodify(path, ":p")
+  end
 
-	if vim.fn.filereadable(path) ~= 1 then
-		return nil, "not a readable file: " .. path
-	end
-	return vim.fs.normalize(path), nil
+  if vim.fn.filereadable(path) ~= 1 then
+    return nil, "not a readable file: " .. path
+  end
+  return vim.fs.normalize(path), nil
 end
 
 return M

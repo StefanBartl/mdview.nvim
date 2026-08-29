@@ -15,26 +15,26 @@ local M = {}
 ---@param bufnr integer
 ---@return nil
 local function on_text_changed(bufnr)
-	log.debug("TextChanged fired for buf " .. bufnr, nil, "textchange", true)
-	push_buffer(bufnr, false) -- only push diffs
+  log.debug("TextChanged fired for buf " .. bufnr, nil, "textchange", true)
+  push_buffer(bufnr, false) -- only push diffs
 end
 
 --- @param group integer|nil
 function M.attach(group)
-	local opts = {
-		desc = "[mdview] Push on insert/change",
-		pattern = defaults.ft_pattern,
-	}
-	if group then
-		opts.group = group
-	end
+  local opts = {
+    desc = "[mdview] Push on insert/change",
+    pattern = defaults.ft_pattern,
+  }
+  if group then
+    opts.group = group
+  end
 
-	local id = autocmd.create({ "TextChanged", "TextChangedI" }, function(args)
-		on_text_changed(args.buf)
-	end, opts)
-	if group then
-		autocmd_registry.register(group, id)
-	end
+  local id = autocmd.create({ "TextChanged", "TextChangedI" }, function(args)
+    on_text_changed(args.buf)
+  end, opts)
+  if group then
+    autocmd_registry.register(group, id)
+  end
 end
 
 return M

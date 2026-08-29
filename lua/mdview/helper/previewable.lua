@@ -17,33 +17,33 @@ local M = {}
 ---@param bufnr integer
 ---@return boolean
 function M.is(bufnr)
-	local defaults = require("mdview.config").defaults
+  local defaults = require("mdview.config").defaults
 
-	local ok_bt, buftype = pcall(safe_buf_get_option, bufnr, "buftype")
-	buftype = ok_bt and buftype or ""
-	if buftype ~= "" then
-		-- excludes terminal, help, quickfix, nofile/scratch, prompt, …
-		return false
-	end
+  local ok_bt, buftype = pcall(safe_buf_get_option, bufnr, "buftype")
+  buftype = ok_bt and buftype or ""
+  if buftype ~= "" then
+    -- excludes terminal, help, quickfix, nofile/scratch, prompt, …
+    return false
+  end
 
-	local ok_name, name = pcall(api.nvim_buf_get_name, bufnr)
-	name = ok_name and name or ""
-	if name == "" or name == defaults.log_buffer_name then
-		return false
-	end
+  local ok_name, name = pcall(api.nvim_buf_get_name, bufnr)
+  name = ok_name and name or ""
+  if name == "" or name == defaults.log_buffer_name then
+    return false
+  end
 
-	local ok_bin, binary = pcall(safe_buf_get_option, bufnr, "binary")
-	if ok_bin and binary then
-		return false
-	end
+  local ok_bin, binary = pcall(safe_buf_get_option, bufnr, "binary")
+  if ok_bin and binary then
+    return false
+  end
 
-	if defaults.experimental and defaults.experimental.any_file == true then
-		return true
-	end
+  if defaults.experimental and defaults.experimental.any_file == true then
+    return true
+  end
 
-	local ok_ft, ft = pcall(safe_buf_get_option, bufnr, "filetype")
-	ft = ok_ft and ft or ""
-	return ft == "markdown" or ft == "md"
+  local ok_ft, ft = pcall(safe_buf_get_option, bufnr, "filetype")
+  ft = ok_ft and ft or ""
+  return ft == "markdown" or ft == "md"
 end
 
 return M

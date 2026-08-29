@@ -36,84 +36,84 @@ M._opened = {}
 ---@param bufnr integer
 ---@return string|nil # normalized path, or nil if not an eligible buffer
 local function eligible_path(bufnr)
-	if not previewable.is(bufnr) then
-		return nil
-	end
-	local name = api.nvim_buf_get_name(bufnr)
-	if name == "" then
-		return nil
-	end
-	return normalize.path(name)
+  if not previewable.is(bufnr) then
+    return nil
+  end
+  local name = api.nvim_buf_get_name(bufnr)
+  if name == "" then
+    return nil
+  end
+  return normalize.path(name)
 end
 
 ---@internal
 ---@param bufnr integer
 ---@return nil
 local function on_switch(bufnr)
-	-- Only relevant while a browser session is running. In tab-preview mode the
-	-- nvim tab already follows the buffer via its own sync, so skip entirely.
-	if not state.get_server() then
-		return
-	end
-	if defaults.open_preview_tab then
-		return
-	end
+  -- Only relevant while a browser session is running. In tab-preview mode the
+  -- nvim tab already follows the buffer via its own sync, so skip entirely.
+  if not state.get_server() then
+    return
+  end
+  if defaults.open_preview_tab then
+    return
+  end
 
-	local path = eligible_path(bufnr)
-	if not path then
-		return
-	end
-	if M._last == path then
-		return -- same buffer as last time (BufEnter fires on window focus too)
-	end
-	M._last = path
+  local path = eligible_path(bufnr)
+  if not path then
+    return
+  end
+  if M._last == path then
+    return -- same buffer as last time (BufEnter fires on window focus too)
+  end
+  M._last = path
 
-	local behavior = require("mdview.config.browser").defaults.behavior or "reuse"
-	if behavior == "manual" then
-		return
-	end
+  local behavior = require("mdview.config.browser").defaults.behavior or "reuse"
+  if behavior == "manual" then
+    return
+  end
 
-	if behavior == "reuse" then
-		local preview_key = state.get_preview_key()
-		if type(preview_key) ~= "string" or preview_key == "" then
-			return -- no tab open to follow
-		end
-		-- Push this buffer's content into the open tab's room so it switches to
-		-- the newly-focused file (even without an edit to trigger live_push).
-		ws_client.wait_ready(function(ok)
-			if not ok then
-				return
-			end
-			local lines = api.nvim_buf_get_lines(bufnr, 0, -1, false) or {}
-			-- A buffer switch is a whole-document change of the previewed room,
-			-- so force a full snapshot rather than diffing against the previous
-			-- buffer's content (which would be a large, pointless diff).
-			ws_client.send_content(preview_key, lines, { full = true })
-			log.debug("reuse: pushed " .. path .. " to preview room " .. preview_key, nil, "bufswitch", true)
-		end, ws_client.WAIT_READY_TIMEOUT)
-		return
-	end
+  if behavior == "reuse" then
+    local preview_key = state.get_preview_key()
+    if type(preview_key) ~= "string" or preview_key == "" then
+      return -- no tab open to follow
+    end
+    -- Push this buffer's content into the open tab's room so it switches to
+    -- the newly-focused file (even without an edit to trigger live_push).
+    ws_client.wait_ready(function(ok)
+      if not ok then
+        return
+      end
+      local lines = api.nvim_buf_get_lines(bufnr, 0, -1, false) or {}
+      -- A buffer switch is a whole-document change of the previewed room,
+      -- so force a full snapshot rather than diffing against the previous
+      -- buffer's content (which would be a large, pointless diff).
+      ws_client.send_content(preview_key, lines, { full = true })
+      log.debug("reuse: pushed " .. path .. " to preview room " .. preview_key, nil, "bufswitch", true)
+    end, ws_client.WAIT_READY_TIMEOUT)
+    return
+  end
 
-	if behavior == "new_tab" then
-		-- Respect the user's autostart preference; if they don't want tabs
-		-- opened automatically, don't spawn new ones on buffer switch either.
-		if not require("mdview.config.browser").defaults.browser_autostart then
-			return
-		end
-		if M._opened[path] then
-			return
-		end
-		M._opened[path] = true
-		-- open() previews the *current* buffer; BufEnter has already made this
-		-- buffer current, so this opens a tab for `path` — but only if it's
-		-- still current by the time the scheduled callback runs.
-		vim.schedule(function()
-			if not api.nvim_buf_is_valid(bufnr) or api.nvim_get_current_buf() ~= bufnr then
-				return
-			end
-			require("mdview").open()
-		end)
-	end
+  if behavior == "new_tab" then
+    -- Respect the user's autostart preference; if they don't want tabs
+    -- opened automatically, don't spawn new ones on buffer switch either.
+    if not require("mdview.config.browser").defaults.browser_autostart then
+      return
+    end
+    if M._opened[path] then
+      return
+    end
+    M._opened[path] = true
+    -- open() previews the *current* buffer; BufEnter has already made this
+    -- buffer current, so this opens a tab for `path` — but only if it's
+    -- still current by the time the scheduled callback runs.
+    vim.schedule(function()
+      if not api.nvim_buf_is_valid(bufnr) or api.nvim_get_current_buf() ~= bufnr then
+        return
+      end
+      require("mdview").open()
+    end)
+  end
 end
 
 -- Reset per-session dedup state. Called on attach so a new :MDViewStart starts
@@ -121,25 +121,25 @@ end
 -- switch.
 ---@return nil
 function M.reset()
-	M._last = nil
-	M._opened = {}
+  M._last = nil
+  M._opened = {}
 end
 
 --- Setup the BufEnter behavior dispatch in the given augroup.
 ---@param group integer|nil
 function M.attach(group)
-	M.reset()
-	local opts = {
-		desc = "[mdview] Apply browser.behavior on markdown buffer switch",
-		pattern = defaults.ft_pattern,
-	}
-	if group then
-		opts.group = group
-	end
-	local id = autocmd.create("BufEnter", function(args)
-		on_switch(args.buf)
-	end, opts)
-	autocmd_registry.register(group, id)
+  M.reset()
+  local opts = {
+    desc = "[mdview] Apply browser.behavior on markdown buffer switch",
+    pattern = defaults.ft_pattern,
+  }
+  if group then
+    opts.group = group
+  end
+  local id = autocmd.create("BufEnter", function(args)
+    on_switch(args.buf)
+  end, opts)
+  autocmd_registry.register(group, id)
 end
 
 return M

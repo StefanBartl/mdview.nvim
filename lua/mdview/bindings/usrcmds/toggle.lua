@@ -12,15 +12,15 @@ local M = {}
 
 --- @param fargs string[]  # tokens after the "toggle" subcommand (same shape start.run expects)
 function M.run(fargs)
-	if state.get_server() then
-		-- A session is live — stop it. Any start-style args are irrelevant
-		-- when stopping, so they're ignored (mirrors :MDView stop).
-		stop.run()
-		return
-	end
-	-- No session — start one, forwarding any file/cwd args verbatim so
-	-- `:MDView toggle file.md cwd=...` behaves exactly like :MDView start.
-	start.run(fargs)
+  if state.get_server() then
+    -- A session is live — stop it. Any start-style args are irrelevant
+    -- when stopping, so they're ignored (mirrors :MDView stop).
+    stop.run()
+    return
+  end
+  -- No session — start one, forwarding any file/cwd args verbatim so
+  -- `:MDView toggle file.md cwd=...` behaves exactly like :MDView start.
+  start.run(fargs)
 end
 
 return M

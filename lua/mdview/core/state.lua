@@ -7,17 +7,17 @@ local M = {}
 
 ---@type mdview.core.state.web
 local web_state = {
-	attached = false,
-	browser = nil,
-	server = nil,
+  attached = false,
+  browser = nil,
+  server = nil,
 }
 
 ---@type mdview.core.state.runner
 M.runner = {
-	proc = nil,
-	is_running = nil,
-	server_job = nil,
-	token = nil,
+  proc = nil,
+  is_running = nil,
+  server_job = nil,
+  token = nil,
 }
 
 -- Helper ------------------------------------------------------------
@@ -25,9 +25,9 @@ M.runner = {
 -- EmmyLua enum
 ---@enum mdview.core.state.WebKey
 local WebKey = {
-	attached = "attached",
-	browser = "browser",
-	server = "server",
+  attached = "attached",
+  browser = "browser",
+  server = "server",
 }
 
 -- expose the enum/table for callers who prefer constants instead of raw strings
@@ -43,17 +43,17 @@ local has_lib_dict_clone = ok_lib_tables and type(lib_tables.dict_clone) == "fun
 ---@param t table
 ---@return table
 local function shallow_copy(t)
-	if type(t) ~= "table" then
-		return t
-	end
-	if has_lib_dict_clone then
-		return lib_tables.dict_clone(t)
-	end
-	local out = {}
-	for k, v in pairs(t) do
-		out[k] = v
-	end
-	return out
+  if type(t) ~= "table" then
+    return t
+  end
+  if has_lib_dict_clone then
+    return lib_tables.dict_clone(t)
+  end
+  local out = {}
+  for k, v in pairs(t) do
+    out[k] = v
+  end
+  return out
 end
 
 -- validate a key is one of the allowed enum members
@@ -61,7 +61,7 @@ end
 ---@param k string
 ---@return boolean
 local function is_valid_key(k)
-	return k == WebKey.attached or k == WebKey.browser or k == WebKey.server
+  return k == WebKey.attached or k == WebKey.browser or k == WebKey.server
 end
 
 -- Web API  ----------------
@@ -71,11 +71,11 @@ end
 --- @param key mdview.core.state.WebKey
 --- @return any
 function M.get_entry(key)
-	if not is_valid_key(key) then
-		error("get_entry: invalid key (expected one of 'attached','browser','server')", 2)
-	end
-	-- return the raw value (not a copy) for handles, and a primitive for booleans
-	return web_state[key]
+  if not is_valid_key(key) then
+    error("get_entry: invalid key (expected one of 'attached','browser','server')", 2)
+  end
+  -- return the raw value (not a copy) for handles, and a primitive for booleans
+  return web_state[key]
 end
 
 --- Set a specific web key to a new value and return the previous value.
@@ -85,37 +85,37 @@ end
 --- @param val any
 --- @return any previous_value
 function M.set_web_entry(key, val)
-	if not is_valid_key(key) then
-		error("set_entry: invalid key (expected one of 'attached','browser','server')", 2)
-	end
+  if not is_valid_key(key) then
+    error("set_entry: invalid key (expected one of 'attached','browser','server')", 2)
+  end
 
-	-- Validate 'attached' must be boolean
-	if key == WebKey.attached and type(val) ~= "boolean" then
-		error("set_entry: 'attached' must be boolean", 2)
-	end
+  -- Validate 'attached' must be boolean
+  if key == WebKey.attached and type(val) ~= "boolean" then
+    error("set_entry: 'attached' must be boolean", 2)
+  end
 
-	local prev = web_state[key]
-	web_state[key] = val
-	return prev
+  local prev = web_state[key]
+  web_state[key] = val
+  return prev
 end
 
 --- Clear (set to nil) the given web entry and return previous value.
 --- @param key mdview.core.state.WebKey
 --- @return any previous_value
 function M.clear_web_entry(key)
-	if not is_valid_key(key) then
-		error("clear_entry: invalid key (expected one of 'attached','browser','server')", 2)
-	end
-	local prev = web_state[key]
-	web_state[key] = nil
-	return prev
+  if not is_valid_key(key) then
+    error("clear_entry: invalid key (expected one of 'attached','browser','server')", 2)
+  end
+  local prev = web_state[key]
+  web_state[key] = nil
+  return prev
 end
 
 -- Return a defensive copy of the web state.
 -- Return a shallow copy to discourage direct mutation by callers.
 --- @return mdview.core.state.web
 function M.get_web()
-	return shallow_copy(web_state)
+  return shallow_copy(web_state)
 end
 
 -- Replace the entire web state with the provided table (validated).
@@ -123,22 +123,22 @@ end
 --- @param t table
 --- @return mdview.core.state.web current state after merge
 function M.set_web(t)
-	if type(t) ~= "table" then
-		error("set_web expects a table", 2)
-	end
-	if t.attached ~= nil then
-		if type(t.attached) ~= "boolean" then
-			error("web.attached must be boolean", 2)
-		end
-		web_state.attached = t.attached
-	end
-	if t.browser ~= nil then
-		web_state.browser = t.browser
-	end
-	if t.server ~= nil then
-		web_state.server = t.server
-	end
-	return shallow_copy(web_state)
+  if type(t) ~= "table" then
+    error("set_web expects a table", 2)
+  end
+  if t.attached ~= nil then
+    if type(t.attached) ~= "boolean" then
+      error("web.attached must be boolean", 2)
+    end
+    web_state.attached = t.attached
+  end
+  if t.browser ~= nil then
+    web_state.browser = t.browser
+  end
+  if t.server ~= nil then
+    web_state.server = t.server
+  end
+  return shallow_copy(web_state)
 end
 
 -- Atomically update the web state using a callback.
@@ -152,91 +152,91 @@ end
 --- @return mdview.core.state.web current_state state after update
 --- @return string|nil err set when the callback raised an error
 function M.update_web(fn)
-	if type(fn) ~= "function" then
-		error("update_web expects a function", 2)
-	end
-	local snapshot = shallow_copy(web_state)
-	local ok, res = pcall(fn, snapshot)
-	if not ok then
-		return shallow_copy(web_state), "update_web callback failed: " .. tostring(res)
-	end
-	if type(res) == "table" then
-		return M.set_web(res), nil
-	end
-	return shallow_copy(web_state), nil
+  if type(fn) ~= "function" then
+    error("update_web expects a function", 2)
+  end
+  local snapshot = shallow_copy(web_state)
+  local ok, res = pcall(fn, snapshot)
+  if not ok then
+    return shallow_copy(web_state), "update_web callback failed: " .. tostring(res)
+  end
+  if type(res) == "table" then
+    return M.set_web(res), nil
+  end
+  return shallow_copy(web_state), nil
 end
 
 --- @return boolean
 function M.is_attached()
-	return web_state.attached == true
+  return web_state.attached == true
 end
 
 -- Set attached flag. Returns previous value.
 --- @param val boolean
 --- @return boolean previous
 function M.set_attached(val)
-	if type(val) ~= "boolean" then
-		error("set_attached expects boolean", 2)
-	end
-	local prev = web_state.attached
-	web_state.attached = val
-	return prev
+  if type(val) ~= "boolean" then
+    error("set_attached expects boolean", 2)
+  end
+  local prev = web_state.attached
+  web_state.attached = val
+  return prev
 end
 
 -- Get current browser handle (may be nil).
 --- @return any
 function M.get_browser()
-	return web_state.browser
+  return web_state.browser
 end
 
 -- Set browser handle: Returns previous handle.
 --- @param handle any
 --- @return any previous
 function M.set_browser(handle)
-	local prev = web_state.browser
-	web_state.browser = handle
-	return prev
+  local prev = web_state.browser
+  web_state.browser = handle
+  return prev
 end
 
 -- Clear browser handle (set to nil). Returns previous handle.
 --- @return any previous
 function M.clear_browser()
-	local prev = web_state.browser
-	web_state.browser = nil
-	return prev
+  local prev = web_state.browser
+  web_state.browser = nil
+  return prev
 end
 
 -- Get current server/runner handle (may be nil).
 --- @return any
 function M.get_server()
-	return web_state.server
+  return web_state.server
 end
 
 -- Set server handle (opaque). Returns previous handle.
 --- @param handle any
 --- @return any previous
 function M.set_server(handle)
-	local prev = web_state.server
-	web_state.server = handle
-	return prev
+  local prev = web_state.server
+  web_state.server = handle
+  return prev
 end
 
 -- Clear server handle (set to nil). Returns previous handle.
 --- @return any previous
 function M.clear_server()
-	local prev = web_state.server
-	web_state.server = nil
-	return prev
+  local prev = web_state.server
+  web_state.server = nil
+  return prev
 end
 
 -- Reset web_state to initial values and return previous snapshot.
 --- @return mdview.core.state.web previous_state
 function M.reset_web()
-	local prev = shallow_copy(web_state)
-	web_state.attached = false
-	web_state.browser = nil
-	web_state.server = nil
-	return prev
+  local prev = shallow_copy(web_state)
+  web_state.attached = false
+  web_state.browser = nil
+  web_state.server = nil
+  return prev
 end
 
 -- Runner API  ----------------
@@ -248,19 +248,19 @@ end
 ---@return any proc the started (or already-running) process handle, or nil on failure
 ---@return string|nil err set when resolving the command/args failed
 function M.ensure_proc_started(cwd_override)
-	local runner = require("mdview.adapter.runner")
+  local runner = require("mdview.adapter.runner")
 
-	-- spawn server process if not already running via runner API
-	if M.proc_is_running() then
-		return M.get_proc(), nil
-	end
+  -- spawn server process if not already running via runner API
+  if M.proc_is_running() then
+    return M.get_proc(), nil
+  end
 
-	local cmd, args, cwd, err = require("mdview.adapter.server_args").resolve(cwd_override)
-	if not cmd then
-		return nil, tostring(err)
-	end
+  local cmd, args, cwd, err = require("mdview.adapter.server_args").resolve(cwd_override)
+  if not cmd then
+    return nil, tostring(err)
+  end
 
-	return runner.start_server(cmd, args, cwd), nil
+  return runner.start_server(cmd, args, cwd), nil
 end
 
 --- Set the shared session token used to authenticate /update and /ws
@@ -268,15 +268,15 @@ end
 ---@param token string|nil
 ---@return string|nil previous
 function M.set_token(token)
-	local prev = M.runner.token
-	M.runner.token = token
-	return prev
+  local prev = M.runner.token
+  M.runner.token = token
+  return prev
 end
 
 --- Get the current shared session token (may be nil if no server started yet).
 ---@return string|nil
 function M.get_token()
-	return M.runner.token
+  return M.runner.token
 end
 
 -- The relay room key (normalized path) the currently-visible browser tab is
@@ -290,13 +290,13 @@ M.runner.preview_key = nil
 ---@param key string|nil
 ---@return nil
 function M.set_preview_key(key)
-	M.runner.preview_key = key
+  M.runner.preview_key = key
 end
 
 --- Get the room key the visible browser tab is bound to, or nil.
 ---@return string|nil
 function M.get_preview_key()
-	return M.runner.preview_key
+  return M.runner.preview_key
 end
 
 --- Returns whether the server process is running (handle exists and is not
@@ -304,60 +304,60 @@ end
 --- lives in `M.runner.proc`, see M.set_proc), so it always returned false.
 ---@return boolean
 function M.proc_is_running()
-	local proc = M.runner.proc
-	if not proc or not proc.handle then
-		return false
-	end
-	local ok, closing = pcall(function()
-		return proc.handle:is_closing()
-	end)
-	return ok and not closing
+  local proc = M.runner.proc
+  if not proc or not proc.handle then
+    return false
+  end
+  local ok, closing = pcall(function()
+    return proc.handle:is_closing()
+  end)
+  return ok and not closing
 end
 
 --- Get the current proc handle (may be nil).
 --- @return any|nil
 function M.get_proc()
-	return M.runner.proc
+  return M.runner.proc
 end
 
 --- Set the proc handle; returns previous handle.
 --- @param h any
 --- @return any previous
 function M.set_proc(h)
-	local prev = M.runner.proc
-	M.runner.proc = h
-	return prev
+  local prev = M.runner.proc
+  M.runner.proc = h
+  return prev
 end
 
 --- Clear the proc handle and return previous value.
 --- @return any previous
 function M.clear_proc()
-	local prev = M.runner.proc
-	M.runner.proc = nil
-	return prev
+  local prev = M.runner.proc
+  M.runner.proc = nil
+  return prev
 end
 
 --- Get the current server_job handle/metadata (may be nil).
 --- @return any|nil
 function M.get_server_job()
-	return M.runner.server_job
+  return M.runner.server_job
 end
 
 --- Set the server_job handle/metadata; returns previous value.
 --- @param j any
 --- @return any previous
 function M.set_server_job(j)
-	local prev = M.runner.server_job
-	M.runner.server_job = j
-	return prev
+  local prev = M.runner.server_job
+  M.runner.server_job = j
+  return prev
 end
 
 --- Clear the server_job entry and return previous value.
 --- @return any previous
 function M.clear_server_job()
-	local prev = M.runner.server_job
-	M.runner.server_job = nil
-	return prev
+  local prev = M.runner.server_job
+  M.runner.server_job = nil
+  return prev
 end
 
 return M

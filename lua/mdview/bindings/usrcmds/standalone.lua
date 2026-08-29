@@ -53,31 +53,31 @@ local watch_support_cache = {}
 ---@param bin string
 ---@param cb fun(supported: boolean)
 local function supports_watch(bin, cb)
-	local cached = watch_support_cache[bin]
-	if cached ~= nil then
-		cb(cached)
-		return
-	end
+  local cached = watch_support_cache[bin]
+  if cached ~= nil then
+    cb(cached)
+    return
+  end
 
-	local function record(out)
-		local supported = type(out) == "string" and out:find("-watch", 1, true) ~= nil
-		watch_support_cache[bin] = supported
-		cb(supported)
-	end
+  local function record(out)
+    local supported = type(out) == "string" and out:find("-watch", 1, true) ~= nil
+    watch_support_cache[bin] = supported
+    cb(supported)
+  end
 
-	if not vim.system then
-		record(vim.fn.system({ bin, "--mdview-capability-probe" }))
-		return
-	end
+  if not vim.system then
+    record(vim.fn.system({ bin, "--mdview-capability-probe" }))
+    return
+  end
 
-	vim.system({ bin, "--mdview-capability-probe" }, { text = true }, function(res)
-		-- Go's flag package writes the usage listing to stderr; keep both
-		-- streams so the probe works regardless of where it lands.
-		local out = (res.stdout or "") .. (res.stderr or "")
-		vim.schedule(function()
-			record(out)
-		end)
-	end)
+  vim.system({ bin, "--mdview-capability-probe" }, { text = true }, function(res)
+    -- Go's flag package writes the usage listing to stderr; keep both
+    -- streams so the probe works regardless of where it lands.
+    local out = (res.stdout or "") .. (res.stderr or "")
+    vim.schedule(function()
+      record(out)
+    end)
+  end)
 end
 
 --- The relay binary to use for standalone mode, in precedence order: an explicit
@@ -87,20 +87,20 @@ end
 ---@internal
 ---@return string|nil path, string|nil err
 local function resolve_binary()
-	local cfg = require("mdview.config").defaults.standalone or {}
-	local override = cfg.binary_path
-	if type(override) == "string" and override ~= "" then
-		local path = vim.fn.expand(override)
-		if vim.fn.executable(path) ~= 1 then
-			return nil, "standalone.binary_path is not executable: " .. path
-		end
-		return path, nil
-	end
-	local built = require("mdview.adapter.server_args").local_built_binary()
-	if built then
-		return built, nil
-	end
-	return install.ensure_binary()
+  local cfg = require("mdview.config").defaults.standalone or {}
+  local override = cfg.binary_path
+  if type(override) == "string" and override ~= "" then
+    local path = vim.fn.expand(override)
+    if vim.fn.executable(path) ~= 1 then
+      return nil, "standalone.binary_path is not executable: " .. path
+    end
+    return path, nil
+  end
+  local built = require("mdview.adapter.server_args").local_built_binary()
+  if built then
+    return built, nil
+  end
+  return install.ensure_binary()
 end
 
 --- Start the relay in standalone watch mode for `file` (default: the current
@@ -111,115 +111,110 @@ end
 ---@param file_arg string|nil # path from the route's `file` arg
 ---@param no_browser boolean|nil # true when --no-browser was passed
 function M.run(file_arg, no_browser)
-	local target, err = detached.resolve_target(file_arg)
-	if not target then
-		notify("[mdview] standalone: " .. tostring(err), vim.log.levels.ERROR)
-		return
-	end
+  local target, err = detached.resolve_target(file_arg)
+  if not target then
+    notify("[mdview] standalone: " .. tostring(err), vim.log.levels.ERROR)
+    return
+  end
 
-	-- Standalone previews the file as it is *on disk*. Warning here rather than
-	-- silently previewing stale content is the honest thing: the user asked for
-	-- this file and would otherwise wonder why their edits don't show up.
-	if vim.bo.modified and vim.fn.fnamemodify(vim.api.nvim_buf_get_name(0), ":p") == target then
-		notify(
-			"[mdview] standalone previews the file on disk — unsaved changes in this buffer won't appear until you :write",
-			vim.log.levels.WARN
-		)
-	end
+  -- Standalone previews the file as it is *on disk*. Warning here rather than
+  -- silently previewing stale content is the honest thing: the user asked for
+  -- this file and would otherwise wonder why their edits don't show up.
+  if vim.bo.modified and vim.fn.fnamemodify(vim.api.nvim_buf_get_name(0), ":p") == target then
+    notify(
+      "[mdview] standalone previews the file on disk — unsaved changes in this buffer won't appear until you :write",
+      vim.log.levels.WARN
+    )
+  end
 
-	local bin, bin_err = resolve_binary()
-	if not bin then
-		notify("[mdview] standalone: " .. tostring(bin_err), vim.log.levels.ERROR)
-		return
-	end
+  local bin, bin_err = resolve_binary()
+  if not bin then
+    notify("[mdview] standalone: " .. tostring(bin_err), vim.log.levels.ERROR)
+    return
+  end
 
-	-- The capability probe is asynchronous now, so everything that depends on
-	-- its verdict moved into this continuation. Nothing else changed about the
-	-- ordering: probe first, bail out on an old binary, otherwise carry on.
-	supports_watch(bin, function(supported)
-		if not supported then
-			notify(
-				("[mdview] standalone: this relay binary has no --watch support.\n%s\nIt needs mdview-server v0.3.0+. Either bump install.version, or point standalone.binary_path at a newer/locally built relay."):format(
-					bin
-				),
-				vim.log.levels.ERROR
-			)
-			return
-		end
+  -- The capability probe is asynchronous now, so everything that depends on
+  -- its verdict moved into this continuation. Nothing else changed about the
+  -- ordering: probe first, bail out on an old binary, otherwise carry on.
+  supports_watch(bin, function(supported)
+    if not supported then
+      notify(
+        ("[mdview] standalone: this relay binary has no --watch support.\n%s\nIt needs mdview-server v0.3.0+. Either bump install.version, or point standalone.binary_path at a newer/locally built relay."):format(
+          bin
+        ),
+        vim.log.levels.ERROR
+      )
+      return
+    end
 
-		local web_root, web_err = install.ensure_client_bundle()
-		if not web_root then
-			notify("[mdview] standalone: " .. tostring(web_err), vim.log.levels.ERROR)
-			return
-		end
+    local web_root, web_err = install.ensure_client_bundle()
+    if not web_root then
+      notify("[mdview] standalone: " .. tostring(web_err), vim.log.levels.ERROR)
+      return
+    end
 
-		local defaults = require("mdview.config").defaults
-		local browser_defaults = require("mdview.config.browser").defaults
+    local defaults = require("mdview.config").defaults
+    local browser_defaults = require("mdview.config.browser").defaults
 
-		-- Generate the token here rather than letting the relay mint its own: a
-		-- detached process's stdout goes nowhere, so if the relay chose the token we
-		-- could never tell the user the preview URL. That matters for --no-browser,
-		-- whose whole point is opening the preview yourself (or from another device).
-		local token = require("mdview.helper.gen_token")()
-		local port = (defaults.server_port or 43219) + 100
-		local theme = tostring(browser_defaults.theme or "github")
-		local highlighter = tostring(browser_defaults.highlighter or "hljs")
+    -- Generate the token here rather than letting the relay mint its own: a
+    -- detached process's stdout goes nowhere, so if the relay chose the token we
+    -- could never tell the user the preview URL. That matters for --no-browser,
+    -- whose whole point is opening the preview yourself (or from another device).
+    local token = require("mdview.helper.gen_token")()
+    local port = (defaults.server_port or 43219) + 100
+    local theme = tostring(browser_defaults.theme or "github")
+    local highlighter = tostring(browser_defaults.highlighter or "hljs")
 
-		local args = {
-			"--watch",
-			target,
-			"--token",
-			token,
-			"--web-root",
-			web_root,
-			-- Offset well clear of both server_port and dev_server_port
-			-- (server_port + 1 by default): a standalone preview is meant to sit
-			-- alongside a normal session, so it must not compete for the relay's
-			-- port, nor land on the Vite dev port during development. The relay's
-			-- FindFreePort still walks upward from here if this one is taken.
-			"--port",
-			tostring(port),
-			"--theme",
-			theme,
-			"--hl",
-			highlighter,
-		}
-		if no_browser then
-			args[#args + 1] = "--open=false"
-		end
+    local args = {
+      "--watch",
+      target,
+      "--token",
+      token,
+      "--web-root",
+      web_root,
+      -- Offset well clear of both server_port and dev_server_port
+      -- (server_port + 1 by default): a standalone preview is meant to sit
+      -- alongside a normal session, so it must not compete for the relay's
+      -- port, nor land on the Vite dev port during development. The relay's
+      -- FindFreePort still walks upward from here if this one is taken.
+      "--port",
+      tostring(port),
+      "--theme",
+      theme,
+      "--hl",
+      highlighter,
+    }
+    if no_browser then
+      args[#args + 1] = "--open=false"
+    end
 
-		local pid, spawn_err = detached.spawn(bin, args, vim.fn.fnamemodify(target, ":h"))
-		if not pid then
-			notify("[mdview] standalone: failed to spawn relay: " .. tostring(spawn_err), vim.log.levels.ERROR)
-			return
-		end
+    local pid, spawn_err = detached.spawn(bin, args, vim.fn.fnamemodify(target, ":h"))
+    if not pid then
+      notify("[mdview] standalone: failed to spawn relay: " .. tostring(spawn_err), vim.log.levels.ERROR)
+      return
+    end
 
-		local url = ("http://localhost:%d/?key=%s&token=%s&theme=%s&hl=%s"):format(
-			port,
-			require("mdview.helper.normalize").path_for_url(target),
-			vim.uri_encode(token),
-			vim.uri_encode(theme),
-			vim.uri_encode(highlighter)
-		)
+    local url = ("http://localhost:%d/?key=%s&token=%s&theme=%s&hl=%s"):format(
+      port,
+      require("mdview.helper.normalize").path_for_url(target),
+      vim.uri_encode(token),
+      vim.uri_encode(theme),
+      vim.uri_encode(highlighter)
+    )
 
-		log.debug(
-			("standalone: spawned pid %d for %s at %s"):format(pid, target, url),
-			nil,
-			"usercmds.standalone",
-			true
-		)
+    log.debug(("standalone: spawned pid %d for %s at %s"):format(pid, target, url), nil, "usercmds.standalone", true)
 
-		local msg = ("[mdview] standalone preview started (pid %d) for %s\nNo Neovim involved — it follows the file on disk. Stop it by killing the pid."):format(
-			pid,
-			vim.fn.fnamemodify(target, ":t")
-		)
-		if no_browser then
-			-- Nothing opened a tab, so the URL is the only way in. Port is the
-			-- requested one; the relay walks upward if it was taken.
-			msg = msg .. ("\nOpen: %s\n(if port %d was taken, the relay picked the next free one)"):format(url, port)
-		end
-		notify(msg, vim.log.levels.INFO)
-	end)
+    local msg = ("[mdview] standalone preview started (pid %d) for %s\nNo Neovim involved — it follows the file on disk. Stop it by killing the pid."):format(
+      pid,
+      vim.fn.fnamemodify(target, ":t")
+    )
+    if no_browser then
+      -- Nothing opened a tab, so the URL is the only way in. Port is the
+      -- requested one; the relay walks upward if it was taken.
+      msg = msg .. ("\nOpen: %s\n(if port %d was taken, the relay picked the next free one)"):format(url, port)
+    end
+    notify(msg, vim.log.levels.INFO)
+  end)
 end
 
 return M

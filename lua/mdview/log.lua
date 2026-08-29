@@ -18,17 +18,17 @@ local M = {}
 --- file = false   -> no persistent JSONL by default (the ring is dumped into
 ---                   the :MDViewDiagnose report instead)
 M.instance = logger.new({
-	name = "mdview",
-	level = "trace",
-	notify_level = vim.log.levels.OFF,
-	file = false,
-	history = 500,
+  name = "mdview",
+  level = "trace",
+  notify_level = vim.log.levels.OFF,
+  file = false,
+  history = 500,
 })
 
 --- Snapshot of the in-memory ring (array of records), most recent last.
 ---@return table[]
 function M.snapshot()
-	return M.instance.snapshot()
+  return M.instance.snapshot()
 end
 
 return M

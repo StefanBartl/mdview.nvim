@@ -8,10 +8,10 @@ math.randomseed(vim.uv.hrtime())
 
 ---@return string
 return function()
-	local parts = {
-		tostring(math.random(0, 0x7fffffff)),
-		tostring(math.random(0, 0x7fffffff)),
-		tostring(vim.uv.hrtime()),
-	}
-	return vim.fn.sha256(table.concat(parts, "-"))
+  local parts = {
+    tostring(math.random(0, 0x7fffffff)),
+    tostring(math.random(0, 0x7fffffff)),
+    tostring(vim.uv.hrtime()),
+  }
+  return vim.fn.sha256(table.concat(parts, "-"))
 end

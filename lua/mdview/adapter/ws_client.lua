@@ -27,27 +27,27 @@ local DEFAULT_PORT = 43219
 --- link all want more of every one of them.
 ---@return { health_poll_ms: integer, health_timeout_ms: integer, max_retries: integer, base_retry_ms: integer }
 local function transport()
-	local defaults = {
-		health_poll_ms = 200,
-		health_timeout_ms = 10000,
-		max_retries = 5,
-		base_retry_ms = 150,
-	}
-	local ok, config = pcall(require, "mdview.config")
-	if not ok then
-		return defaults
-	end
-	local cfg = (type(config.get) == "function" and config.get() or config.options or {})
-	local t = cfg.transport
-	if type(t) ~= "table" then
-		return defaults
-	end
-	local out = {}
-	for key, fallback in pairs(defaults) do
-		local n = t[key]
-		out[key] = (type(n) == "number" and n > 0) and n or fallback
-	end
-	return out
+  local defaults = {
+    health_poll_ms = 200,
+    health_timeout_ms = 10000,
+    max_retries = 5,
+    base_retry_ms = 150,
+  }
+  local ok, config = pcall(require, "mdview.config")
+  if not ok then
+    return defaults
+  end
+  local cfg = (type(config.get) == "function" and config.get() or config.options or {})
+  local t = cfg.transport
+  if type(t) ~= "table" then
+    return defaults
+  end
+  local out = {}
+  for key, fallback in pairs(defaults) do
+    local n = t[key]
+    out[key] = (type(n) == "number" and n > 0) and n or fallback
+  end
+  return out
 end
 -- Per-call readiness wait (used by the launcher). 15s, not the old 2s: a
 -- freshly built or first-run relay binary can take several seconds to bind
@@ -73,7 +73,7 @@ M._ready = false
 --- performs a real /health round trip instead of short-circuiting.
 ---@return nil
 function M.reset_ready()
-	M._ready = false
+  M._ready = false
 end
 
 -- simple helper to construct /health URL
@@ -81,7 +81,7 @@ end
 ---@param port integer
 ---@return string
 local function health_url(port)
-	return string.format("http://localhost:%d/health", port)
+  return string.format("http://localhost:%d/health", port)
 end
 
 -- Non-blocking curl GET fallback
@@ -90,22 +90,22 @@ end
 ---@param cb fun(code:integer)
 ---@return nil
 local function http_get(url, cb)
-	local curl = fn.executable("curl") == 1 and "curl" or nil
-	if curl then
-		fn.jobstart({ curl, "-sS", url }, {
-			stdout_buffered = true,
-			stderr_buffered = true,
-			on_exit = function(_, code, _)
-				cb(code)
-			end,
-		})
-	else
-		-- fallback: blocking system call (Windows may fail if sh not available)
-		local ok, _ = pcall(function()
-			fn.system("curl -sS " .. url)
-		end)
-		cb(ok and 0 or 1)
-	end
+  local curl = fn.executable("curl") == 1 and "curl" or nil
+  if curl then
+    fn.jobstart({ curl, "-sS", url }, {
+      stdout_buffered = true,
+      stderr_buffered = true,
+      on_exit = function(_, code, _)
+        cb(code)
+      end,
+    })
+  else
+    -- fallback: blocking system call (Windows may fail if sh not available)
+    local ok, _ = pcall(function()
+      fn.system("curl -sS " .. url)
+    end)
+    cb(ok and 0 or 1)
+  end
 end
 
 --- Wait until server responds on /health or timeout, then call cb(true) /
@@ -114,62 +114,58 @@ end
 ---@param cb fun(ok:boolean)
 ---@param timeout_ms integer|nil
 function M.wait_ready(cb, timeout_ms)
-	cb = cb or function() end
+  cb = cb or function() end
 
-	if M._ready then
-		cb(true)
-		return
-	end
+  if M._ready then
+    cb(true)
+    return
+  end
 
-	local tcfg = transport()
-	local timeout = timeout_ms or tcfg.health_timeout_ms
-	---@diagnostic disable-next-line LSP-Problems with lib.uv
-	local start_time = uv.now()
-	local attempt = 0
+  local tcfg = transport()
+  local timeout = timeout_ms or tcfg.health_timeout_ms
+  ---@diagnostic disable-next-line LSP-Problems with lib.uv
+  local start_time = uv.now()
+  local attempt = 0
 
-	---@internal
-	---@return nil
-	local function poll()
-		attempt = attempt + 1
-		local port = vim.g.mdview_server_port or DEFAULT_PORT
-		local url = health_url(port)
+  ---@internal
+  ---@return nil
+  local function poll()
+    attempt = attempt + 1
+    local port = vim.g.mdview_server_port or DEFAULT_PORT
+    local url = health_url(port)
 
-		http_get(url, function(code)
-			if code == 0 then
-				M._ready = true
-				log.debug(
-					---@diagnostic disable-next-line LSP-Problems with uv.
-					string.format("server ready after %d ms, attempt %d", uv.now() - start_time, attempt),
-					nil,
-					"ws_client",
-					true
-				)
-				cb(true)
-			else
-				---@diagnostic disable-next-line LSP-Problems with uv.
-				if (uv.now() - start_time) < timeout then
-					-- optionally log every N attempts
-					if attempt % 10 == 0 then
-						api.nvim_echo(
-							{ { string.format("[mdview] waiting for server, attempt %d...\n", attempt), nil } },
-							true,
-							{}
-						)
-					end
-					vim.defer_fn(poll, tcfg.health_poll_ms)
-				else
-					api.nvim_echo(
-						{ { "[mdview] server health-check timed out after " .. tostring(timeout) .. "ms", "ErrorMsg" } },
-						true,
-						{ err = true }
-					)
-					cb(false)
-				end
-			end
-		end)
-	end
+    http_get(url, function(code)
+      if code == 0 then
+        M._ready = true
+        log.debug(
+          ---@diagnostic disable-next-line LSP-Problems with uv.
+          string.format("server ready after %d ms, attempt %d", uv.now() - start_time, attempt),
+          nil,
+          "ws_client",
+          true
+        )
+        cb(true)
+      else
+        ---@diagnostic disable-next-line LSP-Problems with uv.
+        if (uv.now() - start_time) < timeout then
+          -- optionally log every N attempts
+          if attempt % 10 == 0 then
+            api.nvim_echo({ { string.format("[mdview] waiting for server, attempt %d...\n", attempt), nil } }, true, {})
+          end
+          vim.defer_fn(poll, tcfg.health_poll_ms)
+        else
+          api.nvim_echo(
+            { { "[mdview] server health-check timed out after " .. tostring(timeout) .. "ms", "ErrorMsg" } },
+            true,
+            { err = true }
+          )
+          cb(false)
+        end
+      end
+    end)
+  end
 
-	poll()
+  poll()
 end
 
 -- internal helper: construct a URL for an mdview-server endpoint,
@@ -180,45 +176,45 @@ end
 ---@param path string # file path being previewed (used as the room key)
 ---@return string
 local function endpoint_url_for(endpoint, path)
-	local port = vim.g.mdview_server_port or DEFAULT_PORT
-	local normalized = normalize.path_for_url(path)
-	local token = require("mdview.core.state").get_token() or ""
-	return string.format("http://localhost:%d/%s?key=%s&token=%s", port, endpoint, normalized, vim.uri_encode(token))
+  local port = vim.g.mdview_server_port or DEFAULT_PORT
+  local normalized = normalize.path_for_url(path)
+  local token = require("mdview.core.state").get_token() or ""
+  return string.format("http://localhost:%d/%s?key=%s&token=%s", port, endpoint, normalized, vim.uri_encode(token))
 end
 
 ---@internal
 ---@param path string
 ---@return string
 local function update_url_for(path)
-	return endpoint_url_for("update", path)
+  return endpoint_url_for("update", path)
 end
 
 ---@internal
 ---@param path string
 ---@return string
 local function scroll_url_for(path)
-	return endpoint_url_for("scroll", path)
+  return endpoint_url_for("scroll", path)
 end
 
 ---@internal
 ---@param path string
 ---@return string
 local function diff_url_for(path)
-	return endpoint_url_for("diff", path)
+  return endpoint_url_for("diff", path)
 end
 
 ---@internal
 ---@param path string
 ---@return string
 local function doc_url_for(path)
-	return endpoint_url_for("doc", path)
+  return endpoint_url_for("doc", path)
 end
 
 ---@internal
 ---@param path string
 ---@return string
 local function control_url_for(path)
-	return endpoint_url_for("control", path)
+  return endpoint_url_for("control", path)
 end
 
 -- Collects stdout/stderr lines and returns them to the callback so caller
@@ -231,82 +227,82 @@ end
 ---@param cb fun(exit_code: integer, stdout_lines: string[]|nil, stderr_lines: string[]|nil)? # optional callback invoked on completion
 ---@return integer|nil # job ID if curl jobstart was used, nil otherwise
 local function http_post_nonblocking(url, body, cb)
-	cb = cb or function() end
-	local curl = fn.executable("curl") == 1 and "curl" or nil
+  cb = cb or function() end
+  local curl = fn.executable("curl") == 1 and "curl" or nil
 
-	if curl then
-		local tmpf = fn.tempname()
-		local f = io.open(tmpf, "wb")
-		if f then
-			f:write(body)
-			f:close()
-		end
+  if curl then
+    local tmpf = fn.tempname()
+    local f = io.open(tmpf, "wb")
+    if f then
+      f:write(body)
+      f:close()
+    end
 
-		local stdout_acc = {}
-		local stderr_acc = {}
+    local stdout_acc = {}
+    local stderr_acc = {}
 
-		local args = { "-sS", "-X", "POST", url, "--data-binary", "@" .. tmpf, "-H", "Content-Type: text/markdown" }
-		local jid = fn.jobstart(vim.list_extend({ curl }, args), {
-			stdout_buffered = true,
-			stderr_buffered = true,
-			on_stdout = function(_, data, _)
-				if data and #data > 0 then
-					for _, line in ipairs(data) do
-						if line and line ~= "" then
-							table.insert(stdout_acc, line)
-						end
-					end
-				end
-			end,
-			on_stderr = function(_, data, _)
-				if data and #data > 0 then
-					for _, line in ipairs(data) do
-						if line and line ~= "" then
-							table.insert(stderr_acc, line)
-						end
-					end
-				end
-			end,
-			on_exit = function(_, code, _)
-				pcall(function()
-					os.remove(tmpf)
-				end)
-				-- pass collected stdout/stderr to callback
-				cb(code, (#stdout_acc > 0) and stdout_acc or nil, (#stderr_acc > 0) and stderr_acc or nil)
-			end,
-		})
-		return jid
-	else
-		-- fallback: blocking call via system; capture output and forward it to cb
-		local ok, res = pcall(function()
-			-- portable shell invocation; on Windows this may fail if sh is not available
-			local cmd = string.format(
-				"sh -c %q",
-				"curl -sS -X POST "
-					.. url
-					.. " -H 'Content-Type: text/markdown' --data-binary @- <<'BODY'\n"
-					.. body
-					.. "\nBODY"
-			)
-			return fn.system(cmd)
-		end)
-		if ok then
-			-- res is a string; split into lines for parity with curl-on_exit
-			local lines = {}
-			if res and res ~= "" then
-				for s in res:gmatch("([^\n]*)\n?") do
-					if s ~= "" then
-						table.insert(lines, s)
-					end
-				end
-			end
-			cb(0, (#lines > 0) and lines or nil, nil)
-			return nil
-		else
-			cb(1, nil, { tostring(res) })
-			return nil
-		end
-	end
+    local args = { "-sS", "-X", "POST", url, "--data-binary", "@" .. tmpf, "-H", "Content-Type: text/markdown" }
+    local jid = fn.jobstart(vim.list_extend({ curl }, args), {
+      stdout_buffered = true,
+      stderr_buffered = true,
+      on_stdout = function(_, data, _)
+        if data and #data > 0 then
+          for _, line in ipairs(data) do
+            if line and line ~= "" then
+              table.insert(stdout_acc, line)
+            end
+          end
+        end
+      end,
+      on_stderr = function(_, data, _)
+        if data and #data > 0 then
+          for _, line in ipairs(data) do
+            if line and line ~= "" then
+              table.insert(stderr_acc, line)
+            end
+          end
+        end
+      end,
+      on_exit = function(_, code, _)
+        pcall(function()
+          os.remove(tmpf)
+        end)
+        -- pass collected stdout/stderr to callback
+        cb(code, (#stdout_acc > 0) and stdout_acc or nil, (#stderr_acc > 0) and stderr_acc or nil)
+      end,
+    })
+    return jid
+  else
+    -- fallback: blocking call via system; capture output and forward it to cb
+    local ok, res = pcall(function()
+      -- portable shell invocation; on Windows this may fail if sh is not available
+      local cmd = string.format(
+        "sh -c %q",
+        "curl -sS -X POST "
+          .. url
+          .. " -H 'Content-Type: text/markdown' --data-binary @- <<'BODY'\n"
+          .. body
+          .. "\nBODY"
+      )
+      return fn.system(cmd)
+    end)
+    if ok then
+      -- res is a string; split into lines for parity with curl-on_exit
+      local lines = {}
+      if res and res ~= "" then
+        for s in res:gmatch("([^\n]*)\n?") do
+          if s ~= "" then
+            table.insert(lines, s)
+          end
+        end
+      end
+      cb(0, (#lines > 0) and lines or nil, nil)
+      return nil
+    else
+      cb(1, nil, { tostring(res) })
+      return nil
+    end
+  end
 end
 
 -- Replace or augment try_send_pending callback handling to log response body.
@@ -314,65 +310,65 @@ end
 ---@param path string # file path whose pending markdown should be sent
 ---@return nil
 local function try_send_pending(path)
-	-- English comment: normalize incoming path and bail out if normalization fails
-	local norm_path = normalize.path(path)
-	if norm_path then
-		path = norm_path
-	else
-		log.debug("[mdvview.ws_client] normalized path is nil", vim.log.levels.ERROR, "ws_client", true)
-		return
-	end
+  -- English comment: normalize incoming path and bail out if normalization fails
+  local norm_path = normalize.path(path)
+  if norm_path then
+    path = norm_path
+  else
+    log.debug("[mdvview.ws_client] normalized path is nil", vim.log.levels.ERROR, "ws_client", true)
+    return
+  end
 
-	local entry = M._pending[path]
-	if not entry then
-		return
-	end
-	entry.tries = (entry.tries or 0) + 1
+  local entry = M._pending[path]
+  if not entry then
+    return
+  end
+  entry.tries = (entry.tries or 0) + 1
 
-	local url = update_url_for(path)
-	http_post_nonblocking(url, entry.markdown, function(code, stdout_lines, stderr_lines)
-		if code == 0 then
-			-- success: clear queue
-			M._pending[path] = nil
-			vim.schedule(function()
-				local body = stdout_lines and table.concat(stdout_lines, "\n"):sub(1, 200) or "(empty body)"
-				log.debug("queued post success for " .. tostring(url) .. " -> " .. body, nil, "ws_client", true)
-			end)
-		else
-			-- failure: retry/backoff as before
-			if stderr_lines and #stderr_lines > 0 then
-				-- schedule error message to avoid fast-event restrictions
-				vim.schedule(function()
-					api.nvim_echo(
-						{ { "[mdview.ws_client] http_post stderr: " .. table.concat(stderr_lines, "\n"), "ErrorMsg" } },
-						true,
-						{ err = true }
-					)
-				end)
-			end
-			if entry.tries < (entry.max_retries or transport().max_retries) then
-				local delay = (transport().base_retry_ms * (2 ^ (entry.tries - 1)))
-				vim.defer_fn(function()
-					try_send_pending(path)
-				end, delay)
-			else
-				M._pending[path] = nil
-				-- schedule final failure notification
-				vim.schedule(function()
-					api.nvim_echo({
-						{
-							"[mdview.ws_client] failed to send markdown for "
-								.. tostring(path)
-								.. " after "
-								.. tostring(entry.tries)
-								.. " attempts",
-							"ErrorMsg",
-						},
-					}, true, { err = true })
-				end)
-			end
-		end
-	end)
+  local url = update_url_for(path)
+  http_post_nonblocking(url, entry.markdown, function(code, stdout_lines, stderr_lines)
+    if code == 0 then
+      -- success: clear queue
+      M._pending[path] = nil
+      vim.schedule(function()
+        local body = stdout_lines and table.concat(stdout_lines, "\n"):sub(1, 200) or "(empty body)"
+        log.debug("queued post success for " .. tostring(url) .. " -> " .. body, nil, "ws_client", true)
+      end)
+    else
+      -- failure: retry/backoff as before
+      if stderr_lines and #stderr_lines > 0 then
+        -- schedule error message to avoid fast-event restrictions
+        vim.schedule(function()
+          api.nvim_echo(
+            { { "[mdview.ws_client] http_post stderr: " .. table.concat(stderr_lines, "\n"), "ErrorMsg" } },
+            true,
+            { err = true }
+          )
+        end)
+      end
+      if entry.tries < (entry.max_retries or transport().max_retries) then
+        local delay = (transport().base_retry_ms * (2 ^ (entry.tries - 1)))
+        vim.defer_fn(function()
+          try_send_pending(path)
+        end, delay)
+      else
+        M._pending[path] = nil
+        -- schedule final failure notification
+        vim.schedule(function()
+          api.nvim_echo({
+            {
+              "[mdview.ws_client] failed to send markdown for "
+                .. tostring(path)
+                .. " after "
+                .. tostring(entry.tries)
+                .. " attempts",
+              "ErrorMsg",
+            },
+          }, true, { err = true })
+        end)
+      end
+    end
+  end)
 end
 
 -- Public: send markdown to server.
@@ -382,48 +378,44 @@ end
 ---@param opts table|nil { max_retries?: integer, immediate?: boolean }
 ---@return nil
 function M.send_markdown(path, markdown, opts)
-	opts = opts or {}
-	if type(path) ~= "string" or type(markdown) ~= "string" then
-		return
-	end
+  opts = opts or {}
+  if type(path) ~= "string" or type(markdown) ~= "string" then
+    return
+  end
 
-	if opts.immediate then
-		http_post_nonblocking(update_url_for(path), markdown, function(code, stdout_lines, stderr_lines)
-			if code == 0 then
-				vim.schedule(function()
-					local body = stdout_lines and table.concat(stdout_lines, "\n"):sub(1, 200) or "(empty body)"
-					log.debug("immediate post success -> " .. body, nil, "ws_client", true)
-				end)
-			else
-				vim.schedule(function()
-					if stderr_lines and #stderr_lines > 0 then
-						api.nvim_echo({
-							{
-								"[mdview.ws_client] immediate post stderr: " .. table.concat(stderr_lines, "\n"),
-								"ErrorMsg",
-							},
-						}, true, {})
-					else
-						api.nvim_echo(
-							{ { "[mdview.ws_client] immediate post failed for " .. path, "ErrorMsg" } },
-							true,
-							{}
-						)
-					end
-				end)
-			end
-		end)
-		return
-	end
+  if opts.immediate then
+    http_post_nonblocking(update_url_for(path), markdown, function(code, stdout_lines, stderr_lines)
+      if code == 0 then
+        vim.schedule(function()
+          local body = stdout_lines and table.concat(stdout_lines, "\n"):sub(1, 200) or "(empty body)"
+          log.debug("immediate post success -> " .. body, nil, "ws_client", true)
+        end)
+      else
+        vim.schedule(function()
+          if stderr_lines and #stderr_lines > 0 then
+            api.nvim_echo({
+              {
+                "[mdview.ws_client] immediate post stderr: " .. table.concat(stderr_lines, "\n"),
+                "ErrorMsg",
+              },
+            }, true, {})
+          else
+            api.nvim_echo({ { "[mdview.ws_client] immediate post failed for " .. path, "ErrorMsg" } }, true, {})
+          end
+        end)
+      end
+    end)
+    return
+  end
 
-	-- Coalesce rapid updates in _pending queue
-	M._pending[path] = {
-		markdown = markdown,
-		tries = 0,
-		max_retries = opts.max_retries or transport().max_retries,
-	}
+  -- Coalesce rapid updates in _pending queue
+  M._pending[path] = {
+    markdown = markdown,
+    tries = 0,
+    max_retries = opts.max_retries or transport().max_retries,
+  }
 
-	try_send_pending(path)
+  try_send_pending(path)
 end
 
 -- Public: send the current cursor line + total line count for `path`'s
@@ -437,21 +429,21 @@ end
 ---@param viewfrac number|nil # desired 0..1 vertical position of the line in the browser viewport
 ---@param col integer|nil # 0-based byte column of the cursor (for the cursor caret)
 function M.send_scroll(path, line, total, viewfrac, col)
-	if type(path) ~= "string" or path == "" then
-		return
-	end
-	local body = tostring(line) .. "/" .. tostring(total)
-	-- col rides in the 4th field, which requires the 3rd (viewfrac) to be
-	-- present as a placeholder so positions line up on the client.
-	if type(viewfrac) == "number" then
-		body = body .. "/" .. ("%.4f"):format(viewfrac)
-	elseif type(col) == "number" then
-		body = body .. "/0"
-	end
-	if type(col) == "number" then
-		body = body .. "/" .. tostring(col)
-	end
-	http_post_nonblocking(scroll_url_for(path), body, function() end)
+  if type(path) ~= "string" or path == "" then
+    return
+  end
+  local body = tostring(line) .. "/" .. tostring(total)
+  -- col rides in the 4th field, which requires the 3rd (viewfrac) to be
+  -- present as a placeholder so positions line up on the client.
+  if type(viewfrac) == "number" then
+    body = body .. "/" .. ("%.4f"):format(viewfrac)
+  elseif type(col) == "number" then
+    body = body .. "/0"
+  end
+  if type(col) == "number" then
+    body = body .. "/" .. tostring(col)
+  end
+  http_post_nonblocking(scroll_url_for(path), body, function() end)
 end
 
 -- ---------------------------------------------------------------------------
@@ -477,24 +469,24 @@ M._diff_since = {} -- diffs sent since the last full for a key
 ---@param key string|nil
 ---@return nil
 function M.reset_diff_state(key)
-	if key then
-		M._diff_ver[key] = nil
-		M._diff_last[key] = nil
-		M._diff_since[key] = nil
-	else
-		M._diff_ver = {}
-		M._diff_last = {}
-		M._diff_since = {}
-	end
+  if key then
+    M._diff_ver[key] = nil
+    M._diff_last[key] = nil
+    M._diff_since[key] = nil
+  else
+    M._diff_ver = {}
+    M._diff_last = {}
+    M._diff_since = {}
+  end
 end
 
 ---@internal
 ---@return boolean
 local function line_diff_enabled()
-	local ok, exp = pcall(function()
-		return require("mdview.config").defaults.experimental
-	end)
-	return ok and type(exp) == "table" and exp.line_diff == true
+  local ok, exp = pcall(function()
+    return require("mdview.config").defaults.experimental
+  end)
+  return ok and type(exp) == "table" and exp.line_diff == true
 end
 
 -- Public: send the current content of `key`'s room as `lines`. With
@@ -506,43 +498,43 @@ end
 ---@param opts { full?: boolean }|nil
 ---@return nil
 function M.send_content(key, lines, opts)
-	opts = opts or {}
-	if type(key) ~= "string" or key == "" then
-		return
-	end
-	lines = lines or {}
+  opts = opts or {}
+  if type(key) ~= "string" or key == "" then
+    return
+  end
+  lines = lines or {}
 
-	if not line_diff_enabled() then
-		-- legacy path: push the whole document as raw text (unchanged wire format)
-		M.send_markdown(key, table.concat(lines, "\n"), { immediate = true })
-		return
-	end
+  if not line_diff_enabled() then
+    -- legacy path: push the whole document as raw text (unchanged wire format)
+    M.send_markdown(key, table.concat(lines, "\n"), { immediate = true })
+    return
+  end
 
-	local ver = M._diff_ver[key]
-	local last = M._diff_last[key]
-	local since = M._diff_since[key] or 0
-	local force_full = opts.full == true or ver == nil or last == nil or since >= FULL_EVERY
+  local ver = M._diff_ver[key]
+  local last = M._diff_last[key]
+  local since = M._diff_since[key] or 0
+  local force_full = opts.full == true or ver == nil or last == nil or since >= FULL_EVERY
 
-	if force_full then
-		local nv = (ver or 0) + 1
-		local env = "\3" .. vim.json.encode({ t = "f", v = nv, text = table.concat(lines, "\n") })
-		M.send_markdown(key, env, { immediate = true }) -- via /update -> LastPayload
-		M._diff_ver[key] = nv
-		M._diff_last[key] = lines
-		M._diff_since[key] = 0
-		return
-	end
+  if force_full then
+    local nv = (ver or 0) + 1
+    local env = "\3" .. vim.json.encode({ t = "f", v = nv, text = table.concat(lines, "\n") })
+    M.send_markdown(key, env, { immediate = true }) -- via /update -> LastPayload
+    M._diff_ver[key] = nv
+    M._diff_last[key] = lines
+    M._diff_since[key] = 0
+    return
+  end
 
-	local edit = require("mdview.utils.line_diff")(last, lines)
-	if not edit then
-		return -- no change
-	end
-	local nv = ver + 1
-	local env = "\3" .. vim.json.encode({ t = "d", v = nv, base = ver, edits = { edit } })
-	http_post_nonblocking(diff_url_for(key), env, function() end) -- via /diff (ephemeral)
-	M._diff_ver[key] = nv
-	M._diff_last[key] = lines
-	M._diff_since[key] = since + 1
+  local edit = require("mdview.utils.line_diff")(last, lines)
+  if not edit then
+    return -- no change
+  end
+  local nv = ver + 1
+  local env = "\3" .. vim.json.encode({ t = "d", v = nv, base = ver, edits = { edit } })
+  http_post_nonblocking(diff_url_for(key), env, function() end) -- via /diff (ephemeral)
+  M._diff_ver[key] = nv
+  M._diff_last[key] = lines
+  M._diff_since[key] = since + 1
 end
 
 -- Public: tell the preview tab(s) of `key`'s room which document is now shown
@@ -552,10 +544,10 @@ end
 ---@param doc_path string # absolute path of the now-previewed document
 ---@return nil
 function M.send_doc(key, doc_path)
-	if type(key) ~= "string" or key == "" or type(doc_path) ~= "string" or doc_path == "" then
-		return
-	end
-	http_post_nonblocking(doc_url_for(key), doc_path, function() end)
+  if type(key) ~= "string" or key == "" or type(doc_path) ~= "string" or doc_path == "" then
+    return
+  end
+  http_post_nonblocking(doc_url_for(key), doc_path, function() end)
 end
 
 -- Public: push a live preview-control update (a small JSON string, e.g.
@@ -567,10 +559,10 @@ end
 ---@param json string # a small JSON control object
 ---@return nil
 function M.send_control(key, json)
-	if type(key) ~= "string" or key == "" or type(json) ~= "string" or json == "" then
-		return
-	end
-	http_post_nonblocking(control_url_for(key), json, function() end)
+  if type(key) ~= "string" or key == "" or type(json) ~= "string" or json == "" then
+    return
+  end
+  http_post_nonblocking(control_url_for(key), json, function() end)
 end
 
 -- Public: ask every connected preview tab to close itself (the relay
@@ -585,13 +577,13 @@ end
 -- stays open, exactly as it did before this feature).
 ---@return nil
 function M.send_close()
-	if fn.executable("curl") ~= 1 then
-		return
-	end
-	local port = vim.g.mdview_server_port or DEFAULT_PORT
-	local token = require("mdview.core.state").get_token() or ""
-	local url = string.format("http://localhost:%d/close?token=%s", port, vim.uri_encode(token))
-	pcall(fn.system, { "curl", "-sS", "--max-time", "1", "-X", "POST", url })
+  if fn.executable("curl") ~= 1 then
+    return
+  end
+  local port = vim.g.mdview_server_port or DEFAULT_PORT
+  local token = require("mdview.core.state").get_token() or ""
+  local url = string.format("http://localhost:%d/close?token=%s", port, vim.uri_encode(token))
+  pcall(fn.system, { "curl", "-sS", "--max-time", "1", "-X", "POST", url })
 end
 
 return M

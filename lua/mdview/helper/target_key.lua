@@ -21,19 +21,19 @@ local M = {}
 --- @param bufnr integer|nil # defaults to the current buffer (0)
 --- @return string|nil key
 function M.resolve(bufnr)
-	local behavior = require("mdview.config.browser").defaults.behavior or "reuse"
-	if behavior == "reuse" then
-		local pk = require("mdview.core.state").get_preview_key()
-		if type(pk) == "string" and pk ~= "" then
-			return pk
-		end
-	end
+  local behavior = require("mdview.config.browser").defaults.behavior or "reuse"
+  if behavior == "reuse" then
+    local pk = require("mdview.core.state").get_preview_key()
+    if type(pk) == "string" and pk ~= "" then
+      return pk
+    end
+  end
 
-	local path = vim.api.nvim_buf_get_name(bufnr or 0)
-	if not path or path == "" then
-		return nil
-	end
-	return normalize.path(path) or path
+  local path = vim.api.nvim_buf_get_name(bufnr or 0)
+  if not path or path == "" then
+    return nil
+  end
+  return normalize.path(path) or path
 end
 
 return M

@@ -9,12 +9,12 @@ local has_lib_clone = ok_lib and type(lib_tables.clone) == "function"
 ---@param lines table
 ---@return table
 return function(lines)
-	if has_lib_clone then
-		return lib_tables.clone(lines)
-	end
-	local t = {}
-	for i = 1, #lines do
-		t[i] = lines[i]
-	end
-	return t
+  if has_lib_clone then
+    return lib_tables.clone(lines)
+  end
+  local t = {}
+  for i = 1, #lines do
+    t[i] = lines[i]
+  end
+  return t
 end
