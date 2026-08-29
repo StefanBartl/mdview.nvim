@@ -2,6 +2,8 @@
 
 > Alpha stage: highly experimental. Do not expect this plugin to work on your system yet.
 
+# mdview.nvim
+
 ```sh
    ##     ## ########  ##     ## #### ######## ##      ##           ##    ## ##     ## #### ##     ##
    ###   ### ##     ## ##     ##  ##  ##       ##  ##  ##           ###   ## ##     ##  ##  ###   ###
