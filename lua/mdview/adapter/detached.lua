@@ -54,6 +54,9 @@ function M.spawn(cmd, args, cwd, extra_env)
     return nil, "invalid command: " .. tostring(cmd)
   end
 
+  -- luv's meta declares every uv.spawn option required (uid, gid, verbatim,
+  -- hide and, here, the ones already set below), which no real caller passes.
+  ---@diagnostic disable-next-line: missing-fields
   local handle, pid = uv.spawn(cmd, {
     args = args or {},
     cwd = cwd,

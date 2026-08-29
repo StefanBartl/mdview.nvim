@@ -70,6 +70,9 @@ function M.start_server(cmd, args, cwd)
   -- over a not-yet-declared `handle`, and its `handle:close()` on exit
   -- silently no-ops on the wrong variable instead of closing the real handle.
   local handle, pid, err
+  -- luv's meta declares every uv.spawn option required (uid, gid, verbatim,
+  -- hide and, here, the ones already set below), which no real caller passes.
+  ---@diagnostic disable-next-line: missing-fields
   handle, pid, err = uv.spawn(spawn_cmd, {
     args = spawn_args,
     stdio = { nil, stdout, stderr },
