@@ -161,3 +161,7 @@ For open discussion, visit the
 [GitHub Discussions](https://github.com/StefanBartl/mdview.nvim/discussions).
 
 If you find this plugin useful, please give it a ⭐ on GitHub to support its development.
+
+## License
+
+MIT — see [LICENSE](LICENSE).
