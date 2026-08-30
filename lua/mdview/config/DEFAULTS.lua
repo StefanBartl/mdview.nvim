@@ -105,7 +105,10 @@
 
 ---@type mdview.config.Defaults
 return {
-  ft_pattern = { ".markdown", "*.md", "*.mdx" },
+  -- Globs, not extensions: a bare ".markdown" only ever matched a file
+  -- *named* `.markdown`, so edits in `notes.markdown` reached no autocmd and
+  -- the preview silently stopped following the buffer.
+  ft_pattern = { "*.md", "*.markdown", "*.mdx" },
 
   -- Preview any normal text buffer, not just Markdown. When true,
   -- mdview.config.merge() widens `ft_pattern` to `{"*"}` so every autocmd

@@ -1,7 +1,8 @@
 ---@module 'tests.nvim.config_spec'
--- Verifies mdview.config.merge's handling of `any_file`: the widening of
--- `ft_pattern` it triggers, and the deprecated `experimental.any_file` alias
--- the key shipped under until 2026-08-30 (see DEFAULTS.lua).
+-- Verifies the two config defaults that decide which buffers mdview follows:
+-- `ft_pattern` (the autocmd globs) and `any_file` (which widens them), plus
+-- the deprecated `experimental.any_file` alias the latter shipped under until
+-- 2026-08-30. Both were regressions once — see DEFAULTS.lua's comments.
 
 ---@diagnostic disable: undefined-global
 
@@ -26,6 +27,35 @@ local function with_clean_defaults(fn)
     error(err)
   end
 end
+
+describe("config.defaults.ft_pattern", function()
+  --- Neovim matches an autocmd pattern that contains no `/` against the file
+  --- name, so a bare extension like ".markdown" only ever matches a file
+  --- *named* `.markdown`. Every default has to be a real glob, or edits in the
+  --- files it is meant to cover reach no autocmd at all.
+  ---@param pattern string
+  ---@param name string
+  ---@return boolean
+  local function matches(pattern, name)
+    return vim.fn.match(name, vim.fn.glob2regpat(pattern)) >= 0
+  end
+
+  it("covers .md, .markdown and .mdx files", function()
+    for _, name in ipairs({ "notes.md", "notes.markdown", "notes.mdx" }) do
+      local hit = false
+      for _, pattern in ipairs(config.defaults.ft_pattern) do
+        hit = hit or matches(pattern, name)
+      end
+      assert.is_true(hit)
+    end
+  end)
+
+  it("has no bare-extension pattern left", function()
+    for _, pattern in ipairs(config.defaults.ft_pattern) do
+      assert.is_false(pattern:sub(1, 1) == ".")
+    end
+  end)
+end)
 
 describe("config.merge any_file", function()
   it("leaves ft_pattern Markdown-only by default", function()

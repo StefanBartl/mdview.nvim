@@ -103,7 +103,7 @@ wipes out the rest of that sub-table's defaults.
 Defaults: >lua
 
   {
-    ft_pattern = { ".markdown", "*.md", "*.mdx" },
+    ft_pattern = { "*.md", "*.markdown", "*.mdx" },
     any_file   = false,   -- preview any normal text buffer, not just Markdown
 
     server_port     = 43219,  -- preferred port for the relay server
@@ -194,7 +194,8 @@ Example override: >lua
 Field reference ~
 
 ft_pattern ~
-  Filetype/glob patterns mdview's autocommands attach to.
+  Filetype/glob patterns mdview's autocommands attach to. Globs, not bare
+  extensions: `*.markdown`, not `.markdown`.
 
 any_file ~
   Preview any normal text buffer, not just Markdown. Widens `ft_pattern` to
