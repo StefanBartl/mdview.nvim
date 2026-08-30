@@ -88,15 +88,20 @@ end
 ---@return string|nil path, string|nil err
 local function resolve_binary()
   local cfg = require("mdview.config").defaults.standalone or {}
+  local server_args = require("mdview.adapter.server_args")
   local override = cfg.binary_path
   if type(override) == "string" and override ~= "" then
     local path = vim.fn.expand(override)
-    if vim.fn.executable(path) ~= 1 then
-      return nil, "standalone.binary_path is not executable: " .. path
+    -- spawnable(), not executable(): on Windows an extension-less file passes
+    -- the latter and still spawns as ENOENT (see server_args).
+    local usable = server_args.spawnable(path)
+    if not usable then
+      return nil,
+        ("standalone.binary_path is not spawnable: %s (looked for %s)"):format(path, server_args.built_binary_name())
     end
-    return path, nil
+    return usable, nil
   end
-  local built = require("mdview.adapter.server_args").local_built_binary()
+  local built = server_args.local_built_binary()
   if built then
     return built, nil
   end

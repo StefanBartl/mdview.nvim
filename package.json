@@ -15,7 +15,7 @@
     "build": "npm run build:wasm && npm run build:client",
     "build:wasm": "wasm-pack build native/wasm-render --target web --out-dir ../../src/client/wasm-render",
     "build:client": "vite build --config src/client/vite.config.ts",
-    "build:go": "cd native/server && go build -o mdview-server .",
+    "build:go": "node scripts/build-go.mjs",
     "lint": "eslint \"src/**/*.{ts,tsx,js}\" --fix",
     "format": "prettier --write \"src/**/*.{ts,js,json,md,css,scss}\"",
     "test": "vitest run",

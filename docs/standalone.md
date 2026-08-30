@@ -56,7 +56,7 @@ release ships:
 
 ```lua
 require("mdview").setup({
-  standalone = { binary_path = "~/repos/mdview.nvim/native/server/mdview-server" },
+  standalone = { binary_path = "~/repos/mdview.nvim/native/server/mdview-server" },  -- .exe on Windows
 })
 ```
 

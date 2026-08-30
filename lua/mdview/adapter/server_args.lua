@@ -19,20 +19,57 @@ local function plugin_root()
   return vim.fs.normalize(vim.fn.fnamemodify(this, ":p:h:h:h:h"))
 end
 
+--- File name `npm run build:go` gives the relay on this platform.
+---@return string
+local function built_binary_name()
+  return vim.fn.has("win32") == 1 and "mdview-server.exe" or "mdview-server"
+end
+-- Exposed so callers can name the expected file in their own diagnostics.
+M.built_binary_name = built_binary_name
+
+--- The path `uv.spawn()` can actually start for `path`, or nil.
+---
+--- Not the same question as `executable()`. libuv resolves a command with no
+--- extension by appending each PATHEXT entry and never tries the bare name, so
+--- on Windows an extension-less file spawns as ENOENT however readable and
+--- however "executable" Vim calls it. `.exe` next to it is the real target —
+--- and pointing an override at the extension-less name is easy to do, because
+--- that is what `build:go` wrote until 2026-08-30.
+---@param path string
+---@return string|nil
+local function spawnable(path)
+  if vim.fn.has("win32") == 1 and not path:match("%.[%a%d]+$") then
+    local exe = path .. ".exe"
+    return vim.fn.executable(exe) == 1 and exe or nil
+  end
+  return vim.fn.executable(path) == 1 and path or nil
+end
+M.spawnable = spawnable
+
 --- A relay binary built inside this checkout, if one exists. This is the
---- zero-config dev path: `npm run build:go` writes `native/server/mdview-server`
---- (Go keeps the exact -o name, so no `.exe` on Windows), and a checkout that
---- has it is by definition a dev checkout — a normal lazy/packer install never
---- ships one (it's gitignored). So auto-using it is safe: it only ever triggers
---- when a build is actually present.
+--- zero-config dev path: `npm run build:go` writes it next to the Go sources,
+--- and a checkout that has one is by definition a dev checkout — a normal
+--- lazy/packer install never ships one (it's gitignored). So auto-using it is
+--- safe: it only ever triggers when a build is actually present.
 ---@return string|nil
 local function local_built_binary()
-  local root = plugin_root()
-  for _, name in ipairs({ "mdview-server", "mdview-server.exe" }) do
-    local p = root .. "/native/server/" .. name
-    if vim.fn.executable(p) == 1 then
-      return p
-    end
+  local base = plugin_root() .. "/native/server/mdview-server"
+  local found = spawnable(base)
+  if found then
+    return found
+  end
+
+  -- A Windows checkout built before 2026-08-30 still holds the extension-less
+  -- file this function used to hand to uv.spawn. Say so: the failure it caused
+  -- was only ever visible as ":MDView start -> failed to start server process".
+  if vim.fn.has("win32") == 1 and vim.fn.filereadable(base) == 1 then
+    notify(
+      ("[mdview] ignoring %q: Windows cannot spawn a binary without an extension. Run `npm run build:go` to rebuild it as %s."):format(
+        base,
+        built_binary_name()
+      ),
+      vim.log.levels.WARN
+    )
   end
   return nil
 end
@@ -67,12 +104,16 @@ local function resolve_binary()
   end
   if type(override) == "string" and override ~= "" then
     local path = vim.fn.expand(override)
-    if vim.fn.executable(path) == 1 then
-      return path, nil
+    local usable = spawnable(path)
+    if usable then
+      return usable, nil
     end
     -- A stale/typo'd override shouldn't brick start — warn and fall through
     -- to the auto-detected build / release, which usually works.
-    notify(("[mdview] dev.binary_path is not executable, ignoring it: %q"):format(path), vim.log.levels.WARN)
+    notify(
+      ("[mdview] dev.binary_path is not spawnable, ignoring it: %q (looked for %s)"):format(path, built_binary_name()),
+      vim.log.levels.WARN
+    )
   end
   local built = local_built_binary()
   if built then

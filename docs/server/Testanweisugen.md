@@ -37,10 +37,14 @@ $env:LOCALAPPDATA\nvim-data\mdview\bin\v0.1.0\mdview-server_windows_amd64.exe
 Build it straight from the repo and start it with a fixed port + token:
 
 ```sh
-cd native/server && go build -o mdview-server.exe .
-./mdview-server.exe --port 45999 --token testtok123 --web-root ../../dist/client
+npm run build:go   # -> native/server/mdview-server.exe on Windows, mdview-server elsewhere
+cd native/server && ./mdview-server.exe --port 45999 --token testtok123 --web-root ../../dist/client
 # stdout: "Running on http://localhost:45999"  (Lua matches exactly this line)
 ```
+
+(The hand-written `go build -o mdview-server.exe .` that stood here was the
+workaround for `build:go` writing an extension-less name on Windows; the script
+picks the suffix itself since 2026-08-30.)
 
 ## 2) Checking health
 

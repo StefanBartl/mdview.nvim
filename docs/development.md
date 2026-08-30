@@ -45,15 +45,23 @@ Only Go is required.
 npm run build:go
 ```
 
-Produces `native/server/mdview-server` (**no `.exe` suffix, also on Windows** —
-the `-o` name is literal). Then:
+Produces `native/server/mdview-server`, and `mdview-server.exe` on Windows —
+the script asks `go env GOEXE` for the suffix. That matters: libuv resolves an
+extension-less command by appending each PATHEXT entry and never tries the bare
+name, so a Windows build without `.exe` spawns as `ENOENT` however readable it
+is. It used to be built without one; a checkout from before 2026-08-30 needs
+one `npm run build:go` (which also deletes the old file). Then:
 
 ```lua
 require("mdview").setup({
-  dev = { binary_path = "C:/repos/mdview.nvim/native/server/mdview-server" },
-  standalone = { binary_path = "C:/repos/mdview.nvim/native/server/mdview-server" },
+  dev = { binary_path = "C:/repos/mdview.nvim/native/server/mdview-server.exe" },
+  standalone = { binary_path = "C:/repos/mdview.nvim/native/server/mdview-server.exe" },
 })
 ```
+
+Drop the `.exe` on Linux and macOS. An override that names the extension-less
+path on Windows is picked up anyway — the resolver looks for the `.exe` beside
+it before giving up.
 
 `dev.web_root` stays unset, so the client bundle still comes from the pinned
 release. That is fine as long as your Go change doesn't depend on a matching
@@ -66,14 +74,14 @@ Relay **and** client from source. Order matters: `build:client` imports
 generates, so the client build fails outright without it.
 
 ```bash
-npm run build:go     # -> native/server/mdview-server
+npm run build:go     # -> native/server/mdview-server[.exe]
 npm run build        # build:wasm (wasm-pack) then build:client (vite) -> dist/client
 ```
 
 **Zero config needed once built.** `:MDView start` and `:MDView standalone`
 auto-detect a build sitting inside the plugin's own checkout —
-`native/server/mdview-server` (Go keeps the exact `-o` name, so no `.exe` on
-Windows) and `dist/client` — and use it ahead of the downloaded release. A
+`native/server/mdview-server[.exe]` and `dist/client` — and use it ahead of the
+downloaded release. A
 normal install never ships those (both are gitignored), so this only ever kicks
 in on a dev checkout. So you usually **don't** need the `dev.*` /
 `standalone.binary_path` overrides at all — they're only for pointing at a build
@@ -100,10 +108,10 @@ If you *do* want an explicit override (a build outside the checkout):
 ```lua
 require("mdview").setup({
   dev = {
-    binary_path = "C:/repos/mdview.nvim/native/server/mdview-server",
+    binary_path = "C:/repos/mdview.nvim/native/server/mdview-server.exe",
     web_root = "C:/repos/mdview.nvim/dist/client",
   },
-  standalone = { binary_path = "C:/repos/mdview.nvim/native/server/mdview-server" },
+  standalone = { binary_path = "C:/repos/mdview.nvim/native/server/mdview-server.exe" },
 })
 ```
 

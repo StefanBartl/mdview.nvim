@@ -15,7 +15,7 @@
 ---   $LIB_NVIM_PATH          lib.nvim root (same lookup order as TESTS/nvim/harness.lua)
 ---   $MDVIEW_STANDALONE_BIN  relay binary for standalone mode (needs --watch,
 ---                           v0.3.0+); until a release ships, point this at a
----                           locally built native/server/mdview-server
+---                           locally built native/server/mdview-server[.exe]
 
 -- Nothing inherited: no user rtp, no shada, no swapfile. `-u <this file>`
 -- already skips init.lua, but rtp still carries the site dirs.

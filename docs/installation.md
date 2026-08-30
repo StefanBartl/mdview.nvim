@@ -38,8 +38,11 @@ you set them:
   for that piece. If the path does not exist, `:MDView start` fails with
   `dev.binary_path is not executable: ...` — it does not fall back to the
   release.
-- On Windows, `npm run build:go` produces `native/server/mdview-server`
-  **without** a `.exe` suffix. Point `binary_path` at that exact name.
+- On Windows, `npm run build:go` produces `native/server/mdview-server.exe`.
+  It wrote that name without the suffix until 2026-08-30, and Windows cannot
+  spawn an extension-less binary at all — so a checkout from before then needs
+  one rebuild. Naming the extension-less path in `binary_path` still works; the
+  resolver looks for the `.exe` beside it.
 
 **When to use which loading strategy:**
 

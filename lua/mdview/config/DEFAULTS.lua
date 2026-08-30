@@ -247,8 +247,10 @@ return {
     --     binary_path = "~/repos/mdview.nvim/native/server/mdview-server",
     --     web_root    = "~/repos/mdview.nvim/dist/client",
     --   }
-    -- `npm run build:go` writes that name literally — no .exe on Windows —
-    -- and `web_root` needs `npm run build` (wasm-pack + vite) to exist.
+    -- `npm run build:go` writes `mdview-server.exe` on Windows and
+    -- `mdview-server` elsewhere; naming the extension-less path on Windows
+    -- also works, since the resolver looks for the `.exe` beside it.
+    -- `web_root` needs `npm run build` (wasm-pack + vite) to exist.
     -- Neither falls back to the release if the path is missing.
     -- Falls back to $MDVIEW_DEV_BINARY / $MDVIEW_DEV_WEB_ROOT when unset —
     -- the only way to reach a detached instance (scripts/minimal_init.lua
