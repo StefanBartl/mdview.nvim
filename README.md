@@ -128,6 +128,7 @@ work, for turning it off without touching any plugin's config.
 - [Companion plugins](docs/companion-plugins.md) — optional plugins that pair well with the live preview.
 - [Development](docs/development.md) — building mdview.nvim from source and running its test suites.
 - [Architecture](docs/architecture.md) — the Lua/Go/TypeScript/Rust components and how they communicate.
+- [Ecosystem architecture](https://github.com/StefanBartl/documentation.nvim/blob/main/docs/ECOSYSTEM.md) — **not in this repository.** Where docs, static analysis and runtime each belong across the four pieces this plugin is the presentation half of (`lib.nvim`, `documentation.nvim`, `runtime-analysis.nvim`, mdview.nvim), and why telemetry reports render through here rather than growing their own viewer. One document, three pointers.
 - [Features](docs/FEATURES/README.md) — the catalog. The overview and what each theme covers, then per-theme depth in [preview](docs/FEATURES/PREVIEW.md) (incl. link hover previews), [rendering](docs/FEATURES/RENDERING.md), [operations](docs/FEATURES/OPERATIONS.md), [security](docs/FEATURES/SECURITY.md) and the [machinery](docs/FEATURES/FEATURES.md) underneath (caches, throttling, diff transport).
 
 ---
