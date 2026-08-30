@@ -14,6 +14,12 @@
    ##     ## ########     ###    #### ########  ###  ###     ###    ##    ##    ###    #### ##     ##
 ```
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Neovim](https://img.shields.io/badge/Neovim-0.9%2B-57A143?logo=neovim&logoColor=white)](https://neovim.io)
+[![Lua](https://img.shields.io/badge/Lua-5.1%2FLuaJIT-2C2D72?logo=lua&logoColor=white)](https://www.lua.org)
+![Status](https://img.shields.io/badge/status-alpha-red)
+![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20macOS%20%7C%20Windows-lightgrey)
+
 > mdview.nvim is a **live mirror** of your Markdown buffer, not an editing
 > toolkit — pair it with
 > [markdown.nvim](https://github.com/StefanBartl/markdown.nvim) (TOC,
@@ -24,19 +30,6 @@
 
 > Inspired by and positioned as a security/performance-focused alternative to
 > [iamcco/markdown-preview.nvim](https://github.com/iamcco/markdown-preview.nvim).
-
-![version](https://img.shields.io/badge/version-0.9-blue.svg)
-![status](https://img.shields.io/badge/status-beta-orange.svg)
-![Neovim](https://img.shields.io/badge/Neovim-0.9%2B-success.svg)
-![Lazy.nvim](https://img.shields.io/badge/lazy.nvim-supported-success.svg)
-![Lua](https://img.shields.io/badge/language-Lua-yellow.svg)
-![TypeScript](https://img.shields.io/badge/client-TypeScript-3178C6.svg)
-![Server](https://img.shields.io/badge/server-Go-00ADD8.svg)
-![WASM](https://img.shields.io/badge/WASM-ready-654FF0.svg)
-![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20macOS%20%7C%20Windows-lightgrey.svg)
-![Performance](https://img.shields.io/badge/optimized-true-success.svg)
-![Build](https://img.shields.io/badge/build-edge%20runtime-informational.svg)
-![Contributions](https://img.shields.io/badge/contributions-welcome-brightgreen.svg)
 
 ---
 
