@@ -2,7 +2,7 @@
 --- Shared "is this buffer something mdview should preview" gate, used by every
 --- autocmd that drives the preview (BufEnter snapshot, live push, breadcrumbs,
 --- scroll sync, buffer switch). Centralized here because widening
---- `ft_pattern` to `{"*"}` (see mdview.config.merge, experimental.any_file)
+--- `ft_pattern` to `{"*"}` (see mdview.config.merge, the `any_file` key)
 --- makes Neovim's own glob matching fire for every named buffer — this is
 --- what keeps terminal/help/quickfix/scratch buffers out; without it that
 --- exclusion was previously just an accidental side effect of the
@@ -37,7 +37,7 @@ function M.is(bufnr)
     return false
   end
 
-  if defaults.experimental and defaults.experimental.any_file == true then
+  if defaults.any_file == true then
     return true
   end
 

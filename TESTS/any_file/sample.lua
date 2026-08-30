@@ -1,4 +1,4 @@
--- Fixture for the experimental.any_file checklist in TESTS/CHECK.md.
+-- Fixture for the any_file checklist in TESTS/CHECK.md.
 -- Long enough to scroll, so case 2 (proportional scroll sync) has something
 -- to work with. Nothing here is loaded by the plugin.
 

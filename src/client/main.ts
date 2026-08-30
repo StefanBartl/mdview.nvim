@@ -371,7 +371,7 @@ async function boot() {
 
   // Whether the previewed document is Markdown (WASM comrak+ammonia render)
   // or any other text file (syntax-highlighted read-only code view, only
-  // ever reachable when the Lua side's experimental.any_file pushed one).
+  // ever reachable when the Lua side's any_file pushed one).
   const docIsMarkdown = isMarkdownPath(key);
 
   // Render the current document into the preview container: through the WASM

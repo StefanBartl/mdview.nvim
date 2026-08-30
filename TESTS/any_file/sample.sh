@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Fixture for the experimental.any_file checklist in TESTS/CHECK.md.
+# Fixture for the any_file checklist in TESTS/CHECK.md.
 #
 # Same purpose as sample.py, in a second language whose comment marker is
 # `#`: the shebang on line 1 plus the heading-shaped comments below are what

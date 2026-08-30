@@ -1,4 +1,4 @@
-# Fixture for the experimental.any_file checklist in TESTS/CHECK.md.
+# Fixture for the any_file checklist in TESTS/CHECK.md.
 #
 # The point of this file is case 3: every `#` below is a COMMENT marker, not
 # an ATX heading. core/breadcrumbs.lua only scans for headings when the

@@ -1,6 +1,6 @@
 # Control document
 
-This file is the **negative control** for the `experimental.any_file`
+This file is the **negative control** for the `any_file`
 checklist in `TESTS/CHECK.md`. It is ordinary Markdown, so it must keep going
 through the Markdown WASM renderer and keep its per-line `sourcepos` — exact
 scroll sync and the cursor line bar included — whether `any_file` is on or

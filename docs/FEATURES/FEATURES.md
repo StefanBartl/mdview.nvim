@@ -42,12 +42,12 @@ snapshots stay the normal path; the diff path is opt-in.
 - **Careful:** a diff applied to a different base state than the client holds
   renders nonsense — hence the envelope with its resync path.
 
-## Plain-text preview for non-Markdown files (experimental)
+## Plain-text preview for non-Markdown files
 
-With `experimental.any_file`, `mdview.config.merge()` widens `ft_pattern` to
+With `any_file`, `mdview.config.merge()` widens `ft_pattern` to
 `{"*"}`, so Neovim's glob layer fires for every named buffer.
 `helper/previewable.lua` is the actual gate after that (empty buftype, named,
-not binary, not mdview's own log buffer); without `experimental.any_file` it
+not binary, not mdview's own log buffer); without `any_file` it
 additionally requires `filetype == "markdown"/"md"` as before. The client does
 not put a non-Markdown file through the WASM renderer, but renders it as a
 single code block coloured by file extension — the same
@@ -58,7 +58,9 @@ dispatcher.
 - **Module:** `lua/mdview/helper/previewable.lua`; client:
   `src/client/render/fileKind.ts`, `src/client/highlight/languageForPath.ts`,
   `src/client/render/plainText.ts`
-- **Config:** `experimental.any_file` (off by default)
+- **Config:** `any_file` (off by default; `experimental.any_file` is a
+  deprecated alias). Shipped 2026-08-30 after the five-case release check in
+  `TESTS/CHECK.md` passed in a real Neovim.
 - **Careful:** no `data-sourcepos` for these files — scroll sync falls back to
   the existing proportional estimate (see `main.ts`'s `applyScrollPing`
   fallback), and the cursor line bar does not appear. Line-exact parity with

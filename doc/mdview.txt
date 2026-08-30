@@ -104,6 +104,7 @@ Defaults: >lua
 
   {
     ft_pattern = { ".markdown", "*.md", "*.mdx" },
+    any_file   = false,   -- preview any normal text buffer, not just Markdown
 
     server_port     = 43219,  -- preferred port for the relay server
     server_cwd      = nil,    -- optional explicit cwd for the relay process
@@ -194,6 +195,15 @@ Field reference ~
 
 ft_pattern ~
   Filetype/glob patterns mdview's autocommands attach to.
+
+any_file ~
+  Preview any normal text buffer, not just Markdown. Widens `ft_pattern` to
+  `{ "*" }` (overriding a hand-set one) and renders non-Markdown files as a
+  syntax-highlighted read-only code view instead of through the Markdown
+  renderer; scroll sync falls back to proportional, so there is no cursor
+  line bar. Terminal, help, quickfix, scratch, binary and unnamed buffers
+  stay excluded. Off by default. Was `experimental.any_file` before the
+  2026-08-30 release check; the old key still works.
 
 server_port / server_cwd ~
   Preferred port and optional working directory for the spawned

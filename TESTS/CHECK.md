@@ -10,13 +10,26 @@
 
 ---
 
-## `experimental.any_file` — release check
+## `any_file` — release check · PASSED 2026-08-30
 
-Built 2026-08-24, verified only through the Lua harness (55 tests), the client
-vitest (95 tests) and a browser check over the relay in standalone `--watch`.
-None of those go through Neovim's autocmd chain — and that chain is exactly
-what this flag changes, so the feature is not shippable until the cases below
-pass in a real editor.
+**Result: all five cases pass.** Per the verdict at the bottom of this section
+the key left `experimental` on 2026-08-30 and is documented as supported;
+`experimental.any_file` remains as a deprecated alias. Keep this section: it is
+the regression checklist for the feature, and the per-case notes below record
+what "correct" actually looked like when it was signed off.
+
+The run went through a real Neovim (`nvim --headless --listen`, driven over
+`--remote-expr`, so every autocmd fired in the normal event loop) with only
+mdview.nvim + lib.nvim on the runtimepath, against a locally built relay and
+`dist/client`, with the preview tab opened by hand against the URL the
+production launcher built. What that setup does *not* cover is the one thing
+noted per case below: the human judgement on whether the lag "feels ok".
+
+Built 2026-08-24, and until this run verified only through the Lua harness (55
+tests), the client vitest (95 tests) and a browser check over the relay in
+standalone `--watch`. None of those go through Neovim's autocmd chain — and
+that chain is exactly what this flag changes, which is why it was not shippable
+until the cases below passed in a real editor.
 
 **What the flag does**, so the expectations below have a reason:
 
@@ -36,7 +49,7 @@ pass in a real editor.
 Config for the whole run:
 
 ```lua
-require("mdview").setup({ experimental = { any_file = true } })
+require("mdview").setup({ any_file = true })
 ```
 
 Fixtures: `TESTS/any_file/` — `sample.lua`, `sample.py`, `sample.sh`,
@@ -53,6 +66,11 @@ Fixtures: `TESTS/any_file/` — `sample.lua`, `sample.py`, `sample.sh`,
   turn into H1 headings, indented lines into code blocks, the file reads as
   scrambled prose.
 - **Note down**: which of the two, and for which extension.
+- **2026-08-30**: pass. `.lua`, `.py` and `.sh` all render as highlighted code,
+  no Markdown structure imposed — in `sample.py` and `sample.sh` the
+  heading-shaped `#` lines stay comments. Shell highlighting is thinner than
+  Lua's (`for`/`in`/`do` coloured, `echo`/`printf` not); that is hljs's bash
+  grammar, not the preview path.
 
 ### 2. Scroll sync
 
@@ -66,6 +84,12 @@ end.
   wrong offset because something still expects sourcepos.
 - **Note down**: whether the proportional lag "feels ok" — same judgement call
   as `reverse_scroll` above, it cannot be assessed headless.
+- **2026-08-30**: pass, measured rather than judged. Cursor on line 35 of 70 put
+  the scroller at ratio 0.486, line 70 at 0.985 — proportional, as designed. No
+  `.mdview-cursor-bar` in the DOM and zero `[data-sourcepos]` nodes on the code
+  path, versus a visible bar and 20 sourcepos nodes on `control.md`. **Open:**
+  whether the lag feels right is still unjudged — that needs a person scrolling,
+  not a driven session.
 
 ### 3. Breadcrumbs on `#`-comment languages
 
@@ -78,6 +102,10 @@ trap), then `:MDView breadcrumbs`. Repeat with `sample.sh`.
   and Shell `#` is a comment marker.
 - **Fails as**: the comment lines appear as outline entries — the filetype gate
   did not hold (e.g. `filetype` was still empty when the autocmd fired).
+- **2026-08-30**: pass. Cursor walked over every heading-shaped comment in
+  `sample.py` and `sample.sh`; both files produced exactly one entry each, both
+  `(top)`. The same walk over `control.md` in the same session collected its
+  four real headings — so the gate is a gate, not a dead code path.
 - **Then also**: `:MDView breadcrumbs export` and check the written file shows
   the same thing.
 
@@ -98,6 +126,10 @@ the preview switches to it:
   pushes again, which writes again.
 - **Why this case exists at all**: with `ft_pattern = { "*" }` the autocmds now
   *do* fire for these buffers. Only `previewable.is()` stops them.
+- **2026-08-30**: pass. `previewable.is()` returned false for all four
+  (`buftype` = `terminal` / `help` / `quickfix` / `nofile`), the preview kept
+  showing `sample.lua` throughout, and the log ring stayed at 7 lines — no sign
+  of the log-buffer feedback loop.
 
 ### 5. Regression with the flag off
 
@@ -115,8 +147,17 @@ Restart Neovim with `experimental = { any_file = false }` (or the key omitted).
 - **Fails as**: anything at all differs on the Markdown path. `previewable.is()`
   sits in the *shared* path, so a bug there breaks the default too — an
   experimental flag that misbehaves while switched off.
+- **2026-08-30**: pass. `control.md` rendered through the Markdown renderer with
+  20 `[data-sourcepos]` nodes and a visible `.mdview-cursor-bar`. On
+  `sample.lua` `previewable.is()` was false, and an unsaved probe edit plus a
+  cursor move never reached the browser — the tab kept showing `control.md`.
+  The reasoned-not-measured expectation in the paragraph above therefore holds
+  as written.
 
 ### Verdict
+
+**2026-08-30: all five passed; `experimental` dropped from the key.** The
+original decision table, kept for re-runs:
 
 - All five pass -> drop `experimental` from the key, document it as supported.
 - Case 1 or 2 fails -> client-side, `languageForPath.ts` / the scroll bridge.

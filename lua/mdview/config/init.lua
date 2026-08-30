@@ -126,13 +126,25 @@ function M.merge(opts)
     deep_merge_in_place(M.defaults, opts)
   end
 
+  -- `experimental.any_file` was the key's home until TESTS/CHECK.md's release
+  -- check passed (2026-08-30); it now lives at the top level. The old name is
+  -- still honored so a config written against it keeps working — DEFAULTS no
+  -- longer carries it, so it is only ever truthy when a caller passed it. A
+  -- top-level `any_file` in the same setup() call wins, so the alias can never
+  -- flip a deliberate `any_file = false`.
+  if M.defaults.experimental and M.defaults.experimental.any_file == true then
+    if not (opts and opts.any_file ~= nil) then
+      M.defaults.any_file = true
+    end
+  end
+
   -- any_file widens preview scope from Markdown-only to every normal text
   -- buffer; that needs the autocmd glob itself (ft_pattern) to match
   -- everything, not just *.md/*.markdown/*.mdx. Takes precedence over a
   -- hand-set ft_pattern (see DEFAULTS.lua's `any_file` doc comment) — the
   -- per-buffer buftype/filetype gate that actually excludes non-previewable
   -- buffers (terminal, help, quickfix, …) lives in helper/previewable.lua.
-  if M.defaults.experimental and M.defaults.experimental.any_file == true then
+  if M.defaults.any_file == true then
     M.defaults.ft_pattern = { "*" }
   end
 

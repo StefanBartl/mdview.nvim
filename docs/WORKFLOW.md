@@ -150,7 +150,7 @@ It also makes the fastest diagnostic answerable from the notification alone:
 open-failure from a content or room-key problem before you reach for
 `:checkhealth mdview` at all.
 
-## `experimental.any_file` previews non-Markdown — as a code block, deliberately
+## `any_file` previews non-Markdown — as a code block, deliberately
 
 Off by default. Turned on, the autocmds fire for any normal text buffer and a
 non-Markdown document renders as a single syntax-highlighted, read-only code
@@ -159,9 +159,13 @@ highlighter dispatch and the proportional scroll-sync fallback.
 
 Reach for it when you want a second window on a file you are editing — a
 config, a log, a source file — not when you expect Markdown features. It is the
-first step toward a general preview rather than a finished one, and it has not
-yet been exercised through real Neovim use, so treat surprises as reportable
-rather than as the design.
+first step toward a general preview rather than a finished one: what it
+deliberately does *not* give you is Markdown structure, per-line sourcepos or
+the cursor line bar, so scroll sync is proportional rather than line-exact.
+
+It left `experimental` on 2026-08-30, when the five-case release check in
+`TESTS/CHECK.md` was finally run through a real Neovim rather than the test
+harnesses. `experimental.any_file` still works as a deprecated alias.
 
 ## Standalone mode trades interactivity for persistence — know the trade before reaching for it
 

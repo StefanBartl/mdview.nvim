@@ -4,7 +4,7 @@
 // renderer) from any other text file (rendered as a syntax-highlighted
 // read-only code view — see render/plainText.ts). Driven purely by the `key`
 // URL param (the document path) already sent for every session, so no extra
-// query param is needed: experimental.any_file (Lua side) is what decides
+// query param is needed: any_file (Lua side) is what decides
 // whether a non-Markdown path ever reaches the client at all.
 
 const MARKDOWN_EXTENSIONS = new Set(['md', 'markdown', 'mdx']);

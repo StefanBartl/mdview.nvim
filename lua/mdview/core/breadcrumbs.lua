@@ -67,7 +67,7 @@ function M.record(bufnr)
   end
 
   -- ATX heading scan only makes sense for actual Markdown: under
-  -- experimental.any_file, `#` is a plain comment marker in Python/Ruby/
+  -- `any_file`, `#` is a plain comment marker in Python/Ruby/
   -- Shell/etc., so scanning for it there would misdetect comment lines as
   -- headings. Everything else just gets "(top)".
   local ok_ft, ft = pcall(function()
