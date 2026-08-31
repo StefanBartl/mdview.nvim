@@ -23,7 +23,7 @@ mdview.nvim registers a single `:MDView <subcommand>` command (built via
 | `:MDView file-log path [value]` | Set the file log path (`value` is a path or `default`); omit `value` to report the current path. |
 | `:MDView diagnose [path]` | Write a full component-state diagnostics report to a file and open it. |
 | `:MDView cursor [line\|caret\|section\|off\|toggle]` | Set/toggle how the Neovim cursor is marked in the preview; no argument reports the current mode. See [PREVIEW.md](FEATURES/PREVIEW.md#neovim-cursor-marker). |
-| `:MDView selection [on\|off\|toggle]` | Mirror the Neovim visual selection (`v`/`V`/`CTRL-V`) into the preview as a highlight, or stop mirroring; no argument toggles. On by default. See [PREVIEW.md](FEATURES/PREVIEW.md#visual-selection-mirror). |
+| `:MDView selection [on\|off\|toggle]` | Mirror the Neovim visual selection (`v`/`V`/`CTRL-V`) into the preview as a highlight, or stop mirroring; no argument toggles. Off by default — switch it on while presenting. See [PREVIEW.md](FEATURES/PREVIEW.md#visual-selection-mirror). |
 | `:MDView sync [pause\|resume\|toggle]` | Pause/resume Neovim → browser scroll sync (and the cursor marker) without tearing down the session. See [PREVIEW.md](FEATURES/PREVIEW.md#scroll-sync-pauseresume). |
 | `:MDView zoom [+\|-\|reset\|<factor>]` | Adjust the preview's font-size scale; no argument reports the current zoom. See [PREVIEW.md](FEATURES/PREVIEW.md#preview-zoom). |
 | `:MDView overlay <name> [on\|off\|toggle]` / `:MDView overlay list` | Mount/unmount a named overlay on the preview, or list known overlays and their state. See [PREVIEW.md](FEATURES/PREVIEW.md#overlays-floating-table-of-contents). |

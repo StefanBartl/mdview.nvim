@@ -208,11 +208,10 @@ async function boot() {
   let lastCursorCol = -1;
 
   // Mirror of the Neovim visual selection (?sel= from browser.selection_sync;
-  // :MDView selection toggles it live). ON unless explicitly disabled -- the
-  // feature earns its keep while presenting, which is exactly when nobody
-  // wants to have switched something on first. Kept across renders so the
+  // :MDView selection toggles it live). Off unless asked for: while editing,
+  // every v/V drag reaching the browser is noise. Kept across renders so the
   // highlight survives the innerHTML swap every keystroke causes.
-  let selectionEnabled = params.get('sel') !== '0';
+  let selectionEnabled = params.get('sel') === '1';
   let lastSelection: SourceSelection | null = null;
 
   // Both the caret and the selection mirror are placed from the renderer's
@@ -450,6 +449,7 @@ async function boot() {
       overlayData?: unknown;
       blankLines?: unknown;
       selection?: unknown;
+      selectionSync?: unknown;
     };
     try {
       msg = JSON.parse(json) as typeof msg;
@@ -476,7 +476,7 @@ async function boot() {
     if (typeof msg.cursor === 'string') {
       const mode = parseCursorMarkerMode(msg.cursor);
       cursorMarkerMode = mode;
-      const needSourceMap = mode === 'caret';
+      const needSourceMap = mode === 'caret' || selectionEnabled;
       if (needSourceMap !== wantSourceMap) {
         // Toggling caret changes whether the renderer must emit source-position
         // spans, so re-render the current document with the new setting.
@@ -498,6 +498,23 @@ async function boot() {
       blankLinesEnabled = msg.blankLines;
       // Blocks are already in the DOM — just add/remove spacers, no re-render.
       applyBlankLineSpacing(container, blankLinesEnabled);
+    }
+    if (typeof msg.selectionSync === 'boolean' && container) {
+      // `:MDView selection` switching the mirror on/off for this session. The
+      // mirror places its rectangles from the renderer's inline source-position
+      // spans, so enabling it re-renders once to get them -- deliberately here,
+      // at the toggle, rather than in the middle of the first thing being
+      // pointed at.
+      selectionEnabled = msg.selectionSync;
+      if (!selectionEnabled) {
+        lastSelection = null;
+        updateSelection(container, null);
+      }
+      const needSourceMap = selectionEnabled || cursorMarkerMode === 'caret';
+      if (needSourceMap !== wantSourceMap) {
+        wantSourceMap = needSourceMap;
+        renderDocument(lastText);
+      }
     }
     if ('selection' in msg && container) {
       // `false` (Neovim left visual mode, or :MDView selection off) parses to

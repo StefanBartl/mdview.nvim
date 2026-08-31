@@ -33,7 +33,7 @@ vim.api.nvim_set_current_buf(buf)
 
 state.set_server({ stub = true })
 bcfg.defaults.behavior = "new_tab"
-bcfg.defaults.selection_sync = true
+bcfg.defaults.selection_sync = true -- off by default; switched on for these
 vim.o.selection = "inclusive"
 
 local group = vim.api.nvim_create_augroup("MdviewSelectionSyncSpec", { clear = true })

@@ -105,7 +105,7 @@ describe("selection_sync.send_current_selection", function()
   vim.o.selection = "inclusive"
   state.set_server({ stub = true }) -- control.send is a no-op without a session
   bcfg.defaults.behavior = "new_tab" -- route to the buffer's own path
-  bcfg.defaults.selection_sync = true
+  bcfg.defaults.selection_sync = true -- off by default; switched on for these
 
   it("routes the selection to the room the tab watches", function()
     leave_visual()

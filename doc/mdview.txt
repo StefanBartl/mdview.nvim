@@ -141,7 +141,7 @@ Defaults: >lua
       highlighter         = "hljs",    -- code highlighter: hljs|shiki|none
       external_links      = "new_tab", -- external links: "new_tab" | "same_tab"
       cursor_marker       = "line",    -- "line"|"caret"|"section"|"off"
-      selection_sync      = true,      -- mirror the visual selection (v/V/C-v)
+      selection_sync      = false,     -- mirror the visual selection (v/V/C-v)
       zoom                = 1.0,       -- preview font-size zoom (:MDView zoom)
       overlays            = {          -- preview overlays (:MDView overlay)
         toc = false,                   -- floating outline, current section lit
@@ -318,12 +318,13 @@ browser.cursor_marker ~
 browser.selection_sync ~
   Mirror the Neovim visual selection into the preview: what you select with
   `v`, `V` or CTRL-V is highlighted in the browser, live, and disappears when
-  you leave visual mode. Default: `true`.
+  you leave visual mode. Default: `false` — |:MDView-selection| toggles it.
   Meant for showing a document to other people — a lecture, a screen share, a
   walkthrough. Pointing at something in Neovim is invisible to an audience
   watching the browser tab; selecting it says "this part, here" in the window
-  they are looking at. On by default for that reason: it is needed exactly
-  when nobody wants to have switched something on first.
+  they are looking at. Off while you edit, for the same reason: an audience
+  would otherwise watch you select things you are only operating on. Off costs
+  nothing, so there is no third state to disable it in for good.
   All three visual modes keep their shape (charwise flows across lines,
   linewise covers whole lines, blockwise draws a column range on each line).
   The highlight is drawn as rectangles over the document, placed from the same
@@ -578,10 +579,13 @@ pushes a control update over the socket.
 
 :MDView selection [action]                                *:MDView-selection*
   Switches the visual-selection mirror on/off (`on`|`off`|`toggle`; no
-  argument toggles) — see `browser.selection_sync` above. On by default.
-  Switching it off also clears a highlight that is drawn right now, instead of
-  leaving it stranded in the tab; switching it on draws the selection that is
-  already active rather than waiting for the next cursor move.
+  argument toggles) — see `browser.selection_sync` above. Off by default;
+  this is the switch you flip when you start showing the document to someone.
+  Switching it on prepares the tab at once (it re-renders with the source-
+  position spans the mirror needs, so the first thing you point at appears
+  without a hitch) and draws a selection that is already active. Switching it
+  off clears a highlight that is drawn right now, instead of leaving it
+  stranded in the tab.
 
 :MDView sync [action]                                          *:MDView-sync*
   Pauses/resumes the nvim->browser scroll sync (`pause`|`resume`|`toggle`).

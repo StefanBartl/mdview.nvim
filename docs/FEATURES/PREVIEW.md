@@ -91,9 +91,14 @@ blockwise draws the column range on every line it spans. The highlight follows
 the selection while it grows (throttled, with a trailing update so the final
 position always arrives) and disappears the moment you leave visual mode.
 
-**On by default** — the whole point is that it works while presenting without
-having been switched on first. `:MDView selection off` stops it, and clears a
-highlight that is currently drawn rather than stranding it in the tab.
+**Off by default**, and meant to be toggled on for as long as you are showing
+the document to someone: `:MDView selection` flips it. While you are editing
+rather than presenting, every `v`/`V` drag reaching the browser is noise — the
+audience would watch you select things you are only operating on, and off costs
+nothing. Switching it on prepares the tab right away (the mirror needs the
+renderer's source-position spans, so the tab re-renders once — better at the
+toggle than in the middle of the first thing you point at); switching it off
+clears a highlight that is currently drawn rather than stranding it there.
 
 It is drawn as rectangles over the document, positioned from the renderer's
 `data-sp` source-position spans (see
@@ -106,7 +111,7 @@ rather than guessed at.
 
 - **Module:** `lua/mdview/bindings/autocmds/selection_sync.lua`, `src/client/render/selectionMarker.ts`, `src/client/render/sourcePos.ts`
 - **Usercmds:** `:MDView selection [on|off|toggle]` (no argument toggles)
-- **Config:** `browser.selection_sync` (default `true`), passed to the client as `?sel=0` when off
+- **Config:** `browser.selection_sync` (default `false`), passed to the client as `?sel=1` when on
 
 ## Scroll sync pause/resume
 

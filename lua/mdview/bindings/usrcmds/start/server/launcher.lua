@@ -116,11 +116,10 @@ local function resolve_browser_url(opts)
     url = url .. "&zoom=" .. vim.uri_encode(("%.3f"):format(zoom))
   end
 
-  -- visual-selection mirroring (client reads ?sel=0); only pass when OFF --
-  -- the client defaults it on, so a tab opened by an older/newer path still
-  -- behaves like the documented default.
-  if browser_defaults.selection_sync == false then
-    url = url .. "&sel=0"
+  -- visual-selection mirroring (client reads ?sel=1); only pass when ON, so a
+  -- tab reopened after `:MDView selection` keeps what the command last set.
+  if browser_defaults.selection_sync == true then
+    url = url .. "&sel=1"
   end
 
   -- show-all-blank-lines mode (client reads ?blanklines=1); only pass when on
