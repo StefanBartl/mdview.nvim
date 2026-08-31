@@ -66,6 +66,7 @@ function M.try_push(path, lines, opts)
         -- never a diff.
         ws_client.send_content(path, lines, { full = true })
         session.store(path, lines)
+        require("mdview.core.fence_spans").push(vim.api.nvim_get_current_buf(), path)
         log.debug(string.format("try_push: success for %s on attempt %d", path, attempt), nil, "try_push", true)
       else
         if attempt < cfg.max_attempts then

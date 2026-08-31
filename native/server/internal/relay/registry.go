@@ -18,6 +18,7 @@ type Registry struct {
 	mu      sync.Mutex
 	rooms   map[string]map[Conn]struct{}
 	last    map[string][]byte
+	spans   map[string][]byte
 	docDirs map[string]string
 }
 
@@ -25,6 +26,7 @@ func NewRegistry() *Registry {
 	return &Registry{
 		rooms:   make(map[string]map[Conn]struct{}),
 		last:    make(map[string][]byte),
+		spans:   make(map[string][]byte),
 		docDirs: make(map[string]string),
 	}
 }
@@ -73,6 +75,31 @@ func (r *Registry) LastPayload(key string) ([]byte, bool) {
 	defer r.mu.Unlock()
 	payload, ok := r.last[key]
 	return payload, ok
+}
+
+// LastSpans returns the most recently broadcast fence-highlight payload for
+// key, if any.
+func (r *Registry) LastSpans(key string) ([]byte, bool) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	payload, ok := r.spans[key]
+	return payload, ok
+}
+
+// BroadcastSpans fans a fence-highlight payload out to key's room and stores it
+// as the room's latest, alongside — not instead of — the content in LastPayload.
+//
+// Stored rather than ephemeral because it describes the *current* document
+// rather than a passing event: a tab that reloads is seeded with the content
+// from LastPayload, and without this it would show that content unhighlighted
+// until the next edit happened to arrive.
+func (r *Registry) BroadcastSpans(key string, payload []byte) []error {
+	r.mu.Lock()
+	r.spans[key] = payload
+	conns := r.connsForLocked(key)
+	r.mu.Unlock()
+
+	return sendAll(conns, payload)
 }
 
 // Broadcast stores payload as the latest content for key and sends it to

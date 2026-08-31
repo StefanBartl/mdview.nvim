@@ -75,6 +75,51 @@ func TestRegistry_LastPayloadSeedsLateJoiners(t *testing.T) {
 	}
 }
 
+// Fence highlights are stored *alongside* the content, not instead of it: a
+// reloaded tab is seeded with both, and getting this wrong would either lose
+// the document (if spans overwrote it) or show it unhighlighted until the next
+// edit (if spans were ephemeral).
+func TestRegistry_BroadcastSpansSeedsLateJoinersWithoutReplacingContent(t *testing.T) {
+	r := NewRegistry()
+
+	if _, ok := r.LastSpans("/doc/a.md"); ok {
+		t.Fatalf("expected no spans before any broadcast")
+	}
+
+	r.Broadcast("/doc/a.md", []byte("current content"))
+	r.BroadcastSpans("/doc/a.md", []byte("current spans"))
+
+	spans, ok := r.LastSpans("/doc/a.md")
+	if !ok {
+		t.Fatalf("expected spans to be recorded")
+	}
+	if string(spans) != "current spans" {
+		t.Fatalf("expected %q, got %q", "current spans", spans)
+	}
+
+	content, ok := r.LastPayload("/doc/a.md")
+	if !ok || string(content) != "current content" {
+		t.Fatalf("BroadcastSpans must not touch LastPayload; got %q (ok=%v)", content, ok)
+	}
+}
+
+func TestRegistry_BroadcastSpansOnlyReachesSameRoom(t *testing.T) {
+	r := NewRegistry()
+	a := &fakeConn{}
+	b := &fakeConn{}
+	r.Join("/doc/a.md", a)
+	r.Join("/doc/b.md", b)
+
+	r.BroadcastSpans("/doc/a.md", []byte("spans for a"))
+
+	if len(a.received) != 1 || string(a.received[0]) != "spans for a" {
+		t.Fatalf("expected the room's own connection to receive the spans, got %q", a.received)
+	}
+	if len(b.received) != 0 {
+		t.Fatalf("expected another room to receive nothing, got %q", b.received)
+	}
+}
+
 func TestRegistry_BroadcastCollectsSendErrorsWithoutStoppingFanout(t *testing.T) {
 	r := NewRegistry()
 	failing := &fakeConn{failNext: true}

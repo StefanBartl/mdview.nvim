@@ -31,7 +31,7 @@
 ---@field require_display boolean don't auto-open a browser without a GUI/DISPLAY available (see mdview-security)
 ---@field stop_on_browser_exit boolean run :MDViewStop when the opened browser process exits (isolated mode only)
 ---@field theme string preview theme passed to the client as ?theme= — one of "github", "dark-dimmed", "plain", "tokyonight", "catppuccin" (optionally suffixed "-light"/"-dark" to pin the color scheme); see src/client/themes/
----@field highlighter "hljs"|"shiki"|"none" code-fence syntax highlighter (client-side, lazy-loaded): "hljs" (light, default), "shiki" (exact VSCode/TextMate themes, heavier), or "none"
+---@field highlighter "hljs"|"shiki"|"nvim"|"none" code-fence syntax highlighter: "hljs" (highlight.js, light, default), "shiki" (exact VSCode/TextMate themes, heavier), "nvim" (Neovim's own colors, read out of color_my_ascii.nvim and pushed over /spans -- the preview then matches the buffer exactly; blocks it does not paint fall through to highlight.js), or "none"
 ---@field focus "browser"|"nvim" whether the opened tab may take keyboard focus ("browser", default) or focus stays in Neovim ("nvim" — clean on macOS, best-effort on Windows, no-op on Linux); default open_mode only
 ---@field external_links "new_tab"|"same_tab" open external links (http/mailto/absolute) in a new tab ("new_tab", default — keeps the preview tab) or in place ("same_tab")
 ---@field cursor_marker "line"|"caret"|"section"|"off" show the Neovim cursor in the preview: line marker in the left gutter ("line", default), an exact caret at the cursor column ("caret", uses inline source-position spans), a spotlight on the current heading section with the rest dimmed ("section"), or hidden ("off"); rides the scroll-sync ping, so needs scroll_sync on

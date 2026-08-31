@@ -206,6 +206,13 @@ end
 ---@internal
 ---@param path string
 ---@return string
+local function spans_url_for(path)
+  return endpoint_url_for("spans", path)
+end
+
+---@internal
+---@param path string
+---@return string
 local function doc_url_for(path)
   return endpoint_url_for("doc", path)
 end
@@ -563,6 +570,25 @@ function M.send_control(key, json)
     return
   end
   http_post_nonblocking(control_url_for(key), json, function() end)
+end
+
+--- Public: push the buffer's own fenced-code highlighting to `key`'s room, so
+--- the preview can paint code blocks with exactly what Neovim shows
+--- (browser.highlighter = "nvim"). `json` is the payload built by
+--- mdview.core.fence_spans; pass nil to tell the tab there is nothing to paint,
+--- which drops it back to its own JavaScript highlighter.
+---
+--- Fire-and-forget, but NOT ephemeral on the relay's side: it stores the last
+--- one per room and replays it to a joining tab, so a reload does not show the
+--- document unhighlighted until the next edit.
+---@param key string # room key the tab watches
+---@param json string|nil # the fence-highlight payload, or nil for "nothing to paint"
+---@return nil
+function M.send_spans(key, json)
+  if type(key) ~= "string" or key == "" then
+    return
+  end
+  http_post_nonblocking(spans_url_for(key), json or "null", function() end)
 end
 
 -- Public: ask every connected preview tab to close itself (the relay

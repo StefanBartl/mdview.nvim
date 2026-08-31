@@ -3,14 +3,19 @@
 // Code-fence highlighting dispatcher. The highlighter is chosen per session via
 // the ?hl= URL param (set from browser.highlighter on the Lua side) and its
 // implementation is dynamically imported, so an unselected highlighter is never
-// pulled into the loaded bundle — zero cost when off or when the other one is
+// pulled into the loaded bundle — zero cost when off or when another one is
 // chosen.
+//
+// "nvim" is the odd one out: it paints from colors Neovim sends over the /spans
+// channel rather than tokenizing anything itself, and hands the blocks it has
+// no colors for to highlight.js. It therefore loads both modules.
 
-export type HighlighterName = 'hljs' | 'shiki' | 'none';
+export type HighlighterName = 'hljs' | 'shiki' | 'nvim' | 'none';
 
 /** Map the ?hl= param to a highlighter; defaults to highlight.js. */
 export function parseHighlighter(param: string | null | undefined): HighlighterName {
   if (param === 'shiki') return 'shiki';
+  if (param === 'nvim') return 'nvim';
   if (param === 'none') return 'none';
   return 'hljs';
 }
@@ -27,6 +32,10 @@ async function loadApplier(name: HighlighterName): Promise<Applier | null> {
     loadPromise = (async () => {
       if (name === 'shiki') {
         const m = await import('./shiki');
+        return m.highlightAll;
+      }
+      if (name === 'nvim') {
+        const m = await import('./nvim');
         return m.highlightAll;
       }
       const m = await import('./hljs');

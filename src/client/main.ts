@@ -86,6 +86,11 @@ const DOC_MESSAGE_PREFIX = '\x04';
 // controlMessagePrefix. Powers :MDViewCursor / :MDViewZoom without a reload.
 const CONTROL_MESSAGE_PREFIX = '\x05';
 
+// Tags a WS message as a fence-highlight payload (JSON: the buffer's own syntax
+// colors per fenced code block) — must match native/server/main.go's
+// spansMessagePrefix. Powers browser.highlighter = "nvim".
+const SPANS_MESSAGE_PREFIX = '\x06';
+
 function applyScrollPing(container: HTMLElement, message: string): void {
   // Payload: "line/total/viewfrac[/col]". viewfrac (0..1) is where in the browser
   // viewport the cursor line should sit — Neovim sends a small value for "top"
@@ -437,6 +442,30 @@ async function boot() {
     }
   };
 
+  // Apply a fence-highlight payload from Neovim, then repaint the code blocks.
+  // Only ever sent while browser.highlighter = "nvim"; under any other
+  // highlighter the Lua side never collects it, so this stays unused. A
+  // malformed payload clears the spans, which drops every block back to
+  // highlight.js rather than leaving stale colors.
+  const applySpans = (json: string): void => {
+    if (!container) return;
+    void (async () => {
+      try {
+        const { setSpans } = await import('./highlight/nvim');
+        let parsed: unknown = null;
+        try {
+          parsed = JSON.parse(json);
+        } catch {
+          parsed = null;
+        }
+        setSpans(parsed);
+        await highlight(highlighter, container);
+      } catch (err) {
+        console.error('[mdview] fence spans failed', err);
+      }
+    })();
+  };
+
   // Apply a live control update (:MDViewCursor / :MDViewZoom). Best-effort: a
   // malformed payload is ignored rather than breaking the preview.
   const applyControl = (json: string): void => {
@@ -561,6 +590,14 @@ async function boot() {
 
     if (rawMessage.startsWith(CONTROL_MESSAGE_PREFIX)) {
       applyControl(rawMessage.slice(CONTROL_MESSAGE_PREFIX.length));
+      return;
+    }
+
+    if (rawMessage.startsWith(SPANS_MESSAGE_PREFIX)) {
+      // The buffer's own fence highlighting (browser.highlighter = "nvim").
+      // Arrives on its own channel, after the content it describes, so the
+      // document is already rendered and only needs repainting.
+      applySpans(rawMessage.slice(SPANS_MESSAGE_PREFIX.length));
       return;
     }
 

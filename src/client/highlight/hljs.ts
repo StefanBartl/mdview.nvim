@@ -15,9 +15,13 @@ import './hljs-theme.css';
  * language are highlighted with auto-detection off (left plain) to avoid
  * mislabeling prose. Runs on trusted, already-sanitized DOM, so the spans it
  * injects need no further sanitization.
+ *
+ * `selector` narrows which blocks to touch. The nvim highlighter uses it to
+ * hand over exactly the blocks Neovim had no colors for, so the two can share
+ * one document without painting over each other.
  */
-export function highlightAll(root: HTMLElement): void {
-  root.querySelectorAll<HTMLElement>('pre code').forEach(el => {
+export function highlightAll(root: HTMLElement, selector = 'pre code'): void {
+  root.querySelectorAll<HTMLElement>(selector).forEach(el => {
     // Re-highlighting is guarded by hljs via the `data-highlighted` attribute;
     // after a re-render the nodes are fresh, so this always applies.
     hljs.highlightElement(el);

@@ -57,6 +57,12 @@ const docMessagePrefix = "\x04"
 // reload. \x05 is a control byte that can't appear in typed Markdown.
 const controlMessagePrefix = "\x05"
 
+// Tags a WS message as a fence-highlight payload (JSON: the buffer's own
+// syntax colors per fenced code block) rather than document content --
+// browser.highlighter = "nvim". Must match src/client/main.ts's
+// SPANS_MESSAGE_PREFIX.
+const spansMessagePrefix = "\x06"
+
 // wsConn adapts a *websocket.Conn to relay.Conn so relay.Registry stays
 // decoupled from the WebSocket library and can be tested without a network.
 type wsConn struct {
@@ -137,6 +143,7 @@ func main() {
 	mux.HandleFunc("/preview", handlePreview(registry, *token))
 	mux.HandleFunc("/control", handleControl(registry, *token))
 	mux.HandleFunc("/diff", handleDiff(registry, *token))
+	mux.HandleFunc("/spans", handleSpans(registry, *token))
 	mux.HandleFunc("/close", handleClose(registry, *token))
 	mux.HandleFunc("/nav", handleNav(navQueue, *token))
 	mux.HandleFunc("/toggle", handleToggle(toggleQueue, watchKey, watchPath, *token))
@@ -588,6 +595,42 @@ func handleControl(registry *relay.Registry, token string) http.HandlerFunc {
 	}
 }
 
+// handleSpans fans the buffer's own fenced-code highlighting out to key's room
+// and stores it as the room's latest, alongside -- not instead of -- the
+// content. Powers browser.highlighter = "nvim", where the preview paints code
+// blocks with exactly what Neovim shows rather than re-guessing the language in
+// JavaScript.
+//
+// Stored rather than ephemeral (unlike /scroll, /doc and /control) because it
+// describes the current document rather than a passing event: a reloaded tab is
+// seeded with LastPayload's content, and would otherwise show it unhighlighted
+// until the next edit happened to arrive. The relay never inspects the payload,
+// it only forwards and remembers the bytes.
+func handleSpans(registry *relay.Registry, token string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		if !relay.ValidToken(token, r.URL.Query().Get("token")) {
+			http.Error(w, "forbidden", http.StatusForbidden)
+			return
+		}
+		key := r.URL.Query().Get("key")
+		if key == "" {
+			http.Error(w, "missing key", http.StatusBadRequest)
+			return
+		}
+		body, err := io.ReadAll(io.LimitReader(r.Body, maxUpdateBodyBytes))
+		if err != nil {
+			http.Error(w, "failed to read body", http.StatusBadRequest)
+			return
+		}
+		registry.BroadcastSpans(key, append([]byte(spansMessagePrefix), body...))
+		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
 // handleDiff fans an incremental content update (a client-tagged envelope) out
 // to key's room WITHOUT recording it as the room's last content. Full snapshots
 // still flow through /update (LastPayload), so a newly-joined tab is seeded with
@@ -898,6 +941,14 @@ func handleWS(registry *relay.Registry, token string, port int) http.HandlerFunc
 		defer registry.Leave(key, conn)
 
 		if payload, ok := registry.LastPayload(key); ok {
+			if err := conn.Send(payload); err != nil {
+				return
+			}
+		}
+
+		// After the content, never before: the client applies fence highlights to
+		// a rendered document, so spans arriving first would find nothing.
+		if payload, ok := registry.LastSpans(key); ok {
 			if err := conn.Send(payload); err != nil {
 				return
 			}

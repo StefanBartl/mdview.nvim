@@ -138,7 +138,7 @@ Defaults: >lua
                                        -- follows) | "new_tab" | "manual"
       theme               = "github",  -- github|dark-dimmed|plain|tokyonight|
                                        -- catppuccin (optionally -light/-dark)
-      highlighter         = "hljs",    -- code highlighter: hljs|shiki|none
+      highlighter         = "hljs",    -- code highlighter: hljs|shiki|nvim|none
       external_links      = "new_tab", -- external links: "new_tab" | "same_tab"
       cursor_marker       = "line",    -- "line"|"caret"|"section"|"off"
       selection_sync      = false,     -- mirror the visual selection (v/V/C-v)
@@ -279,6 +279,19 @@ browser.highlighter ~
               `--code-*` variables.
     "shiki" — exact TextMate/VSCode themes (tokyo-night, catppuccin, dark-plus,
               …) mapped from `browser.theme`; heavier, grammars load on demand.
+    "nvim"  — Neovim's own colors. Nothing is tokenized in the browser: the
+              highlighting color_my_ascii.nvim applied to the buffer is read
+              back out through its public API, resolved to #rrggbb, and pushed
+              per fenced block over the /spans channel. Preview and buffer then
+              agree by construction — same colorscheme, same groups — and a
+              :colorscheme change reaches the browser with the next push.
+              A block color_my_ascii did NOT paint goes to highlight.js rather
+              than losing its colors: its fence map covers 31 language tags,
+              highlight.js knows about 190, so this is an addition to the
+              JavaScript highlighter, not a replacement. color_my_ascii stays a
+              soft dependency — without it there is simply nothing to send.
+              The relay stores the last spans per room, so a reloaded tab is
+              repainted at once instead of waiting for the next edit.
     "none"  — no highlighting.
 
 browser.external_links ~

@@ -94,13 +94,41 @@ without reopening the tab.
 
 ## Code-fence syntax highlighting
 
-Client-side, lazy-loaded, and swappable at three cost/fidelity levels:
+Client-side, lazy-loaded, and swappable at four cost/fidelity levels:
 `hljs` (highlight.js, light, the default), `shiki` (exact TextMate/VSCode
-grammars matching the tokyo-night/catppuccin/dark-plus themes, heavier), or
-`none`.
+grammars matching the tokyo-night/catppuccin/dark-plus themes, heavier),
+`nvim` (see below), or `none`.
 
 - **Module:** `src/client/highlight/hljs.ts`, `src/client/highlight/shiki.ts`
 - **Config:** `browser.highlighter` (default `"hljs"`)
+
+### `nvim` — the buffer's own colors
+
+`browser.highlighter = "nvim"` stops guessing the language in the browser and
+paints code blocks with **the colors Neovim is already showing**. The preview
+and the buffer next to it then agree by construction rather than by
+coincidence: same colorscheme, same highlight groups, and a `:colorscheme`
+change in Neovim reaches the browser with the next push.
+
+The colors come from [color_my_ascii.nvim](https://github.com/StefanBartl/color_my_ascii.nvim)
+through its public read-back API (`color_my_ascii.highlight`), which returns
+the spans it painted plus their resolved `#rrggbb`. mdview collects them per
+fenced block and pushes them over `/spans` — a channel of its own, stored by
+the relay rather than ephemeral, so a reloaded tab is repainted immediately
+instead of sitting unhighlighted until the next edit.
+
+**A block Neovim did not paint goes to highlight.js**, not to a flat gray box.
+That is the normal case, not an edge case: color_my_ascii's `fence_language_map`
+covers 31 fence tags, highlight.js knows around 190 languages. So `nvim` is an
+*addition* to the JavaScript highlighter for the languages both know, never a
+replacement that loses coverage — a document with ```lua and ```yaml blocks gets
+the first from Neovim and the second from highlight.js, in one page.
+
+color_my_ascii stays a **soft** dependency: without it there are no spans, the
+payload is empty, and every block falls through exactly as it did before.
+
+- **Module:** `lua/mdview/core/fence_spans.lua`, `src/client/highlight/nvim.ts`
+- **Config:** `browser.highlighter = "nvim"`
 
 ## Blank-line handling
 

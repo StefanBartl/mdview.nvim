@@ -94,6 +94,11 @@ function M.push_buffer_changes(bufnr, opts)
   ws_client.send_content(target, lines, { full = opts and opts.full == true or nil })
   session.store(path, lines)
 
+  -- The buffer's own fenced-code highlighting, for browser.highlighter =
+  -- "nvim". A no-op under any other highlighter, and sent after the content on
+  -- purpose: the client paints spans onto a rendered document.
+  require("mdview.core.fence_spans").push(bufnr, target)
+
   -- Tell the tab which document it's now showing whenever it changes (initial
   -- push, or a buffer switch in "reuse" mode) — powers browser Back/Forward.
   -- Keyed by target room so it fires once per new document, not per keystroke.

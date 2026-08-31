@@ -89,6 +89,10 @@ local function on_switch(bufnr)
       -- so force a full snapshot rather than diffing against the previous
       -- buffer's content (which would be a large, pointless diff).
       ws_client.send_content(preview_key, lines, { full = true })
+      -- The new buffer's own fence highlighting too, or the tab would keep
+      -- painting the previous document's code blocks (browser.highlighter =
+      -- "nvim"; a no-op under any other).
+      require("mdview.core.fence_spans").push(bufnr, preview_key)
       log.debug("reuse: pushed " .. path .. " to preview room " .. preview_key, nil, "bufswitch", true)
     end, ws_client.WAIT_READY_TIMEOUT)
     return
