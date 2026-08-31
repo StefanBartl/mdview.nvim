@@ -33,6 +33,9 @@ In detail in [`PREVIEW.md`](PREVIEW.md).
   `BufWritePost`.
 - **Scroll sync Neovim → browser**, and **reverse scroll** browser → Neovim.
 - **Cursor marker** — Neovim's position, shown in the rendered document.
+- **Visual selection mirror** — what you select with `v`/`V`/`CTRL-V` is
+  highlighted in the preview, for showing a document to other people. Off
+  while you edit; `:MDView selection` toggles it.
 - **Zoom**, **pause/resume** of the scroll sync, **overlays** (a floating TOC),
   **breadcrumbs** (the session outline).
 - **Click to navigate** — clicking a relative link opens the file in Neovim
@@ -52,8 +55,10 @@ In detail in [`RENDERING.md`](RENDERING.md).
 - **comrak and ammonia in one WASM call** — rendering and sanitization are
   inseparable; no caller can obtain HTML that bypassed the allowlist.
 - **Themes**, loaded lazily — a theme is a CSS file plus a map entry.
-- **Code-fence highlighting** via Shiki (with an hljs path), applied
-  asynchronously after insertion into the DOM.
+- **Code-fence highlighting** via highlight.js or Shiki, applied
+  asynchronously after insertion into the DOM — or `nvim`, which paints with
+  the colors Neovim is already showing and hands what it cannot colour to
+  highlight.js.
 - **Private blocks** — a fence with the info string `private` renders blurred,
   revealed by a click or by `:MDView reveal`.
 - **Local images** — relative `<img src>` is rewritten onto the `/asset` route.

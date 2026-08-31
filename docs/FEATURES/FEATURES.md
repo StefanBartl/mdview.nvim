@@ -95,6 +95,25 @@ Live buffers and the standalone file watcher both end up in the same
 
 - **Module:** `native/server/internal/relay/registry.go`, `internal/source/watch.go`
 
+## Two stored payloads per room
+
+A room remembers its content (`LastPayload`, written by `Broadcast`) and, since
+`browser.highlighter = "nvim"`, its fence highlighting (`LastSpans`, written by
+`BroadcastSpans`). A joining connection is seeded with both, **content first** —
+the client paints spans onto a rendered document, so the other order would find
+nothing to paint.
+
+Stored, not ephemeral, and that distinction is the whole point: every other
+sidecar channel (`/scroll`, `/doc`, `/control`) carries a passing event that the
+next one supersedes, so seeding a late joiner with it would be wrong. Fence
+highlighting describes the *current* document, exactly like the content does. A
+reloaded tab would otherwise sit there unhighlighted until the next edit
+happened to arrive.
+
+- **Module:** `native/server/internal/relay/registry.go` (`Broadcast`,
+  `BroadcastSpans`, `LastPayload`, `LastSpans`), `native/server/main.go`
+  (`handleSpans`, `handleWS`)
+
 ## The polling bridge, browser → Neovim
 
 Neovim has no WebSocket client, and the relay stays a dumb byte forwarder. For

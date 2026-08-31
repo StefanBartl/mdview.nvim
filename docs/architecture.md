@@ -28,6 +28,21 @@ standalone mode there is no Lua side to do it.
 
 See [standalone.md](standalone.md) for the user-facing side of this.
 
+Beside the content there are **sidecar channels**, each a POST from Neovim that
+the relay forwards verbatim without inspecting it: `/scroll` (cursor position),
+`/doc` (which document is shown), `/control` (live preview settings, capped at
+1 KiB), and `/spans` (the buffer's own fence highlighting, for
+`browser.highlighter = "nvim"`).
+
+`/spans` is the one exception to "sidecars are ephemeral". The others carry a
+passing event that the next one supersedes; fence highlighting describes the
+current document, so the relay stores the last one per room alongside — never
+instead of — the content, and seeds a joining tab with both. Without that, a
+reloaded tab would show the content unhighlighted until the next edit arrived.
+
+See [FEATURES/RENDERING.md](FEATURES/RENDERING.md#nvim--the-buffers-own-colors)
+and [FEATURES/PREVIEW.md](FEATURES/PREVIEW.md#visual-selection-mirror).
+
 ## Local image assets
 
 The WASM renderer produces correct `<img>` markup for `![alt](path)` on its
