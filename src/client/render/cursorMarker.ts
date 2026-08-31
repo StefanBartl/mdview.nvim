@@ -18,6 +18,7 @@
 
 import { pickScrollTarget, fractionInBlock } from './scrollSync';
 import { topLevelBlocks, sectionRange } from './docModel';
+import { runsOnLine, byteOffsetToUtf16, findTextPosition } from './sourcePos';
 
 export type CursorMarkerMode = 'off' | 'line' | 'caret' | 'section';
 
@@ -102,32 +103,6 @@ function placeLineBar(container: HTMLElement, line: number): void {
   barEl = ensureEl(barEl, container, 'mdview-cursor-bar');
   barEl.style.display = 'block';
   barEl.style.top = `${yInContent}px`;
-}
-
-interface SpanRange {
-  el: HTMLElement;
-  sc: number; // start byte column (1-based)
-  ec: number; // end byte column (1-based, inclusive of the last byte)
-}
-
-/** Parse the `data-sp="sl:sc:el:ec"` runs on `line` (single-line inline runs). */
-function runsOnLine(container: HTMLElement, line: number): SpanRange[] {
-  const out: SpanRange[] = [];
-  container.querySelectorAll<HTMLElement>('span[data-sp]').forEach((el) => {
-    const sp = el.getAttribute('data-sp');
-    if (!sp) return;
-    const p = sp.split(':');
-    if (p.length !== 4) return;
-    const sl = Number(p[0]);
-    const sc = Number(p[1]);
-    const el2 = Number(p[2]);
-    const ec = Number(p[3]);
-    if (sl !== line || el2 !== line) return; // only single-line runs
-    if (!Number.isFinite(sc) || !Number.isFinite(ec)) return;
-    out.push({ el, sc, ec });
-  });
-  out.sort((a, b) => a.sc - b.sc);
-  return out;
 }
 
 /**
@@ -237,50 +212,6 @@ function caretPixelBox(
   range.collapse(true);
   const r = range.getBoundingClientRect();
   if (r.width || r.height || r.left || r.top) return { left: r.left, top: r.top, height: r.height };
-  return null;
-}
-
-/** UTF-8 byte length of a single code point. */
-function utf8Len(cp: number): number {
-  if (cp <= 0x7f) return 1;
-  if (cp <= 0x7ff) return 2;
-  if (cp <= 0xffff) return 3;
-  return 4;
-}
-
-/**
- * Convert a UTF-8 byte offset into `s` to a UTF-16 code-unit offset (what DOM
- * Range uses). Stops at the code-point boundary at/after the byte offset, and
- * clamps to the string length.
- */
-function byteOffsetToUtf16(s: string, byteOffset: number): number {
-  if (byteOffset <= 0) return 0;
-  let bytes = 0;
-  let u16 = 0;
-  for (const ch of s) {
-    if (bytes >= byteOffset) return u16;
-    bytes += utf8Len(ch.codePointAt(0) ?? 0);
-    u16 += ch.length;
-  }
-  return u16; // offset at/after the end
-}
-
-/** Find the descendant text node + local offset for a UTF-16 offset within `el`. */
-function findTextPosition(el: HTMLElement, u16Offset: number): { node: Text; offset: number } | null {
-  const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
-  let acc = 0;
-  let last: Text | null = null;
-  let node = walker.nextNode() as Text | null;
-  while (node) {
-    const len = node.data.length;
-    if (u16Offset <= acc + len) {
-      return { node, offset: Math.max(0, u16Offset - acc) };
-    }
-    acc += len;
-    last = node;
-    node = walker.nextNode() as Text | null;
-  }
-  if (last) return { node: last, offset: last.data.length };
   return null;
 }
 

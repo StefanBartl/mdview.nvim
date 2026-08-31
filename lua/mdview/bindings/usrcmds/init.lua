@@ -31,6 +31,7 @@ local reveal = require("mdview.bindings.usrcmds.reveal")
 local breadcrumbs = require("mdview.bindings.usrcmds.breadcrumbs")
 local overlay = require("mdview.bindings.usrcmds.overlay")
 local blanklines = require("mdview.bindings.usrcmds.blanklines")
+local selection = require("mdview.bindings.usrcmds.selection")
 
 local M = {}
 
@@ -208,6 +209,15 @@ function M.attach()
       desc = "Set the Neovim-cursor marker in the preview (line|caret|section|off|toggle — toggle flips section on/off)",
       run = function(ctx)
         cursor.run(ctx.args.mode)
+      end,
+    },
+
+    {
+      path = { "selection" },
+      args = { { name = "action", type = "STRING", optional = true, values = selection.actions } },
+      desc = "Mirror the visual selection (v/V/CTRL-V) into the preview, or stop mirroring; no argument toggles",
+      run = function(ctx)
+        selection.run(ctx.args.action)
       end,
     },
 

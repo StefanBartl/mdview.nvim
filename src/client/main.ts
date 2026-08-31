@@ -18,6 +18,7 @@ import { markExternalLinks, parseExternalLinkMode } from './render/externalLinks
 import { resolveLocalImages } from './render/localImages';
 import { installLinkHover } from './render/linkHover';
 import { updateCursorMarker, parseCursorMarkerMode } from './render/cursorMarker';
+import { updateSelection, parseSelection, type SourceSelection } from './render/selectionMarker';
 import { applyBlankLineSpacing, parseBlankLines } from './render/blankLines';
 import { enableTaskCheckboxes, installTaskToggle } from './render/taskToggle';
 import { installFieldSync } from './render/fieldSync';
@@ -203,9 +204,20 @@ async function boot() {
   // so it renders with the source map on; "line"/"off" render without it. Both
   // are mutable so :MDViewCursor can change them live (see the control channel).
   let cursorMarkerMode = parseCursorMarkerMode(params.get('cursor'));
-  let wantSourceMap = cursorMarkerMode === 'caret';
   let lastCursorLine = -1;
   let lastCursorCol = -1;
+
+  // Mirror of the Neovim visual selection (?sel= from browser.selection_sync;
+  // :MDView selection toggles it live). ON unless explicitly disabled -- the
+  // feature earns its keep while presenting, which is exactly when nobody
+  // wants to have switched something on first. Kept across renders so the
+  // highlight survives the innerHTML swap every keystroke causes.
+  let selectionEnabled = params.get('sel') !== '0';
+  let lastSelection: SourceSelection | null = null;
+
+  // Both the caret and the selection mirror are placed from the renderer's
+  // inline source-position spans, so either one turns the source map on.
+  let wantSourceMap = cursorMarkerMode === 'caret' || selectionEnabled;
 
   // Show-all-blank-lines mode (?blanklines=1 from browser.preserve_blank_lines;
   // :MDView blanklines toggles it live). Off (CommonMark default: runs of
@@ -410,6 +422,9 @@ async function boot() {
       if (lastCursorLine >= 0) {
         updateCursorMarker(container, lastCursorLine, lastCursorCol >= 0 ? lastCursorCol : null, cursorMarkerMode);
       }
+      // Same for the visual-selection mirror: the render wiped its layer, and
+      // the selection it draws is still the current one.
+      if (selectionEnabled && lastSelection) updateSelection(container, lastSelection);
       // Overlays derive from the document (headings, positions) — let them
       // refresh against the new content.
       notifyOverlayRender();
@@ -434,6 +449,7 @@ async function boot() {
       overlays?: unknown;
       overlayData?: unknown;
       blankLines?: unknown;
+      selection?: unknown;
     };
     try {
       msg = JSON.parse(json) as typeof msg;
@@ -483,6 +499,24 @@ async function boot() {
       // Blocks are already in the DOM — just add/remove spacers, no re-render.
       applyBlankLineSpacing(container, blankLinesEnabled);
     }
+    if ('selection' in msg && container) {
+      // `false` (Neovim left visual mode, or :MDView selection off) parses to
+      // null, which clears the highlight.
+      lastSelection = parseSelection(msg.selection);
+      if (!lastSelection) {
+        updateSelection(container, null);
+      } else if (!wantSourceMap) {
+        // The mirror places its rectangles from the inline source-position
+        // spans, so a tab opened with ?sel=0 has to re-render once to get
+        // them — but only now that there is actually something to draw.
+        selectionEnabled = true;
+        wantSourceMap = true;
+        renderDocument(lastText);
+      } else {
+        selectionEnabled = true;
+        updateSelection(container, lastSelection);
+      }
+    }
   };
 
   transport.onMessage((rawMessage: string) => {
@@ -501,6 +535,10 @@ async function boot() {
 
     if (rawMessage.startsWith(DOC_MESSAGE_PREFIX)) {
       onDocChange(rawMessage.slice(DOC_MESSAGE_PREFIX.length));
+      // A selection addresses lines of the document it was made in; carrying
+      // it into the next one would highlight unrelated text.
+      lastSelection = null;
+      if (container) updateSelection(container, null);
       return;
     }
 

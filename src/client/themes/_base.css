@@ -114,6 +114,29 @@ body {
   }
 }
 
+/* Visual-selection mirror (browser.selection_sync): the Neovim selection drawn
+   over the document as rectangles, one per visual line, positioned in content
+   coordinates by JS from a DOM Range. A layer rather than markup around the
+   text -- a source selection crosses element boundaries freely, and the layer
+   is cheap to wipe on every re-render. Deliberately loud: it exists to be seen
+   on someone else's screen, through video compression. */
+.mdview-selection-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+  z-index: 4; /* under the cursor caret/bar (5), over the document */
+}
+.mdview-selection-rect {
+  position: absolute;
+  border-radius: 2px;
+  background: var(--selection-highlight, rgba(255, 196, 61, 0.32));
+  box-shadow: 0 0 0 1px var(--selection-highlight-edge, rgba(255, 196, 61, 0.55));
+  pointer-events: none;
+}
+
 /* Section spotlight (browser.cursor_marker = "section"): dim the blocks outside
    the cursor's section and lift the ones inside it, so a passive viewer can see
    at a glance which section is being discussed — more robust under video

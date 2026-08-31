@@ -76,6 +76,38 @@ a live control update — no reload needed either way.
 - **Usercmds:** `:MDView cursor [line|caret|section|off|toggle]` (no argument reports the current mode)
 - **Config:** `browser.cursor_marker` (default unset — see the command's own report for the effective value)
 
+## Visual selection mirror
+
+What you select in Neovim with `v` / `V` / `CTRL-V` is highlighted in the
+preview, live, as you drag it. It exists for showing a document to other
+people — a lecture, a screen share, a walkthrough of a checklist or README:
+pointing at something in Neovim is invisible to an audience looking at the
+browser tab, and selecting it says "this part, here" in the window they are
+actually watching.
+
+All three visual modes are mirrored, in their own shape: charwise flows from
+the start column to the end column across lines, linewise covers whole lines,
+blockwise draws the column range on every line it spans. The highlight follows
+the selection while it grows (throttled, with a trailing update so the final
+position always arrives) and disappears the moment you leave visual mode.
+
+**On by default** — the whole point is that it works while presenting without
+having been switched on first. `:MDView selection off` stops it, and clears a
+highlight that is currently drawn rather than stranding it in the tab.
+
+It is drawn as rectangles over the document, positioned from the renderer's
+`data-sp` source-position spans (see
+[RENDERING.md](RENDERING.md#source-position-mapping)) — not by wrapping the
+selected text in markup, which could not express a selection that crosses
+element boundaries. Fenced code blocks carry no inline spans, so their columns
+are resolved from the block's own line structure instead; a block that the
+Shiki highlighter rebuilt wholesale loses its source positions and is skipped
+rather than guessed at.
+
+- **Module:** `lua/mdview/bindings/autocmds/selection_sync.lua`, `src/client/render/selectionMarker.ts`, `src/client/render/sourcePos.ts`
+- **Usercmds:** `:MDView selection [on|off|toggle]` (no argument toggles)
+- **Config:** `browser.selection_sync` (default `true`), passed to the client as `?sel=0` when off
+
 ## Scroll sync pause/resume
 
 `:MDView sync [pause|resume|toggle]` freezes the nvim→browser scroll sync

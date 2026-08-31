@@ -141,6 +141,7 @@ Defaults: >lua
       highlighter         = "hljs",    -- code highlighter: hljs|shiki|none
       external_links      = "new_tab", -- external links: "new_tab" | "same_tab"
       cursor_marker       = "line",    -- "line"|"caret"|"section"|"off"
+      selection_sync      = true,      -- mirror the visual selection (v/V/C-v)
       zoom                = 1.0,       -- preview font-size zoom (:MDView zoom)
       overlays            = {          -- preview overlays (:MDView overlay)
         toc = false,                   -- floating outline, current section lit
@@ -313,6 +314,24 @@ browser.cursor_marker ~
     "off"   — no marker.
   All ride the scroll-sync ping, so they need |mdview-scroll_sync| on. Switch
   at runtime with |:MDView-cursor|.
+
+browser.selection_sync ~
+  Mirror the Neovim visual selection into the preview: what you select with
+  `v`, `V` or CTRL-V is highlighted in the browser, live, and disappears when
+  you leave visual mode. Default: `true`.
+  Meant for showing a document to other people — a lecture, a screen share, a
+  walkthrough. Pointing at something in Neovim is invisible to an audience
+  watching the browser tab; selecting it says "this part, here" in the window
+  they are looking at. On by default for that reason: it is needed exactly
+  when nobody wants to have switched something on first.
+  All three visual modes keep their shape (charwise flows across lines,
+  linewise covers whole lines, blockwise draws a column range on each line).
+  The highlight is drawn as rectangles over the document, placed from the same
+  `data-sp` source-position spans the "caret" cursor marker uses, so turning
+  this on also renders documents with those spans. Fenced code blocks carry no
+  spans and are located by their own line structure instead.
+  Switch it off with |:MDView-selection|, which also clears a highlight that
+  is currently drawn.
 
 browser.zoom ~
   Preview font-size zoom factor (`1.0` = 100%, the default). |:MDView-start|
@@ -556,6 +575,13 @@ pushes a control update over the socket.
   `line` (blinking bar at the cursor line), `caret` (caret at the exact cursor
   column), `section` (spotlight the current heading section, dim the rest), or
   `off`. No argument reports the current mode. Tab-completed.
+
+:MDView selection [action]                                *:MDView-selection*
+  Switches the visual-selection mirror on/off (`on`|`off`|`toggle`; no
+  argument toggles) — see `browser.selection_sync` above. On by default.
+  Switching it off also clears a highlight that is drawn right now, instead of
+  leaving it stranded in the tab; switching it on draws the selection that is
+  already active rather than waiting for the next cursor move.
 
 :MDView sync [action]                                          *:MDView-sync*
   Pauses/resumes the nvim->browser scroll sync (`pause`|`resume`|`toggle`).

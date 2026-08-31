@@ -8,6 +8,7 @@ local bufenter = require("mdview.bindings.autocmds.bufenter")
 local buffer_switch = require("mdview.bindings.autocmds.buffer_switch")
 local vim_leave = require("mdview.bindings.autocmds.vim_leave")
 local scroll_sync = require("mdview.bindings.autocmds.scroll_sync")
+local selection_sync = require("mdview.bindings.autocmds.selection_sync")
 local breadcrumbs = require("mdview.bindings.autocmds.breadcrumbs")
 -- local on_text_change = require("mdview.bindings.autocmds.on_text_change")
 -- local bufwrite = require("mdview.bindings.autocmds.bufwrite")
@@ -22,6 +23,9 @@ function M.teardown()
     return
   end
   autocmd_registry.detach_all()
+  -- Drop the deduplication cache: the next session talks to a fresh tab that
+  -- knows nothing about the selection this one last sent.
+  pcall(require("mdview.bindings.autocmds.selection_sync").reset)
   pcall(require("mdview.adapter.inbound_poll").stop)
   pcall(api.nvim_del_augroup_by_id, M.augroup_id)
   M.augroup_id = nil
@@ -47,6 +51,7 @@ function M.attach()
   buffer_switch.attach(M.augroup_id) -- Apply browser.behavior on buffer switch
   live_push.attach(M.augroup_id) -- Live Markdown push (diffs + full push on write)
   scroll_sync.attach(M.augroup_id) -- nvim-to-browser scroll sync (config: scroll_sync)
+  selection_sync.attach(M.augroup_id) -- visual selection mirrored into the preview (config: browser.selection_sync)
   breadcrumbs.attach(M.augroup_id) -- Session breadcrumbs (config: breadcrumbs)
   vim_leave.attach(M.augroup_id) -- Stop server on VimLeave
 

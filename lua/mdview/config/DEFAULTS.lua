@@ -37,6 +37,7 @@
 ---@field cursor_marker "line"|"caret"|"section"|"off" show the Neovim cursor in the preview: line marker in the left gutter ("line", default), an exact caret at the cursor column ("caret", uses inline source-position spans), a spotlight on the current heading section with the rest dimmed ("section"), or hidden ("off"); rides the scroll-sync ping, so needs scroll_sync on
 ---@field zoom number preview font-size zoom factor (1.0 = 100%, default); adjust at runtime with :MDViewZoom, passed to the client as ?zoom= and pushed live
 ---@field overlays table<string, boolean> which preview overlays start enabled, e.g. { toc = false }; toggle at runtime with :MDViewOverlay, passed to the client as ?overlays= and pushed live
+---@field selection_sync boolean mirror the Neovim visual selection (v / V / CTRL-V) into the preview as a highlight, live -- for showing a document to other people; on by default, switch it off with `:MDView selection off`, passed to the client as ?sel=0 and pushed live
 ---@field preserve_blank_lines boolean show every blank line between blocks as extra vertical space instead of CommonMark's default (any run of blank lines collapses to one paragraph gap); off by default, toggle at runtime with `:MDView blanklines`, passed to the client as ?blanklines=1 and pushed live
 
 ---@class mdview.config.StartDefaults
@@ -226,6 +227,10 @@ return {
     -- collapses to one paragraph gap) is what most people expect. See
     -- :MDView blanklines.
     preserve_blank_lines = false,
+    -- On by default: it costs nothing until something is actually selected,
+    -- and the whole point is that it works while presenting without having
+    -- been switched on first. See :MDView selection.
+    selection_sync = true,
   },
 
   start = {
