@@ -61,6 +61,7 @@
 ---@field line_diff boolean opt in to sending only changed lines per edit instead of the whole document (versioned diff transport; client reassembles full text)
 ---@field click_navigate boolean opt in to click-to-navigate: clicking a relative link in the preview opens the linked document in Neovim (via the relay's /nav bridge)
 ---@field reverse_scroll boolean opt in to reverse scroll: scrolling the preview moves Neovim's cursor to match (polled, so slightly lagged)
+---@field any_file boolean? **deprecated** -- the flag moved to the top level on 2026-08-30. Still read by `config.merge` so an older config keeps working; DEFAULTS does not carry it, so it is only ever set when a caller passed it.
 
 ---@class mdview.config.Defaults
 ---@field ft_pattern string[] filetype/glob patterns mdview's autocmds attach to

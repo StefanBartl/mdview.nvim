@@ -152,15 +152,19 @@ function M.attach(group)
     if not pending_timer then
       local remaining = throttle_ms - (t - last_sent_at)
       pending_timer = (vim.uv or vim.loop).new_timer()
-      pending_timer:start(
-        math.max(0, remaining),
-        0,
-        vim.schedule_wrap(function()
-          cancel_pending()
-          last_sent_at = now_ms()
-          push_now(pending_bufnr)
-        end)
-      )
+      -- Out of libuv handles: skip the trailing push rather than raising here.
+      -- The leading edge above has already been sent.
+      if pending_timer then
+        pending_timer:start(
+          math.max(0, remaining),
+          0,
+          vim.schedule_wrap(function()
+            cancel_pending()
+            last_sent_at = now_ms()
+            push_now(pending_bufnr)
+          end)
+        )
+      end
     end
   end
 

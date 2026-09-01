@@ -83,6 +83,7 @@ function M.spawn(cmd, args, cwd, extra_env)
     handle:close()
   end)
 
+  ---@cast pid integer
   return pid, nil
 end
 

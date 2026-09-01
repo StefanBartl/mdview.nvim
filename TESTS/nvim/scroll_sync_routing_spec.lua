@@ -20,6 +20,7 @@ local normalize = require("mdview.helper.normalize")
 -- ws_client.send_scroll(target, ...); stub it.
 local last_key
 local orig = ws.send_scroll
+---@diagnostic disable-next-line: duplicate-set-field
 ws.send_scroll = function(key)
   last_key = key
 end

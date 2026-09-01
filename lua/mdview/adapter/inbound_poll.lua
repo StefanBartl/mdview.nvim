@@ -50,8 +50,6 @@ end
 
 -- ---- click-to-navigate -----------------------------------------------------
 
----@param key string
----@param href string
 -- Absolute path? (Unix "/…" or Windows "C:/…" / "C:\…"). Back/forward
 -- navigation sends absolute document paths; relative links are resolved against
 -- the source document's directory.
@@ -449,6 +447,9 @@ function M.start()
     return
   end
   timer = uv.new_timer()
+  if not timer then
+    return
+  end
   local interval = interval_ms()
   timer:start(interval, interval, vim.schedule_wrap(tick))
 end

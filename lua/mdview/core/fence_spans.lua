@@ -96,7 +96,7 @@ end
 ---@return table|nil payload
 function M.collect(bufnr)
   local fences, highlight = api()
-  if not fences then
+  if not fences or not highlight then
     return nil
   end
 

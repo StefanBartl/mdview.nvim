@@ -21,7 +21,7 @@ vim.api.nvim_buf_set_lines(buf, 0, -1, false, {
 })
 vim.api.nvim_set_current_buf(buf)
 
-local KEY = normalize.path(vim.api.nvim_buf_get_name(buf))
+local KEY = assert(normalize.path(vim.api.nvim_buf_get_name(buf)), "the fixture buffer has a name")
 
 local function line(n)
   return vim.api.nvim_buf_get_lines(buf, n - 1, n, false)[1]

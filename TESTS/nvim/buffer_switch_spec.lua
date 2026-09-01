@@ -15,6 +15,7 @@ local normalize = require("mdview.helper.normalize")
 -- Capture where content is routed. live_push calls send_content; stub it.
 local last_key
 local orig = ws.send_content
+---@diagnostic disable-next-line: duplicate-set-field
 ws.send_content = function(key)
   last_key = key
 end

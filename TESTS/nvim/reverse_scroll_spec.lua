@@ -19,7 +19,7 @@ end
 vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
 vim.api.nvim_set_current_buf(buf)
 
-local KEY = normalize.path(vim.api.nvim_buf_get_name(buf))
+local KEY = assert(normalize.path(vim.api.nvim_buf_get_name(buf)), "the fixture buffer has a name")
 
 local function cursor_line_for(ratio)
   vim.api.nvim_win_set_cursor(0, { 1, 0 })
@@ -45,7 +45,8 @@ describe("inbound_poll reverse-scroll cursor mapping (10 lines)", function()
   end)
   it("ignores an unknown key (no matching buffer)", function()
     vim.api.nvim_win_set_cursor(0, { 4, 0 })
-    inbound._handle_scroll(normalize.path("C:/proj/nope.md"), 1.0)
+    local unknown = assert(normalize.path("C:/proj/nope.md"), "a literal path normalizes")
+    inbound._handle_scroll(unknown, 1.0)
     assert.are.equal(4, vim.api.nvim_win_get_cursor(0)[1]) -- unchanged
   end)
 end)

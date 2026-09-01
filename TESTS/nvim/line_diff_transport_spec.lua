@@ -13,9 +13,11 @@ local ws = require("mdview.adapter.ws_client")
 -- http_post_nonblocking (curl/jobstart) — stub jobstart so nothing is spawned;
 -- we assert the diff path was taken via the version/since bookkeeping instead.
 local fulls = {}
+---@diagnostic disable-next-line: duplicate-set-field
 ws.send_markdown = function(_, body)
   fulls[#fulls + 1] = body
 end
+---@diagnostic disable-next-line: duplicate-set-field
 vim.fn.jobstart = function()
   return 1
 end

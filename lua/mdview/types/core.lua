@@ -6,7 +6,7 @@
 ---@field server any opaque server/runner handle (or nil)
 
 ---@class mdview.core.state.runner
----@field proc integer|nil
+---@field proc SpawnedProcess|nil The spawned relay process, as `state.set_proc` files it away.
 ---@field server_job integer|nil
 ---@field token string|nil shared session token for the running mdview-server process
 ---@field is_running boolean|nil whether the relay process is currently running

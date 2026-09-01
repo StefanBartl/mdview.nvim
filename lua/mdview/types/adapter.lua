@@ -9,10 +9,10 @@
 
 -- == runner ==
 ---@class SpawnedProcess
----@field handle userdata        # luv handle for the spawned process
+---@field handle uv.uv_process_t # luv handle for the spawned process
 ---@field pid integer            # process ID
----@field stdout userdata        # stdout pipe handle
----@field stderr userdata        # stderr pipe handle
+---@field stdout uv.uv_pipe_t    # stdout pipe handle
+---@field stderr uv.uv_pipe_t    # stderr pipe handle
 ---@field cwd string             # working directory used for the spawn
 
 -- == browser.init ==

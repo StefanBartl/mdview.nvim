@@ -26,6 +26,15 @@ local notify = require("lib.nvim.notify").create("").notify
 
 local M = {}
 
+--- Probing spawns the relay once. It used to run through vim.fn.system(),
+--- which blocked the UI thread for the whole (short, but non-zero) lifetime of
+--- that process; vim.system() reports back via callback instead. The verdict is
+--- memoised per binary path -- a given binary's flag set does not change while
+--- Neovim is running -- so repeated `:MDView standalone` calls probe once.
+---@internal
+---@type table<string, boolean>
+local watch_support_cache = {}
+
 --- Does `bin` understand --watch?
 ---
 --- Worth checking before spawning: standalone mode needs a relay built with
@@ -37,18 +46,6 @@ local M = {}
 --- Go's flag package prints its usage (which lists every defined flag) to
 --- stderr and exits non-zero for an unknown flag, so an unknown-flag probe is
 --- itself the capability check.
----@internal
----@param bin string
----@return boolean
---- Probing spawns the relay once. It used to run through vim.fn.system(),
---- which blocked the UI thread for the whole (short, but non-zero) lifetime of
---- that process; vim.system() reports back via callback instead. The verdict is
---- memoised per binary path -- a given binary's flag set does not change while
---- Neovim is running -- so repeated `:MDView standalone` calls probe once.
----@internal
----@type table<string, boolean>
-local watch_support_cache = {}
-
 ---@internal
 ---@param bin string
 ---@param cb fun(supported: boolean)

@@ -151,7 +151,8 @@ describe("fence_spans.push", function()
     bcfg.defaults.highlighter = "hljs"
     clear_cma()
 
-    assert.are.equal(1, vim.json.decode(sent).v)
+    local json = assert(sent, "a payload was sent")
+    assert.are.equal(1, vim.json.decode(json).v)
   end)
 
   ws.send_spans = orig_send_spans

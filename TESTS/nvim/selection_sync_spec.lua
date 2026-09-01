@@ -116,7 +116,8 @@ describe("selection_sync.send_current_selection", function()
     selection_sync.send_current_selection(buf)
     leave_visual()
     assert.are.equal(buf_key, last_key)
-    local msg = vim.json.decode(last_json)
+    local json = assert(last_json, "a selection payload was sent")
+    local msg = vim.json.decode(json)
     assert.are.equal("char", msg.selection.mode)
     assert.are.equal(5, msg.selection.ec)
   end)
@@ -128,7 +129,8 @@ describe("selection_sync.send_current_selection", function()
     selection_sync.send_current_selection(buf)
     -- vim.json.encode drops nil-valued keys; the client has to be TOLD, or it
     -- keeps drawing the selection that is no longer there.
-    assert.are.equal(false, vim.json.decode(last_json).selection)
+    local json = assert(last_json, "a payload was sent")
+    assert.are.equal(false, vim.json.decode(json).selection)
   end)
 
   it("does not repeat an unchanged selection", function()
@@ -154,7 +156,8 @@ describe("selection_sync.send_current_selection", function()
     selection_sync.send_current_selection(buf)
     leave_visual()
     bcfg.defaults.selection_sync = true
-    assert.are.equal(false, vim.json.decode(last_json).selection)
+    local json = assert(last_json, "a payload was sent")
+    assert.are.equal(false, vim.json.decode(json).selection)
   end)
 
   ws.send_control = orig_send_control

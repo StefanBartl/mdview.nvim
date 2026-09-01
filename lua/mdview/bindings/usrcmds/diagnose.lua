@@ -12,7 +12,9 @@ function M.run(path)
   local report = require("mdview.diagnostics").run(path)
   notify("[mdview] diagnostics written to " .. report, vim.log.levels.INFO)
   -- open it so the user sees it immediately and can copy/hand it over
-  pcall(vim.cmd, "tabnew " .. vim.fn.fnameescape(report))
+  pcall(function()
+    vim.cmd("tabnew " .. vim.fn.fnameescape(report))
+  end)
 end
 
 return M

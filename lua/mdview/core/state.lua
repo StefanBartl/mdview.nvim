@@ -315,14 +315,14 @@ function M.proc_is_running()
 end
 
 --- Get the current proc handle (may be nil).
---- @return any|nil
+---@return SpawnedProcess|nil
 function M.get_proc()
   return M.runner.proc
 end
 
 --- Set the proc handle; returns previous handle.
---- @param h any
---- @return any previous
+---@param h SpawnedProcess|nil
+---@return SpawnedProcess|nil previous
 function M.set_proc(h)
   local prev = M.runner.proc
   M.runner.proc = h

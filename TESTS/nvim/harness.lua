@@ -106,10 +106,15 @@ _G.assert = setmetatable({
     end
   end,
 }, {
-  __call = function(_, cond, msg)
+  -- Returns its arguments, the way Lua's own `assert` does. Without that,
+  -- `local x = assert(maybe_nil(), "...")` silently binds nil here while it
+  -- works everywhere else -- and the same global is visible to the code under
+  -- test, not just to the specs.
+  __call = function(_, cond, msg, ...)
     if not cond then
       error(msg or "assert failed", 2)
     end
+    return cond, msg, ...
   end,
 })
 

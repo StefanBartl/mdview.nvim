@@ -50,6 +50,19 @@ function M.start_server(cmd, args, cwd)
 
   local stdout = uv.new_pipe(false)
   local stderr = uv.new_pipe(false)
+  if not stdout or not stderr then
+    -- Same contract as the guards below: log here, let the nil return tell the
+    -- caller. Without this, an exhausted handle table turns the six uses of
+    -- these pipes further down into "index a nil value" instead.
+    log.append(desc_tag .. "could not create the stdio pipes", desc_tag)
+    if stdout then
+      pcall(stdout.close, stdout)
+    end
+    if stderr then
+      pcall(stderr.close, stderr)
+    end
+    return nil
+  end
 
   local spawn_cwd = resolve_spawn_cwd(cwd)
 
@@ -171,6 +184,7 @@ function M.start_server(cmd, args, cwd)
     end
   end)
 
+  ---@cast pid integer
   state.set_proc({ handle = handle, pid = pid, stdout = stdout, stderr = stderr, cwd = spawn_cwd })
   return state.get_proc()
 end

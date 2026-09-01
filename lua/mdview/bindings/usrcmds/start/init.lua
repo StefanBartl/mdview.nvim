@@ -30,7 +30,7 @@ local M = {}
 -- quotes on the cwd value (single or double) are stripped.
 ---@internal
 ---@param fargs string[]
----@return string|nil file, string|nil cwd
+---@return string|nil file, string|nil cwd, integer|nil port
 local function parse_start_args(fargs)
   local file, cwd, port
   for _, token in ipairs(fargs or {}) do
