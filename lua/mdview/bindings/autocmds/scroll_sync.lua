@@ -7,6 +7,7 @@
 local api = vim.api
 local ws_client = require("mdview.adapter.ws_client")
 local previewable = require("mdview.helper.previewable")
+local pin = require("mdview.core.pin")
 local target_key = require("mdview.helper.target_key")
 local defaults = require("mdview.config").defaults
 local autocmd = require("lib.nvim.bindings.autocmd")
@@ -70,6 +71,12 @@ end
 ---@return nil
 function M.send_current_position(bufnr)
   if not previewable.is(bufnr) then
+    return
+  end
+
+  -- Pinned to another document (:MDView pin): scrolling around a reference
+  -- file must not drag the pinned document's viewport along with it.
+  if pin.blocks(bufnr) then
     return
   end
 

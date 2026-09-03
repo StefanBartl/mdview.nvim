@@ -15,6 +15,7 @@
 
 local control = require("mdview.adapter.control")
 local previewable = require("mdview.helper.previewable")
+local pin = require("mdview.core.pin")
 local defaults = require("mdview.config").defaults
 local autocmd = require("lib.nvim.bindings.autocmd")
 local autocmd_registry = require("mdview.helper.autocmds_registry")
@@ -112,6 +113,12 @@ function M.send_current_selection(bufnr)
     return
   end
   if not previewable.is(bufnr) then
+    return
+  end
+  -- Pinned to another document (:MDView pin): a selection made in some other
+  -- buffer would be drawn at those line/column numbers in the PINNED
+  -- document, highlighting text that has nothing to do with it.
+  if pin.blocks(bufnr) then
     return
   end
 

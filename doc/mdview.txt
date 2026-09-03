@@ -381,6 +381,8 @@ browser.behavior ~
                 (once per file; respects `browser_autostart`).
     "manual"  — switching buffers does nothing; open other files explicitly
                 with |:MDView-open|.
+  |:MDView-pin| suspends the follow for as long as you want to keep one
+  document on screen, without changing this setting.
 
 browser.autodetect_browser ~
   Try to locate an installed browser automatically (chrome, chromium, edge,
@@ -605,6 +607,31 @@ pushes a control update over the socket.
   While paused, moving the cursor no longer scrolls the preview or moves its
   cursor marker — useful to jump to a reference spot without dragging a
   screen-sharing viewer along. No argument reports the state.
+
+:MDView pin [action]                                            *:MDView-pin*
+  Holds the preview on the document it is showing instead of letting it follow
+  the active buffer (`on`|`off`|`toggle`|`status`; no argument toggles).
+
+  Under the default `browser.behavior` = "reuse" there is one preview tab and
+  it follows you: switch Markdown buffers and the browser switches too. That
+  is right while writing and wrong while reading -- opening a second file to
+  check something takes the document you were showing off the screen, and only
+  switching back brings it there again.
+
+  While pinned, everything another buffer would send into the pinned tab's
+  room is dropped at the source: the content push, the scroll ping, the
+  visual-selection mirror, and (under "new_tab") auto-opened tabs. The pinned
+  document's own edits, scrolling and selections still reach the preview
+  normally -- a pin filters which buffer may drive the tab, it does not pause
+  the session.
+
+  `off` also catches the tab up with the buffer you are actually in, rather
+  than leaving it on the released document until the next buffer switch.
+
+  A pin is session state, not config: |:MDView-stop| and a fresh
+  |:MDView-start| clear it, since it held that tab on that document.
+  |:MDView-open| moves a live pin instead of being blocked by it -- it
+  re-points the tab at the current buffer on purpose. Tab-completed.
 
 :MDView zoom [step]                                            *:MDView-zoom*
   Adjusts the preview font-size zoom (`browser.zoom`). `+`/`-` step by 10%

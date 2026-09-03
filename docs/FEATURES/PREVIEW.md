@@ -123,6 +123,47 @@ No argument reports whether sync is currently paused.
 - **Module:** `lua/mdview/bindings/usrcmds/sync.lua`, `lua/mdview/bindings/autocmds/scroll_sync.lua`
 - **Usercmds:** `:MDView sync [pause|resume|toggle]`
 
+## Document pinning
+
+`:MDView pin` holds the preview on the document it is currently showing, and
+stops it following the active buffer.
+
+Under the default `browser.behavior = "reuse"` there is one preview tab and it
+follows you: switch Markdown files in Neovim and the browser switches too.
+That is right while writing and wrong while reading. Opening a second file to
+check something — a spec, a README, notes — takes the document you were looking
+at off the screen, and nothing puts it back but switching to it again. It is
+worst in the case the preview exists for: presenting, where the audience is
+watching the tab and not your editor.
+
+A pin freezes the tab on one document, and is deliberately asymmetric. Traffic
+from **other** buffers that would land in the pinned tab's room is dropped at
+the source — the content push, the scroll ping, the selection mirror, and (in
+`"new_tab"` behavior) auto-opened tabs. The **pinned document's own** traffic
+is untouched: edit it, scroll it, select in it, and the preview follows along
+exactly as before. So a pin is a filter on which buffer may drive the tab, not
+a pause switch on the session.
+
+The gate is the room the traffic is headed for, not the buffer it came from.
+Under `"new_tab"` / `"manual"` every document has [a room of
+its own](#per-document-rooms), so a push from another buffer reaches a tab of
+its own and takes nothing away from the pinned one — pinning does not block it.
+Blocking there would turn a pin into a global mute, which is not what it means.
+
+`:MDView pin off` releases it and immediately catches the tab up with the
+buffer you are actually in, rather than leaving it on the released document
+until the next buffer switch happens to move it.
+
+A pin is session state, like the room key of the open tab: it is cleared by
+`:MDView stop` and by a fresh `:MDView start`, since it held *that* tab on
+*that* document and means nothing without it. `:MDView open` is the one thing
+that moves a live pin instead of being blocked by it — it re-points the tab at
+the current buffer on purpose, so the pin comes along.
+
+- **Module:** `lua/mdview/core/pin.lua`, `lua/mdview/bindings/usrcmds/pin.lua`, `lua/mdview/bindings/autocmds/buffer_switch.lua`
+- **Usercmds:** `:MDView pin [on|off|toggle|status]` (no argument toggles)
+- **Config:** none — a pin is runtime session state, not a setting; it interacts with `browser.behavior`
+
 ## Preview zoom
 
 `:MDView zoom [+|-|reset|<factor>]` adjusts the preview's font-size scale at

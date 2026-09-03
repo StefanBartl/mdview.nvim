@@ -12,6 +12,7 @@ local api = vim.api
 local ws_client = require("mdview.adapter.ws_client")
 local session = require("mdview.core.session")
 local previewable = require("mdview.helper.previewable")
+local pin = require("mdview.core.pin")
 local log = require("mdview.helper.log")
 local normalize = require("mdview.helper.normalize")
 local target_key = require("mdview.helper.target_key")
@@ -65,6 +66,14 @@ end
 function M.push_buffer_changes(bufnr, opts)
   if not previewable.is(bufnr) then
     log.debug("skipping buffer, not previewable", nil, "livepush", true)
+    return
+  end
+
+  -- The preview is pinned to a different document (:MDView pin): this
+  -- buffer's content would land in the pinned tab's room and replace what it
+  -- is holding, which is the one thing a pin exists to prevent.
+  if pin.blocks(bufnr) then
+    log.debug("skipping buffer, preview pinned to " .. tostring(pin.get()), nil, "livepush", true)
     return
   end
 

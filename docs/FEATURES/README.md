@@ -36,6 +36,9 @@ In detail in [`PREVIEW.md`](PREVIEW.md).
 - **Visual selection mirror** — what you select with `v`/`V`/`CTRL-V` is
   highlighted in the preview, for showing a document to other people. Off
   while you edit; `:MDView selection` toggles it.
+- **Document pinning** — `:MDView pin` holds the preview on one document while
+  you read around in other buffers, instead of the tab following every buffer
+  switch.
 - **Zoom**, **pause/resume** of the scroll sync, **overlays** (a floating TOC),
   **breadcrumbs** (the session outline).
 - **Click to navigate** — clicking a relative link opens the file in Neovim

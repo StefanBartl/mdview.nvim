@@ -47,6 +47,10 @@ function M.attach()
   -- leave dead rows in the generated bindings table.
   M.augroup_id = require("lib.nvim.bindings.autocmd").group("MdviewAutocmds", true)
 
+  -- A pin belongs to the tab it was pinned to; a fresh session gets a fresh
+  -- tab, so it must not start out holding a document from the last one.
+  require("mdview.core.pin").clear()
+
   bufenter.attach(M.augroup_id) -- BufEnter snapshot
   buffer_switch.attach(M.augroup_id) -- Apply browser.behavior on buffer switch
   live_push.attach(M.augroup_id) -- Live Markdown push (diffs + full push on write)

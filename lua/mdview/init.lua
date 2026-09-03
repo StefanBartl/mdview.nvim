@@ -80,6 +80,10 @@ function M.open(opts)
   -- (and, in "reuse" behavior, later live pushes) route to this room.
   state.set_preview_key(key)
 
+  -- An explicit :MDView open IS a request to preview this buffer, so a live
+  -- pin comes along instead of blocking the document it was just asked for.
+  require("mdview.core.pin").follow(buf)
+
   -- best-effort: seed the relay with current content so the new tab isn't
   -- empty. Force a full snapshot so the new tab's LastPayload is whole text
   -- (not a diff) when experimental.line_diff is on.

@@ -6,6 +6,10 @@
 --   "new_tab" — open a fresh preview tab for the entered buffer (once per file).
 --   "manual"  — do nothing (open other files explicitly with :MDViewOpen).
 --
+-- Overridden by a document pin (:MDView pin, mdview.core.pin): while one is up
+-- the preview holds the pinned document and buffer switches do nothing at all,
+-- whichever behavior is configured.
+--
 -- Registered in the main mdview augroup (attached on :MDViewStart, torn down on
 -- :MDViewStop). Distinct from bufenter.lua, which only snapshots content.
 
@@ -14,6 +18,7 @@ local ws_client = require("mdview.adapter.ws_client")
 local state = require("mdview.core.state")
 local normalize = require("mdview.helper.normalize")
 local previewable = require("mdview.helper.previewable")
+local pin = require("mdview.core.pin")
 local log = require("mdview.helper.log")
 local defaults = require("mdview.config").defaults
 local autocmd = require("lib.nvim.bindings.autocmd")
@@ -46,6 +51,45 @@ local function eligible_path(bufnr)
   return normalize.path(name)
 end
 
+--- Push `bufnr`'s whole content into the room the open tab watches, so the tab
+--- switches to that document ("reuse" behavior).
+---
+--- Exported because two things need it: a buffer switch, and releasing a
+--- document pin — after `:MDView pin off` the tab still shows the pinned
+--- document, and no further event would move it until the NEXT switch, which
+--- would read as the command having done nothing.
+---@param bufnr integer
+---@return boolean started # false when there is no open tab to push to
+function M.resync(bufnr)
+  local path = eligible_path(bufnr)
+  if not path then
+    return false
+  end
+  local preview_key = state.get_preview_key()
+  if type(preview_key) ~= "string" or preview_key == "" then
+    return false -- no tab open to follow
+  end
+  M._last = path
+  -- Push this buffer's content into the open tab's room so it switches to
+  -- the newly-focused file (even without an edit to trigger live_push).
+  ws_client.wait_ready(function(ok)
+    if not ok then
+      return
+    end
+    local lines = api.nvim_buf_get_lines(bufnr, 0, -1, false) or {}
+    -- A buffer switch is a whole-document change of the previewed room,
+    -- so force a full snapshot rather than diffing against the previous
+    -- buffer's content (which would be a large, pointless diff).
+    ws_client.send_content(preview_key, lines, { full = true })
+    -- The new buffer's own fence highlighting too, or the tab would keep
+    -- painting the previous document's code blocks (browser.highlighter =
+    -- "nvim"; a no-op under any other).
+    require("mdview.core.fence_spans").push(bufnr, preview_key)
+    log.debug("reuse: pushed " .. path .. " to preview room " .. preview_key, nil, "bufswitch", true)
+  end, ws_client.WAIT_READY_TIMEOUT)
+  return true
+end
+
 ---@internal
 ---@param bufnr integer
 ---@return nil
@@ -58,6 +102,13 @@ local function on_switch(bufnr)
   if defaults.open_preview_tab then
     return
   end
+  -- Pinned: the preview holds the document it was pinned to, so a switch
+  -- changes nothing. `M._last` is deliberately left alone — it still names the
+  -- document the tab is showing, which is what the next switch has to compare
+  -- against once the pin is released.
+  if pin.is_pinned() then
+    return
+  end
 
   local path = eligible_path(bufnr)
   if not path then
@@ -66,37 +117,19 @@ local function on_switch(bufnr)
   if M._last == path then
     return -- same buffer as last time (BufEnter fires on window focus too)
   end
-  M._last = path
 
   local behavior = require("mdview.config.browser").defaults.behavior or "reuse"
   if behavior == "manual" then
+    M._last = path
     return
   end
 
   if behavior == "reuse" then
-    local preview_key = state.get_preview_key()
-    if type(preview_key) ~= "string" or preview_key == "" then
-      return -- no tab open to follow
-    end
-    -- Push this buffer's content into the open tab's room so it switches to
-    -- the newly-focused file (even without an edit to trigger live_push).
-    ws_client.wait_ready(function(ok)
-      if not ok then
-        return
-      end
-      local lines = api.nvim_buf_get_lines(bufnr, 0, -1, false) or {}
-      -- A buffer switch is a whole-document change of the previewed room,
-      -- so force a full snapshot rather than diffing against the previous
-      -- buffer's content (which would be a large, pointless diff).
-      ws_client.send_content(preview_key, lines, { full = true })
-      -- The new buffer's own fence highlighting too, or the tab would keep
-      -- painting the previous document's code blocks (browser.highlighter =
-      -- "nvim"; a no-op under any other).
-      require("mdview.core.fence_spans").push(bufnr, preview_key)
-      log.debug("reuse: pushed " .. path .. " to preview room " .. preview_key, nil, "bufswitch", true)
-    end, ws_client.WAIT_READY_TIMEOUT)
+    M.resync(bufnr)
     return
   end
+
+  M._last = path
 
   if behavior == "new_tab" then
     -- Respect the user's autostart preference; if they don't want tabs

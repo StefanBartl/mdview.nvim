@@ -32,6 +32,7 @@ local breadcrumbs = require("mdview.bindings.usrcmds.breadcrumbs")
 local overlay = require("mdview.bindings.usrcmds.overlay")
 local blanklines = require("mdview.bindings.usrcmds.blanklines")
 local selection = require("mdview.bindings.usrcmds.selection")
+local pin = require("mdview.bindings.usrcmds.pin")
 
 local M = {}
 
@@ -218,6 +219,15 @@ function M.attach()
       desc = "Mirror the visual selection (v/V/CTRL-V) into the preview, or stop mirroring; no argument toggles",
       run = function(ctx)
         selection.run(ctx.args.action)
+      end,
+    },
+
+    {
+      path = { "pin" },
+      args = { { name = "action", type = "STRING", optional = true, values = pin.actions } },
+      desc = "Hold the preview on the current document instead of following the active buffer; no argument toggles",
+      run = function(ctx)
+        pin.run(ctx.args.action)
       end,
     },
 
