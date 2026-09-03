@@ -6,7 +6,7 @@ mdview.nvim registers a single `:MDView <subcommand>` command (built via
 
 | Command | Description |
 | --- | --- |
-| `:MDView start [file] [cwd=…]` | Start the relay and open the preview for the current buffer (or the given file). |
+| `:MDView start [file] [cwd=…] [port=N]` | Start the relay and open the preview for the current buffer (or the given file). `cwd=`/`port=` override `server_cwd`/`server_port` for that spawn only. |
 | `:MDView stop` | Stop the relay, detach autocommands, and (in isolated mode) close the browser. |
 | `:MDView toggle [file] [cwd=…]` | Start if stopped, stop if running. |
 | `:MDView open` | Re-open a browser tab against the already-running session (does not start a new relay). |
@@ -16,7 +16,7 @@ mdview.nvim registers a single `:MDView <subcommand>` command (built via
 | `:MDView weblogs` | Show the relay's captured stdout, including `[client]` browser-side diagnostics. |
 | `:MDView log [trace\|debug\|info\|warn\|error]` | Show mdview's internal log ring, optionally filtered to a level and above. |
 | `:MDView log export [path]` | Export the internal log ring to a file. |
-| `:MDView file-log` | Toggle persistent file logging of the relay's stdout, then report the state. |
+| `:MDView file-log` / `file-log toggle` | Toggle persistent file logging of the relay's stdout, then report the state. |
 | `:MDView file-log on [path]` | Enable persistent file logging (optionally set its path). |
 | `:MDView file-log off` | Disable persistent file logging. |
 | `:MDView file-log status` | Report persistent file logging state without changing anything. |

@@ -1,6 +1,12 @@
 # Test harness for the line-diff function in mdview.nvim
 
-This short markdown document describes how to run `diff_harness.lua` in order to test the line-diff function (`mdview.util.diff`) and verify the results.
+How to run `lua/mdview/test/diff_harness.lua` to exercise the line-diff
+function (`mdview.utils.diff`) and check the results. The diff transport it
+measures is opt-in — `experimental.line_diff`, off by default — so this is the
+page to reach for when changing that path. See
+[MACHINERY.md](FEATURES/MACHINERY.md#line-diff-transport-experimental) for what
+the transport does and why a swallowed diff is worse than a swallowed scroll
+ping.
 
 ---
 
@@ -26,9 +32,9 @@ This short markdown document describes how to run `diff_harness.lua` in order to
 
 - The `mdview.nvim` repository checked out and runnable
 
-- The modules:
-  - `mdview.util.diff` (the line-diff function)
-  - `mdview.util.apply` (the helper `apply_patch` for testing the patches)
+- The modules the harness requires:
+  - `mdview.utils.diff` (the line-diff function)
+  - `mdview.test.apply` (the helper `apply_patch` that verifies a patch)
 
 ---
 
@@ -105,7 +111,7 @@ nvim --headless -c "luafile lua/mdview/test/diff_harness.lua" -c "qa"
 
 ## 7. Debugging
 
-- Enable detailed logging in `diff.lua`:
+- Enable detailed logging in `lua/mdview/utils/diff.lua`:
 
 ```lua
 print(vim.inspect(diffs))

@@ -15,7 +15,7 @@
 ---@alias mdview.config.BrowserBehavior
 ---| '"reuse"' # the one preview tab follows the active markdown buffer (default)
 ---| '"new_tab"' # each markdown buffer you switch to opens its own preview tab
----| '"manual"' # switching buffers does nothing; open other files with :MDViewOpen
+---| '"manual"' # switching buffers does nothing; open other files with :MDView open
 
 ---@class mdview.config.BrowserDefaults
 ---@field open_mode mdview.config.BrowserOpenMode how the preview browser is opened (default "default")
@@ -23,25 +23,25 @@
 ---@field autodetect_browser boolean try to locate a browser automatically (isolated mode only)
 ---@field browser string friendly name e.g. "chrome" or "firefox" (isolated mode only)
 ---@field browser_cmd string absolute path to executable to force use (isolated mode only)
----@field browser_autoclose boolean whether :MDViewStop closes the controlled browser (isolated mode only)
+---@field browser_autoclose boolean whether :MDView stop closes the controlled browser (isolated mode only)
 ---@field browser_autostart boolean whether to open the browser automatically on start
 ---@field resolved_browser_cmd string|nil internal, populated by config.browser.resolve_and_validate()
 ---@field browser_args string[]|nil extra CLI args for the resolved browser executable (isolated mode only)
 ---@field open_url string|nil static override URL always used instead of the computed key/token URL
 ---@field require_display boolean don't auto-open a browser without a GUI/DISPLAY available (see mdview-security)
----@field stop_on_browser_exit boolean run :MDViewStop when the opened browser process exits (isolated mode only)
+---@field stop_on_browser_exit boolean run :MDView stop when the opened browser process exits (isolated mode only)
 ---@field theme string preview theme passed to the client as ?theme= — one of "github", "dark-dimmed", "plain", "tokyonight", "catppuccin" (optionally suffixed "-light"/"-dark" to pin the color scheme); see src/client/themes/
 ---@field highlighter "hljs"|"shiki"|"nvim"|"none" code-fence syntax highlighter: "hljs" (highlight.js, light, default), "shiki" (exact VSCode/TextMate themes, heavier), "nvim" (Neovim's own colors, read out of color_my_ascii.nvim and pushed over /spans -- the preview then matches the buffer exactly; blocks it does not paint fall through to highlight.js), or "none"
 ---@field focus "browser"|"nvim" whether the opened tab may take keyboard focus ("browser", default) or focus stays in Neovim ("nvim" — clean on macOS, best-effort on Windows, no-op on Linux); default open_mode only
 ---@field external_links "new_tab"|"same_tab" open external links (http/mailto/absolute) in a new tab ("new_tab", default — keeps the preview tab) or in place ("same_tab")
 ---@field cursor_marker "line"|"caret"|"section"|"off" show the Neovim cursor in the preview: line marker in the left gutter ("line", default), an exact caret at the cursor column ("caret", uses inline source-position spans), a spotlight on the current heading section with the rest dimmed ("section"), or hidden ("off"); rides the scroll-sync ping, so needs scroll_sync on
----@field zoom number preview font-size zoom factor (1.0 = 100%, default); adjust at runtime with :MDViewZoom, passed to the client as ?zoom= and pushed live
----@field overlays table<string, boolean> which preview overlays start enabled, e.g. { toc = false }; toggle at runtime with :MDViewOverlay, passed to the client as ?overlays= and pushed live
+---@field zoom number preview font-size zoom factor (1.0 = 100%, default); adjust at runtime with :MDView zoom, passed to the client as ?zoom= and pushed live
+---@field overlays table<string, boolean> which preview overlays start enabled, e.g. { toc = false }; toggle at runtime with :MDView overlay, passed to the client as ?overlays= and pushed live
 ---@field selection_sync boolean mirror the Neovim visual selection (v / V / CTRL-V) into the preview as a highlight, live -- for showing a document to other people; off by default, switch it on for as long as you are presenting with `:MDView selection` (toggles), passed to the client as ?sel=1 and pushed live
 ---@field preserve_blank_lines boolean show every blank line between blocks as extra vertical space instead of CommonMark's default (any run of blank lines collapses to one paragraph gap); off by default, toggle at runtime with `:MDView blanklines`, passed to the client as ?blanklines=1 and pushed live
 
 ---@class mdview.config.StartDefaults
----@field push_strategy "launcher"|"try_push" initial-push strategy used by :MDViewStart
+---@field push_strategy "launcher"|"try_push" initial-push strategy used by :MDView start
 ---@field try_push_opts table|nil forwarded to try_push when push_strategy == "try_push"
 ---@field wait_timeout_ms integer|nil forwarded to launcher.wait_ready
 
@@ -71,20 +71,20 @@
 ---@field dev_local boolean developer-only flag
 ---@field debug boolean when true, print server stdout/stderr into Neovim (dev only)
 ---@field log_buffer_name string scratch buffer name used to show logs when debug=true
----@field file_log boolean opt in to writing the relay's stdout to a persistent log file (default false — nothing is written to disk); toggle at runtime with :MDViewFileLog
+---@field file_log boolean opt in to writing the relay's stdout to a persistent log file (default false — nothing is written to disk); toggle at runtime with :MDView file-log
 ---@field file_log_path string|nil where the persistent log is written when file_log=true; defaults to `stdpath("log")/mdview/relay-<timestamp>.log` (never the cwd)
 ---@field debug_plugin boolean enable plugin-internal debug notifications
 ---@field debug_preview boolean enable live-push debug notifications
 ---@field dev_server_port integer Vite dev server port for client (dev workflow only)
----@field live_push_throttle_ms integer minimum time between full-buffer pushes on TextChanged/TextChangedI (each push spawns a curl process; rapid edits within the window coalesce into one trailing push instead of one per keystroke — see :MDView start vs standalone CPU benchmark in DONE.md). BufWritePost's save-triggered full push is never throttled.
+---@field live_push_throttle_ms integer minimum time between full-buffer pushes on TextChanged/TextChangedI (each push spawns a curl process; rapid edits within the window coalesce into one trailing push instead of one per keystroke). BufWritePost's save-triggered full push is never throttled.
 ---@field scroll_sync boolean send cursor position to the browser preview so it scrolls to follow (nvim-to-browser only)
 ---@field scroll_sync_throttle_ms integer minimum time between scroll-position pings
 ---@field scroll_sync_mode "top"|"cursor" where the cursor line lands in the browser viewport: near the top, or mirroring the cursor's height in the nvim window
 ---@field scroll_sync_top_offset number in "top" mode, fraction (0..1) down from the viewport top to place the line (0 = glued to top)
 ---@field sync_checkboxes boolean let ticking a GFM task-list checkbox in the preview write back to the source: standalone rewrites the file directly, :MDView start edits the buffer (polled, since Neovim has no WebSocket client). Default true; set false to render checkboxes read-only and stop the browser->Neovim poll
 ---@field sync_fields boolean let editing a raw-HTML text field (`<input name=…>` / `<textarea name=…>`) in the preview write its value back to the source, matched by the `name` attribute (raw HTML has no source position). Standalone rewrites the file, :MDView start edits the buffer (polled). Default true; set false to render such fields read-only
----@field breadcrumbs boolean record session breadcrumbs (which document + heading section over time) for :MDViewBreadcrumbs (default true)
----@field open_preview_tab boolean :MDViewStart opens an nvim-tab preview (Treesitter-highlighted mirror, no browser/relay HTML) instead of the browser
+---@field breadcrumbs boolean record session breadcrumbs (which document + heading section over time) for :MDView breadcrumbs (default true)
+---@field open_preview_tab boolean :MDView start opens an nvim-tab preview (Treesitter-highlighted mirror, no browser/relay HTML) instead of the browser
 ---@field browser mdview.config.BrowserDefaults
 ---@field start mdview.config.StartDefaults
 ---@field install mdview.config.InstallDefaults
@@ -141,7 +141,7 @@ return {
   -- Persistent file logging is opt-in: with `file_log = false` (the default)
   -- mdview never touches the disk, so starting a preview no longer creates a
   -- `logs/` directory in whatever the cwd happens to be. Turn it on via
-  -- setup({ file_log = true }) or at runtime with :MDViewFileLog on.
+  -- setup({ file_log = true }) or at runtime with :MDView file-log on.
   file_log = false,
   -- nil -> stdpath("log")/mdview/relay-<timestamp>.log (resolved lazily, so
   -- the file is only created once file logging is actually enabled).
@@ -219,7 +219,7 @@ return {
     external_links = "new_tab",
     cursor_marker = "line",
     zoom = 1.0,
-    -- Preview overlays (see :MDViewOverlay). Off by default — they're for
+    -- Preview overlays (see :MDView overlay). Off by default — they're for
     -- presenting/screen-sharing, not for everyday editing.
     overlays = {
       toc = false,

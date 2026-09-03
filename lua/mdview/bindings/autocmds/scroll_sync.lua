@@ -83,7 +83,7 @@ function M.send_current_position(bufnr)
   -- Route to the room the open tab actually watches (browser.behavior
   -- "reuse" follows the active buffer via state.preview_key, so a scroll
   -- ping to the buffer's own path after switching buffers would land in a
-  -- room nobody's listening to — see target_key.lua and DONE.md BUGS).
+  -- room nobody's listening to — see target_key.lua).
   local target = target_key.resolve(bufnr)
   if not target or target == "" then
     return

@@ -1,5 +1,5 @@
 # Manual test tasks (in a real Neovim)
-[testlink](.\docs\PoC.md)
+
 1. `browser.behavior`: test with two MD files — `reuse` (one tab follows), `new_tab`, `manual`.
     **Enable the opt-in features one by one** (`setup({ experimental = { … = true } })`)
 1. `click_navigate = true` → click a relative link `[x](other.md)` → nvim opens `other.md`, the preview follows.

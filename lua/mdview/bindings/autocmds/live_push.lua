@@ -34,9 +34,8 @@ local function now_ms()
   return uv.now()
 end
 
--- Throttle state for TextChanged/TextChangedI (see the CPU benchmark in
--- DONE.md's "Performance" section: unthrottled, every keystroke spawned its
--- own curl process). Unlike scroll_sync's throttle — which just drops a ping
+-- Throttle state for TextChanged/TextChangedI. Unthrottled, every keystroke
+-- spawned its own curl process, which is what the throttle exists to stop. Unlike scroll_sync's throttle — which just drops a ping
 -- that arrives too soon, fine for a transient scroll position — dropping a
 -- content push would leave the preview stale indefinitely with nothing else to
 -- trigger a resync. So a push inside the throttle window is deferred to a

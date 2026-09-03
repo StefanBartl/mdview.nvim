@@ -1,4 +1,4 @@
-> **Active development.** This repository is in its development phase — breaking changes are to be expected at any time. Pin a commit or tag if you depend on it.
+> **Alpha stage — active development.** This repository is in its development phase — breaking changes are to be expected at any time. Pin a commit or tag if you depend on it.
 
 > Alpha stage: highly experimental. Do not expect this plugin to work on your system yet.
 
@@ -28,6 +28,13 @@
 > show up in the live preview automatically. Recommended companion, not a
 > dependency — see [Companion plugins](docs/companion-plugins.md).
 
+> Pairs well with
+> [color_my_ascii.nvim](https://github.com/StefanBartl/color_my_ascii.nvim):
+> it colours fenced code inside the buffer, and with
+> `browser.highlighter = "nvim"` mdview reads those colours back out and paints
+> the browser with them — so both sides show the same thing instead of two
+> highlighters guessing the language separately. Also optional.
+
 > Inspired by and positioned as a security/performance-focused alternative to
 > [iamcco/markdown-preview.nvim](https://github.com/iamcco/markdown-preview.nvim).
 
@@ -36,10 +43,10 @@
 ## Table of Contents
 
 - [Overview](#overview)
+- [Capabilities](#capabilities)
 - [Quickstart](#quickstart)
 - [Requirements](#requirements)
 - [Documentation](#documentation)
-- [Disclaimer](#disclaimer)
 - [Feedback](#feedback)
 
 ---
@@ -107,9 +114,11 @@ Then open a markdown file and run `:MDView start`. No external toolchain is requ
 
 ## Requirements
 
-`curl` (used to download the relay binary and client bundle on first use) —
-declared in [`docs/install.json`](docs/install.json) and checked by
-`:checkhealth mdview`. If [lib.nvim](https://github.com/StefanBartl/lib.nvim)'s
+`curl` and `tar` — the first downloads the relay binary and client bundle on
+first use, the second extracts the bundle. Both are checked by
+`:checkhealth mdview`, which treats either one missing as an error;
+`curl` is additionally declared in [`docs/install.json`](docs/install.json).
+If [lib.nvim](https://github.com/StefanBartl/lib.nvim)'s
 [`deps` module](https://github.com/StefanBartl/lib.nvim/blob/main/lua/lib/nvim/deps/README.md)
 is available, a popup explains this the first time `setup()` runs after
 installing mdview.nvim; `:Lib deps show mdview.nvim` repeats it any time.
@@ -123,22 +132,17 @@ work, for turning it off without touching any plugin's config.
 
 ## Documentation
 
+Start with the [documentation index](docs/README.md) — it lists every page and
+says what each one answers.
+
+- [Documentation index](docs/README.md) — the full map of what is written down.
+- [Features](docs/FEATURES/README.md) — the catalog: the overview, then per-theme depth in preview, rendering, operations, security, and the machinery underneath.
 - [Installation](docs/installation.md) — lazy.nvim/packer setup variants and when to use each.
 - [Configuration](docs/configuration.md) — all available `setup()` options and their defaults.
 - [Commands](docs/commands.md) — full `:MDView <subcommand>` command reference and `:checkhealth mdview`.
-- [Background & standalone](docs/standalone.md) — previews that outlive your Neovim instance, and running mdview with no Neovim at all.
-- [Companion plugins](docs/companion-plugins.md) — optional plugins that pair well with the live preview.
-- [Development](docs/development.md) — building mdview.nvim from source and running its test suites.
-- [Architecture](docs/architecture.md) — the Lua/Go/TypeScript/Rust components and how they communicate.
+- [Bindings cheatsheet](docs/BINDINGS.md) — every command, autocommand and keymap in one table.
+- [Workflow](docs/WORKFLOW.md) — how the pieces combine once a session is running.
 - [Ecosystem architecture](https://github.com/StefanBartl/documentation.nvim/blob/main/docs/ECOSYSTEM.md) — **not in this repository.** Where docs, static analysis and runtime each belong across the four pieces this plugin is the presentation half of (`lib.nvim`, `documentation.nvim`, `runtime-analysis.nvim`, mdview.nvim), and why telemetry reports render through here rather than growing their own viewer. One document, three pointers.
-- [Features](docs/FEATURES/README.md) — the catalog. The overview and what each theme covers, then per-theme depth in [preview](docs/FEATURES/PREVIEW.md) (incl. link hover previews), [rendering](docs/FEATURES/RENDERING.md), [operations](docs/FEATURES/OPERATIONS.md), [security](docs/FEATURES/SECURITY.md) and the [machinery](docs/FEATURES/FEATURES.md) underneath (caches, throttling, diff transport).
-
----
-
-## Disclaimer
-
-ℹ️ mdview.nvim is under active development –
-expect rapid iteration, experimental features, and evolving APIs.
 
 ---
 

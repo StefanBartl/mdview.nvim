@@ -1,12 +1,19 @@
-# Server test instructions (Go relay)
+# Testing the relay by hand
 
-> **Architecture note.** mdview **no longer** renders markdown server-side.
-> The Go relay (`native/server/`, shipped as a platform-specific binary)
-> transports only **raw text** to the browser tabs; rendering and sanitising
-> happen exclusively in the Rust/WASM client. There is therefore **no `/render`
-> endpoint** any more and **no Node dev server** (`npm run dev:server` and the
-> Vite proxy on 43220 are removed). Older instructions expecting JSON
-> `{ html }` responses are invalid.
+For working on the Go relay (`native/server/`) or on the browser bridge.
+`go test ./...` covers the automated half; this page is the manual half —
+driving each endpoint with `curl` so a failure can be pinned to one hop
+instead of "the preview is blank".
+
+Running the *plugin's* test suites is [Development](development.md#tests).
+Reading logs during normal use is
+[Operations](FEATURES/OPERATIONS.md) and [WORKFLOW.md](WORKFLOW.md).
+
+> **Architecture note.** mdview does **not** render Markdown server-side.
+> The relay transports only **raw text** to the browser tabs; rendering and
+> sanitising happen exclusively in the Rust/WASM client. There is therefore
+> no `/render` endpoint and no Node dev server. Instructions elsewhere that
+> expect JSON `{ html }` responses describe a version that no longer exists.
 
 ## Endpoints
 
@@ -25,7 +32,7 @@ All functional endpoints are **token-gated** (`?token=<session>`), except
 
 ## 1) Starting the relay binary manually
 
-After the first `:MDViewStart` the binary lives in the install cache:
+After the first `:MDView start` the binary lives in the install cache:
 
 ```
 # Windows
@@ -67,10 +74,23 @@ A wrong/missing token ⇒ **403**, a missing `key` ⇒ **400**.
 
 ## 4) Checking the browser diagnostics sink (`/clientlog`)
 
+The client reports its own diagnostics — a missing key/token, connection
+progress, transport errors, the first successful render, render errors — to
+the relay, which prints each line as `[client] …` on stdout. The Lua runner
+captures that stdout, so those lines also surface in `:MDView weblogs` and in
+the `:MDView diagnose` report. That is the reason you rarely need DevTools.
+
 ```sh
 curl -sS -o /dev/null -w "%{http_code}\n" \
   -X POST "http://localhost:45999/clientlog?token=testtok123" --data "hello"
 # expected: 204, and on the relay stdout:  [client] hello
+```
+
+If you do end up in the browser console, these two answer most of it:
+
+```js
+console.log("location", location.href);          // key/token/theme in the URL?
+new WebSocket(`ws://${location.host}/ws${location.search}`); // readyState === 1 ?
 ```
 
 ## 5) WebSocket room isolation
@@ -85,7 +105,17 @@ websocat "ws://localhost:45999/ws?token=testtok123&key=test1" \
 # without a valid Origin header -> "forbidden origin" (DNS rebinding protection)
 ```
 
-## 6) Cleaning up / port occupied
+## 6) A headless smoke test of the Lua side
+
+Close to what CI runs, with `lib.nvim` put on the runtimepath by hand:
+
+```sh
+nvim --headless -u NONE -i NONE \
+  --cmd "set rtp+=.,../lib.nvim" \
+  -c "luafile TESTS/lua/smoke_spec.lua" -c "qa!"
+```
+
+## 7) Cleaning up / port occupied
 
 ```sh
 # Windows (PowerShell)
@@ -96,5 +126,7 @@ Get-NetTCPConnection -LocalPort 45999 -ErrorAction SilentlyContinue |
 lsof -i :45999 && kill -9 <PID>
 ```
 
-> The relay binds exclusively to `127.0.0.1`, so there are no firewall/interface
-> special cases as there were with the old Node server.
+> The relay binds exclusively to `127.0.0.1`, so there are no
+> firewall/interface special cases. The relay is a single native binary —
+> there are no stray `node.exe` processes to hunt down any more; killing the
+> process above is enough.

@@ -36,7 +36,7 @@
 Lorem ipsum dolor sit amet, consectetuer adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat.
 
 <figure style="text-align:center;" id="#fig-nvimlogo">
-  <img src="./ressources/neovim-logo.png" alt="Testfigure nvim-Logo">
+  <img src="./resources/neovim-logo.png" alt="Testfigure nvim-Logo">
   <figcaption>Testfigure nvim-Logo</figcaption>
 </figure>
 

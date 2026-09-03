@@ -147,7 +147,7 @@ MDVIEW_DEV_WEB_ROOT=/path/to/dist/client
 | `Cannot find module './wasm-render/mdview_wasm_render.js'` | `build:client` ran without `build:wasm`. Use `npm run build`. |
 | `:MDView standalone` reports no `--watch` support | The relay is older than v0.3.0 — bump `install.version` or point `standalone.binary_path` at a local build. |
 
-`:checkhealth mdview` and `:MDView diagnostics` show which binary and web root
+`:checkhealth mdview` and `:MDView diagnose` show which binary and web root
 are actually in use.
 
 ## Tests
@@ -160,5 +160,10 @@ npm run test:lua      # busted, if installed
 npm run check:types   # tsc --noEmit
 npm run lint
 ```
+
+Driving the relay's endpoints by hand — for a failure that needs pinning to one
+hop — is [Testing the relay by hand](relay-testing.md). The line-diff
+transport has its own benchmark harness, see
+[diff-harness.md](diff-harness.md).
 
 **Contributions are welcome** – whether it's a bugfix, optimization, or new feature idea.

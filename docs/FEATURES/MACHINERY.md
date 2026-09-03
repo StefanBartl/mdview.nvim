@@ -2,11 +2,8 @@
 
 What has no command of its own but affects every change: caches, throttling,
 the diff transport, the document model, lifecycle. This is the theme file for
-everything that does not have a page of its own — the four in
-[`README.md`](README.md)'s table do.
-
-From here on: machinery that has no command of its own but affects every
-change.
+everything that does not have a page of its own — the four topics listed
+beside it in [`README.md`](README.md) do.
 
 ## The readiness cache in `ws_client`
 

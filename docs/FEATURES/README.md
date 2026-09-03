@@ -9,6 +9,7 @@ plugin needs that answered just as often as "which command does that".
 | --- | --- |
 | **this file** | the full overview, user- *and* developer-facing |
 | [`PREVIEW.md`](PREVIEW.md) · [`RENDERING.md`](RENDERING.md) · [`OPERATIONS.md`](OPERATIONS.md) · [`SECURITY.md`](SECURITY.md) | the big topics in detail, in the [`FEATURES_FORMAT`](https://github.com/StefanBartl/documentation.nvim/blob/main/docs/FEATURES_FORMAT.md) schema |
+| [`MACHINERY.md`](MACHINERY.md) | everything with no command of its own — caches, throttling, the diff transport, lifecycle |
 
 ---
 
@@ -94,7 +95,7 @@ In detail in [`SECURITY.md`](SECURITY.md).
 ---
 
 > **Only theme files live in this folder.** The Features tab's parser reads
-> every `##` here as a feature, so the five section summaries above — which
-> group features rather than being ones — belong in this intro rather than in
-> a theme file. They were `##` headings in `FEATURES.md` until 2026-08-26 and
-> were counted as five features that do not exist.
+> every `##` here as a feature, so the section summaries above — which group
+> features rather than being ones — belong in this intro rather than in a theme
+> file. As headings in a theme file they were counted as features that do not
+> exist.
