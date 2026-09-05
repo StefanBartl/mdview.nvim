@@ -10,7 +10,10 @@
 
 ---@diagnostic disable: undefined-field
 
-local uv = vim.loop
+-- DEP-01: matches the fallback pattern every other module in this repo
+-- already uses -- this repo's stated floor is 0.9+, so a bare vim.uv would
+-- break on Neovim < 0.10.
+local uv = vim.uv or vim.loop
 
 local M = {}
 

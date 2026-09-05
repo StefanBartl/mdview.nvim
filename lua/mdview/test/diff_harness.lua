@@ -4,7 +4,10 @@
 
 local diff = require("mdview.utils.diff") -- module providing compute_line_diff
 local util = require("mdview.test.apply") -- module providing apply_patch (see below)
-local uv = vim.loop
+-- DEP-01: matches the fallback pattern every other module in this repo
+-- already uses -- this repo's stated floor is 0.9+, so a bare vim.uv would
+-- break on Neovim < 0.10.
+local uv = vim.uv or vim.loop
 
 -- undefined fields on vim.loop; suppress those specific diagnostics for clarity.
 ---@diagnostic disable: undefined-field, deprecated, undefined-global, unused-local, return-type-mismatch
