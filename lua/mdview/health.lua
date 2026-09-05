@@ -17,6 +17,7 @@ local start = health.start or health.report_start
 local ok = health.ok or health.report_ok
 local warn = health.warn or health.report_warn
 local error_ = health.error or health.report_error
+local info = health.info or health.report_info
 
 ---@internal
 ---@param cmd string
@@ -32,7 +33,7 @@ function M.check()
   if vim.fn.has("nvim-0.9") == 1 then
     ok("Neovim >= 0.9")
   else
-    error_("Neovim >= 0.9 is required")
+    error_("Neovim >= 0.9 is required", { "Upgrade Neovim to 0.9+" })
   end
 
   -- lib.nvim is a HARD dependency: mdview requires it for cross-platform
@@ -43,22 +44,24 @@ function M.check()
   if pcall(require, "lib.nvim.cross.platform.is_windows") then
     ok("lib.nvim found (required cross-platform / logging / usercmd library)")
   else
-    error_(
-      "lib.nvim not found — it is a required dependency. "
-        .. 'Add "StefanBartl/lib.nvim" to your plugin manager\'s dependencies (see README).'
-    )
+    error_("lib.nvim not found — it is a required dependency", {
+      'Add "StefanBartl/lib.nvim" to your plugin manager\'s dependencies (see README)',
+    })
   end
 
   if executable("curl") then
     ok("curl found (used to download the mdview-server release on first use)")
   else
-    error_("curl not found in PATH — mdview.nvim cannot download the relay server binary or client bundle")
+    error_(
+      "curl not found in PATH — mdview.nvim cannot download the relay server binary or client bundle",
+      { "Install curl" }
+    )
   end
 
   if executable("tar") then
     ok("tar found (used to extract the client bundle)")
   else
-    error_("tar not found in PATH — mdview.nvim cannot extract the downloaded client bundle")
+    error_("tar not found in PATH — mdview.nvim cannot extract the downloaded client bundle", { "Install tar" })
   end
 
   start("mdview.nvim: installed assets")
@@ -69,7 +72,7 @@ function M.check()
   if status.binary_installed then
     ok("mdview-server binary cached at " .. status.binary_path)
   else
-    warn("mdview-server binary not yet installed — will be downloaded on first `:MDView start`")
+    info("mdview-server binary not yet installed — will be downloaded on first `:MDView start`")
   end
 
   if status.client_installed then
@@ -82,17 +85,20 @@ function M.check()
     if has_index and #wasm > 0 then
       ok("client bundle looks complete (index.html + WASM present)")
     else
+      local missing = {}
+      if not has_index then
+        missing[#missing + 1] = "index.html missing"
+      end
+      if #wasm == 0 then
+        missing[#missing + 1] = "no .wasm in assets/"
+      end
       error_(
-        "client bundle at "
-          .. dir
-          .. " is incomplete ("
-          .. (has_index and "" or "index.html missing; ")
-          .. (#wasm > 0 and "" or "no .wasm in assets/; ")
-          .. "delete the cache dir and re-run :MDView start to re-download)"
+        ("client bundle at %s is incomplete (%s)"):format(dir, table.concat(missing, "; ")),
+        { "Delete the cache dir and re-run :MDView start to re-download" }
       )
     end
   else
-    warn("client bundle not yet installed — will be downloaded on first `:MDView start`")
+    info("client bundle not yet installed — will be downloaded on first `:MDView start`")
   end
 
   -- Config & opt-in features ------------------------------------------------
@@ -128,7 +134,9 @@ function M.check()
     if resolved and resolved ~= "" then
       ok("browser resolved (isolated mode): " .. resolved)
     else
-      warn('open_mode = "isolated" but no browser resolved — set browser.browser_cmd or browser.browser')
+      warn('open_mode = "isolated" but no browser resolved', {
+        "Set browser.browser_cmd or browser.browser in setup()",
+      })
     end
   else
     ok('open_mode = "default" — uses the OS opener (no browser executable needed)')
@@ -143,9 +151,9 @@ function M.check()
     if has_display then
       ok("a GUI/display is available for browser autostart")
     else
-      warn(
-        "no DISPLAY/WAYLAND_DISPLAY detected — browser autostart is skipped (set browser.require_display = false to override)"
-      )
+      warn("no DISPLAY/WAYLAND_DISPLAY detected — browser autostart is skipped", {
+        "Set browser.require_display = false to override",
+      })
     end
   end
 
@@ -163,7 +171,10 @@ function M.check()
     if body == "ok" then
       ok(("relay running on port %d and healthy (GET /health = ok)"):format(port))
     else
-      warn(("relay process is up on port %d but /health did not return ok (got %q)"):format(port, tostring(body)))
+      warn(
+        ("relay process is up on port %d but /health did not return ok (got %q)"):format(port, tostring(body)),
+        { "Restart the relay: :MDView stop then :MDView start" }
+      )
     end
     ok("attached = " .. tostring(state.is_attached()) .. ", session token set = " .. tostring(state.get_token() ~= nil))
   else
