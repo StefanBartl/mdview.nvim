@@ -35,6 +35,32 @@ could otherwise open a WebSocket to the relay using credentials it never saw
 (no token needed for the browser to *initiate* a same-origin-looking
 handshake — Origin is the only signal available to refuse it).
 
+## Release downloads are checksummed, bounded, and never trusted half-written
+
+`:MDView start` bootstraps the platform-matching `mdview-server` binary and
+the prebuilt browser client bundle from GitHub Releases on first use (same
+pattern as mason.nvim/nvim-treesitter). Each asset is downloaded via `curl`
+as an argv array (no shell interpolation) and verified against the release's
+own `checksums.txt` (SHA-256) before being treated as installed; a mismatch
+deletes the file rather than leaving a wrong-but-present binary around to be
+picked up on the next start.
+
+The download itself is bounded — `--max-time 60` and `--max-filesize
+100MB` — since `curl_download` runs synchronously on the main loop: without
+a timeout, a hung connection would freeze Neovim indefinitely, and without a
+size cap, a compromised or misconfigured release host could exhaust disk
+space instead of just failing. A failed download (timeout, oversize, network
+error) also has its partial output file removed immediately — the next
+`:MDView start` treats *any* file already on disk at the target path as
+"already installed" without re-checksumming it, so leaving a truncated
+binary there would have meant it silently skips verification and gets
+executed as the server process on the following start.
+
+- **Module:** `lua/mdview/adapter/install.lua` (`curl_download`,
+  `ensure_asset`, `expected_checksum`, `file_sha256`)
+- **Config:** `install.repo`, `install.version` (pin a fork or a specific
+  release instead of the default)
+
 ## Port selection is race-free
 
 The relay doesn't just probe whether a preferred port looks free and then

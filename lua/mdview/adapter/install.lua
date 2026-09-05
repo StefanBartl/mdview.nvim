@@ -95,6 +95,12 @@ local function expected_checksum(checksums_text, name)
   return nil
 end
 
+-- 60s/100MB: generous for a Go binary or a small client tarball over a slow
+-- connection, but bounded -- a hung or malicious server must not block this
+-- (synchronous, main-loop-blocking) call forever or fill the disk (SEC-21).
+local DOWNLOAD_TIMEOUT_S = 60
+local DOWNLOAD_MAX_BYTES = 100 * 1024 * 1024
+
 ---@internal
 ---@param url string
 ---@param dest string
@@ -103,8 +109,24 @@ local function curl_download(url, dest)
   if fn.executable("curl") ~= 1 then
     return false, "curl not found in PATH; cannot download mdview release assets"
   end
-  fn.system({ "curl", "-fsSL", "-o", dest, url })
+  fn.system({
+    "curl",
+    "-fsSL",
+    "--max-time",
+    tostring(DOWNLOAD_TIMEOUT_S),
+    "--max-filesize",
+    tostring(DOWNLOAD_MAX_BYTES),
+    "-o",
+    dest,
+    url,
+  })
   if vim.v.shell_error ~= 0 then
+    -- curl's -o writes as it streams, so a timeout/network error/oversize
+    -- abort routinely leaves a truncated `dest` behind. ensure_asset()'s
+    -- caller treats any filereadable(dest) as "already installed, trusted"
+    -- on its next call -- leaving the partial file would skip re-download
+    -- *and* checksum verification for whatever corrupt bytes landed here.
+    pcall(os.remove, dest)
     return false, ("curl failed (exit %d) for %s"):format(vim.v.shell_error, url)
   end
   return true, nil
