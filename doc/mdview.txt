@@ -510,7 +510,7 @@ composer (`lib.nvim.bindings.usercmd.composer`): every subcommand below complete
   See |mdview-standalone|.
 
 :MDView open                                                    *:MDView-open*
-  Re-opens a browser tab for the *current* buffer against the
+  Re-opens a browser tab for the current buffer against the
   *already-running* session. It does NOT start a new relay process — run
   |:MDView-start| first. Pushes the current buffer's content once so the new
   tab isn't empty, then opens the browser using the same key/token URL logic
@@ -544,7 +544,7 @@ composer (`lib.nvim.bindings.usercmd.composer`): every subcommand below complete
 :MDView file-log off                                      *:MDView-file-log-off*
 :MDView file-log status                                *:MDView-file-log-status*
 :MDView file-log path [value]                            *:MDView-file-log-path*
-  Toggles persistent *file* logging of the relay's stdout at runtime. It is
+  Toggles persistent file logging of the relay's stdout at runtime. It is
   opt-in and off by default, so a plain |:MDView-start| writes nothing to
   disk. When on, output is appended to `file_log_path` — by default
   `stdpath('log')/mdview/relay-<timestamp>.log`, never a `logs/` directory
@@ -582,7 +582,7 @@ composer (`lib.nvim.bindings.usercmd.composer`): every subcommand below complete
 
 Live preview controls ~
 
-These change the *open* preview tab without a reload: each sets the matching
+These change the open preview tab without a reload: each sets the matching
 `browser.*` option (so a re-opened tab keeps it) and, while a session runs,
 pushes a control update over the socket.
 
