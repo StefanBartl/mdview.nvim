@@ -5,8 +5,8 @@
 local fn = vim.fn
 
 -- A dedicated, persistent profile directory reused across invocations
--- (instead of a fresh fn.tempname() every time), so repeated :MDViewStart /
--- :MDViewOpen calls reuse the same mdview browser session/window rather than
+-- (instead of a fresh fn.tempname() every time), so repeated :MDView start /
+-- :MDView open calls reuse the same mdview browser session/window rather than
 -- piling up a new orphaned browser process each time (the roadmap's "reuse
 -- the current browser session" request). Being a SEPARATE profile from the
 -- user's everyday one is also what makes closing the preview window actually

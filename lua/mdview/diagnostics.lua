@@ -2,7 +2,7 @@
 -- One-shot diagnostics for mdview.nvim: gathers the state of every component
 -- (Neovim, dependencies, install cache, config, running relay, health probe,
 -- recent internal log ring) into a single plain-text report written to a
--- file. The point is a hand-off: run :MDViewDiagnose, then send the printed
+-- file. The point is a hand-off: run :MDView diagnose, then send the printed
 -- file so an issue can be reproduced without a live session.
 --
 -- Read-only except for probing /health and writing the report; never starts,
@@ -117,7 +117,7 @@ function M.collect()
   -- line. Honest even when webtransport was requested: with no HTTP/3 backend
   -- it falls back and reports websocket.
   local ok_alog, alog = pcall(require, "mdview.adapter.log")
-  local active = "(unknown — open a preview and check :MDViewShowWebLogs)"
+  local active = "(unknown — open a preview and check :MDView weblogs)"
   if ok_alog and type(alog.lines) == "function" then
     local llines = alog.lines()
     for i = #llines, 1, -1 do

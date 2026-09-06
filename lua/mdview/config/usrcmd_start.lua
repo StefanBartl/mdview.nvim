@@ -1,5 +1,5 @@
 ---@module 'mdview.config.usrcmd_start'
---- Configuration for the :MDViewStart command's initial-push strategy.
+--- Configuration for the :MDView start command's initial-push strategy.
 
 local M = {}
 

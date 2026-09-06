@@ -1,6 +1,6 @@
 ---@module 'mdview.bindings.autocmds.preview_tab_sync'
 -- Keeps any open nvim-tab preview (mdview.adapter.preview_tab) in sync with
--- its source buffer's content. Entirely independent of :MDViewStart / the
+-- its source buffer's content. Entirely independent of :MDView start / the
 -- relay session's MdviewAutocmds augroup — these autocmds are created once,
 -- lazily, the first time a tab preview is opened (mdview.adapter.preview_tab
 -- calls M.ensure_attached()), and stay registered globally for the rest of

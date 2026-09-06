@@ -196,7 +196,7 @@ end
 
 -- Close a previously opened browser handle via jobstop(). The profile
 -- directory is intentionally left alone (see module docstring) — it's
--- reused by the next :MDViewStart / :MDViewOpen, not deleted.
+-- reused by the next :MDView start / :MDView open, not deleted.
 -- If there is no job handle (external opener used), this is a no-op.
 ---@param handle BrowserHandle|nil
 ---@return boolean, string|nil

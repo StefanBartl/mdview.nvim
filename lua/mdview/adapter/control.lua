@@ -1,7 +1,7 @@
 ---@module 'mdview.adapter.control'
 -- Live preview-control updates: push small JSON control objects (cursor mode,
--- zoom factor) to the open preview tab so runtime commands (:MDViewCursor,
--- :MDViewZoom) take effect without reloading the tab. Routed to the same room
+-- zoom factor) to the open preview tab so runtime commands (:MDView cursor,
+-- :MDView zoom) take effect without reloading the tab. Routed to the same room
 -- the tab watches — the preview key in "reuse" behavior, otherwise the current
 -- buffer's path — matching live_push's target resolution.
 

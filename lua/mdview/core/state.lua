@@ -244,7 +244,7 @@ end
 --- Low-level: only returns status, does not notify() itself (see
 --- Refactoring.md "fail late" / report-at-the-boundary) — the caller decides
 --- whether/how to surface `err`.
----@param cwd_override string|nil # forwarded to mdview.adapter.server_args.resolve(), e.g. from `:MDViewStart cwd=...`
+---@param cwd_override string|nil # forwarded to mdview.adapter.server_args.resolve(), e.g. from `:MDView start cwd=...`
 ---@return any proc the started (or already-running) process handle, or nil on failure
 ---@return string|nil err set when resolving the command/args failed
 function M.ensure_proc_started(cwd_override)

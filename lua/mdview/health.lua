@@ -197,12 +197,14 @@ function M.check()
   else
     ok("markdown.nvim not installed (optional companion — buffer-text features would mirror into the preview)")
   end
-  -- color_my_ascii highlights in the nvim buffer (not HTML), so it complements
-  -- rather than feeds the browser preview.
+  -- color_my_ascii highlights fenced code in the nvim buffer. With
+  -- browser.highlighter = "nvim" mdview also reads those colors back out and
+  -- paints the preview's code blocks with them (core/fence_spans); otherwise
+  -- the preview highlights on its own. Optional, not a dependency.
   if has_plugin("color_my_ascii") then
-    ok("color_my_ascii.nvim detected (highlights code in the nvim buffer; browser highlighting is separate)")
+    ok('color_my_ascii.nvim detected — with browser.highlighter = "nvim" its colors also paint the preview')
   else
-    ok("color_my_ascii.nvim not installed (optional; highlights fenced code inside Neovim)")
+    ok("color_my_ascii.nvim not installed (optional companion; would feed the preview's fenced-code colors)")
   end
 
   -- mdview.nvim's own docs/install.json via lib.nvim.deps — the same curl

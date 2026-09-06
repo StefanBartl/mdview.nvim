@@ -110,7 +110,7 @@ local function resolve_browser_url(opts)
   end
 
   -- preview zoom factor (client reads ?zoom=); only pass a non-default so a
-  -- freshly reopened tab starts at the zoom :MDViewZoom last set.
+  -- freshly reopened tab starts at the zoom :MDView zoom last set.
   local zoom = browser_defaults.zoom
   if type(zoom) == "number" and zoom > 0 and zoom ~= 1.0 then
     url = url .. "&zoom=" .. vim.uri_encode(("%.3f"):format(zoom))
@@ -242,7 +242,7 @@ function M.start(opts)
       -- open_preview_tab replaces the browser tab with an nvim-tab
       -- preview (Treesitter mirror, no HTML/relay involved at all —
       -- see mdview.adapter.preview_tab) — the relay/WASM pipeline
-      -- above still runs normally, so :MDViewOpen can still open the
+      -- above still runs normally, so :MDView open can still open the
       -- browser later if wanted.
       if require("mdview.config").defaults.open_preview_tab then
         require("mdview.adapter.preview_tab").open(buf)

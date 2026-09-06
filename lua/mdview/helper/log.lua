@@ -3,7 +3,7 @@
 -- (mdview.log, built on lib.nvim.logger).
 --
 -- Every call is RECORDED into the logger's in-memory ring (so
--- :MDViewDiagnose always has recent history); a vim.notify only happens when
+-- :MDView diagnose always has recent history); a vim.notify only happens when
 -- the caller opts in AND mdview.config.defaults.debug_preview is on. Keeping
 -- the (msg, level, tag, debug) signature means existing call sites are
 -- unchanged.

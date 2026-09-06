@@ -1,7 +1,6 @@
 ---@module 'mdview.adapter.log'
--- Collects logs for mdview server and optionally writes to a scratch buffer or file.
--- Minimal changes: replace deprecated buffer option APIs with nvim_set_option_value,
--- keep behavior and surface stable.
+-- Collects the relay server's stdout/stderr and optionally mirrors it to a
+-- scratch buffer or a persistent file.
 
 local api = vim.api
 local schedule = vim.schedule
@@ -56,7 +55,7 @@ M.LOG_BUF_NAME = string.format("./logs/debug-%s.log", timestamp)
 -- It used to default to "./logs/debuglog", which silently created a `logs/`
 -- directory in whatever the cwd happened to be as soon as a preview started.
 -- Both the enabled flag and the path can be overridden here via M.setup(),
--- and toggled at runtime through M.set_file_log()/:MDViewFileLog.
+-- and toggled at runtime through M.set_file_log()/:MDView file-log.
 ---@type boolean|nil
 local file_log_override = nil
 ---@type string|nil
@@ -90,7 +89,7 @@ local function file_path()
   return default_file_path
 end
 
---- Effective file-logging state, for :MDViewFileLog and diagnostics.
+--- Effective file-logging state, for :MDView file-log and diagnostics.
 ---@return boolean enabled, string path
 function M.file_log_state()
   return is_file_log(), file_path()
@@ -109,7 +108,7 @@ end
 ---
 --- The path is stored as given: expanding `~`/relative paths needs vim.fn.*,
 --- which file_path()'s caller (M.append, a fast event context) can't do — so
---- callers such as :MDViewFileLog expand before handing the path over.
+--- callers such as :MDView file-log expand before handing the path over.
 ---@param path string|nil
 ---@return boolean enabled, string path
 function M.set_file_log_path(path)

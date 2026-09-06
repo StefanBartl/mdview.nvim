@@ -2,7 +2,7 @@
 -- Central structured logger for mdview.nvim, built on lib.nvim.logger.
 --
 -- Every internal log call is recorded into a bounded in-memory ring
--- REGARDLESS of the user's debug config, so :MDViewDiagnose can dump a
+-- REGARDLESS of the user's debug config, so :MDView diagnose can dump a
 -- recent history even when debug notifications are off. The debug config
 -- (mdview.config.defaults.debug_preview) only controls what ADDITIONALLY
 -- reaches vim.notify — see mdview.helper.log, which drives notifications
@@ -16,7 +16,7 @@ local M = {}
 --- level = trace  -> capture everything into the ring
 --- notify_level = OFF -> never auto-notify; callers pass { notify = true }
 --- file = false   -> no persistent JSONL by default (the ring is dumped into
----                   the :MDViewDiagnose report instead)
+---                   the :MDView diagnose report instead)
 M.instance = logger.new({
   name = "mdview",
   level = "trace",

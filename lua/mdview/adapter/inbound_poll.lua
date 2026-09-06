@@ -2,11 +2,13 @@
 -- Browser->Neovim polling bridge for the features that need to push events
 -- upstream (Neovim has no WebSocket client, and the relay stays a dumb
 -- byte-forwarder). While a session is active it polls, per tick:
---   * GET /nav        (experimental.click_navigate) — clicked links to open
---   * GET /scrollback (experimental.reverse_scroll) — browser scroll position
+--   * GET /nav        (experimental.click_navigate)   — clicked links to open
+--   * GET /scrollback (experimental.reverse_scroll)   — browser scroll position
+--   * GET /toggle     (sync_checkboxes, default on)   — task-list checkbox ticks
+--   * GET /field      (sync_fields, default on)       — text-field write-back
 -- Only the enabled endpoints are polled; the timer runs only if at least one is
--- enabled. curl is already a hard dependency; a click/scroll is latency-tolerant
--- enough for a poll.
+-- enabled. curl is already a hard dependency, and every polled event is
+-- latency-tolerant enough for a poll.
 
 local uv = vim.uv or vim.loop
 

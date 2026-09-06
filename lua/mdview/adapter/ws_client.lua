@@ -1,12 +1,11 @@
 ---@module 'mdview.adapter.ws_client'
--- Enhanced wait_ready helper with robust logging, retries, and Windows support.
--- Reviewed for a further file split ("Modularisieren"): the four concerns
--- here (health polling, URL building, HTTP transport, retry/queue) are each
--- already a single named local function with a clear boundary: splitting
--- them into separate files would add cross-file indirection without a
--- corresponding win, unlike e.g. bindings/ or adapter/browser/, which
--- separate genuinely independent, independently-testable, multi-consumer
--- concerns. Kept as one file.
+-- wait_ready helper plus the HTTP transport to the relay: health polling, URL
+-- building, non-blocking POST, and the retry/queue path.
+--
+-- Kept as one file: the four concerns are each a single named local with a
+-- clear boundary, so splitting them would add cross-file indirection without
+-- the independent, multi-consumer payoff that bindings/ or adapter/browser/
+-- get from being split.
 
 local fn = vim.fn
 -- DEP-01: matches the fallback pattern every other module in this repo
@@ -596,7 +595,7 @@ end
 
 -- Public: ask every connected preview tab to close itself (the relay
 -- broadcasts a close signal to all rooms; the client calls window.close()).
--- Used by :MDViewStop so tabs opened in the OS default browser — which mdview
+-- Used by :MDView stop so tabs opened in the OS default browser — which mdview
 -- can't close via a process handle — close cooperatively.
 --
 -- Intentionally BLOCKING with a short timeout: it runs right before the relay

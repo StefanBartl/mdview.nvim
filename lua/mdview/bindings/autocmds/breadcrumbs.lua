@@ -1,6 +1,6 @@
 ---@module 'mdview.bindings.autocmds.breadcrumbs'
 -- Records session breadcrumbs (mdview.core.breadcrumbs) as the cursor moves and
--- on buffer switches, so :MDViewBreadcrumbs can show/export a rough outline of
+-- on buffer switches, so :MDView breadcrumbs can show/export a rough outline of
 -- what was visited during the session. Gated behind config.breadcrumbs (default
 -- true); throttled, and the recorder itself dedupes on (doc, heading), so this
 -- stays off the hot path.

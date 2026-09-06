@@ -4,14 +4,14 @@
 --   "reuse"   — the one open tab follows you: push the entered buffer's content
 --               to the room that tab watches (state.preview_key).
 --   "new_tab" — open a fresh preview tab for the entered buffer (once per file).
---   "manual"  — do nothing (open other files explicitly with :MDViewOpen).
+--   "manual"  — do nothing (open other files explicitly with :MDView open).
 --
 -- Overridden by a document pin (:MDView pin, mdview.core.pin): while one is up
 -- the preview holds the pinned document and buffer switches do nothing at all,
 -- whichever behavior is configured.
 --
--- Registered in the main mdview augroup (attached on :MDViewStart, torn down on
--- :MDViewStop). Distinct from bufenter.lua, which only snapshots content.
+-- Registered in the main mdview augroup (attached on :MDView start, torn down on
+-- :MDView stop). Distinct from bufenter.lua, which only snapshots content.
 
 local api = vim.api
 local ws_client = require("mdview.adapter.ws_client")
@@ -153,7 +153,7 @@ local function on_switch(bufnr)
   end
 end
 
--- Reset per-session dedup state. Called on attach so a new :MDViewStart starts
+-- Reset per-session dedup state. Called on attach so a new :MDView start starts
 -- clean and a stale "_last" from a previous session can't suppress the first
 -- switch.
 ---@return nil

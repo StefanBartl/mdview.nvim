@@ -56,7 +56,7 @@ function M.setup(opts)
 end
 
 --- Re-open a browser tab for the current buffer against the already-running
---- mdview-server session (does NOT start a new server — use :MDViewStart for
+--- mdview-server session (does NOT start a new server — use :MDView start for
 --- that). Pushes the current buffer's content first so the new tab has
 --- something to render instead of waiting for the next edit.
 ---@param opts table|nil # { browser_url?: string, browser_cmd?: string, browser_args?: table }
@@ -65,7 +65,7 @@ function M.open(opts)
   opts = opts or {}
 
   if not state.is_attached() or not state.get_server() then
-    notify("[mdview] no mdview session running — start one first with :MDViewStart", vim.log.levels.WARN)
+    notify("[mdview] no mdview session running — start one first with :MDView start", vim.log.levels.WARN)
     return false
   end
 

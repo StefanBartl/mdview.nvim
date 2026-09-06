@@ -147,7 +147,7 @@ local function resolve_web_root()
   return install.ensure_client_bundle()
 end
 
---- @param cwd_override string|nil # takes precedence over mdview.config.defaults.server_cwd, e.g. from `:MDViewStart cwd=...`
+--- @param cwd_override string|nil # takes precedence over mdview.config.defaults.server_cwd, e.g. from `:MDView start cwd=...`
 --- @return string|nil cmd
 --- @return string[]|nil args
 --- @return string|nil cwd

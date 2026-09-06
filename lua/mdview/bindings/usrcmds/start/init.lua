@@ -50,7 +50,7 @@ local function parse_start_args(fargs)
 end
 
 -- initial_push_async: if an explicit path is provided (arg_path), prefer immediate try_push.
--- This allows `:MDViewStart /path/to/file.md` to immediately render that file into the preview.
+-- This allows `:MDView start /path/to/file.md` to immediately render that file into the preview.
 ---@internal
 ---@param push_strategy "launcher"|"try_push"
 ---@param try_push_opts table|nil
@@ -157,7 +157,7 @@ function M.run(fargs)
   end
 
   -- Server already running: don't re-spawn. Re-open the preview surface
-  -- instead — the common reason to run :MDViewStart again is that the
+  -- instead — the common reason to run :MDView start again is that the
   -- browser window was closed (without stopping the session) and the
   -- user wants it back. Always return from this branch: previously it
   -- fell through into the full start path, re-running session.init()
@@ -216,7 +216,7 @@ function M.run(fargs)
   end
   -- Wire session + autocmds BEFORE marking the server as "running":
   -- if autocmds.attach() errors, we don't want state.get_server() left
-  -- truthy (which would make every later :MDViewStart say "already
+  -- truthy (which would make every later :MDView start say "already
   -- running" against a never-fully-started session).
   session.init()
   autocmds.attach()

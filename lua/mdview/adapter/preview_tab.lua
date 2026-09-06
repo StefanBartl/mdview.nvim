@@ -8,7 +8,7 @@
 -- highlighted via Neovim's markdown Treesitter parser (falling back to Vim's
 -- bundled regex `syntax=markdown` if Treesitter's markdown parser isn't
 -- installed, so it's never left unhighlighted). Works fully independently
--- of :MDViewStart / the relay session.
+-- of :MDView start / the relay session.
 
 local api = vim.api
 local safe_buf_get_option = require("mdview.helper.safe_buf_get_option")

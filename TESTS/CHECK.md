@@ -6,7 +6,7 @@
 2. `reverse_scroll = true` → scroll in the browser → the nvim cursor follows (with ~250 ms lag, now `transport.inbound_poll_ms` — **please judge here whether it "feels ok"**, that could not be assessed headless; if it does not, that key is the dial).
 3. `webtransport = true` → should fall back to WebSocket transparently (no HTTP/3 backend), the preview works normally.
     **Cross-platform (if possible)**
-1. Test `:MDViewStart` once on Linux — the shim should catch the lib.nvim bug; once lib.nvim itself is fixed, the shim can go.
+1. Test `:MDView start` once on Linux — the shim should catch the lib.nvim bug; once lib.nvim itself is fixed, the shim can go.
 
 ---
 

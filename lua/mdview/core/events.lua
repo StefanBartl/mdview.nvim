@@ -8,8 +8,7 @@
 -- (M.push_buffer, via utils/diff_granular) predates the current architecture,
 -- where the client WASM renderer needs whole-document context and can't
 -- render from a partial diff chunk; the line-diff optimization is deferred.
--- Kept for reference/future reactivation, not
--- an oversight.
+-- Kept for reference / future reactivation, not an oversight.
 
 local session = require("mdview.core.session")
 local ws_client = require("mdview.adapter.ws_client")
@@ -41,7 +40,7 @@ function M.push_buffer(bufnr, force)
   if norm_path then
     path = norm_path
   else
-    log.debug("normalized path ist nil", vim.log.levels.ERROR, "events", true)
+    log.debug("normalized path is nil", vim.log.levels.ERROR, "events", true)
     return
   end
 
@@ -99,7 +98,7 @@ function M.store_snapshot_on_enter(bufnr)
 
   local norm_path = normalize.path(path)
   if not norm_path then
-    log.debug("normalized path ist nil", vim.log.levels.ERROR, "events", true)
+    log.debug("normalized path is nil", vim.log.levels.ERROR, "events", true)
     return
   end
   path = norm_path
