@@ -76,6 +76,14 @@ function M.resync(bufnr)
     if not ok then
       return
     end
+    -- wait_ready is async and can take up to WAIT_READY_TIMEOUT (15s) on a
+    -- slow/first-run relay start; `bufnr` was only valid when resync() was
+    -- called, not necessarily by the time this fires (e.g. the buffer was
+    -- wiped while the health check was still polling). Re-validate before
+    -- touching it, or nvim_buf_get_lines throws on the stale handle.
+    if not api.nvim_buf_is_valid(bufnr) then
+      return
+    end
     local lines = api.nvim_buf_get_lines(bufnr, 0, -1, false) or {}
     -- A buffer switch is a whole-document change of the previewed room,
     -- so force a full snapshot rather than diffing against the previous
