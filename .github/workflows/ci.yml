@@ -158,6 +158,7 @@ jobs:
         with:
           repository: StefanBartl/lib.nvim
           path: .deps/lib.nvim
+          ref: ci-verified
 
       - name: Install luacheck and busted via luarocks locally
         run: |
