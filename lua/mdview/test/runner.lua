@@ -8,6 +8,7 @@
 local runner = require("mdview.adapter.runner")
 local ws_client = require("mdview.adapter.ws_client")
 local api = vim.api
+---@type fun(msg: string, level?: integer, opts?: table)
 local notify = vim.notify
 
 local M = {}

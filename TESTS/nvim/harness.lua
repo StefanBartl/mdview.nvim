@@ -119,11 +119,16 @@ _G.assert = setmetatable({
 })
 
 local current = "?"
+
+-- This harness is deliberately minimal, not busted/plenary -- these globals
+-- are its own, not a redefinition of someone else's.
+---@diagnostic disable-next-line: duplicate-set-field
 function _G.describe(name, fn)
   current = name
   fn()
 end
 
+---@diagnostic disable-next-line: duplicate-set-field
 function _G.it(name, fn)
   local ok, err = pcall(fn)
   if ok then
