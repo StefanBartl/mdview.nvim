@@ -27,10 +27,16 @@ The [repository README](../README.md) is the short version; this is the index.
 |---|---|
 | [architecture.md](architecture.md) | Which component is written in which language, and how do they talk? |
 | [FEATURES/MACHINERY.md](FEATURES/MACHINERY.md) | The parts with no command of their own — caches, throttling, the diff transport, lifecycle. |
+| [install.json](install.json) | The declared external tools (`curl`), read by `lib.nvim.deps` and `:checkhealth mdview`. |
+
+## Working on it
+
+| Page | What it answers |
+|---|---|
+| [CONTRIBUTING.md](CONTRIBUTING.md) | Which of the four components does my change belong in, and what are the rules that hold across all of them? |
 | [development.md](development.md) | How do I build mdview.nvim from source and run its four test suites? |
 | [relay-testing.md](relay-testing.md) | How do I drive the Go relay's endpoints by hand to pin a failure to one hop? |
 | [diff-harness.md](diff-harness.md) | How do I benchmark and verify the experimental line-diff transport? |
-| [install.json](install.json) | The declared external tools (`curl`), read by `lib.nvim.deps` and `:checkhealth mdview`. |
 
 ## Not in this repository
 
