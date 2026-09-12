@@ -197,7 +197,7 @@ return {
   -- One-time "which CLI tools does this plugin want, and why" popup on
   -- first setup() after install (via lib.nvim.deps). false disables it
   -- for this plugin specifically, right here in the spec passed to
-  -- setup() — no vim.g needed. See README "Requirements".
+  -- setup() — no vim.g needed. See docs/configuration.md.
   deps_popup = true,
 
   browser = {
