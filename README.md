@@ -67,16 +67,9 @@ says what each one answers.
 - [Development](docs/development.md) — building from source and running the four test suites.
 - [Relay testing](docs/relay-testing.md) — driving the Go relay's endpoints by hand to pin a failure to one hop.
 - [Diff harness](docs/diff-harness.md) — benchmarking and verifying the experimental line-diff transport.
+- [Ecosystem architecture](https://github.com/StefanBartl/documentation.nvim/blob/main/docs/ECOSYSTEM.md) — how docs, static analysis and runtime split across `lib.nvim`, `documentation.nvim`, `runtime-analysis.nvim` and mdview.nvim.
 
 `:help mdview` is the same reference inside the editor.
-
-### Not in this repository
-
-[Ecosystem architecture](https://github.com/StefanBartl/documentation.nvim/blob/main/docs/ECOSYSTEM.md)
-— where docs, static analysis and runtime each belong across the four pieces
-mdview.nvim is the presentation half of (`lib.nvim`, `documentation.nvim`,
-`runtime-analysis.nvim`, mdview.nvim), and why telemetry reports render through
-here rather than growing their own viewer.
 
 ---
 
