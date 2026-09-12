@@ -1,9 +1,11 @@
 # Security
 
-mdview.nvim positions itself as a security/performance-focused alternative to
-existing Neovim Markdown-preview plugins (see the README). Two mechanisms
-carry that claim: a relay that only ever admits the local machine, and a
-renderer that never emits unsanitized HTML (covered in
+mdview.nvim positions itself as a security- and performance-focused
+alternative to existing Neovim Markdown-preview plugins — it was inspired
+by, and contrasts most directly with,
+[iamcco/markdown-preview.nvim](https://github.com/iamcco/markdown-preview.nvim).
+Two mechanisms carry that claim: a relay that only ever admits the local
+machine, and a renderer that never emits unsanitized HTML (covered in
 [RENDERING.md](RENDERING.md)). This file covers the former.
 
 ## Loopback-only relay with per-session token and Origin checks

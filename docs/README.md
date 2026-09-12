@@ -8,6 +8,7 @@ The [repository README](../README.md) is the short version; this is the index.
 | Page | What it answers |
 |---|---|
 | [installation.md](installation.md) | How do I install it, what does it need, and where do the relay binary and client bundle come from? |
+| [quickstart.md](quickstart.md) | What's the first thing to run after installing? |
 | [WORKFLOW.md](WORKFLOW.md) | Once a session is running, how do the pieces combine — which controls apply live, which need a restart, what breaks first? |
 | [FEATURES/](FEATURES/README.md) | What can it actually do? |
 
@@ -20,6 +21,7 @@ The [repository README](../README.md) is the short version; this is the index.
 | [BINDINGS.md](BINDINGS.md) | Commands, autocommands and keymaps at a glance, with the full argument shape of each. |
 | [standalone.md](standalone.md) | How do I get a preview that outlives `:qa`, or runs with no Neovim at all? |
 | [companion-plugins.md](companion-plugins.md) | Which optional plugins pair with the live preview, and what does each add? |
+| [health.md](health.md) | What does `:checkhealth mdview` report, section by section? |
 
 ## Under the hood
 

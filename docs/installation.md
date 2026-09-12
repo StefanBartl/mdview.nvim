@@ -13,6 +13,18 @@
 No Go, Rust or Node toolchain is needed to *run* mdview — that is only for
 [building from source](development.md).
 
+Two more plugins are detected at runtime and integrate if present, never
+required: see [companion-plugins.md](companion-plugins.md).
+
+Declared tools (currently just `curl`) live in [install.json](install.json)
+and are read by lib.nvim's
+[deps module](https://github.com/StefanBartl/lib.nvim/blob/main/lua/lib/nvim/deps/README.md),
+which shows a one-time popup listing them and why they're needed, on the
+first `setup()` call after installing. Repeat it any time with
+`:Lib deps show mdview.nvim`; turn it off for this plugin with
+`deps_popup = false` in `setup()` (see [configuration.md](configuration.md)),
+or globally with `vim.g.lib_nvim_deps_disable_first_run = true`.
+
 ## How the runtime pieces get there
 
 `:MDView start` spawns a native relay binary and serves a prebuilt browser
