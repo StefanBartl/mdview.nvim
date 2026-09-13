@@ -207,14 +207,16 @@ function M.check()
     ok("color_my_ascii.nvim not installed (optional companion; would feed the preview's fenced-code colors)")
   end
 
-  -- mdview.nvim's own docs/install.json via lib.nvim.deps — the same curl
-  -- check above, but with its declared `why` and a pointer to
-  -- `:Lib deps show`. Does nothing if lib.nvim.deps is unavailable (older
+  -- mdview.nvim's own docs/install.json via lib.nvim.deps — points to
+  -- `:Lib deps show`. Not a per-tool report: curl (the whole of
+  -- docs/install.json) is already checked above with a mdview-specific
+  -- message; looping over the spec here too would just restate it in the
+  -- generic wording. Does nothing if lib.nvim.deps is unavailable (older
   -- lib.nvim).
   local ok_deps, deps_health = pcall(require, "lib.nvim.deps.health")
   if ok_deps then
     start("mdview.nvim: declared tools (lib.nvim.deps)")
-    deps_health.report_for("mdview.nvim")
+    deps_health.pointer_for("mdview.nvim")
   end
 
   require("lib.nvim.bindings.usercmd.composer").checkhealth("MDView")
