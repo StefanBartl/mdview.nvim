@@ -233,4 +233,8 @@ function M.run(fargs)
   log.debug("usercmds.start: MDView start completed wiring", nil, "usercmds.start", true)
 end
 
+-- Exposed for tests: pure token-parsing logic, otherwise unreachable except
+-- through the full M.run() (which spawns a real server process).
+M._parse_start_args = parse_start_args
+
 return M

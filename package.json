@@ -23,8 +23,8 @@
     "test:all": "npm run test && npm run test:go && npm run test:rust && echo 'Lua tests separate (busted) run in CI or with `npm run test:lua`'",
     "test:go": "cd native/server && go test ./...",
     "test:rust": "cd native/wasm-render && cargo test",
-    "test:lua": "if command -v busted >/dev/null 2>&1; then busted tests/lua || true; else echo 'busted not installed; skipping Lua tests'; fi",
-    "test:lua:nvim": "nvim --headless -u NONE -i NONE --cmd \"set rtp+=.,../lib.nvim\" -c \"luafile tests/nvim/harness.lua\" -c \"qa!\"",
+    "test:lua": "if command -v busted >/dev/null 2>&1; then busted TESTS/lua || true; else echo 'busted not installed; skipping Lua tests'; fi",
+    "test:lua:nvim": "nvim --headless -u NONE -i NONE --cmd \"set rtp+=.,../lib.nvim\" -c \"luafile TESTS/nvim/harness.lua\" -c \"qa!\"",
     "check:types": "tsc -p tsconfig.json --noEmit",
     "prepare": "husky install"
   },
