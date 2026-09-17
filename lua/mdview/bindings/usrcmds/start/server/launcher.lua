@@ -34,7 +34,11 @@ local function has_display()
   if is_windows() or vim.fn.has("mac") == 1 then
     return true
   end
-  return (vim.env.DISPLAY and vim.env.DISPLAY ~= "") or (vim.env.WAYLAND_DISPLAY and vim.env.WAYLAND_DISPLAY ~= "")
+  -- `and`/`or` as a ternary degrades to nil, not false, when both operands
+  -- are nil -- `~=` on each side keeps every branch a real boolean, so the
+  -- function honours its own `@return boolean` when no display is set too.
+  local display, wayland = vim.env.DISPLAY, vim.env.WAYLAND_DISPLAY
+  return (display ~= nil and display ~= "") or (wayland ~= nil and wayland ~= "")
 end
 M.has_display = has_display
 
