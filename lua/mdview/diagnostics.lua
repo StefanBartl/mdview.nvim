@@ -162,9 +162,12 @@ function M.collect()
 end
 
 --- Run diagnostics, write the report to `path` (or a timestamped default in
---- stdpath('log')), and return the path.
+--- stdpath('log')), and return the path. A path that cannot be written --
+--- an unwritable directory, a missing parent -- is an error, not a path: the
+--- report is the hand-off, so a path with nothing behind it must never be
+--- reported as written.
 ---@param path string|nil
----@return string report_path
+---@return string|nil report_path, string|nil err
 function M.run(path)
   local lines = M.collect()
   if not path or path == "" then
@@ -172,12 +175,13 @@ function M.run(path)
     pcall(fn.mkdir, dir, "p")
     path = dir .. "/mdview-diagnostics.txt"
   end
-  local f = io.open(path, "w")
-  if f then
-    f:write(table.concat(lines, "\n") .. "\n")
-    f:close()
+  local f, open_err = io.open(path, "w")
+  if not f then
+    return nil, ("cannot write %s: %s"):format(path, tostring(open_err))
   end
-  return path
+  f:write(table.concat(lines, "\n") .. "\n")
+  f:close()
+  return path, nil
 end
 
 return M

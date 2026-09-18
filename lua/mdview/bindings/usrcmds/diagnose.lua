@@ -9,7 +9,11 @@ local M = {}
 
 ---@param path string|nil
 function M.run(path)
-  local report = require("mdview.diagnostics").run(path)
+  local report, err = require("mdview.diagnostics").run(path)
+  if not report then
+    notify("[mdview] diagnostics not written: " .. tostring(err), vim.log.levels.ERROR)
+    return
+  end
   notify("[mdview] diagnostics written to " .. report, vim.log.levels.INFO)
   -- open it so the user sees it immediately and can copy/hand it over
   pcall(function()

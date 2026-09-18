@@ -143,6 +143,22 @@ describe("usrcmds.diagnose", function()
     vim.cmd("tabclose")
     vim.fn.delete(path)
   end)
+
+  it("reports an unwritable path as an error and opens nothing", function()
+    -- A parent directory that does not exist: io.open fails, and before the
+    -- fix the command still announced "diagnostics written to <path>" and
+    -- opened an empty buffer for it.
+    local path = vim.fn.tempname() .. "-no-such-dir/mdview-diagnose.txt"
+    local tabs_before = vim.fn.tabpagenr("$")
+
+    local report, err = require("mdview.diagnostics").run(path)
+    assert.is_nil(report)
+    assert.is_true(type(err) == "string" and err:find(path, 1, true) ~= nil)
+
+    diagnose.run(path)
+    assert.are.equal(0, vim.fn.filereadable(path))
+    assert.are.equal(tabs_before, vim.fn.tabpagenr("$"))
+  end)
 end)
 
 describe("usrcmds.file_log", function()

@@ -565,7 +565,9 @@ composer (`lib.nvim.bindings.usercmd.composer`): every subcommand below complete
   it. Covers environment, dependencies, install cache, effective config, the
   running session with a live /health probe, the browser URL that would be
   opened, and the recent internal log ring — everything needed to hand a
-  bug report off for debugging.
+  bug report off for debugging. If `[path]` cannot be written (missing
+  parent directory, read-only location) an error is reported and nothing
+  is opened.
 
 :MDView preview-tab                                        *:MDView-preview-tab*
   Toggles an nvim-tab Markdown preview for the current buffer: a read-only
