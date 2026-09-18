@@ -177,6 +177,34 @@ jobs:
         # belong in the headless-nvim suite below instead.
         run: busted TESTS/lua
 
+  # Split out of the `lua` job above, which cannot move: it builds a Lua 5.3
+  # toolchain via apt and downloads a hardcoded nvim-linux-x86_64 tarball, both
+  # Linux-only by construction. The specs under TESTS/nvim/ need none of that
+  # -- only a Neovim -- so they run on all three platforms here instead, which
+  # is where platform assumptions in the plugin's own Lua would show up.
+  nvim-specs:
+    name: headless nvim specs (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      # One platform failing must not cancel the others: which of the three
+      # broke is the whole information content of this job.
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/checkout@v5
+        with:
+          repository: StefanBartl/lib.nvim
+          path: .deps/lib.nvim
+          ref: ci-verified
+      - uses: rhysd/action-setup-vim@v1
+        with:
+          neovim: true
+          version: stable
       - name: Run headless-nvim specs (real Neovim API)
         # Specs under TESTS/nvim/ exercise vim-dependent modules; the harness
         # exits non-zero (via :cq) if any assertion fails.
