@@ -27,6 +27,10 @@ function M.teardown()
   -- knows nothing about the selection this one last sent.
   pcall(require("mdview.bindings.autocmds.selection_sync").reset)
   pcall(require("mdview.adapter.inbound_poll").stop)
+  -- live_push's trailing debounce timer (armed by a push inside the throttle
+  -- window) otherwise survives teardown and fires after the session it was
+  -- meant to flush is already gone (PERF-62).
+  pcall(live_push._cancel_pending)
   pcall(api.nvim_del_augroup_by_id, M.augroup_id)
   M.augroup_id = nil
 end

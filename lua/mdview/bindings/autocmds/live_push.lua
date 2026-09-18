@@ -50,10 +50,15 @@ local pending_bufnr = nil
 local function cancel_pending()
   if pending_timer then
     pending_timer:stop()
-    pending_timer:close()
+    -- close() can itself error on an already-closing handle; pcall it so a
+    -- teardown race never surfaces as an uncaught error (PERF-62).
+    pcall(function()
+      pending_timer:close()
+    end)
     pending_timer = nil
   end
 end
+M._cancel_pending = cancel_pending -- exposed for teardown (bindings/autocmds/init.lua) and tests
 
 -- Send the current content of bufnr to the relay for `bufnr`'s room and store a
 -- session snapshot for bookkeeping. Routing (per-path vs the preview key) and
