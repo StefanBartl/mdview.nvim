@@ -219,7 +219,16 @@ function M.check()
     deps_health.pointer_for("mdview.nvim")
   end
 
-  require("lib.nvim.bindings.usercmd.composer").checkhealth("MDView")
+  -- BUG (fixed here): this used to be an unguarded `require(...)`, which
+  -- crashed :checkhealth outright on any lib.nvim old/partial enough to lack
+  -- this submodule -- discarding every ok/warn/error already reported above,
+  -- including the "lib.nvim not found" one this function goes out of its way
+  -- to report gracefully. pcall'd like the `lib.nvim.deps.health` require
+  -- just above, for the same reason.
+  local ok_composer, composer = pcall(require, "lib.nvim.bindings.usercmd.composer")
+  if ok_composer then
+    composer.checkhealth("MDView")
+  end
 end
 
 return M

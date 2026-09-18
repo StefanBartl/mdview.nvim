@@ -50,7 +50,7 @@ files:
   real preview at (links, images, non-Markdown files for `any_file`). Not
   Lua test inputs.
 
-## Coverage (this round)
+## Coverage — round 25
 
 Before this round: 19 spec files (`smoke_spec.lua`, `line_diff_spec.lua`,
 `breadcrumbs_spec.lua`, `buffer_switch_resync_spec.lua`, `buffer_switch_spec.lua`,
@@ -222,12 +222,23 @@ trivial edit:
   real relay process from a REPL, not code any `:MDView` command path
   reaches. `diff_harness.lua` in particular is a standalone benchmark script
   (prints timing/ratio numbers), not a test suite itself.
-- `health.lua`, `diagnostics.lua`'s `M.collect` in full — declarative
-  `:checkhealth`/report generators; `diagnose.lua`'s usrcmd wrapper test
-  above exercises `diagnostics.run()` end-to-end (including `M.collect`)
+- `diagnostics.lua`'s `M.collect` in full — `diagnose.lua`'s usrcmd wrapper
+  test exercises `diagnostics.run()` end-to-end (including `M.collect`)
   against a real temp path with no session running, which is the one branch
   free of real network/process calls (a running session's `/health` GET is
   skipped by construction — see `usrcmds_session_actions_spec.lua`).
+  `health.lua` was similarly excluded here as "declarative"; the 2026-09-18
+  re-audit below found that reasoning didn't hold (real branches, and a real
+  bug) and gave it its own spec instead — see that section. Still not
+  covered: the exact ok()/warn()/error() *message text* `M.check()` reports
+  (vim.health writes into the global report machinery, not a return value a
+  spec can capture) and the real-curl-subprocess branch of its own `/health`
+  probe (same real-network reasoning as `diagnostics.lua`'s, stubbed instead
+  where it's reached at all).
+- `config/usrcmd_start.lua` — a two-line re-export of the same shared
+  `config.defaults.start` table `mdview.config` itself exposes (see
+  `config/DEFAULTS.lua`); no logic of its own, `mdview.config`'s own coverage
+  already exercises the table it points at.
 
 ## Internals exposed for testing
 
@@ -243,3 +254,118 @@ function, matching the convention already used elsewhere in this plugin
 Purely additive: an existing local function gained one extra line
 (`M._parse_start_args = parse_start_args`) exporting the same, unmodified
 function under a new name. No behavior changed.
+
+The 2026-09-18 re-audit (below) added a second one, same convention:
+
+- `bindings/usrcmds/init.lua` — `M._log_level_routes` (the `log <level>`
+  route-list generator). Otherwise only reachable through the full
+  `M.attach()`, which registers a real `:MDView` user command as a side
+  effect.
+
+## Re-audit — 2026-09-18
+
+A re-audit pass, not a rewrite: every skip reason above was re-checked
+against the *current* source (only `start/server/launcher.lua`'s
+`has_display()` had changed since round 25 — a genuine nil-vs-false bug it
+already documents in its own comment, fixed and covered by
+`launcher_url_spec.lua` at the time; nothing else under `lua/mdview/` had
+changed). The specific bug patterns this campaign keeps finding elsewhere
+(a health-check that warns about a missing dependency and then crashes into
+it anyway; a non-idempotent augroup; byte/column confusion in text-position
+logic; Windows path/colon bugs) were checked for directly rather than
+assumed absent:
+
+- **Augroup idempotency** (`bindings/autocmds/init.lua`): already correct
+  and already documents its own past bug fix in a comment —
+  `require("lib.nvim.bindings.autocmd").group("MdviewAutocmds", true)` uses
+  `lib.nvim`'s cache-verified, `clear=true` group lookup, not a raw
+  `nvim_create_augroup`/`get_augroup` that would double-register on a second
+  `setup()`. No action needed.
+- **Byte/column/char-index confusion** (`core/fence_spans.lua`,
+  `bindings/autocmds/{selection_sync,scroll_sync}.lua`, `adapter/ws_client.lua`):
+  every position value is consistently a documented 1-based or 0-based byte
+  column (matching comrak's own `data-sp` convention), with comments at each
+  site saying which. No confusion found; these are also the modules round 25
+  already covered most deeply.
+- **Windows path/colon bugs**: mdview.nvim's own Lua doesn't parse
+  link/image paths itself (that's the client's `src/client` TypeScript side,
+  covered by `TESTS/client/*.test.ts`, out of this audit's scope) or do any
+  `string:find(":", ...)`-style parsing anywhere in `lua/mdview/`.
+  `helper/normalize.lua`'s `path_for_url` already documents and works around
+  the one real instance of this class of bug (a Windows drive letter's `:`
+  breaking `rundll32`'s URL handling) from a past round.
+- **lib.nvim sibling availability**: confirmed a real `lib.nvim` checkout
+  exists at `../lib.nvim` (this repo's own CI clones it to `.deps/lib.nvim`
+  for the same reason) — already correctly assumed present, not something
+  this plugin got wrong. mdview.nvim also has no telescope/fzf-lua/snacks
+  dependency anywhere to get wrong in the first place.
+
+### Gap found and closed: `health.lua`'s crash-on-degraded-dependency bug
+
+Exactly bug pattern (a) from this campaign's running list. `M.check()`
+gracefully reports "lib.nvim not found" as a health *error* (not a crash) when
+`lib.nvim.cross.platform.is_windows` fails to resolve — but its last line was
+an **unguarded** `require("lib.nvim.bindings.usercmd.composer").checkhealth(...)`,
+one `require` away from the exact same risk the line right above it
+(`pcall(require, "lib.nvim.deps.health")`) already guards against. Any
+lib.nvim old/partial enough to be missing that specific submodule crashed
+`:checkhealth` outright, discarding every ok/warn/error already reported in
+the same call — including the graceful one this function goes out of its way
+to produce.
+
+Fixed directly (trivial, zero behavior change on the normal path: same
+`pcall(require, ...)` idiom already used one block above, in the same file):
+
+```lua
+local ok_composer, composer = pcall(require, "lib.nvim.bindings.usercmd.composer")
+if ok_composer then
+  composer.checkhealth("MDView")
+end
+```
+
+Pinned in the new `TESTS/nvim/health_spec.lua` (simulates the missing
+submodule via `package.preload`, confirmed to fail without the fix and pass
+with it) alongside two non-bug smoke cases (`M.check()` under normal
+conditions, and with a faked running session so the "attached/session token"
+branch also runs — `vim.fn.system` stubbed directly, no real curl subprocess).
+
+### Gaps found and closed: two unmentioned, genuinely uncovered files
+
+Not stale skip reasons — these two were simply never mentioned by round 25's
+"deliberately omitted" list at all, and had zero coverage:
+
+- `helper/copy_lines.lua` — a shallow array copy (used on the live path by
+  `bindings/autocmds/bufenter.lua`, not only by the dormant `core/events.lua`)
+  with a real branch: `lib.nvim`'s `clone` when resolvable, a local loop
+  fallback otherwise. Pure Lua, no `vim` global — new `TESTS/lua/copy_lines_spec.lua`
+  covers both branches (the fallback forced via `package.preload`, since
+  `has_lib_clone` is resolved once at module load), asserting each returns a
+  real independent copy, not an aliased reference.
+- `bindings/usrcmds/init.lua` — `M.attach()` (the `:MDView` route-tree
+  registration) was never exercised at all: the harness deliberately never
+  calls `require("mdview").setup()` (see harness.lua's own comment), the only
+  normal path to it. The giant route table itself stays undertested by
+  design (every route's target is already covered directly in its own spec —
+  same reasoning as `bindings/autocmds/init.lua`'s wiring exclusion above),
+  but `log_level_routes()` — generating one route per `log.LEVELS` entry and
+  sorting them — is real, previously-untested logic, and `M.attach()`
+  registering the command tree without erroring at all was itself unverified.
+  New `TESTS/nvim/usrcmds_init_spec.lua` covers both, via the newly-exposed
+  `M._log_level_routes` (see "Internals exposed for testing" above).
+
+### Totals
+
+Before this re-audit: 30 spec files, 239 headless-nvim checks, 13 busted
+checks (all green, per round 25). After: **33 spec files** (+3:
+`health_spec.lua`, `usrcmds_init_spec.lua` under `TESTS/nvim/` (29 total);
+`copy_lines_spec.lua` under `TESTS/lua/` (4 total)), **247 headless-nvim
+checks** (+8), **19 busted checks** (+6). All green, stable across repeated
+runs (`nvim`'s harness and `busted` each run twice locally with identical
+pass counts both times).
+
+No new `BUG:`-pinned regressions were added this round beyond the one fixed
+directly above (`health.lua`'s fix was trivial and unambiguous enough to fix
+in place rather than pin, per this round's own instructions — unlike the
+three dormant-code bugs round 25 pinned instead, this one is on a path
+(`:checkhealth`) users actually run, and the fix has no behavior change on
+the working path).

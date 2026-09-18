@@ -58,6 +58,11 @@ local function log_level_routes()
   return routes
 end
 
+-- Exposed for testing, same convention as start/init.lua's
+-- M._parse_start_args: otherwise only reachable through the full M.attach(),
+-- which registers a real :MDView user command as a side effect.
+M._log_level_routes = log_level_routes
+
 ---@return nil
 function M.attach()
   local routes = {
