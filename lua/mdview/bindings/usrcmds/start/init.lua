@@ -207,8 +207,10 @@ function M.run(fargs)
   local try_push_opts = start_defaults.try_push_opts
   local wait_timeout = start_defaults.wait_timeout_ms
   local browser_opts = {
-    browser_autostart = (browser_defaults.browser_autostart == nil) and browser_defaults.browser_autostart
-      or browser_defaults.browser_autostart,
+    -- Was a degenerate `(x == nil) and x or x` ternary (ERR-60): both
+    -- branches were the same expression, so it never did anything but
+    -- obscure the plain read below.
+    browser_autostart = browser_defaults.browser_autostart,
     browser_cmd = browser_defaults.browser_cmd or browser_defaults.resolved_browser_cmd,
     browser_args = browser_defaults.browser_args,
   }

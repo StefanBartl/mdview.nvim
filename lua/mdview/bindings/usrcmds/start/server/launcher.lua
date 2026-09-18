@@ -182,9 +182,15 @@ function M.start(opts)
   -- nil lets wait_ready apply `transport.health_timeout_ms`; only an explicit
   -- `start.wait_timeout_ms` overrides it.
   local wait_timeout = opts.wait_timeout_ms
-  local browser_autostart = (opts.browser_autostart == nil)
-      and require("mdview.config.browser").defaults.browser_autostart
-    or opts.browser_autostart
+  -- Not `(cond) and a or b`: browser_autostart is a legitimately-false
+  -- config value, so the shorthand would silently fall through to the
+  -- config default whenever the caller passed `false` explicitly (ERR-60).
+  local browser_autostart
+  if opts.browser_autostart == nil then
+    browser_autostart = require("mdview.config.browser").defaults.browser_autostart
+  else
+    browser_autostart = opts.browser_autostart
+  end
   local browser_cmd = opts.browser_cmd or require("mdview.config.browser").defaults.resolved_browser_cmd
   local browser_args = opts.browser_args
 
