@@ -223,6 +223,19 @@ describe("usrcmds.breadcrumbs (wrapper)", function()
     assert(vim.fn.bufnr("mdview://breadcrumbs") ~= -1, "expected the breadcrumbs scratch buffer to exist")
   end)
 
+  it("show() reuses the same buffer on a second call instead of a name collision", function()
+    crumbs.clear()
+    breadcrumbs_cmd.show()
+    local first = vim.fn.bufnr("mdview://breadcrumbs")
+    assert(first ~= -1, "expected the breadcrumbs scratch buffer to exist")
+    -- Previously a bare pcall around nvim_buf_set_name swallowed the E95 name
+    -- collision here and left the second buffer unnamed (LLS-31): asserting
+    -- same bufnr *and* same name is what that regression would break.
+    breadcrumbs_cmd.show()
+    assert.are.equal(first, vim.fn.bufnr("mdview://breadcrumbs"))
+    assert.are.equal("mdview://breadcrumbs", vim.api.nvim_buf_get_name(first))
+  end)
+
   it("export(path) writes the formatted outline to disk", function()
     local buf = vim.api.nvim_create_buf(true, false)
     vim.api.nvim_buf_set_name(buf, "mdview_spec_crumbs_export.md")
