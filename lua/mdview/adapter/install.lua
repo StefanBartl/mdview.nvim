@@ -246,6 +246,11 @@ function M.ensure_client_bundle()
 
   fn.system({ "tar", "-xzf", archive_path, "-C", extracted_dir })
   if vim.v.shell_error ~= 0 then
+    -- A failed/partial extract (missing tar, disk full, truncated archive)
+    -- leaves extracted_dir on disk, empty or half-populated. The isdirectory
+    -- check above would accept it as a finished bundle on the next call, the
+    -- same failure mode curl_download's own cleanup exists to avoid.
+    fn.delete(extracted_dir, "rf")
     return nil, "failed to extract " .. CLIENT_ASSET
   end
 
