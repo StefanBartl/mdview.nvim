@@ -81,7 +81,12 @@ function M.check()
     -- silently at render time with a blank page; surface it here instead.
     local dir = status.client_dir
     local has_index = vim.fn.filereadable(dir .. "/index.html") == 1
-    local wasm = vim.fn.glob(dir .. "/assets/*.wasm", true, true)
+    -- glob() reads its whole argument as a pattern, not a path: a metachar
+    -- in `dir` (e.g. from a short 8.3 Windows path or an install.version
+    -- string) would silently glob to an empty list rather than error, and
+    -- an intact bundle would then be reported (and told to be deleted) as
+    -- incomplete (XP-01).
+    local wasm = vim.fn.glob(require("lib.nvim.fs.globbable")(dir) .. "/assets/*.wasm", true, true)
     if has_index and #wasm > 0 then
       ok("client bundle looks complete (index.html + WASM present)")
     else
