@@ -28,9 +28,13 @@ local M = {}
 --   :MDView start cwd="c:/Users/bartl/"
 -- The first non-`cwd=`-prefixed token is taken as the file path; surrounding
 -- quotes on the cwd value (single or double) are stripped.
+--
+-- A `cwd=`/`port=` token whose value does not parse (`port=808O`, a bare
+-- `cwd=`) is an error, not a file: adopting it as the path would silently
+-- preview a document named after the typo and drop the override it meant.
 ---@internal
 ---@param fargs string[]
----@return string|nil file, string|nil cwd, integer|nil port
+---@return string|nil file, string|nil cwd, integer|nil port, string|nil err
 local function parse_start_args(fargs)
   local file, cwd, port
   for _, token in ipairs(fargs or {}) do
@@ -42,11 +46,15 @@ local function parse_start_args(fargs)
       -- `port=` rather than `--port`: `cwd=` is this command's existing
       -- convention, and one shape for both beats two.
       port = tonumber(port_val)
+    elseif token:match("^cwd=") then
+      return nil, nil, nil, "cwd= needs a directory, got '" .. token .. "'"
+    elseif token:match("^port=") then
+      return nil, nil, nil, "port= needs a number, got '" .. token .. "'"
     elseif not file then
       file = token
     end
   end
-  return file, cwd, port
+  return file, cwd, port, nil
 end
 
 -- initial_push_async: if an explicit path is provided (arg_path), prefer immediate try_push.
@@ -130,7 +138,11 @@ end
 function M.run(fargs)
   notify("[mdview] start invoked", vim.log.levels.DEBUG)
 
-  local file_arg, cwd_arg, port_arg = parse_start_args(fargs)
+  local file_arg, cwd_arg, port_arg, parse_err = parse_start_args(fargs)
+  if parse_err then
+    notify("[mdview] " .. parse_err, vim.log.levels.WARN)
+    return
+  end
 
   -- A fixed port for this run only, for the case the config key cannot
   -- serve: a firewall rule or a port-forward that has to match exactly, on

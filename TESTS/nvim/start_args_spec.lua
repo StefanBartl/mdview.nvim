@@ -71,4 +71,26 @@ describe("usrcmds.start._parse_start_args", function()
     assert.is_nil(cwd)
     assert.is_nil(port)
   end)
+
+  it("rejects a malformed port= instead of adopting it as the file", function()
+    -- `808O` (letter O): before the fix this became the FILE path, the relay
+    -- started on the default port, and an empty document was previewed.
+    local file, cwd, port, err = parse({ "port=808O" })
+    assert.is_nil(file)
+    assert.is_nil(cwd)
+    assert.is_nil(port)
+    assert.is_true(type(err) == "string" and err:find("port=", 1, true) ~= nil)
+  end)
+
+  it("rejects a bare cwd= / port= with no value", function()
+    local _, _, _, err_cwd = parse({ "notes.md", "cwd=" })
+    assert.is_true(type(err_cwd) == "string" and err_cwd:find("cwd=", 1, true) ~= nil)
+    local _, _, _, err_port = parse({ "port=", "notes.md" })
+    assert.is_true(type(err_port) == "string" and err_port:find("port=", 1, true) ~= nil)
+  end)
+
+  it("returns no error for well-formed args", function()
+    local _, _, _, err = parse({ "notes.md", "cwd=/tmp/proj", "port=8080" })
+    assert.is_nil(err)
+  end)
 end)

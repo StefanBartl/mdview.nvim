@@ -481,7 +481,10 @@ composer (`lib.nvim.bindings.usercmd.composer`): every subcommand below complete
   |mdview-autocmds|), and opens the browser preview. `[file]` and
   `cwd=...` are both optional and may appear in either order:
   `[file]` (tab-completed as a file path) targets that file instead of the
-  current buffer; `cwd=...` overrides `server_cwd` for this spawn only.
+  current buffer; `cwd=...` overrides `server_cwd` for this spawn only
+  (`port=N` does the same for `server_port`). A `cwd=`/`port=` token whose
+  value does not parse (`port=808O`, a bare `cwd=`) is rejected with a
+  message rather than taken as the file to preview.
   Calling it again while already running is a no-op that still allows
   pushing a newly given `[file]` (`cwd=...` is ignored once running).
 
