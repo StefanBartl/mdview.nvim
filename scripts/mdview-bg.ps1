@@ -63,8 +63,14 @@ if (-not (Test-Path -LiteralPath $init -PathType Leaf)) {
 # from this shell's.
 $target = (Resolve-Path -LiteralPath $File).Path
 
-$cmd = "MDView standalone $target"
-if ($NoBrowser) { $cmd = "$cmd --no-browser" }
+# $target is never pasted into an Ex command string (SEC-35): inside a `-c`
+# argument, `|` starts a new Ex command, and `|` is a legal filename character
+# on Windows. It travels through the environment instead, read by the fixed
+# Lua chunk below via vim.env -- a spelling Vim's command-line parser never
+# sees.
+$env:MDVIEW_BG_FILE = $target
+$env:MDVIEW_BG_NO_BROWSER = if ($NoBrowser) { '1' } else { '0' }
+$cmd = "lua require('mdview.bindings.usrcmds.standalone').run(vim.env.MDVIEW_BG_FILE, vim.env.MDVIEW_BG_NO_BROWSER == '1')"
 
 # The Neovim launcher is short-lived (it spawns the detached relay and quits),
 # so it runs in the foreground — its output carries the standalone notification,

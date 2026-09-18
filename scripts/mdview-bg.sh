@@ -78,10 +78,17 @@ fi
 # from this shell's.
 FILE=$(CDPATH='' cd -- "$(dirname -- "$FILE")" && printf '%s/%s' "$(pwd)" "$(basename -- "$FILE")")
 
-CMD="MDView standalone $FILE"
-[ "$NO_BROWSER" -eq 1 ] && CMD="$CMD --no-browser"
+# FILE is never pasted into an Ex command string (SEC-35): inside a `-c "..."`
+# argument, `|` starts a new Ex command, and `|` is a legal filename character
+# on this platform. It travels through the environment instead, read by the
+# fixed Lua chunk below via vim.env — a spelling Vim's command-line parser
+# never sees.
+export MDVIEW_BG_FILE="$FILE"
+export MDVIEW_BG_NO_BROWSER=$NO_BROWSER
 
 # The Neovim launcher is short-lived (it spawns the detached relay and quits),
 # so it can run in the foreground — its output carries the standalone
 # notification, incl. the preview URL under --no-browser.
-exec "$NVIM" --headless -u "$INIT" -c "$CMD" -c "qa!"
+exec "$NVIM" --headless -u "$INIT" \
+	-c "lua require('mdview.bindings.usrcmds.standalone').run(vim.env.MDVIEW_BG_FILE, vim.env.MDVIEW_BG_NO_BROWSER == '1')" \
+	-c "qa!"
