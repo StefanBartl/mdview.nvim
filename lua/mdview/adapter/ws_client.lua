@@ -19,6 +19,17 @@ local log = require("mdview.helper.log")
 local M = {}
 
 local DEFAULT_PORT = 43219
+
+-- Built-in readiness wait, used when `transport.health_timeout_ms` is not
+-- configured. 15s, not the old 2s: a freshly built or first-run relay binary
+-- can take several seconds to bind while the OS/antivirus scans it, and the
+-- launcher gates the browser open on this window (it must — the relay also
+-- serves the page, so opening before it's up would just load a browser error
+-- page). A 2s cap made the tab intermittently never open — the "worked last
+-- time" flakiness. Polling ends the moment /health answers, so a healthy
+-- relay still opens in well under a second; only a slow start waits.
+M.WAIT_READY_TIMEOUT = M.WAIT_READY_TIMEOUT or 15000
+
 --- Timing against the relay process, as one `transport` block rather than
 --- four separate keys: they are one decision -- how patient to be with a
 --- relay that is slow to answer -- and tuning one without the others is how
@@ -31,7 +42,7 @@ local DEFAULT_PORT = 43219
 local function transport()
   local defaults = {
     health_poll_ms = 200,
-    health_timeout_ms = 10000,
+    health_timeout_ms = M.WAIT_READY_TIMEOUT,
     max_retries = 5,
     base_retry_ms = 150,
   }
@@ -39,8 +50,9 @@ local function transport()
   if not ok then
     return defaults
   end
-  local cfg = (type(config.get) == "function" and config.get() or config.options or {})
-  local t = cfg.transport
+  -- mdview.config exposes the live, merged values as `defaults` (see its
+  -- module comment); there is no get()/options accessor.
+  local t = type(config.defaults) == "table" and config.defaults.transport or nil
   if type(t) ~= "table" then
     return defaults
   end
@@ -51,15 +63,9 @@ local function transport()
   end
   return out
 end
--- Per-call readiness wait (used by the launcher). 15s, not the old 2s: a
--- freshly built or first-run relay binary can take several seconds to bind
--- while the OS/antivirus scans it, and the launcher gates the browser open on
--- this window (it must — the relay also serves the page, so opening before it's
--- up would just load a browser error page). A 2s cap made the tab
--- intermittently never open — the "worked last time" flakiness. Polling ends
--- the moment /health answers, so a healthy relay still opens in well under a
--- second; only a slow start waits.
-M.WAIT_READY_TIMEOUT = M.WAIT_READY_TIMEOUT or 15000
+-- Exposed for tests: the config lookup is otherwise only observable by
+-- timing a real relay.
+M._transport = transport
 
 M.last_request = {}
 M._pending = {} -- pending queue: path -> { markdown=..., tries=0 }
@@ -115,7 +121,7 @@ end
 --- cb(false). Once the server has been seen healthy, later calls short-circuit
 --- to cb(true) without another /health round trip (see M.reset_ready).
 ---@param cb fun(ok:boolean)
----@param timeout_ms integer|nil
+---@param timeout_ms integer|nil # explicit override; nil = `transport.health_timeout_ms`
 function M.wait_ready(cb, timeout_ms)
   cb = cb or function() end
 

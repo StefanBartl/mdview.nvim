@@ -100,7 +100,7 @@
 --- window that already expired.
 ---@class mdview.config.TransportDefaults
 ---@field health_poll_ms integer how often the relay is polled while waiting for it to come up (default 200)
----@field health_timeout_ms integer total wait for the relay to become healthy (default 10000)
+---@field health_timeout_ms integer total wait for the relay to become healthy (default 15000)
 ---@field max_retries integer retry attempts for a single message (default 5)
 ---@field base_retry_ms integer initial retry delay; backs off exponentially from here (default 150)
 ---@field inbound_poll_ms integer how often the browser is polled for checkbox/field/navigate events (default 250)
@@ -159,7 +159,9 @@ return {
   -- box, or a relay over a slow link all want more of every one of them.
   transport = {
     health_poll_ms = 200,
-    health_timeout_ms = 10000,
+    -- 15s: a first-run relay binary can take several seconds to bind while
+    -- the OS/antivirus scans it (see adapter/ws_client.lua, WAIT_READY_TIMEOUT).
+    health_timeout_ms = 15000,
     max_retries = 5,
     base_retry_ms = 150,
     inbound_poll_ms = 250,

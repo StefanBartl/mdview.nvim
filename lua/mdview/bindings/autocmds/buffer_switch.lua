@@ -76,8 +76,8 @@ function M.resync(bufnr)
     if not ok then
       return
     end
-    -- wait_ready is async and can take up to WAIT_READY_TIMEOUT (15s) on a
-    -- slow/first-run relay start; `bufnr` was only valid when resync() was
+    -- wait_ready is async and can take up to transport.health_timeout_ms
+    -- (15s) on a slow/first-run relay start; `bufnr` was only valid when resync() was
     -- called, not necessarily by the time this fires (e.g. the buffer was
     -- wiped while the health check was still polling). Re-validate before
     -- touching it, or nvim_buf_get_lines throws on the stale handle.
@@ -94,7 +94,7 @@ function M.resync(bufnr)
     -- "nvim"; a no-op under any other).
     require("mdview.core.fence_spans").push(bufnr, preview_key)
     log.debug("reuse: pushed " .. path .. " to preview room " .. preview_key, nil, "bufswitch", true)
-  end, ws_client.WAIT_READY_TIMEOUT)
+  end)
   return true
 end
 

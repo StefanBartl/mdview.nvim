@@ -179,7 +179,9 @@ M.resolve_browser_url = resolve_browser_url
 --- @return any|nil
 function M.start(opts)
   opts = opts or {}
-  local wait_timeout = opts.wait_timeout_ms or ws_client.WAIT_READY_TIMEOUT or 2000
+  -- nil lets wait_ready apply `transport.health_timeout_ms`; only an explicit
+  -- `start.wait_timeout_ms` overrides it.
+  local wait_timeout = opts.wait_timeout_ms
   local browser_autostart = (opts.browser_autostart == nil)
       and require("mdview.config.browser").defaults.browser_autostart
     or opts.browser_autostart

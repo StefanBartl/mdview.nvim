@@ -139,7 +139,7 @@ function M.attach(group)
       end
       log.debug("TextChanged fired, buf: " .. bufnr, nil, "livepush", true)
       M.push_buffer_changes(bufnr)
-    end, ws_client.WAIT_READY_TIMEOUT)
+    end)
   end
 
   local function on_text_changed(args)
@@ -195,7 +195,7 @@ function M.attach(group)
       -- Force a full snapshot on save: cheap resync point that reseeds
       -- the relay's LastPayload and heals any diff desync.
       M.push_buffer_changes(args.buf, { full = true })
-    end, ws_client.WAIT_READY_TIMEOUT)
+    end)
   end
 
   local opts_b = {

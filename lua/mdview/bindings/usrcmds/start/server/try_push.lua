@@ -9,12 +9,13 @@ local vim = vim
 
 local M = {}
 
+-- No wait_timeout_per_attempt_ms default: nil lets wait_ready apply
+-- `transport.health_timeout_ms`, so only an explicit opt overrides it.
 local DEFAULTS = {
   max_attempts = 5,
   initial_delay_ms = 150,
   backoff_factor = 2.0,
   jitter = true,
-  wait_timeout_per_attempt_ms = ws_client.WAIT_READY_TIMEOUT or 2000,
 }
 
 --- Apply symmetric jitter up to fraction `p` of base (p in 0..1)

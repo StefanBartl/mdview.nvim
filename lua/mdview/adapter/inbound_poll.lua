@@ -25,8 +25,10 @@ local function interval_ms()
   if not ok then
     return 250
   end
-  local cfg = (type(config.get) == "function" and config.get() or config.options or {})
-  local n = (cfg.transport or {}).inbound_poll_ms
+  -- mdview.config exposes the live, merged values as `defaults`; there is no
+  -- get()/options accessor.
+  local t = type(config.defaults) == "table" and config.defaults.transport or nil
+  local n = type(t) == "table" and t.inbound_poll_ms or nil
   return (type(n) == "number" and n > 0) and n or 250
 end
 local timer = nil
