@@ -14,6 +14,7 @@
 -- already uses -- this repo's stated floor is 0.9+, so a bare vim.uv would
 -- break on Neovim < 0.10.
 local uv = vim.uv or vim.loop
+local expand_path = require("lib.nvim.cross.fs.expand_path")
 
 local M = {}
 
@@ -138,9 +139,11 @@ end
 function M.resolve_target(arg)
   local path
   if arg and arg ~= "" then
-    -- expand() only on a user-typed arg, which may carry `~` or `$VAR`; a
+    -- expand_path() only on a user-typed arg, which may carry `~` or `$VAR`; a
     -- buffer name is already a literal path and must not be re-expanded.
-    path = M.canonical_path(vim.fn.expand(arg))
+    -- Pure string substitution, not vim.fn.expand(): no &shell backtick
+    -- execution and no `%`/`#`/`<cfile>` special-name resolution (SEC-34).
+    path = M.canonical_path(expand_path(arg))
   else
     local name = vim.api.nvim_buf_get_name(vim.api.nvim_get_current_buf())
     if name == "" then

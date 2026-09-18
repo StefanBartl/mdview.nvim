@@ -17,6 +17,7 @@
 --   :MDView file-log status          report without changing anything
 
 local notify = require("lib.nvim.notify").create("").notify
+local expand_path = require("lib.nvim.cross.fs.expand_path")
 
 local M = {}
 
@@ -32,16 +33,20 @@ local function report(enabled, path)
   end
 end
 
--- Expand `~` and resolve relative paths to absolute *here*, where vim.fn.* is
--- safe — mdview.adapter.log reads the path from the relay's stdout callback (a
--- fast event context) and can't expand it itself. Resolving also means a
--- relative path is pinned to the cwd at the time the command ran, rather than
--- silently following later :cd's.
+-- Expand `~`/`$VAR` and resolve relative paths to absolute *here*, where
+-- vim.fn.* is safe — mdview.adapter.log reads the path from the relay's
+-- stdout callback (a fast event context) and can't expand it itself.
+-- Resolving also means a relative path is pinned to the cwd at the time the
+-- command ran, rather than silently following later :cd's.
+--
+-- expand_path(), not vim.fn.expand(): this is a user-typed :MDView argument,
+-- and vim.fn.expand() runs a backtick span through &shell and resolves
+-- `%`/`#`/`<cfile>` to buffer state the user did not ask for (SEC-34).
 ---@internal
 ---@param path string
 ---@return string
 local function absolute(path)
-  return vim.fn.fnamemodify(vim.fn.expand(path), ":p")
+  return vim.fn.fnamemodify(expand_path(path), ":p")
 end
 
 --- :MDView file-log on [path]
