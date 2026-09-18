@@ -95,8 +95,15 @@ local function open_default(url, focus)
       local tmp = fn.tempname() .. ".ps1"
       local f = io.open(tmp, "w")
       if f then
+        -- tmp sits under the user's profile temp dir, whose path may itself
+        -- carry a `'` (an account name like "O'Brien"). PowerShell escapes a
+        -- literal `'` inside a single-quoted string by doubling it -- do that
+        -- first, or an unescaped quote closes the literal early and the
+        -- remainder of the path is parsed as PowerShell source (SEC-46).
+        local tmp_escaped = tmp:gsub("'", "''")
         f:write(
-          windows_focus_restore_ps() .. (";Remove-Item -LiteralPath '%s' -ErrorAction SilentlyContinue"):format(tmp)
+          windows_focus_restore_ps()
+            .. (";Remove-Item -LiteralPath '%s' -ErrorAction SilentlyContinue"):format(tmp_escaped)
         )
         f:close()
         -- Fired BEFORE the open below so it captures Neovim as the
