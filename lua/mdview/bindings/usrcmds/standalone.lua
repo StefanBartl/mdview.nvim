@@ -122,7 +122,12 @@ function M.run(file_arg, no_browser)
   -- Standalone previews the file as it is *on disk*. Warning here rather than
   -- silently previewing stale content is the honest thing: the user asked for
   -- this file and would otherwise wonder why their edits don't show up.
-  if vim.bo.modified and vim.fn.fnamemodify(vim.api.nvim_buf_get_name(0), ":p") == target then
+  --
+  -- Both sides go through canonical_path, because `target` is canonical and a
+  -- bare fnamemodify(":p") is not: it keeps backslashes on Windows (so this
+  -- never matched there at all) and leaves an unresolved /tmp or /var spelling
+  -- on macOS. The warning was silently dead in exactly the cases it exists for.
+  if vim.bo.modified and detached.canonical_path(vim.api.nvim_buf_get_name(0)) == target then
     notify(
       "[mdview] standalone previews the file on disk — unsaved changes in this buffer won't appear until you :write",
       vim.log.levels.WARN
