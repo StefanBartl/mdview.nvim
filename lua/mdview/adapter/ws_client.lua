@@ -86,28 +86,29 @@ local function health_url(port)
   return string.format("http://localhost:%d/health", port)
 end
 
--- Non-blocking curl GET fallback
+-- curl is a hard dependency (docs/installation.md); there is no transport
+-- without it. Reported as a distinct, non-retryable error rather than as a
+-- curl exit code, so wait_ready can fail at once instead of polling until the
+-- timeout for a request that was never sent.
+local CURL_MISSING = "curl not found on PATH"
+
+-- Non-blocking curl GET
 ---@internal
 ---@param url string
----@param cb fun(code:integer)
+---@param cb fun(code:integer, err:string|nil) # err is set only when no request was made
 ---@return nil
 local function http_get(url, cb)
-  local curl = fn.executable("curl") == 1 and "curl" or nil
-  if curl then
-    fn.jobstart({ curl, "-sS", url }, {
-      stdout_buffered = true,
-      stderr_buffered = true,
-      on_exit = function(_, code, _)
-        cb(code)
-      end,
-    })
-  else
-    -- fallback: blocking system call (Windows may fail if sh not available)
-    local ok, _ = pcall(function()
-      fn.system("curl -sS " .. url)
-    end)
-    cb(ok and 0 or 1)
+  if fn.executable("curl") ~= 1 then
+    cb(127, CURL_MISSING)
+    return
   end
+  fn.jobstart({ "curl", "-sS", url }, {
+    stdout_buffered = true,
+    stderr_buffered = true,
+    on_exit = function(_, code, _)
+      cb(code, nil)
+    end,
+  })
 end
 
 --- Wait until server responds on /health or timeout, then call cb(true) /
@@ -136,8 +137,11 @@ function M.wait_ready(cb, timeout_ms)
     local port = vim.g.mdview_server_port or DEFAULT_PORT
     local url = health_url(port)
 
-    http_get(url, function(code)
-      if code == 0 then
+    http_get(url, function(code, err)
+      if err then
+        api.nvim_echo({ { "[mdview] server health-check impossible: " .. err, "ErrorMsg" } }, true, { err = true })
+        cb(false)
+      elseif code == 0 then
         M._ready = true
         log.debug(
           ---@diagnostic disable-next-line LSP-Problems with uv.
@@ -228,8 +232,13 @@ end
 
 -- Collects stdout/stderr lines and returns them to the callback so caller
 -- (try_send_pending) can log the server response body (and quickly detect empty replies).
--- Helper: execute an HTTP POST using curl via jobstart when available.
+-- Helper: execute an HTTP POST using curl via jobstart.
 -- Callback signature: cb(exit_code:number, stdout_lines:string[]|nil, stderr_lines:string[]|nil)
+--
+-- The body travels through a temp file and an argv list, never through a
+-- shell: it is the user's buffer text, and a shell would run any `$(...)` or
+-- backtick span in it. Without curl the POST fails explicitly (a missing tool
+-- is a failure, not a success with no response).
 ---@internal
 ---@param url URL # target URL for the POST request
 ---@param body string # request body content
@@ -237,81 +246,52 @@ end
 ---@return integer|nil # job ID if curl jobstart was used, nil otherwise
 local function http_post_nonblocking(url, body, cb)
   cb = cb or function() end
-  local curl = fn.executable("curl") == 1 and "curl" or nil
+  if fn.executable("curl") ~= 1 then
+    cb(127, nil, { CURL_MISSING })
+    return nil
+  end
 
-  if curl then
-    local tmpf = fn.tempname()
-    local f = io.open(tmpf, "wb")
-    if f then
-      f:write(body)
-      f:close()
-    end
+  local tmpf = fn.tempname()
+  local f = io.open(tmpf, "wb")
+  if f then
+    f:write(body)
+    f:close()
+  end
 
-    local stdout_acc = {}
-    local stderr_acc = {}
+  local stdout_acc = {}
+  local stderr_acc = {}
 
-    local args = { "-sS", "-X", "POST", url, "--data-binary", "@" .. tmpf, "-H", "Content-Type: text/markdown" }
-    local jid = fn.jobstart(vim.list_extend({ curl }, args), {
-      stdout_buffered = true,
-      stderr_buffered = true,
-      on_stdout = function(_, data, _)
-        if data and #data > 0 then
-          for _, line in ipairs(data) do
-            if line and line ~= "" then
-              table.insert(stdout_acc, line)
-            end
-          end
-        end
-      end,
-      on_stderr = function(_, data, _)
-        if data and #data > 0 then
-          for _, line in ipairs(data) do
-            if line and line ~= "" then
-              table.insert(stderr_acc, line)
-            end
-          end
-        end
-      end,
-      on_exit = function(_, code, _)
-        pcall(function()
-          os.remove(tmpf)
-        end)
-        -- pass collected stdout/stderr to callback
-        cb(code, (#stdout_acc > 0) and stdout_acc or nil, (#stderr_acc > 0) and stderr_acc or nil)
-      end,
-    })
-    return jid
-  else
-    -- fallback: blocking call via system; capture output and forward it to cb
-    local ok, res = pcall(function()
-      -- portable shell invocation; on Windows this may fail if sh is not available
-      local cmd = string.format(
-        "sh -c %q",
-        "curl -sS -X POST "
-          .. url
-          .. " -H 'Content-Type: text/markdown' --data-binary @- <<'BODY'\n"
-          .. body
-          .. "\nBODY"
-      )
-      return fn.system(cmd)
-    end)
-    if ok then
-      -- res is a string; split into lines for parity with curl-on_exit
-      local lines = {}
-      if res and res ~= "" then
-        for s in res:gmatch("([^\n]*)\n?") do
-          if s ~= "" then
-            table.insert(lines, s)
+  local args = { "-sS", "-X", "POST", url, "--data-binary", "@" .. tmpf, "-H", "Content-Type: text/markdown" }
+  local jid = fn.jobstart(vim.list_extend({ "curl" }, args), {
+    stdout_buffered = true,
+    stderr_buffered = true,
+    on_stdout = function(_, data, _)
+      if data and #data > 0 then
+        for _, line in ipairs(data) do
+          if line and line ~= "" then
+            table.insert(stdout_acc, line)
           end
         end
       end
-      cb(0, (#lines > 0) and lines or nil, nil)
-      return nil
-    else
-      cb(1, nil, { tostring(res) })
-      return nil
-    end
-  end
+    end,
+    on_stderr = function(_, data, _)
+      if data and #data > 0 then
+        for _, line in ipairs(data) do
+          if line and line ~= "" then
+            table.insert(stderr_acc, line)
+          end
+        end
+      end
+    end,
+    on_exit = function(_, code, _)
+      pcall(function()
+        os.remove(tmpf)
+      end)
+      -- pass collected stdout/stderr to callback
+      cb(code, (#stdout_acc > 0) and stdout_acc or nil, (#stderr_acc > 0) and stderr_acc or nil)
+    end,
+  })
+  return jid
 end
 
 -- Replace or augment try_send_pending callback handling to log response body.
