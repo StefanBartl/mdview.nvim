@@ -249,6 +249,7 @@ describe("usrcmds.breadcrumbs (wrapper)", function()
     local target = vim.fn.bufnr("mdview://breadcrumbs")
 
     vim.cmd("tabnew") -- tabnew itself adds its own blank buffer; count after it
+    local scratch_tab = vim.api.nvim_get_current_tabpage()
     local bufs_before = #vim.api.nvim_list_bufs()
     breadcrumbs_cmd.show()
 
@@ -263,6 +264,12 @@ describe("usrcmds.breadcrumbs (wrapper)", function()
     end
     assert.are.equal(1, shown_in, "the breadcrumbs buffer must not be shown in two tabs at once")
 
+    -- show() just switched back to whichever tab already displays the
+    -- breadcrumbs buffer (that's the fix under test) -- not this test's
+    -- throwaway tabnew tab. Close by the captured handle rather than
+    -- assuming it's still current, or this would tabclose the wrong tab
+    -- and wipe the persistent breadcrumbs window other specs reuse.
+    vim.api.nvim_set_current_tabpage(scratch_tab)
     vim.cmd("tabclose")
   end)
 
