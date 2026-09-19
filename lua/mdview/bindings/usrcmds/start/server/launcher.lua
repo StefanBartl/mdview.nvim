@@ -328,8 +328,12 @@ function M.start(opts)
       -- relay opens in well under a second.
       push_and_open()
     else
+      -- wait_timeout can be nil here (it lets wait_ready apply
+      -- transport.health_timeout_ms, see above) -- resolve the same
+      -- effective value wait_ready itself used, or %d raises on a nil.
+      local effective_timeout = wait_timeout or ws_client._transport().health_timeout_ms
       notify(
-        ("[mdview] relay did not respond within %dms — run :MDView open once it's up"):format(wait_timeout),
+        ("[mdview] relay did not respond within %dms — run :MDView open once it's up"):format(effective_timeout),
         vim.log.levels.WARN
       )
     end

@@ -236,3 +236,56 @@ describe("launcher.has_display", function()
     vim.env.WAYLAND_DISPLAY = w0
   end)
 end)
+
+describe("launcher.start timeout-failure message", function()
+  it("does not crash formatting the timeout when wait_timeout_ms is nil (BUG, fixed)", function()
+    -- opts.wait_timeout_ms = nil is the real default (start/init.lua forwards
+    -- config.defaults.start.wait_timeout_ms, which is nil so wait_ready
+    -- applies transport.health_timeout_ms instead). The failure-path message
+    -- used to format that nil straight with %d, which errors instead of
+    -- showing the intended warning -- exactly when the relay is genuinely
+    -- slow to answer, the one case this message exists for.
+    local prev_proc = state.get_proc()
+    local prev_server = state.get_server()
+    local prev_attached = state.is_attached()
+    -- A faked already-running process skips M.start's spawn/resolve branch
+    -- entirely (see its own comment), reaching ws_client.wait_ready without
+    -- a real subprocess.
+    state.set_proc({ handle = {
+      is_closing = function()
+        return false
+      end,
+    } })
+
+    local ws_client = require("mdview.adapter.ws_client")
+    local orig_wait_ready = ws_client.wait_ready
+    local seen_timeout_ms = "not called"
+    ws_client.wait_ready = function(cb, timeout_ms)
+      seen_timeout_ms = timeout_ms
+      cb(false) -- simulate a health-check timeout
+    end
+
+    local captured = nil
+    local orig_notify = vim.notify
+    vim.notify = function(msg, level)
+      captured = { msg = msg, level = level }
+    end
+
+    local ok, err = pcall(function()
+      launcher.start({ wait_timeout_ms = nil })
+    end)
+
+    vim.notify = orig_notify
+    ws_client.wait_ready = orig_wait_ready
+    state.set_proc(prev_proc)
+    state.set_server(prev_server)
+    state.set_attached(prev_attached)
+    require("mdview.bindings.autocmds").teardown()
+
+    assert.is_nil(seen_timeout_ms, "expected wait_timeout_ms=nil to reach wait_ready unchanged")
+    assert.is_true(ok, "launcher.start must not throw formatting a nil timeout -- got: " .. tostring(err))
+    assert(captured ~= nil, "expected the timeout-failure notify to fire")
+    assert.is_nil(captured.msg:find("nil", 1, true), "message must not contain the literal 'nil': " .. captured.msg)
+    assert(captured.msg:match("%d+ms") ~= nil, "message must contain a real millisecond count: " .. captured.msg)
+  end)
+end)
