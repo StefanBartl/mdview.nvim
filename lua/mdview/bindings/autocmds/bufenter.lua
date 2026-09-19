@@ -1,4 +1,4 @@
---- @module 'mdview.bindings.autocmds.bufenter'
+---@module 'mdview.bindings.autocmds.bufenter'
 --- Autocmd: BufEnter snapshot handling
 
 ---@diagnostic disable: undefined-global, unused-local

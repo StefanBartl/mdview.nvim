@@ -1,4 +1,4 @@
---- @module 'mdview.bindings.autocmds.bufwrite'
+---@module 'mdview.bindings.autocmds.bufwrite'
 --- Autocmd: BufWritePost full-push handling
 
 ---@diagnostic disable: undefined-global, unused-local
