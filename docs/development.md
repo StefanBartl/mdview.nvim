@@ -47,10 +47,12 @@ npm run build:go
 
 Produces `native/server/mdview-server`, and `mdview-server.exe` on Windows —
 the script asks `go env GOEXE` for the suffix. That matters: libuv resolves an
-extension-less command by appending each PATHEXT entry and never tries the bare
-name, so a Windows build without `.exe` spawns as `ENOENT` however readable it
-is. It used to be built without one; a checkout from before 2026-08-30 needs
-one `npm run build:go` (which also deletes the old file). Then:
+extension-less command by appending `.com`, `.exe`, `.bat` and `.cmd` — its own
+fixed list, not `$PATHEXT` — and never tries the bare name, so a Windows build
+without `.exe` spawns as `ENOENT` however readable it is. A name that already
+carries an extension it tries verbatim, whatever the extension is. It used to
+be built without one; a checkout from before 2026-08-30 needs one
+`npm run build:go` (which also deletes the old file). Then:
 
 ```lua
 require("mdview").setup({

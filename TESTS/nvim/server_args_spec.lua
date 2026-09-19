@@ -1,9 +1,11 @@
 ---@module 'tests.nvim.server_args_spec'
 -- Verifies mdview.adapter.server_args' notion of "a path uv.spawn() can start",
 -- which is not the same as vim.fn.executable(). libuv resolves a command with
--- no extension by appending each PATHEXT entry and never tries the bare name,
+-- no extension by appending .com/.exe/.bat/.cmd and never tries the bare name,
 -- so on Windows an extension-less relay binary passes executable() and then
--- spawns as ENOENT — the failure this guards against.
+-- spawns as ENOENT — the failure this guards against. A name that already
+-- carries an extension libuv tries verbatim instead, which executable() does
+-- not model either: see the 'shell' case at the bottom.
 
 ---@diagnostic disable: undefined-global
 
@@ -79,6 +81,37 @@ describe("server_args.spawnable", function()
     with_tempdir(function(dir)
       local named = touch_executable(dir .. "/relay.bin")
       assert.are.equal(named, server_args.spawnable(named))
+    end)
+  end)
+
+  it("gives the same answer whatever 'shell' is set to", function()
+    if not windows then
+      -- 'shell' never enters the question elsewhere.
+      return
+    end
+    -- The case above hid for as long as it did because executable() on Windows
+    -- only applies its $PATHEXT test when 'shell' does *not* look Unix-like.
+    -- A developer running the suite from Git bash inherits shell=bash.exe and
+    -- sees green; CI's nvim falls back to the cmd.exe default and sees red.
+    -- uv.spawn() calls CreateProcessW directly and never consults a shell, so
+    -- the two must agree — whichever way, this is a setting that cannot change
+    -- whether a file starts.
+    with_tempdir(function(dir)
+      local named = touch_executable(dir .. "/relay.bin")
+      local saved = vim.o.shell
+      local seen = {}
+      local ok, err = pcall(function()
+        -- Indexed, not appended: a nil result must leave a hole for the
+        -- assertion below to report, not silently shift the next answer down.
+        for i, sh in ipairs({ "cmd.exe", "bash.exe" }) do
+          vim.o.shell = sh
+          seen[i] = server_args.spawnable(named)
+        end
+      end)
+      vim.o.shell = saved
+      assert(ok, err)
+      assert.are.equal(named, seen[1])
+      assert.are.equal(named, seen[2])
     end)
   end)
 end)

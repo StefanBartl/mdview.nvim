@@ -8,6 +8,9 @@ local install = require("mdview.adapter.install")
 local gen_token = require("mdview.helper.gen_token")
 local notify = require("lib.nvim.notify").create("").notify
 
+-- This repo's stated floor is Neovim 0.9, where vim.uv does not exist yet.
+local uv = vim.uv or vim.loop
+
 local M = {}
 
 --- Absolute path to this mdview.nvim checkout, derived from this file's own
@@ -29,20 +32,34 @@ M.built_binary_name = built_binary_name
 
 --- The path `uv.spawn()` can actually start for `path`, or nil.
 ---
---- Not the same question as `executable()`. libuv resolves a command with no
---- extension by appending each PATHEXT entry and never tries the bare name, so
---- on Windows an extension-less file spawns as ENOENT however readable and
---- however "executable" Vim calls it. `.exe` next to it is the real target —
---- and pointing an override at the extension-less name is easy to do, because
---- that is what `build:go` wrote until 2026-08-30.
+--- Not the same question as `executable()`, and on Windows wrong in both
+--- directions:
+---
+--- * A name with no extension libuv resolves by appending .com/.exe/.bat/.cmd,
+---   never trying the bare name — so an extension-less file spawns as ENOENT
+---   however readable it is. `.exe` next to it is the real target, and pointing
+---   an override at the extension-less name is easy to do, because that is what
+---   `build:go` wrote until 2026-08-30.
+--- * A name that already carries an extension libuv tries verbatim, whatever
+---   that extension is. `executable()` asks something else entirely: whether
+---   the name ends in a $PATHEXT entry — and it skips that test when 'shell'
+---   looks Unix-like. So its answer moved with a setting `uv.spawn()` cannot
+---   see (libuv calls CreateProcessW directly, never through a shell): a real
+---   relay at `…/mdview-server.bin` was "spawnable" under a Git-bash 'shell'
+---   and refused under the Windows default cmd.exe.
+---
+--- Windows has no exec bit, so existence is the whole question there — the
+--- same thing libuv checks before handing the path to CreateProcessW. On Unix
+--- the bit is real and `uv.spawn()` fails EACCES without it, so keep asking.
 ---@param path string
 ---@return string|nil
 local function spawnable(path)
-  if vim.fn.has("win32") == 1 and not path:match("%.[%a%d]+$") then
-    local exe = path .. ".exe"
-    return vim.fn.executable(exe) == 1 and exe or nil
+  if vim.fn.has("win32") ~= 1 then
+    return vim.fn.executable(path) == 1 and path or nil
   end
-  return vim.fn.executable(path) == 1 and path or nil
+  local candidate = path:match("%.[%a%d]+$") and path or (path .. ".exe")
+  local stat = uv.fs_stat(candidate)
+  return (stat and stat.type == "file") and candidate or nil
 end
 M.spawnable = spawnable
 
