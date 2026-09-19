@@ -175,7 +175,6 @@ local function ensure_dir(dir)
   end
   -- This repo's stated floor is Neovim 0.9, where vim.uv does not exist yet.
   local uv = vim.uv or vim.loop
-  ---@diagnostic disable-next-line LSP-problems with uv.loop
   local stat = uv.fs_stat(dir)
   if stat then
     -- already exists
@@ -215,14 +214,11 @@ local function ensure_dir(dir)
     if i < #parts then
       cur = cur .. "/"
     end
-    ---@diagnostic disable-next-line  LSP-Problems with uuv.loop
     local st = uv.fs_stat(cur)
     if not st then
-      ---@diagnostic disable-next-line  LSP_Problems with uv.loop
       local ok, _ = pcall(uv.fs_mkdir, cur, tonumber("755", 8))
       if not ok then
         -- fs_mkdir may return nil and set errno; attempt non-pcall call for message
-        ---@diagnostic disable-next-line  lsp problemsuuv.loop
         local _, e = uv.fs_mkdir(cur, tonumber("755", 8))
         return false, e
       end

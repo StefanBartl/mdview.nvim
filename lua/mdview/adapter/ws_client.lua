@@ -132,7 +132,6 @@ function M.wait_ready(cb, timeout_ms)
 
   local tcfg = transport()
   local timeout = timeout_ms or tcfg.health_timeout_ms
-  ---@diagnostic disable-next-line LSP-Problems with lib.uv
   local start_time = uv.now()
   local attempt = 0
 
@@ -150,7 +149,6 @@ function M.wait_ready(cb, timeout_ms)
       elseif code == 0 then
         M._ready = true
         log.debug(
-          ---@diagnostic disable-next-line LSP-Problems with uv.
           string.format("server ready after %d ms, attempt %d", uv.now() - start_time, attempt),
           nil,
           "ws_client",
@@ -158,7 +156,6 @@ function M.wait_ready(cb, timeout_ms)
         )
         cb(true)
       else
-        ---@diagnostic disable-next-line LSP-Problems with uv.
         if (uv.now() - start_time) < timeout then
           -- optionally log every N attempts
           if attempt % 10 == 0 then
