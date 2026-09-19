@@ -11,6 +11,25 @@ local M = {}
 
 local SCRATCH_NAME = "mdview://breadcrumbs"
 
+-- Find a window, in any tab page, currently displaying `buf`.
+-- vim.fn.bufwinid() only searches the *current* tab page (same semantics as
+-- bufwinnr(), see :help bufwinnr()), so it misses a window showing `buf` in
+-- some other tab -- walk every tab page's window list explicitly instead.
+---@internal
+---@param buf integer
+---@return integer|nil win
+---@return integer|nil tabpage
+local function find_window_for_buf(buf)
+  for _, tabpage in ipairs(vim.api.nvim_list_tabpages()) do
+    for _, win in ipairs(vim.api.nvim_tabpage_list_wins(tabpage)) do
+      if vim.api.nvim_win_get_buf(win) == buf then
+        return win, tabpage
+      end
+    end
+  end
+  return nil, nil
+end
+
 -- Reuse the single dedicated breadcrumbs buffer across repeat invocations
 -- rather than creating a new one each time -- nvim_buf_set_name throws E95 on
 -- a name collision, which happens whenever the previous split is still open
@@ -24,11 +43,12 @@ local SCRATCH_NAME = "mdview://breadcrumbs"
 local function show_in_scratch(lines)
   local existing = vim.fn.bufnr(SCRATCH_NAME)
   if existing ~= -1 then
-    local win = vim.fn.bufwinid(existing)
-    if win == -1 then
+    local win, tabpage = find_window_for_buf(existing)
+    if win == nil then
       vim.cmd("botright new")
       vim.api.nvim_win_set_buf(0, existing)
     else
+      vim.api.nvim_set_current_tabpage(tabpage)
       vim.api.nvim_set_current_win(win)
     end
     vim.bo[existing].modifiable = true

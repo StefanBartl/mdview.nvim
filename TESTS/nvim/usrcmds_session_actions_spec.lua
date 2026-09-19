@@ -236,6 +236,36 @@ describe("usrcmds.breadcrumbs (wrapper)", function()
     assert.are.equal("mdview://breadcrumbs", vim.api.nvim_buf_get_name(first))
   end)
 
+  it("show() from another tab reuses the buffer instead of leaking an orphan", function()
+    -- vim.fn.bufwinid() only searches the *current* tab page, so a naive
+    -- reuse check misses a window showing the breadcrumbs buffer in some
+    -- other tab: it takes the "not displayed" branch, opens a throwaway
+    -- `botright new` window, and immediately discards that window's fresh
+    -- scratch buffer by swapping in the existing one -- leaking one orphan
+    -- buffer per invocation from a tab that doesn't already show it, and
+    -- ending up with the breadcrumbs buffer displayed in two tabs at once.
+    crumbs.clear()
+    breadcrumbs_cmd.show() -- shows it in the current (first) tab
+    local target = vim.fn.bufnr("mdview://breadcrumbs")
+
+    vim.cmd("tabnew") -- tabnew itself adds its own blank buffer; count after it
+    local bufs_before = #vim.api.nvim_list_bufs()
+    breadcrumbs_cmd.show()
+
+    assert.are.equal(bufs_before, #vim.api.nvim_list_bufs(), "no extra buffer should have leaked")
+    assert.are.equal(target, vim.fn.bufnr("mdview://breadcrumbs"))
+
+    local shown_in = 0
+    for _, win in ipairs(vim.api.nvim_list_wins()) do
+      if vim.api.nvim_win_get_buf(win) == target then
+        shown_in = shown_in + 1
+      end
+    end
+    assert.are.equal(1, shown_in, "the breadcrumbs buffer must not be shown in two tabs at once")
+
+    vim.cmd("tabclose")
+  end)
+
   it("export(path) writes the formatted outline to disk", function()
     local buf = vim.api.nvim_create_buf(true, false)
     vim.api.nvim_buf_set_name(buf, "mdview_spec_crumbs_export.md")
