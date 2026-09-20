@@ -32,7 +32,7 @@ things missing are the ones that require knowing where a cursor is.
 > **It previews the file on disk.** Unsaved buffer changes don't appear until you
 > `:write`. mdview warns you if you run it on a modified buffer.
 
-**When you'd use it**
+### When you'd use it
 
 - *A reference doc beside your work.* API notes, a spec, a cheat sheet — open it
   once, and it keeps following the file no matter what you do to your editor.

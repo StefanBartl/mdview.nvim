@@ -56,7 +56,7 @@ you set them:
   one rebuild. Naming the extension-less path in `binary_path` still works; the
   resolver looks for the `.exe` beside it.
 
-**When to use which loading strategy:**
+### When to use which loading strategy
 
 | Variant | Startup impact | Commands available | When to use |
 |---|---|---|---|

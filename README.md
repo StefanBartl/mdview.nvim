@@ -55,31 +55,31 @@ Rust/WASM module with sanitization built in — no toolchain needed to run it.
 Start with the [documentation index](docs/README.md) — it lists every page and
 says what each one answers.
 
-**The Basics**
+### The Basics
 
 - [Requirements](docs/installation.md#requirements) — Neovim version, required plugins and CLI tools.
 - [Installation](docs/installation.md) — plugin-manager variants, and where the relay binary and client bundle come from.
 - [Quickstart](docs/quickstart.md) — the first thing to run after installing.
 
-**Reference**
+### Reference
 
 - [Configuration](docs/configuration.md) — every `setup()` option and its default.
 - [Commands](docs/commands.md) — every `:MDView` subcommand, including what ships with the defaults.
 - [Bindings cheatsheet](docs/BINDINGS.md) — commands, autocommands and keymaps at a glance.
 - [Workflow](docs/WORKFLOW.md) — once a session is running: which controls apply live, which need a restart, what breaks first.
 
-**What it does**
+### What it does
 
 - [Features](docs/FEATURES/README.md) — the full catalog, then per-theme depth: [preview](docs/FEATURES/PREVIEW.md), [rendering](docs/FEATURES/RENDERING.md), [operations](docs/FEATURES/OPERATIONS.md), [security](docs/FEATURES/SECURITY.md), and [the machinery underneath](docs/FEATURES/MACHINERY.md).
 - [Standalone](docs/standalone.md) — a preview that outlives `:qa`, or runs with no Neovim at all.
 - [Companion plugins](docs/companion-plugins.md) — which optional plugins pair with the live preview, and what each adds.
 
-**Under the hood**
+### Under the hood
 
 - [Architecture](docs/architecture.md) — which component is written in which language, and how they talk.
 - [Health check](docs/health.md) — what `:checkhealth mdview` reports, section by section.
 
-**Working on it**
+### Working on it
 
 - [Contributing](docs/CONTRIBUTING.md) — ground rules, the four-language layout, and how to change a component.
 - [Development](docs/development.md) — building from source and running the four test suites.
