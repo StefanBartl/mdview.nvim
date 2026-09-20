@@ -42,6 +42,13 @@ files:
 - `TESTS/client/*.test.ts` — the TypeScript/Vitest suite for the browser
   client (`src/client/`), run by the CI `node` job (`npm test`), not the Lua
   `lua` job. Different ecosystem, different test runner.
+- `TESTS/e2e_session.lua` — a **real** `:MDView` session, headless: start, switch
+  between markdown buffers, edit, stop, start again, against the installed relay
+  binary (so `:MDView install` must have run once). Checks the pieces the stubbed
+  specs cannot: the BufEnter hub, `live_push` and the teardown working together
+  against a relay that is really there. Not run by CI. Run with
+  `nvim --headless -u NONE -i NONE -c "luafile TESTS/e2e_session.lua" -c "qa!"`;
+  it prints `MDVIEW_E2E_OK` and exits non-zero on the first failed check.
 - `TESTS/CHECK.md` — a hand-run manual release checklist (things that need a
   real browser/eyes, e.g. the `browser.behavior` matrix, opt-in experimental
   features "feeling" right). Not automated by design.
