@@ -3,7 +3,7 @@
 
 local fn = vim.fn
 local browser_cfg = require("mdview.config.browser")
-local probe_platform_paths = require("mdview.adapter.browser.probe_plattform_paths")
+local probe_platform_paths = require("mdview.adapter.browser.probe_platform_paths")
 
 -- Default candidate names
 ---@type string[]
