@@ -8,7 +8,6 @@
 local api = vim.api
 local defaults = require("mdview.config").defaults
 local autocmd = require("lib.nvim.bindings.autocmd")
-local autocmd_registry = require("mdview.helper.autocmds_registry")
 
 local M = {}
 
@@ -39,8 +38,7 @@ function M.attach(group)
   if group then
     opts.group = group
   end
-  local id = autocmd.create({ "CursorMoved", "CursorMovedI", "BufEnter" }, record, opts)
-  autocmd_registry.register(group, id)
+  autocmd.create({ "CursorMoved", "CursorMovedI", "BufEnter" }, record, opts)
 
   -- Seed the first breadcrumb for the current buffer (no BufEnter fires when a
   -- session starts on the already-current buffer).

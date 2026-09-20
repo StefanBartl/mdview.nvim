@@ -129,7 +129,11 @@ Autocommands have a real attach/detach lifecycle; user commands do **not** —
 they are registered once at `setup()` and never torn down. The reason: a
 `:MDViewStop` that deleted its own commands along the way was a real bug.
 
-- **Module:** `lua/mdview/helper/autocmds_registry.lua`, `bindings/autocmds/init.lua`
+A session's autocommands all live in one augroup (`MdviewAutocmds`); stopping
+deletes the group, which takes every autocmd with it. There is no separate
+list of autocmd ids to keep in step.
+
+- **Module:** `lua/mdview/bindings/autocmds/init.lua`
 
 ## Session and process state
 

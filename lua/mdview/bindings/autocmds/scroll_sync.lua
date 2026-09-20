@@ -11,7 +11,6 @@ local pin = require("mdview.core.pin")
 local target_key = require("mdview.helper.target_key")
 local defaults = require("mdview.config").defaults
 local autocmd = require("lib.nvim.bindings.autocmd")
-local autocmd_registry = require("mdview.helper.autocmds_registry")
 
 local M = {}
 
@@ -139,10 +138,7 @@ function M.attach(group)
     opts.group = group
   end
 
-  local id = autocmd.create({ "CursorMoved", "CursorMovedI" }, on_cursor_moved, opts)
-  if group then
-    autocmd_registry.register(group, id)
-  end
+  autocmd.create({ "CursorMoved", "CursorMovedI" }, on_cursor_moved, opts)
 end
 
 return M

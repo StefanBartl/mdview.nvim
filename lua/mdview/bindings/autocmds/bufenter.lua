@@ -11,7 +11,6 @@ local normalize = require("mdview.helper.normalize")
 local log = require("mdview.helper.log")
 local defaults = require("mdview.config").defaults
 local autocmd = require("lib.nvim.bindings.autocmd")
-local autocmds_registry = require("mdview.helper.autocmds_registry")
 
 local M = {}
 
@@ -54,12 +53,9 @@ function M.attach(group)
     opts.group = group
   end
 
-  local id = autocmd.create("BufEnter", function(args)
+  autocmd.create("BufEnter", function(args)
     on_buf_enter(args.buf)
   end, opts)
-  if group then
-    autocmds_registry.register(group, id)
-  end
 end
 
 return M

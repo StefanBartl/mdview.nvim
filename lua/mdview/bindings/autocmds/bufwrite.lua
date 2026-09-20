@@ -5,7 +5,6 @@
 local events = require("mdview.core.events")
 local log = require("mdview.helper.log")
 local autocmd = require("lib.nvim.bindings.autocmd")
-local autocmd_registry = require("mdview.helper.autocmds_registry")
 
 local M = {}
 
@@ -29,12 +28,9 @@ function M.attach(group)
     opts.group = group
   end
 
-  local id = autocmd.create({ "BufWritePost" }, function(args)
+  autocmd.create({ "BufWritePost" }, function(args)
     on_buf_write(args.buf)
   end, opts)
-  if group then
-    autocmd_registry.register(group, id)
-  end
 end
 
 return M

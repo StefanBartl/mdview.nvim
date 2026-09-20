@@ -12,7 +12,6 @@ local selection_sync = require("mdview.bindings.autocmds.selection_sync")
 local breadcrumbs = require("mdview.bindings.autocmds.breadcrumbs")
 -- local on_text_change = require("mdview.bindings.autocmds.on_text_change")
 -- local bufwrite = require("mdview.bindings.autocmds.bufwrite")
-local autocmd_registry = require("mdview.helper.autocmds_registry")
 
 local M = {}
 M.augroup_id = nil
@@ -22,7 +21,11 @@ function M.teardown()
   if not M.augroup_id then
     return
   end
-  autocmd_registry.detach_all()
+  -- Everything a session registers lives in this one augroup, so deleting the
+  -- group takes every autocmd with it. Clearing it through lib first (rather
+  -- than only deleting) also forgets the records lib keeps, so a stopped
+  -- session does not stay listed in the generated bindings table.
+  require("lib.nvim.bindings.autocmd").group("MdviewAutocmds", true)
   -- Drop the deduplication cache: the next session talks to a fresh tab that
   -- knows nothing about the selection this one last sent.
   pcall(require("mdview.bindings.autocmds.selection_sync").reset)

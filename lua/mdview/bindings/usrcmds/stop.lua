@@ -27,8 +27,11 @@ end
 ---@param close_browser_override boolean?  # when provided, explicitly control whether to close the browser handle; if nil, use browser_cfg.defaults.browser_autoclose
 ---@return nil
 function M.stop(close_browser_override)
+  -- teardown() guards itself on its own augroup id, so it is safe to call
+  -- unconditionally -- and it must be: an attach() that threw half-way never
+  -- reached set_attached(true), yet has registered part of its autocmds.
+  pcall(autocmds.teardown)
   if state.is_attached() then
-    pcall(autocmds.teardown)
     state.set_attached(false)
   end
 
@@ -79,12 +82,6 @@ function M.stop(close_browser_override)
     state.set_browser(nil)
   end
 
-  -- Only autocommands get torn down here — the :MDView user command is
-  -- registered once at setup() and stays available for the whole Neovim
-  -- session; tearing it down here previously deleted :MDViewStop and
-  -- :MDViewOpen (this plugin's now-retired flat commands) from existence
-  -- the first time :MDViewStop ran (since fixed).
-  require("mdview.helper.autocmds_registry").detach_all()
   notify("[mdview] stopped", vim.log.levels.INFO)
 end
 

@@ -8,7 +8,6 @@
 -- buffer (confirmed and fixed).
 
 local autocmd = require("lib.nvim.bindings.autocmd")
-local autocmds_registry = require("mdview.helper.autocmds_registry")
 local state = require("mdview.core.state")
 
 local M = {}
@@ -34,10 +33,7 @@ function M.attach(group)
     opts.group = group
   end
 
-  local id = autocmd.create("VimLeavePre", on_leave, opts)
-  if group then
-    autocmds_registry.register(group, id)
-  end
+  autocmd.create("VimLeavePre", on_leave, opts)
 end
 
 return M

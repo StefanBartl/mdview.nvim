@@ -215,10 +215,6 @@ trivial edit:
   `gen_token`) a thin wrapper with no branch of its own to assert against
   beyond "returns a string" (its actual entropy/uniqueness is `lib.nvim`'s or
   Neovim's concern, not this plugin's).
-- `helper/autocmds_registry.lua` — exercised end-to-end as a collaborator
-  through every `bindings/autocmds/*.attach(group)` call in the existing and
-  new suites (registration + `detach_all()` on stop); a dedicated suite
-  would just re-assert the same table-of-ids bookkeeping in isolation.
 - `test/apply.lua`, `test/diff_harness.lua`, `test/runner.lua` — developer
   tooling for the (dormant) line-diff transport and for manually driving a
   real relay process from a REPL, not code any `:MDView` command path

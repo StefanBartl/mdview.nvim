@@ -18,7 +18,6 @@ local previewable = require("mdview.helper.previewable")
 local pin = require("mdview.core.pin")
 local defaults = require("mdview.config").defaults
 local autocmd = require("lib.nvim.bindings.autocmd")
-local autocmd_registry = require("mdview.helper.autocmds_registry")
 
 local M = {}
 
@@ -154,12 +153,6 @@ end
 ---@param group integer|nil
 ---@return nil
 function M.attach(group)
-  local function register(id)
-    if group then
-      autocmd_registry.register(group, id)
-    end
-  end
-
   ---@param args table
   local function on_mode_changed(args)
     -- Entering, leaving or reshaping (v -> V) a selection: never throttled.
@@ -193,19 +186,17 @@ function M.attach(group)
     M.send_current_selection(args.buf)
   end
 
-  local mode_id = autocmd.create("ModeChanged", on_mode_changed, {
+  autocmd.create("ModeChanged", on_mode_changed, {
     desc = "[mdview] Mirror the visual selection into the browser preview",
     pattern = MODE_PATTERNS,
     group = group,
   })
-  register(mode_id)
 
-  local move_id = autocmd.create("CursorMoved", on_cursor_moved, {
+  autocmd.create("CursorMoved", on_cursor_moved, {
     desc = "[mdview] Follow a growing visual selection in the browser preview",
     pattern = defaults.ft_pattern,
     group = group,
   })
-  register(move_id)
 end
 
 --- Reset the cached payload — used by tests and by a session teardown, so the

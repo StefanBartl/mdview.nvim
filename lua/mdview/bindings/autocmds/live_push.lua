@@ -18,7 +18,6 @@ local normalize = require("mdview.helper.normalize")
 local target_key = require("mdview.helper.target_key")
 local defaults = require("mdview.config").defaults
 local autocmd = require("lib.nvim.bindings.autocmd")
-local autocmd_registry = require("mdview.helper.autocmds_registry")
 
 local M = {}
 
@@ -188,8 +187,7 @@ function M.attach(group)
   if group then
     opts_a.group = group
   end
-  local id_a = autocmd.create({ "TextChanged", "TextChangedI" }, on_text_changed, opts_a)
-  autocmd_registry.register(group, id_a)
+  autocmd.create({ "TextChanged", "TextChangedI" }, on_text_changed, opts_a)
 
   local function on_write(args)
     ws_client.wait_ready(function(ok)
@@ -210,8 +208,7 @@ function M.attach(group)
   if group then
     opts_b.group = group
   end
-  local id_b = autocmd.create("BufWritePost", on_write, opts_b)
-  autocmd_registry.register(group, id_b)
+  autocmd.create("BufWritePost", on_write, opts_b)
 end
 
 return M

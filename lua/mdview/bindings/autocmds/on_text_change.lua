@@ -7,7 +7,6 @@ local push_buffer = require("mdview.core.events").push_buffer
 local log = require("mdview.helper.log")
 local defaults = require("mdview.config").defaults
 local autocmd = require("lib.nvim.bindings.autocmd")
-local autocmd_registry = require("mdview.helper.autocmds_registry")
 
 local M = {}
 
@@ -29,12 +28,9 @@ function M.attach(group)
     opts.group = group
   end
 
-  local id = autocmd.create({ "TextChanged", "TextChangedI" }, function(args)
+  autocmd.create({ "TextChanged", "TextChangedI" }, function(args)
     on_text_changed(args.buf)
   end, opts)
-  if group then
-    autocmd_registry.register(group, id)
-  end
 end
 
 return M
