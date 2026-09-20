@@ -196,8 +196,8 @@ describe("buffer_switch under a document pin", function()
   state.set_preview_key(PREVIEW_KEY)
   bcfg.defaults.behavior = "reuse"
 
-  local group = vim.api.nvim_create_augroup("MdviewPinSwitchSpec", { clear = true })
-  buffer_switch.attach(group)
+  -- Through the BufEnter hub, which is how a session wires it.
+  buffer_switch.attach()
 
   --- Enter `buf` the way a user would, so BufEnter really fires.
   local function enter(buf)
@@ -237,7 +237,7 @@ describe("buffer_switch under a document pin", function()
   end)
 
   -- restore
-  vim.api.nvim_del_augroup_by_id(group)
+  require("mdview.bindings.autocmds.enter_hub").reset()
   pin.clear()
   state.set_server(nil)
   state.set_preview_key(nil)

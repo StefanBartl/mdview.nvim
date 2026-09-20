@@ -5,30 +5,19 @@
 
 local api = vim.api
 local session = require("mdview.core.session")
-local previewable = require("mdview.helper.previewable")
 local copy_lines = require("mdview.helper.copy_lines")
-local normalize = require("mdview.helper.normalize")
 local log = require("mdview.helper.log")
-local defaults = require("mdview.config").defaults
-local autocmd = require("lib.nvim.bindings.autocmd")
+local hub = require("mdview.bindings.autocmds.enter_hub")
 
 local M = {}
 
--- on BufEnter, store snapshot if not present
+-- On BufEnter, store a snapshot if not present. The hub has already checked
+-- that the buffer is previewable and normalized its path.
 ---@internal
 ---@param bufnr integer
+---@param norm_path string|nil
 ---@return nil
-local function on_buf_enter(bufnr)
-  if not previewable.is(bufnr) then
-    return
-  end
-
-  local path = api.nvim_buf_get_name(bufnr)
-  if path == "" then
-    return
-  end
-
-  local norm_path = normalize.path(path)
+local function on_buf_enter(bufnr, norm_path)
   if not norm_path then
     log.debug("normalized path is nil", vim.log.levels.ERROR, "events", true)
     return
@@ -42,20 +31,14 @@ local function on_buf_enter(bufnr)
   end
 end
 
---- Setup BufEnter autocmd in the given augroup.
---- @param group integer|nil  # nvim augroup id (optional). If nil, autocmd will be created without group.
-function M.attach(group)
-  local opts = {
+--- Register the snapshot handler with the session's BufEnter hub.
+function M.attach()
+  hub.register("mdview.bufenter", {
     desc = "[mdview] Snapshot on enter",
-    pattern = defaults.ft_pattern,
-  }
-  if group then
-    opts.group = group
-  end
-
-  autocmd.create("BufEnter", function(args)
-    on_buf_enter(args.buf)
-  end, opts)
+    load = function(ctx)
+      on_buf_enter(ctx.buf, ctx.context.path)
+    end,
+  })
 end
 
 return M

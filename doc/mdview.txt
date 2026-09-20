@@ -692,7 +692,8 @@ notifying why).
 
 All registered in a single augroup (`MdviewAutocmds`) by
 `mdview.bindings.autocmds.attach()` when |:MDView-start| runs, and torn down
-together by |:MDView-stop|.
+together by |:MDView-stop|. The BufEnter handlers (snapshot, buffer switch,
+breadcrumbs) share one autocmd, `bindings/autocmds/enter_hub.lua`.
 
   Event                           Purpose ~
   BufEnter                        Take a session snapshot of the entered

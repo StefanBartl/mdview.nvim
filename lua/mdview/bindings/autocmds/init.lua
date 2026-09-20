@@ -21,6 +21,9 @@ function M.teardown()
   if not M.augroup_id then
     return
   end
+  -- The BufEnter hub is one autocmd that outlives a group clear (it is only
+  -- detached), so it has to be told first.
+  require("mdview.bindings.autocmds.enter_hub").reset()
   -- Everything a session registers lives in this one augroup, so deleting the
   -- group takes every autocmd with it. Clearing it through lib first (rather
   -- than only deleting) also forgets the records lib keeps, so a stopped
@@ -58,12 +61,12 @@ function M.attach()
   -- tab, so it must not start out holding a document from the last one.
   require("mdview.core.pin").clear()
 
-  bufenter.attach(M.augroup_id) -- BufEnter snapshot
-  buffer_switch.attach(M.augroup_id) -- Apply browser.behavior on buffer switch
+  bufenter.attach() -- BufEnter snapshot (through the BufEnter hub)
+  buffer_switch.attach() -- Apply browser.behavior on buffer switch (through the BufEnter hub)
   live_push.attach(M.augroup_id) -- Live Markdown push (diffs + full push on write)
   scroll_sync.attach(M.augroup_id) -- nvim-to-browser scroll sync (config: scroll_sync)
   selection_sync.attach(M.augroup_id) -- visual selection mirrored into the preview (config: browser.selection_sync)
-  breadcrumbs.attach(M.augroup_id) -- Session breadcrumbs (config: breadcrumbs)
+  breadcrumbs.attach(M.augroup_id) -- Session breadcrumbs (config: breadcrumbs); its BufEnter half goes through the hub
   vim_leave.attach(M.augroup_id) -- Stop server on VimLeave
 
   -- Browser->Neovim inbound poller (click-to-navigate + reverse scroll; no-op

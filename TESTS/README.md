@@ -209,7 +209,11 @@ trivial edit:
   own sync/displacement — all covered where the real logic lives). Wiring
   four/five more copies of "does `autocmd.create` get called with the right
   event/pattern" would pad the suite without pinning anything new; the
-  contracts they call into are pinned directly instead.
+  contracts they call into are pinned directly instead. The two places where the
+  wiring itself carries behavior are the exception: `enter_hub_spec.lua` (the
+  shared BufEnter dispatcher: pattern filter, previewable gate, order, shared
+  path, reset/re-attach) and `autocmds_lifecycle_spec.lua` (attach/teardown as
+  one unit, including lib's records and a restart).
 - `helper/{gen_token,is_windows,safe_buf_get_option}.lua` — one-line
   re-exports of `lib.nvim`/`vim.fn.sha256`+`vim.uv.hrtime` helpers, or (for
   `gen_token`) a thin wrapper with no branch of its own to assert against

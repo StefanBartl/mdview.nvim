@@ -55,6 +55,8 @@ one per file, aggregated into the `:MDView` route tree in
 
 All registered in a single augroup (`MdviewAutocmds`), created by [`mdview.bindings.autocmds.attach()`](../lua/mdview/bindings/autocmds/init.lua) and torn down together by `:MDView stop`.
 
+The three `BufEnter` handlers (snapshot, buffer switch, and the enter half of the breadcrumbs) run behind **one** autocmd, [`bindings/autocmds/enter_hub.lua`](../lua/mdview/bindings/autocmds/enter_hub.lua), built on `lib.nvim`'s autocmd dispatcher. It is filtered by `ft_pattern` in Neovim itself, and the "is this buffer previewable" check and the normalized path are worked out once per event and handed to all three. They do not depend on each other's order; they run in the order the rows below are listed. The other rows are one handler per event and stay plain autocmds.
+
 | Event | Module | Purpose |
 | --- | --- | --- |
 | `BufEnter` | [`bindings/autocmds/bufenter.lua`](../lua/mdview/bindings/autocmds/bufenter.lua) | Takes a session snapshot of the entered buffer. |

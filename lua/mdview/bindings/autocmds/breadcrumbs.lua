@@ -8,6 +8,7 @@
 local api = vim.api
 local defaults = require("mdview.config").defaults
 local autocmd = require("lib.nvim.bindings.autocmd")
+local hub = require("mdview.bindings.autocmds.enter_hub")
 
 local M = {}
 
@@ -38,7 +39,15 @@ function M.attach(group)
   if group then
     opts.group = group
   end
-  autocmd.create({ "CursorMoved", "CursorMovedI", "BufEnter" }, record, opts)
+  autocmd.create({ "CursorMoved", "CursorMovedI" }, record, opts)
+  -- Entering a buffer shares the session's BufEnter hub with the snapshot and
+  -- buffer-switch handlers; the throttle above is shared by both routes.
+  hub.register("mdview.breadcrumbs", {
+    desc = "[mdview] Record a breadcrumb on entering a buffer",
+    load = function(ctx)
+      record(ctx.ev)
+    end,
+  })
 
   -- Seed the first breadcrumb for the current buffer (no BufEnter fires when a
   -- session starts on the already-current buffer).

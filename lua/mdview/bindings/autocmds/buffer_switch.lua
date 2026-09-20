@@ -21,7 +21,7 @@ local previewable = require("mdview.helper.previewable")
 local pin = require("mdview.core.pin")
 local log = require("mdview.helper.log")
 local defaults = require("mdview.config").defaults
-local autocmd = require("lib.nvim.bindings.autocmd")
+local hub = require("mdview.bindings.autocmds.enter_hub")
 
 local M = {}
 
@@ -99,8 +99,9 @@ end
 
 ---@internal
 ---@param bufnr integer
+---@param path string|nil  # normalized path, as the hub worked it out
 ---@return nil
-local function on_switch(bufnr)
+local function on_switch(bufnr, path)
   -- Only relevant while a browser session is running. In tab-preview mode the
   -- nvim tab already follows the buffer via its own sync, so skip entirely.
   if not state.get_server() then
@@ -117,7 +118,6 @@ local function on_switch(bufnr)
     return
   end
 
-  local path = eligible_path(bufnr)
   if not path then
     return
   end
@@ -169,20 +169,16 @@ function M.reset()
   M._opened = {}
 end
 
---- Setup the BufEnter behavior dispatch in the given augroup.
----@param group integer|nil
-function M.attach(group)
+--- Register the buffer-switch handler with the session's BufEnter hub.
+---@return nil
+function M.attach()
   M.reset()
-  local opts = {
+  hub.register("mdview.buffer_switch", {
     desc = "[mdview] Apply browser.behavior on markdown buffer switch",
-    pattern = defaults.ft_pattern,
-  }
-  if group then
-    opts.group = group
-  end
-  autocmd.create("BufEnter", function(args)
-    on_switch(args.buf)
-  end, opts)
+    load = function(ctx)
+      on_switch(ctx.buf, ctx.context.path)
+    end,
+  })
 end
 
 return M
