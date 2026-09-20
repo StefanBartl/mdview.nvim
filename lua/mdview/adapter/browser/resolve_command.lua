@@ -7,7 +7,7 @@ local probe_platform_paths = require("mdview.adapter.browser.probe_platform_path
 
 -- Default candidate names
 ---@type string[]
-local default_candidates = { "chrome", "google-chrome", "chromium", "msedge", "firefox" }
+local default_candidates = { "chrome", "google-chrome", "chromium", "msedge", "microsoft-edge", "firefox" }
 
 -- Test whether a candidate path/name is usable
 ---@internal

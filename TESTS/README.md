@@ -178,11 +178,13 @@ trivial edit:
   `curl_download`/`ensure_asset`/checksum helpers under them) — real network
   downloads from GitHub Releases plus a real `tar`/`chmod` subprocess. Only
   the network-free, filesystem-only `M.status()` is covered (see above).
-- `adapter/browser/probe_plattform_paths.lua` — a declarative list of
-  hardcoded candidate paths per platform, no branching logic of its own;
-  exercised as a fallback inside `resolve_command`'s autodetect tests, but
-  not worth asserting the literal path list (which platform's branch even
-  runs depends on the OS actually running the suite).
+- `adapter/browser/probe_platform_paths.lua` — mostly a declarative list of
+  hardcoded candidate paths per platform; not worth asserting the literal
+  path list itself (which platform's branch even runs depends on the OS
+  actually running the suite), and exercised as a fallback inside
+  `resolve_command`'s autodetect tests. Its one real branch (the Windows
+  env-var lookup) has its own regression test — see
+  `probe_platform_paths_spec.lua` below.
 - `adapter/browser/resolve_command.lua`'s autodetection/friendly-name/
   platform-probe branches beyond the `explicit_cmd`/config-precedence cases
   covered — depend on what happens to be installed and where on whatever
@@ -369,3 +371,33 @@ in place rather than pin, per this round's own instructions — unlike the
 three dormant-code bugs round 25 pinned instead, this one is on a path
 (`:checkhealth`) users actually run, and the fix has no behavior change on
 the working path).
+
+## Fix — 2026-09-20: `probe_platform_paths.lua` browser-detection bugs
+
+Filename-typo fix (`probe_plattform_paths.lua` -> `probe_platform_paths.lua`)
+prompted a closer look at the file itself, which turned up two real bugs on
+the autodetect fallback path:
+
+1. **Windows candidates built via a `{ os.getenv(...), ... }` table literal,
+   then walked with `ipairs`.** `ipairs` stops at the first `nil` hole, so
+   whenever `PROGRAMFILES(X86)` is unset (which it commonly is under Git
+   Bash/MSYS2 — Windows env var names containing parentheses often don't
+   pass through), every base *after* it (`LOCALAPPDATA`, where per-user
+   Chrome installs live) was silently skipped, even though it was set. Fixed
+   by building the candidate list with `table.insert` (skipping unset vars
+   without leaving holes) instead of a literal with possible `nil` slots.
+2. **The Linux probe list and the cross-platform `default_candidates`/
+   `build_args_for_browser` name matching all used `msedge`**, which is the
+   Windows binary name only; Microsoft Edge on Linux installs as
+   `microsoft-edge`/`microsoft-edge-stable`. Edge was effectively
+   undetectable on Linux despite the code's evident intent to support it.
+   Fixed in all three places (`probe_platform_paths.lua`'s Linux branch,
+   `resolve_command.lua`'s `default_candidates`, and
+   `build_args_for_browser.lua`'s name match).
+
+Pinned in new `TESTS/nvim/probe_platform_paths_spec.lua`: a Windows-only case
+(stubs `os.getenv` to simulate `PROGRAMFILES(X86)` being unset, asserts a
+`LOCALAPPDATA`-based candidate still appears) and a Linux-only case (asserts
+`microsoft-edge` appears and the old `msedge` path does not). Both follow
+this suite's existing convention of testing against whichever OS actually
+runs it rather than mocking `vim.fn.has` (see `server_args_spec.lua`).

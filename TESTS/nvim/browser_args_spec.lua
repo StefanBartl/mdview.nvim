@@ -41,7 +41,15 @@ end
 
 describe("build_args_for_browser", function()
   it("builds Chrome/Chromium/Edge args with a persistent profile dir and the URL last", function()
-    for _, exe in ipairs({ "chrome", "chromium", "msedge", "google-chrome", "/usr/bin/Google-Chrome" }) do
+    for _, exe in ipairs({
+      "chrome",
+      "chromium",
+      "msedge",
+      "microsoft-edge",
+      "/usr/bin/microsoft-edge-stable",
+      "google-chrome",
+      "/usr/bin/Google-Chrome",
+    }) do
       local args, tmp = build_args(exe, "http://localhost:1/?x=1")
       assert(tmp and tmp ~= "", "expected a profile dir for " .. exe)
       assert.are.equal("http://localhost:1/?x=1", args[#args])

@@ -30,7 +30,13 @@ return function(exe, url)
   local name = exe:lower()
   local tmp = make_tmp_profile()
 
-  if name:match("chrome") or name:match("chromium") or name:match("msedge") or name:match("google%-chrome") then
+  if
+    name:match("chrome")
+    or name:match("chromium")
+    or name:match("msedge")
+    or name:match("microsoft%-edge")
+    or name:match("google%-chrome")
+  then
     -- A normal browser window (taskbar icon, address bar) rather than a
     -- chromeless --app window: --app was dropped because it produced a
     -- window with no taskbar entry and no toolbar, which reads as broken.

@@ -8,13 +8,24 @@ return function()
   local paths = {} ---@type string[]
 
   if fn.has("win32") == 1 then
-    local program_files = { os.getenv("PROGRAMFILES"), os.getenv("PROGRAMFILES(X86)"), os.getenv("LOCALAPPDATA") }
-    for _, base in ipairs(program_files) do
-      if base and base ~= vim.NIL then
-        table.insert(paths, base .. "\\Google\\Chrome\\Application\\chrome.exe")
-        table.insert(paths, base .. "\\Chromium\\Application\\chrome.exe")
-        table.insert(paths, base .. "\\Microsoft\\Edge\\Application\\msedge.exe")
+    -- Built up with table.insert (not a `{ os.getenv(...), ... }` literal)
+    -- because a middle env var can be nil: ipairs() stops at the first hole,
+    -- which would silently drop every later base (e.g. LOCALAPPDATA, where
+    -- per-user Chrome installs live) whenever PROGRAMFILES(X86) is unset --
+    -- as it commonly is under Git Bash/MSYS2, which doesn't pass through
+    -- Windows env var names containing parentheses.
+    local env_vars = { "PROGRAMFILES", "PROGRAMFILES(X86)", "LOCALAPPDATA" }
+    local program_files = {}
+    for _, var in ipairs(env_vars) do
+      local val = os.getenv(var)
+      if val then
+        table.insert(program_files, val)
       end
+    end
+    for _, base in ipairs(program_files) do
+      table.insert(paths, base .. "\\Google\\Chrome\\Application\\chrome.exe")
+      table.insert(paths, base .. "\\Chromium\\Application\\chrome.exe")
+      table.insert(paths, base .. "\\Microsoft\\Edge\\Application\\msedge.exe")
     end
   elseif fn.has("mac") == 1 then
     table.insert(paths, "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome")
@@ -27,7 +38,8 @@ return function()
     table.insert(paths, "/usr/bin/google-chrome-stable")
     table.insert(paths, "/usr/bin/chromium-browser")
     table.insert(paths, "/usr/bin/chromium")
-    table.insert(paths, "/usr/bin/msedge")
+    table.insert(paths, "/usr/bin/microsoft-edge")
+    table.insert(paths, "/usr/bin/microsoft-edge-stable")
     table.insert(paths, "/usr/bin/firefox")
   end
 
