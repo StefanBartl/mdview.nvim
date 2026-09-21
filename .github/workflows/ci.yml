@@ -22,6 +22,7 @@ jobs:
   rust:
     name: Rust / WASM render module
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
 
@@ -58,6 +59,7 @@ jobs:
   node:
     name: Node.js / TypeScript
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     needs: rust
     steps:
       - uses: actions/checkout@v5
@@ -94,6 +96,7 @@ jobs:
   go:
     name: Go relay server
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v5
 
@@ -116,6 +119,7 @@ jobs:
   stylua:
     name: stylua (format check)
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v5
       - uses: JohnnyMorganz/stylua-action@v4
@@ -127,6 +131,7 @@ jobs:
   lua:
     name: Lua / Neovim quick checks
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
 
@@ -175,7 +180,15 @@ jobs:
         # Only pure-Lua specs (no `vim` global) run here; module paths come from
         # the repo-root .busted config's lpath. Specs that need the Neovim API
         # belong in the headless-nvim suite below instead.
-        run: busted TESTS/lua
+        run: |
+          exec > >(tee -a "$RUNNER_TEMP/test-output.log") 2>&1
+          busted TESTS/lua
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: test-output-lua
+          path: ${{ runner.temp }}/test-output.log
+          if-no-files-found: ignore
 
   # Split out of the `lua` job above, which cannot move: it builds a Lua 5.3
   # toolchain via apt and downloads a hardcoded nvim-linux-x86_64 tarball, both
@@ -185,6 +198,7 @@ jobs:
   nvim-specs:
     name: headless nvim specs (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
     strategy:
       # One platform failing must not cancel the others: which of the three
       # broke is the whole information content of this job.
@@ -208,13 +222,22 @@ jobs:
       - name: Run headless-nvim specs (real Neovim API)
         # Specs under TESTS/nvim/ exercise vim-dependent modules; the harness
         # exits non-zero (via :cq) if any assertion fails.
-        run: nvim --headless -u NONE -i NONE --cmd "set rtp+=.,.deps/lib.nvim" -c "luafile TESTS/nvim/harness.lua" -c "qa!"
+        run: |
+          exec > >(tee -a "$RUNNER_TEMP/test-output.log") 2>&1
+          nvim -n --headless -u NONE -i NONE --cmd "set rtp+=.,.deps/lib.nvim" -c "luafile TESTS/nvim/harness.lua" -c "qa!"
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: test-output-nvim-specs-${{ matrix.os }}
+          path: ${{ runner.temp }}/test-output.log
+          if-no-files-found: ignore
 
   release:
     name: Release (tag push only)
     if: startsWith(github.ref, 'refs/tags/v')
     needs: [rust, node, go, lua]
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     permissions:
       contents: write
     steps:
