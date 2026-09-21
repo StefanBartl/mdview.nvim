@@ -31,7 +31,7 @@ jobs:
           targets: wasm32-unknown-unknown
 
       - name: Cache cargo
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ~/.cargo/registry
@@ -51,7 +51,7 @@ jobs:
         run: wasm-pack build --target web --out-dir ../../src/client/wasm-render
 
       - name: Upload WASM render module
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: wasm-render-pkg
           path: src/client/wasm-render
@@ -64,7 +64,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: '22'
           cache: 'npm'
@@ -76,7 +76,7 @@ jobs:
       # type-checking and unit tests: src/client/main.ts imports it, and it's a
       # gitignored build artifact, so without it tsc/vitest fail with TS2307.
       - name: Download WASM render module
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: wasm-render-pkg
           path: src/client/wasm-render
@@ -100,7 +100,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with:
           go-version-file: native/server/go.mod
 
@@ -245,7 +245,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with:
           go-version-file: native/server/go.mod
 
@@ -256,7 +256,7 @@ jobs:
           args: release --clean --skip=publish --config .goreleaser.yml
           workdir: native/server
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: '22'
           cache: 'npm'
