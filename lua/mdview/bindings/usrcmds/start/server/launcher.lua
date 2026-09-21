@@ -227,12 +227,14 @@ function M.start(opts)
   -- Wait for server health, then perform the initial full push and open
   -- the browser (only once the server is actually reachable, so the tab
   -- doesn't load against a not-yet-ready port).
-  -- The initial push + browser open, run once the relay is (or should be)
-  -- reachable. Factored out so it runs on BOTH a healthy /health and a
-  -- health-check timeout: gating the browser entirely on the health window is
-  -- what made the tab intermittently never open when a freshly built binary
-  -- was slow to bind. On a timeout the relay is usually up moments later; the
-  -- client's WebSocket transport reconnects, so opening best-effort is safe.
+  -- The initial push + browser open, run once /health actually answers OK
+  -- (see the wait_ready callback below). A health-check timeout does NOT
+  -- call this: opening before the relay is confirmed reachable would load a
+  -- browser error page the browser wouldn't retry, so the timeout path only
+  -- warns and leaves the user to run :MDView open once the relay is up (see
+  -- d5bb8b1). The `opened` guard still matters even with the single call
+  -- site below: it makes a second/duplicate wait_ready callback firing a
+  -- harmless no-op instead of double-pushing and double-opening.
   local opened = false
   local function deliver_initial_preview()
     if opened then
