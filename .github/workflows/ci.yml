@@ -100,9 +100,14 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
+      # `cache-dependency-path` explicitly: the action's own module-cache
+      # lookup defaults to the repo root, which has no go.sum -- it lives
+      # under native/server/ alongside go-version-file. Without this the
+      # cache silently never hits and every run re-downloads every module.
       - uses: actions/setup-go@v7
         with:
           go-version-file: native/server/go.mod
+          cache-dependency-path: native/server/go.sum
 
       - name: Vet
         working-directory: native/server
@@ -248,6 +253,7 @@ jobs:
       - uses: actions/setup-go@v7
         with:
           go-version-file: native/server/go.mod
+          cache-dependency-path: native/server/go.sum
 
       - name: Cross-compile mdview-server binaries
         uses: goreleaser/goreleaser-action@v6
