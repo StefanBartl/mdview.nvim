@@ -123,7 +123,7 @@ end
 --  3. autodetect via _candidates list
 -- The resolved command is stored in M.defaults.resolved_browser_cmd
 ---@return string|nil err
-function M.resolve_and_validate()
+function M.resolve_browser_cmd()
   -- explicit absolute command override
   if M.defaults.browser_cmd and M.defaults.browser_cmd ~= "" then
     M.defaults.browser_cmd = require("lib.nvim.cross.fs.expand_path")(M.defaults.browser_cmd)
@@ -176,14 +176,14 @@ end
 --- spurious "no browser found" on systems where autodetection misses.
 ---@param notify_on_fail boolean|nil
 ---@return boolean success, string|nil msg
-function M.setup_and_notify(notify_on_fail)
+function M.resolve_with_notify(notify_on_fail)
   notify_on_fail = notify_on_fail == nil and true or notify_on_fail
 
   if M.defaults.open_mode ~= "isolated" then
     return true, nil
   end
 
-  local err = M.resolve_and_validate()
+  local err = M.resolve_browser_cmd()
   if err then
     if notify_on_fail then
       notify(("[mdview.config.browser] browser resolution: %s"):format(tostring(err)), vim.log.levels.WARN, {})

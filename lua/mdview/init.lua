@@ -37,7 +37,7 @@ function M.setup(opts)
   cfg.merge(opts)
 
   -- Resolve browser at setup time and notify user if resolution failed
-  require("mdview.config.browser").setup_and_notify()
+  require("mdview.config.browser").resolve_with_notify()
   require("mdview.bindings.usrcmds").attach()
 
   -- One-time (persisted across restarts) popup on the first setup() after

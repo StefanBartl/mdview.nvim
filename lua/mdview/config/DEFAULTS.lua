@@ -25,7 +25,7 @@
 ---@field browser_cmd string absolute path to executable to force use (isolated mode only)
 ---@field browser_autoclose boolean whether :MDView stop closes the controlled browser (isolated mode only)
 ---@field browser_autostart boolean whether to open the browser automatically on start
----@field resolved_browser_cmd string|nil internal, populated by config.browser.resolve_and_validate()
+---@field resolved_browser_cmd string|nil internal, populated by config.browser.resolve_browser_cmd()
 ---@field browser_args string[]|nil extra CLI args for the resolved browser executable (isolated mode only)
 ---@field open_url string|nil static override URL always used instead of the computed key/token URL
 ---@field require_display boolean don't auto-open a browser without a GUI/DISPLAY available (see mdview-security)

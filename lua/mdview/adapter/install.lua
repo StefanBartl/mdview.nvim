@@ -17,7 +17,7 @@ local CLIENT_ASSET = "mdview-client.tar.gz"
 -- release version (require('mdview').setup({ install = {...} })) is honored.
 ---@internal
 ---@return string repo, string version
-local function repo_and_version()
+local function install_source()
   local install_cfg = require("mdview.config").defaults.install
   return install_cfg.repo, install_cfg.version
 end
@@ -58,7 +58,7 @@ end
 ---@internal
 ---@return string
 local function install_dir()
-  local _, version = repo_and_version()
+  local _, version = install_source()
   return fn.stdpath("data") .. "/mdview/bin/" .. version
 end
 
@@ -149,7 +149,7 @@ local function ensure_asset(dir, name)
     return nil, "failed to create install directory: " .. dir
   end
 
-  local repo, version = repo_and_version()
+  local repo, version = install_source()
   local base_url = ("https://github.com/%s/releases/download/%s"):format(repo, version)
   local checksums_path = dir .. "/checksums.txt"
   if fn.filereadable(checksums_path) == 0 then

@@ -234,7 +234,7 @@ function M.start(opts)
   -- was slow to bind. On a timeout the relay is usually up moments later; the
   -- client's WebSocket transport reconnects, so opening best-effort is safe.
   local opened = false
-  local function push_and_open()
+  local function deliver_initial_preview()
     if opened then
       return
     end
@@ -326,7 +326,7 @@ function M.start(opts)
       -- opening before it's up would load a browser error page (and the
       -- browser wouldn't retry). Polling ends on first success, so a healthy
       -- relay opens in well under a second.
-      push_and_open()
+      deliver_initial_preview()
     else
       -- wait_timeout can be nil here (it lets wait_ready apply
       -- transport.health_timeout_ms, see above) -- resolve the same
