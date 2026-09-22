@@ -15,6 +15,7 @@
 local control = require("mdview.adapter.control")
 local state = require("mdview.core.state")
 local bcfg = require("mdview.config.browser")
+local scroll_sync = require("mdview.bindings.autocmds.scroll_sync")
 
 local blanklines = require("mdview.bindings.usrcmds.blanklines")
 local cursor = require("mdview.bindings.usrcmds.cursor")
@@ -35,6 +36,12 @@ local orig_control_send = control.send
 control.send = function(fields)
   sent = fields
   return true
+end
+
+local position_pinged
+local orig_send_current_position = scroll_sync.send_current_position
+scroll_sync.send_current_position = function(bufnr)
+  position_pinged = bufnr
 end
 
 describe("usrcmds.blanklines", function()
@@ -94,6 +101,29 @@ describe("usrcmds.cursor", function()
     assert.are.equal("caret", bcfg.defaults.cursor_marker)
     assert.are.same({ cursor = "caret" }, sent)
     state.set_server(nil)
+  end)
+
+  it("pings the current cursor position after a live mode switch (paints without a CursorMoved)", function()
+    state.set_server({ stub = true })
+    position_pinged = nil
+    cursor.run("section")
+    assert.are.equal(vim.api.nvim_get_current_buf(), position_pinged)
+    state.set_server(nil)
+  end)
+
+  it("does not ping a position when switching to 'off' -- nothing to paint", function()
+    state.set_server({ stub = true })
+    position_pinged = nil
+    cursor.run("off")
+    assert.is_nil(position_pinged)
+    state.set_server(nil)
+  end)
+
+  it("does not ping a position when there is no session to push to", function()
+    state.set_server(nil)
+    position_pinged = nil
+    cursor.run("section")
+    assert.is_nil(position_pinged)
   end)
 
   it("rejects an unknown mode without mutating", function()
@@ -157,8 +187,6 @@ describe("usrcmds.reveal", function()
 end)
 
 describe("usrcmds.sync", function()
-  local scroll_sync = require("mdview.bindings.autocmds.scroll_sync")
-
   it("pause/resume/toggle drive scroll_sync's pause switch", function()
     scroll_sync.set_paused(false)
     sync.run("pause")
@@ -318,4 +346,5 @@ describe("usrcmds.theme", function()
 end)
 
 control.send = orig_control_send
+scroll_sync.send_current_position = orig_send_current_position
 vim.notify = orig_notify
