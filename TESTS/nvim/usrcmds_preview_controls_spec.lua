@@ -119,6 +119,16 @@ describe("usrcmds.cursor", function()
     state.set_server(nil)
   end)
 
+  it("does not ping a position while :MDView sync is paused", function()
+    state.set_server({ stub = true })
+    scroll_sync.set_paused(true)
+    position_pinged = nil
+    cursor.run("section")
+    assert.is_nil(position_pinged)
+    scroll_sync.set_paused(false)
+    state.set_server(nil)
+  end)
+
   it("does not ping a position when there is no session to push to", function()
     state.set_server(nil)
     position_pinged = nil

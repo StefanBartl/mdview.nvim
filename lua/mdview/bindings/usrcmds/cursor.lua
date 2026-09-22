@@ -74,9 +74,12 @@ function M.run(mode)
   browser.cursor_marker = mode
 
   if state.get_server() and control.send({ cursor = mode }) then
-    if mode ~= "off" then
+    if mode ~= "off" and not scroll_sync.is_paused() then
       -- Best-effort: paint the new marker immediately instead of leaving it
       -- blank until the cursor happens to move (see module comment above).
+      -- Skipped while :MDView sync is paused -- that pause exists precisely
+      -- so moving around Neovim (or, here, switching marker modes) does not
+      -- drag the preview along.
       pcall(scroll_sync.send_current_position, vim.api.nvim_get_current_buf())
     end
     notify("[mdview] cursor marker: " .. mode, vim.log.levels.INFO)
