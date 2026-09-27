@@ -12,9 +12,15 @@ local fn = vim.fn
 -- already uses -- this repo's stated floor is 0.9+, so a bare vim.uv would
 -- break on Neovim < 0.10.
 local uv = vim.uv or vim.loop
-local api = vim.api
 local normalize = require("mdview.helper.normalize")
 local log = require("mdview.helper.log")
+
+-- Unlike config/init.lua's and init.lua's plain `create("")` (no popup,
+-- follows the future global default), these specific messages are health-
+-- check/HTTP failures that can carry a raw stderr dump -- exactly the
+-- long/multi-line case a toast is for, so popup is requested explicitly
+-- here rather than waiting on that default.
+local notify = require("lib.nvim.notify").create("", { popup = true, source = "mdview" }).notify
 
 local M = {}
 
@@ -144,7 +150,7 @@ function M.wait_ready(cb, timeout_ms)
 
     http_get(url, function(code, err)
       if err then
-        api.nvim_echo({ { "[mdview] server health-check impossible: " .. err, "ErrorMsg" } }, true, { err = true })
+        notify("[mdview] server health-check impossible: " .. err, vim.log.levels.ERROR)
         cb(false)
       elseif code == 0 then
         M._ready = true
@@ -159,15 +165,11 @@ function M.wait_ready(cb, timeout_ms)
         if (uv.now() - start_time) < timeout then
           -- optionally log every N attempts
           if attempt % 10 == 0 then
-            api.nvim_echo({ { string.format("[mdview] waiting for server, attempt %d...\n", attempt), nil } }, true, {})
+            notify(string.format("[mdview] waiting for server, attempt %d...", attempt), vim.log.levels.INFO)
           end
           vim.defer_fn(poll, tcfg.health_poll_ms)
         else
-          api.nvim_echo(
-            { { "[mdview] server health-check timed out after " .. tostring(timeout) .. "ms", "ErrorMsg" } },
-            true,
-            { err = true }
-          )
+          notify("[mdview] server health-check timed out after " .. tostring(timeout) .. "ms", vim.log.levels.ERROR)
           cb(false)
         end
       end
@@ -331,11 +333,7 @@ local function try_send_pending(path)
       if stderr_lines and #stderr_lines > 0 then
         -- schedule error message to avoid fast-event restrictions
         vim.schedule(function()
-          api.nvim_echo(
-            { { "[mdview.ws_client] http_post stderr: " .. table.concat(stderr_lines, "\n"), "ErrorMsg" } },
-            true,
-            { err = true }
-          )
+          notify("[mdview.ws_client] http_post stderr: " .. table.concat(stderr_lines, "\n"), vim.log.levels.ERROR)
         end)
       end
       if entry.tries < (entry.max_retries or transport().max_retries) then
@@ -347,16 +345,14 @@ local function try_send_pending(path)
         M._pending[path] = nil
         -- schedule final failure notification
         vim.schedule(function()
-          api.nvim_echo({
-            {
-              "[mdview.ws_client] failed to send markdown for "
-                .. tostring(path)
-                .. " after "
-                .. tostring(entry.tries)
-                .. " attempts",
-              "ErrorMsg",
-            },
-          }, true, { err = true })
+          notify(
+            "[mdview.ws_client] failed to send markdown for "
+              .. tostring(path)
+              .. " after "
+              .. tostring(entry.tries)
+              .. " attempts",
+            vim.log.levels.ERROR
+          )
         end)
       end
     end
@@ -385,14 +381,12 @@ function M.send_markdown(path, markdown, opts)
       else
         vim.schedule(function()
           if stderr_lines and #stderr_lines > 0 then
-            api.nvim_echo({
-              {
-                "[mdview.ws_client] immediate post stderr: " .. table.concat(stderr_lines, "\n"),
-                "ErrorMsg",
-              },
-            }, true, {})
+            notify(
+              "[mdview.ws_client] immediate post stderr: " .. table.concat(stderr_lines, "\n"),
+              vim.log.levels.ERROR
+            )
           else
-            api.nvim_echo({ { "[mdview.ws_client] immediate post failed for " .. path, "ErrorMsg" } }, true, {})
+            notify("[mdview.ws_client] immediate post failed for " .. path, vim.log.levels.ERROR)
           end
         end)
       end
