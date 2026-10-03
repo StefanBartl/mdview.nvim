@@ -1,6 +1,6 @@
 // src/client/render/clickNav.ts
 //
-// Click-to-navigate (opt-in experimental.click_navigate). When a user clicks a
+// Click-to-navigate (experimental.click_navigate, on by default). When a user clicks a
 // relative link in the preview, we don't let the browser follow it (there's no
 // web server behind these paths) — instead we hand the href to Neovim via the
 // relay's /nav bridge, and Neovim opens the target document, which flows back
