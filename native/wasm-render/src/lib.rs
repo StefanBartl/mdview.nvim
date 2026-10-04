@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::collections::HashSet;
 
 use comrak::nodes::{AstNode, NodeHtmlBlock, NodeValue};
@@ -114,6 +115,96 @@ fn transform_private_blocks<'a>(root: &'a AstNode<'a>, inner_options: &Options) 
     }
 }
 
+/// Is this line the shape of a flat frontmatter entry, `key: value` (or `key:`
+/// opening a block list), with a key that has no whitespace in it?
+fn is_key_line(line: &str) -> bool {
+    match line.split_once(':') {
+        Some((k, _)) => {
+            !k.is_empty()
+                && !k.contains(char::is_whitespace)
+                && !line.starts_with(char::is_whitespace)
+        }
+        None => false,
+    }
+}
+
+/// Turn the lines between the frontmatter delimiters into a small key/value
+/// table. Each `key: value` line becomes one row; an indented line or a line
+/// without `key:` shape continues the previous row's value, so a block list or
+/// a folded value stays readable instead of being dropped.
+fn front_matter_table(inner: &[&str]) -> String {
+    let mut rows: Vec<(String, String)> = Vec::new();
+    for line in inner {
+        let trimmed = line.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+        match (is_key_line(line), rows.last_mut()) {
+            (true, _) => {
+                let (k, v) = trimmed.split_once(':').unwrap_or((trimmed, ""));
+                rows.push((k.to_string(), v.trim().to_string()));
+            }
+            (false, Some(last)) => {
+                if !last.1.is_empty() {
+                    last.1.push(' ');
+                }
+                last.1.push_str(trimmed);
+            }
+            (false, None) => rows.push((String::new(), trimmed.to_string())),
+        }
+    }
+    let mut html = String::from("<table><caption>Frontmatter</caption><tbody>");
+    for (k, v) in rows {
+        html.push_str(&format!(
+            "<tr><th>{}</th><td>{}</td></tr>",
+            escape_html_text(&k),
+            escape_html_text(&v)
+        ));
+    }
+    html.push_str("</tbody></table>");
+    html
+}
+
+/// Replace a leading YAML frontmatter block (`---` ... `---` or `...`, first
+/// entry a `key:` line) by a key/value table, so a task or note file does not
+/// render as a horizontal rule plus a heading made of its metadata lines (a
+/// setext heading, because the closing `---` underlines the text above it).
+///
+/// The block is swapped for one line of raw HTML plus as many blank lines as it
+/// had, so every later line keeps its number: the `data-sourcepos` values
+/// (scroll sync, cursor marker) still match the Neovim buffer. The table goes
+/// through the same sanitizer as any other raw HTML. Input that does not start
+/// with such a block is returned unchanged.
+fn replace_front_matter(input: &str) -> Cow<'_, str> {
+    let mut lines = input.split_inclusive('\n');
+    let mut consumed = match lines.next() {
+        Some(first) if first.trim_end() == "---" => first.len(),
+        _ => return Cow::Borrowed(input),
+    };
+    let mut inner: Vec<&str> = Vec::new();
+    let mut block_lines = 1usize;
+    let mut closed = false;
+    for line in lines {
+        consumed += line.len();
+        block_lines += 1;
+        let bare = line.trim_end();
+        if bare == "---" || bare == "..." {
+            closed = true;
+            break;
+        }
+        inner.push(bare);
+    }
+    let first_entry = inner.iter().find(|l| !l.trim().is_empty());
+    if !closed || !first_entry.is_some_and(|l| is_key_line(l)) {
+        return Cow::Borrowed(input);
+    }
+    let mut out = front_matter_table(&inner);
+    out.push('\n');
+    out.push_str(&"\n".repeat(block_lines - 1));
+    out.push_str(&input[consumed..]);
+    Cow::Owned(out)
+}
+
 /// Build the ammonia sanitizer. Identical to the default allowlist except it
 /// additionally permits the disabled checkbox inputs comrak emits for GFM
 /// task lists (`- [ ]` / `- [x]`), so they render as real checkboxes instead
@@ -190,7 +281,8 @@ fn sanitizer() -> ammonia::Builder<'static> {
 pub fn render_markdown(input: &str, source_map: bool) -> String {
     let arena = Arena::new();
     let options = build_options();
-    let root = parse_document(&arena, input, &options);
+    let input = replace_front_matter(input);
+    let root = parse_document(&arena, &input, &options);
     // Private blocks first: this replaces ```private code blocks with rendered
     // <div data-private> HTML, so the source-map pass then correctly skips them
     // (they hold no inline Text/Code nodes to wrap).
@@ -217,6 +309,46 @@ mod tests {
         assert!(html.contains("<h1"));
         assert!(html.contains("Title"));
         assert!(html.contains("Hello world."));
+    }
+
+    #[test]
+    fn frontmatter_becomes_a_table_not_hr_and_heading() {
+        let src = "---\ntitle: A task\nstatus: open\ntags: [a, b]\n---\n\n# Body\n";
+        let html = render_markdown(src, false);
+        assert!(!html.contains("<hr"), "{html}");
+        assert!(!html.contains("<h2"), "{html}");
+        assert!(html.contains("<th>status</th><td>open</td>"), "{html}");
+        assert!(html.contains("<td>[a, b]</td>"), "{html}");
+        // Later blocks keep their real source line (the block is padded, not removed).
+        assert!(html.contains("<h1 data-sourcepos=\"7:1-7:6\">"), "{html}");
+    }
+
+    #[test]
+    fn frontmatter_values_are_escaped_and_continuations_kept() {
+        let src = "---\r\nsummary: <script>x</script> & more\r\nrefs:\r\n  - a.lua\r\n  - b.lua\r\n---\r\ntext";
+        let html = render_markdown(src, false);
+        assert!(!html.contains("<script"), "{html}");
+        assert!(html.contains("&amp; more"), "{html}");
+        assert!(
+            html.contains("<th>refs</th><td>- a.lua - b.lua</td>"),
+            "{html}"
+        );
+        assert!(html.contains("text"), "{html}");
+    }
+
+    #[test]
+    fn only_a_leading_keyed_block_counts_as_frontmatter() {
+        // A rule in the middle, a rule pair around prose, an unterminated block and an
+        // empty pair all stay plain Markdown.
+        for src in [
+            "Text\n\n---\nkey: v\n---\n\nMore",
+            "---\nSome intro\n---\n\nText",
+            "---\nkey: v\nno closing delimiter",
+            "---\n---\n\nText",
+        ] {
+            let html = render_markdown(src, false);
+            assert!(!html.contains("<table"), "{src:?} -> {html}");
+        }
     }
 
     #[test]

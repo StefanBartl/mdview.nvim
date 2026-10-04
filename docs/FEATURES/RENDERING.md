@@ -55,6 +55,25 @@ client-side syntax highlighter would mangle injected spans).
 
 - **Module:** `native/wasm-render/src/lib.rs` (`annotate_source_positions`)
 
+## YAML frontmatter
+
+A document that starts with a `---` line, a first entry of the shape `key: value`
+and a closing `---` (or `...`) line has its frontmatter shown as a small
+two-column table (captioned "Frontmatter") instead of being read as a
+horizontal rule plus a heading made of the metadata lines — which is what the
+closing `---` turns it into, as a setext heading underline. Flat entries become
+one row each; an indented or key-less line continues the previous value, so a
+block list stays readable. Values are escaped text and the table passes the same
+sanitizer as every other raw HTML.
+
+The block is replaced by one line of HTML and as many blank lines as it had, so
+every later line keeps its number and `data-sourcepos` (scroll sync, cursor
+marker) still matches the buffer. A `---` anywhere but the first line, a pair of
+rules around prose, an empty pair, and a block with no closing delimiter all stay
+plain Markdown.
+
+- **Module:** `native/wasm-render/src/lib.rs` (`replace_front_matter`, `front_matter_table`)
+
 ## Private blocks
 
 A fenced code block with the info string `private` (` ```private `) is
