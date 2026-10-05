@@ -352,6 +352,38 @@ mod tests {
     }
 
     #[test]
+    fn frontmatter_keys_and_quotes_never_become_markup() {
+        // A key is element text just like a value: markup in either stays text (`&lt;`), and
+        // a quote-and-handler value is only text inside the cell, never an attribute.
+        let src = "---\n<img/src=x/onerror=alert(1)>: <b>bold</b>\nnote: \"q\" onmouseover=\"x()\"\n---\n\nbody";
+        let html = render_markdown(src, false);
+        assert!(!html.contains("<img"), "{html}");
+        assert!(!html.contains("<b>"), "{html}");
+        assert!(
+            html.contains("<th>&lt;img/src=x/onerror=alert(1)&gt;</th>"),
+            "{html}"
+        );
+        assert!(html.contains("<td>&lt;b&gt;bold&lt;/b&gt;</td>"), "{html}");
+        assert!(
+            html.contains("<td>\"q\" onmouseover=\"x()\"</td>"),
+            "{html}"
+        );
+        assert!(html.contains("body"), "{html}");
+    }
+
+    #[test]
+    fn a_long_unclosed_block_stays_plain_markdown() {
+        // A document that opens with a rule and never closes it is walked once and left alone.
+        let mut src = String::from("---\nkey: v\n");
+        for i in 0..50_000 {
+            src.push_str(&format!("line {i}\n"));
+        }
+        let html = render_markdown(&src, false);
+        assert!(!html.contains("<table"), "unclosed block became a table");
+        assert!(html.contains("line 49999"));
+    }
+
+    #[test]
     fn renders_gfm_tables() {
         let html = render_markdown("| a | b |\n|---|---|\n| 1 | 2 |\n", false);
         assert!(html.contains("<table"));
