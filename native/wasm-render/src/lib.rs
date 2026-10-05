@@ -71,12 +71,18 @@ fn annotate_source_positions<'a>(node: &'a AstNode<'a>, in_image: bool) {
         match &d.value {
             NodeValue::Text(text) => Some(format!(
                 "<span data-sp=\"{}:{}:{}:{}\">{}</span>",
-                sp.start.line, sp.start.column, sp.end.line, sp.end.column,
+                sp.start.line,
+                sp.start.column,
+                sp.end.line,
+                sp.end.column,
                 escape_html_text(text),
             )),
             NodeValue::Code(code) => Some(format!(
                 "<span data-sp=\"{}:{}:{}:{}\"><code>{}</code></span>",
-                sp.start.line, sp.start.column, sp.end.line, sp.end.column,
+                sp.start.line,
+                sp.start.column,
+                sp.end.line,
+                sp.end.column,
                 escape_html_text(&code.literal),
             )),
             _ => None,
@@ -226,7 +232,11 @@ fn sanitizer() -> ammonia::Builder<'static> {
     // caret placement (data-sp, on inline spans); data-private marks a blurred
     // block. All carry no executable content — just digits / a bare flag — and
     // can't be used to inject script.
-    builder.add_generic_attributes(["data-sourcepos", "data-sp", "data-private"].iter().copied());
+    builder.add_generic_attributes(
+        ["data-sourcepos", "data-sp", "data-private"]
+            .iter()
+            .copied(),
+    );
 
     // `type`/`checked`/`disabled` for checkboxes; `name`/`value`/`placeholder`
     // for syncable text inputs. All inert data — crucially NOT `formaction`,
@@ -418,7 +428,10 @@ mod tests {
 
     #[test]
     fn strips_iframe_and_object_tags() {
-        let html = render_markdown("<iframe src=\"https://evil.example\"></iframe><object data=\"x\"></object>", false);
+        let html = render_markdown(
+            "<iframe src=\"https://evil.example\"></iframe><object data=\"x\"></object>",
+            false,
+        );
         assert!(!html.contains("<iframe"));
         assert!(!html.contains("<object"));
     }
@@ -485,13 +498,19 @@ mod tests {
     #[test]
     fn textarea_content_is_inert() {
         // A <script> inside a <textarea> is parsed as text, never a script node.
-        let html = render_markdown("<textarea name=\"x\"><script>alert(1)</script></textarea>", false);
+        let html = render_markdown(
+            "<textarea name=\"x\"><script>alert(1)</script></textarea>",
+            false,
+        );
         assert!(!html.contains("<script>"));
     }
 
     #[test]
     fn strips_dangerous_textarea_attributes() {
-        let html = render_markdown("<textarea name=\"x\" onfocus=\"alert(1)\"></textarea>", false);
+        let html = render_markdown(
+            "<textarea name=\"x\" onfocus=\"alert(1)\"></textarea>",
+            false,
+        );
         assert!(!html.contains("onfocus"));
         assert!(!html.contains("alert(1)"));
     }
@@ -546,7 +565,10 @@ mod tests {
     #[test]
     fn source_map_still_strips_xss() {
         // Enabling source_map must not weaken sanitization.
-        let html = render_markdown("hi <script>alert(1)</script> [x](javascript:alert(1))", true);
+        let html = render_markdown(
+            "hi <script>alert(1)</script> [x](javascript:alert(1))",
+            true,
+        );
         assert!(!html.contains("<script"));
         assert!(!html.contains("javascript:"));
         assert!(!html.contains("alert(1)"));
