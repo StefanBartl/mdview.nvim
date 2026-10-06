@@ -39,7 +39,10 @@ const maxFileBytes = 32 << 20
 // that connects before the first change still gets content.
 //
 // A change therefore reaches the browser after two polls (about 500 ms at the
-// default interval); the first read is broadcast immediately.
+// default interval). The first read is broadcast immediately too, unless it is
+// empty: an empty first read may be the truncate step of a non-atomic save, so
+// like any other change it has to read the same on a second poll first (an
+// intentionally empty file is therefore broadcast one interval later).
 //
 // A read error is reported once and then retried silently: the common cause is
 // an editor writing via a temp file and renaming over the target, during which
@@ -49,57 +52,76 @@ func Watch(b Broadcaster, key, path string, interval time.Duration, stop <-chan 
 	if interval <= 0 {
 		interval = DefaultInterval
 	}
-
-	var last, pending []byte
-	// hasPending is separate from pending == nil because an empty file reads
-	// as an empty non-nil slice and must still count as a candidate.
-	var hasPending, reportedErr bool
-
-	read := func() {
-		content, err := readCapped(path)
-		if err != nil {
-			if !reportedErr {
-				fmt.Printf("[watch] cannot read %s: %v (retrying)\n", path, err)
-				reportedErr = true
-			}
-			return
-		}
-		if reportedErr {
-			fmt.Printf("[watch] recovered: %s\n", path)
-			reportedErr = false
-		}
-		// Compare content, not mtime: mtime granularity is coarse enough on
-		// some filesystems that two saves within the same tick would look
-		// identical, and a no-op save shouldn't cost a full re-render.
-		if last != nil && bytes.Equal(last, content) {
-			pending, hasPending = nil, false
-			return
-		}
-		// A change is broadcast only once it reads the same on two polls in a
-		// row. A non-atomic save (truncate, then write) is visible mid-way as
-		// an empty or partial file; broadcasting that would flash an empty
-		// preview and re-render the real content a tick later.
-		if last != nil && !(hasPending && bytes.Equal(pending, content)) {
-			pending, hasPending = content, true
-			return
-		}
-		pending, hasPending = nil, false
-		last = content
-		b.Broadcast(key, content)
-	}
-
-	read()
+	w := &watcher{b: b, key: key, path: path, read: readCapped}
+	w.poll()
 
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
+	w.run(ticker.C, stop)
+}
+
+// watcher is Watch's state, split from the clock and the file system so the
+// debounce can be tested step by step: poll is one read, run feeds it from a
+// tick channel, and read is the only thing that touches the disk.
+type watcher struct {
+	b    Broadcaster
+	key  string
+	path string
+	read func(path string) ([]byte, error)
+
+	last, pending []byte
+	// hasLast and hasPending are separate from nil checks because an empty
+	// file is a valid value (a reader may return a nil slice for it).
+	hasLast, hasPending, reportedErr bool
+}
+
+// run polls on every tick until stop is closed.
+func (w *watcher) run(tick <-chan time.Time, stop <-chan struct{}) {
 	for {
 		select {
 		case <-stop:
 			return
-		case <-ticker.C:
-			read()
+		case <-tick:
+			w.poll()
 		}
 	}
+}
+
+// poll reads the file once and broadcasts the content when it is new and, where
+// needed, confirmed.
+func (w *watcher) poll() {
+	content, err := w.read(w.path)
+	if err != nil {
+		if !w.reportedErr {
+			fmt.Printf("[watch] cannot read %s: %v (retrying)\n", w.path, err)
+			w.reportedErr = true
+		}
+		return
+	}
+	if w.reportedErr {
+		fmt.Printf("[watch] recovered: %s\n", w.path)
+		w.reportedErr = false
+	}
+	// Compare content, not mtime: mtime granularity is coarse enough on
+	// some filesystems that two saves within the same tick would look
+	// identical, and a no-op save shouldn't cost a full re-render.
+	if w.hasLast && bytes.Equal(w.last, content) {
+		w.pending, w.hasPending = nil, false
+		return
+	}
+	// A change is broadcast only once it reads the same on two polls in a
+	// row. A non-atomic save (truncate, then write) is visible mid-way as
+	// an empty or partial file; broadcasting that would flash an empty
+	// preview and re-render the real content a tick later. The very first
+	// read is exempt (a tab that connects early should not wait) unless it
+	// is empty, which is exactly what a save caught mid-truncate looks like.
+	if (w.hasLast || len(content) == 0) && !(w.hasPending && bytes.Equal(w.pending, content)) {
+		w.pending, w.hasPending = content, true
+		return
+	}
+	w.pending, w.hasPending = nil, false
+	w.last, w.hasLast = content, true
+	w.b.Broadcast(w.key, content)
 }
 
 // readCapped reads path, refusing anything past maxFileBytes rather than

@@ -1,6 +1,7 @@
 package source
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"sync"
@@ -185,51 +186,181 @@ func TestWatch_StopsWhenStopChannelClosed(t *testing.T) {
 	}
 }
 
-// A truncate-then-write save is visible as an empty file for a moment; that
-// empty read must be held back like any other unconfirmed change, and an
-// intentionally empty file must still be broadcast once it is stable.
-func TestWatch_EmptyFileIsDebouncedButStillBroadcastWhenStable(t *testing.T) {
-	dir := t.TempDir()
-	path := filepath.Join(dir, "doc.md")
-	if err := os.WriteFile(path, []byte("full"), 0o644); err != nil {
-		t.Fatal(err)
-	}
+// scripted hands out the scripted reads one per poll (the last one
+// repeats), so a test drives the debounce poll by poll without a clock or a
+// file system.
+type scriptedRead struct {
+	content string
+	err     error
+}
 
+func scripted(reads ...scriptedRead) func(string) ([]byte, error) {
+	i := 0
+	return func(string) ([]byte, error) {
+		r := reads[i]
+		if i < len(reads)-1 {
+			i++
+		}
+		if r.err != nil {
+			return nil, r.err
+		}
+		if r.content == "" {
+			return nil, nil // deliberately nil: an empty file must not depend on a non-nil slice
+		}
+		return []byte(r.content), nil
+	}
+}
+
+func newScripted(reads ...scriptedRead) (*watcher, *fakeBroadcaster) {
 	b := &fakeBroadcaster{}
-	stop := make(chan struct{})
-	defer close(stop)
-	go Watch(b, "room", path, 40*time.Millisecond, stop)
+	return &watcher{b: b, key: "room", path: "doc.md", read: scripted(reads...)}, b
+}
 
-	if !waitFor(t, func() bool { _, p := b.snapshot(); return len(p) >= 1 }) {
-		t.Fatal("initial broadcast never arrived")
+func contents(b *fakeBroadcaster) []string {
+	_, p := b.snapshot()
+	out := make([]string, len(p))
+	for i, c := range p {
+		out[i] = string(c)
 	}
-	// Transient empty state, replaced before the next poll can confirm it.
-	if err := os.WriteFile(path, nil, 0o644); err != nil {
-		t.Fatal(err)
+	return out
+}
+
+func expectSent(t *testing.T, b *fakeBroadcaster, want ...string) {
+	t.Helper()
+	got := contents(b)
+	if len(got) != len(want) {
+		t.Fatalf("broadcasts = %q, want %q", got, want)
 	}
-	if err := os.WriteFile(path, []byte("full2"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	if !waitFor(t, func() bool {
-		_, p := b.snapshot()
-		return len(p) >= 2 && string(p[len(p)-1]) == "full2"
-	}) {
-		t.Fatal("expected the final content to be broadcast")
-	}
-	for _, p := range func() [][]byte { _, p := b.snapshot(); return p }() {
-		if len(p) == 0 {
-			t.Fatal("a transient empty file was broadcast")
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("broadcasts = %q, want %q", got, want)
 		}
 	}
+}
 
-	// A deliberately emptied file that stays empty is real content.
-	if err := os.WriteFile(path, nil, 0o644); err != nil {
-		t.Fatal(err)
+func TestPoll_FirstNonEmptyReadIsBroadcastAtOnce(t *testing.T) {
+	w, b := newScripted(scriptedRead{content: "hello"})
+	w.poll()
+	expectSent(t, b, "hello")
+	w.poll()
+	expectSent(t, b, "hello")
+}
+
+// The very first read can land in the truncate window of a non-atomic save: it
+// must not be broadcast as an empty preview, the real content that follows is.
+func TestPoll_EmptyFirstReadIsHeldBackUntilConfirmed(t *testing.T) {
+	w, b := newScripted(scriptedRead{content: ""}, scriptedRead{content: "full"})
+	w.poll()
+	expectSent(t, b)
+	w.poll()
+	expectSent(t, b, "full")
+}
+
+// An intentionally empty file is real content: broadcast once it reads empty
+// on a second poll.
+func TestPoll_StableEmptyFirstReadIsBroadcastOnSecondPoll(t *testing.T) {
+	w, b := newScripted(scriptedRead{content: ""})
+	w.poll()
+	expectSent(t, b)
+	w.poll()
+	expectSent(t, b, "")
+	w.poll()
+	expectSent(t, b, "")
+}
+
+func TestPoll_ChangeNeedsTwoEqualReads(t *testing.T) {
+	w, b := newScripted(
+		scriptedRead{content: "one"},
+		scriptedRead{content: "tw"}, // partial write
+		scriptedRead{content: "two"},
+		scriptedRead{content: "two"},
+	)
+	w.poll()
+	w.poll()
+	w.poll()
+	expectSent(t, b, "one")
+	w.poll()
+	expectSent(t, b, "one", "two")
+}
+
+// Truncate-then-write between two polls leaves an empty read in the middle.
+func TestPoll_TransientEmptyIsNeverBroadcast(t *testing.T) {
+	w, b := newScripted(
+		scriptedRead{content: "full"},
+		scriptedRead{content: ""},
+		scriptedRead{content: "full2"},
+		scriptedRead{content: "full2"},
+	)
+	for i := 0; i < 4; i++ {
+		w.poll()
 	}
-	if !waitFor(t, func() bool {
-		_, p := b.snapshot()
-		return len(p) >= 3 && len(p[len(p)-1]) == 0
-	}) {
-		t.Fatal("a stable empty file was never broadcast")
+	expectSent(t, b, "full", "full2")
+}
+
+func TestPoll_EmptiedFileThatStaysEmptyIsBroadcast(t *testing.T) {
+	w, b := newScripted(scriptedRead{content: "full"}, scriptedRead{content: ""})
+	w.poll()
+	w.poll()
+	expectSent(t, b, "full")
+	w.poll()
+	expectSent(t, b, "full", "")
+}
+
+// A revert to the broadcast content cancels the pending candidate.
+func TestPoll_RevertCancelsPending(t *testing.T) {
+	w, b := newScripted(
+		scriptedRead{content: "a"},
+		scriptedRead{content: "b"},
+		scriptedRead{content: "a"},
+		scriptedRead{content: "b"},
+	)
+	for i := 0; i < 4; i++ {
+		w.poll()
+	}
+	expectSent(t, b, "a")
+}
+
+func TestPoll_ReadErrorsAreSurvivedAndRecovered(t *testing.T) {
+	gone := errors.New("gone")
+	w, b := newScripted(
+		scriptedRead{content: "before"},
+		scriptedRead{err: gone},
+		scriptedRead{err: gone},
+		scriptedRead{content: "after"},
+		scriptedRead{content: "after"},
+	)
+	for i := 0; i < 5; i++ {
+		w.poll()
+	}
+	expectSent(t, b, "before", "after")
+	if w.reportedErr {
+		t.Fatal("the error state should be cleared once the file is readable again")
+	}
+}
+
+// run feeds poll from a tick channel and returns on stop; an unbuffered tick
+// channel makes every send a rendezvous, so no sleeping is involved.
+func TestRun_PollsOnEveryTickAndStopsOnStop(t *testing.T) {
+	w, b := newScripted(scriptedRead{content: "one"}, scriptedRead{content: "two"})
+	tick := make(chan time.Time)
+	stop := make(chan struct{})
+	done := make(chan struct{})
+	go func() {
+		w.run(tick, stop)
+		close(done)
+	}()
+
+	tick <- time.Time{} // "one", first read: sent at once
+	tick <- time.Time{} // "two" seen once: held back
+	tick <- time.Time{} // "two" again: sent
+	// The next send returns only after the loop finished the previous poll.
+	tick <- time.Time{}
+	expectSent(t, b, "one", "two")
+
+	close(stop)
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("run did not return after stop was closed")
 	}
 }
