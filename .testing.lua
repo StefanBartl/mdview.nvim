@@ -43,6 +43,14 @@ return {
   guard_allow = {
     -- ws_client pushes buffer content with `curl -X POST` to the local relay; the specs exercise
     -- that transport against a port without a server, so the spawn is the behavior under test.
-    spawn = { "curl" },
+    spawn = {
+      "curl",
+      -- browser_args_spec and server_args_spec make a fake executable with `chmod +x` (Unix only),
+      -- which is how the specs create the "browser/server binary found on disk" fixture.
+      "chmod",
+      -- breadcrumbs_spec opens a .py buffer on purpose; Neovim's own python3 ftplugin then probes
+      -- the python3 provider (a runtime action, not the plugin's), which only exists on CI runners.
+      "python3",
+    },
   },
 }
