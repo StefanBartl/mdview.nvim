@@ -14,10 +14,15 @@
 --- raising. Such a buffer shows what is on disk instead, never an empty
 --- document.
 ---
---- Documented exceptions that deliberately keep reading the REAL buffer with
---- `nvim_buf_get_lines` (the guard spec TESTS/nvim/mirror_guard_spec.lua
---- lists them and fails on any other use of `nvim_buf_get_lines` or `readfile`
---- under lua/mdview):
+--- Everything else under lua/mdview stays away from the raw read routes (a
+--- buffer's lines or text, a file's lines or bytes). The guard spec
+--- TESTS/nvim/mirror_guard_spec.lua lists the forbidden routes and fails on any
+--- use outside the documented exceptions. An exception is granted per route,
+--- never per file: a file that may read the real buffer may not read a file
+--- from disk because of that, and the other way round.
+---
+--- Documented exceptions, which deliberately keep reading the REAL buffer with
+--- `nvim_buf_get_lines`:
 ---
 ---   * adapter/inbound_poll.lua -- the reverse direction (browser -> buffer:
 ---     checkbox toggle, text-field sync). It must read and patch the text the
@@ -25,6 +30,12 @@
 ---   * core/breadcrumbs.lua -- computes the heading trail up to the cursor
 ---     line of the real buffer (a ranged read, not content for the preview).
 ---   * test/runner.lua -- the in-editor test runner reads the buffer under test.
+---
+--- Documented exception for reading a file with `io.open` in read mode (the
+--- content is not preview text):
+---
+---   * adapter/install.lua -- hashes the downloaded server binary and reads the
+---     checksum list that belongs to it.
 ---
 --- Future asynchronous variant: `M.lines_async(bufnr, cb)` is the slot for a
 --- transform that cannot answer synchronously. For now it calls back at once

@@ -45,9 +45,12 @@ overrides are only for a build kept somewhere else.
   opt-in config keys. The text that goes *into* the preview is read in one
   place, `lua/mdview/core/mirror.lua` (`lines` for a buffer, `lines_for_path`
   for a file that may not be open); a buffer that is not loaded is answered from
-  disk, never as an empty document. `TESTS/nvim/mirror_guard_spec.lua` fails on
-  any other `nvim_buf_get_lines` or `readfile` under `lua/mdview`, apart from
-  the exceptions its header lists.
+  disk, never as an empty document, and a file is matched to its buffer by exact
+  name, never by pattern. `TESTS/nvim/mirror_guard_spec.lua` fails on any other
+  raw read route under `lua/mdview` (the buffer API, `readfile`, `io.open` in a
+  read mode and their equivalents; the spec's `RULES` table is the list). An
+  exception is granted per route, not per file, and is documented in the header
+  of `mirror.lua`; an exception the code no longer uses fails the spec too.
 - **Companions are never loaded.** markdown.nvim and color_my_ascii.nvim are
   detected, never required. `:checkhealth mdview` notes their presence; nothing
   else may depend on it.
