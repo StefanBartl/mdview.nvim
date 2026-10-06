@@ -3,7 +3,6 @@
 
 ---@diagnostic disable: undefined-global, unused-local
 
-local api = vim.api
 local session = require("mdview.core.session")
 local copy_lines = require("mdview.helper.copy_lines")
 local log = require("mdview.helper.log")
@@ -25,7 +24,7 @@ local function on_buf_enter(bufnr, norm_path)
 
   -- only store snapshot if we don't already have it
   if not session.get(norm_path) then
-    local lines = api.nvim_buf_get_lines(bufnr, 0, -1, false)
+    local lines = require("mdview.core.mirror").lines(bufnr)
     session.store(norm_path, copy_lines(lines))
     log.debug("BufEnter snapshot stored for path: " .. norm_path, nil, "bufenter", true)
   end

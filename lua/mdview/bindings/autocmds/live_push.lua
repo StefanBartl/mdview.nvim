@@ -94,7 +94,7 @@ function M.push_buffer_changes(bufnr, opts)
     return
   end
 
-  local lines = api.nvim_buf_get_lines(bufnr, 0, -1, false) or {}
+  local lines = require("mdview.core.mirror").lines(bufnr)
 
   -- In "reuse" browser_behavior the single preview tab follows the active
   -- buffer, so route this buffer's content to the room the open tab is

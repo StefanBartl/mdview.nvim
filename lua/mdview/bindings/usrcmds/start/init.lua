@@ -82,7 +82,7 @@ local function initial_push_async(push_strategy, try_push_opts, wait_timeout, br
     local bufnr = vim.fn.bufnr(norm, false)
     local lines
     if bufnr and bufnr ~= -1 then
-      lines = api.nvim_buf_get_lines(bufnr, 0, -1, false) or {}
+      lines = require("mdview.core.mirror").lines(bufnr)
     else
       -- safe file read fallback
       local ok, content = pcall(vim.fn.readfile, norm)
@@ -106,7 +106,7 @@ local function initial_push_async(push_strategy, try_push_opts, wait_timeout, br
       log.debug("start: no normalized path for initial push", nil, "usercmds.start", true)
       return
     end
-    local lines = api.nvim_buf_get_lines(bufnr, 0, -1, false) or {}
+    local lines = require("mdview.core.mirror").lines(bufnr)
     trypush.try_push(path, lines, try_push_opts)
     return
   end

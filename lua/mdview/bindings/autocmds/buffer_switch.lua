@@ -83,7 +83,7 @@ function M.resync(bufnr)
     if not api.nvim_buf_is_valid(bufnr) then
       return
     end
-    local lines = api.nvim_buf_get_lines(bufnr, 0, -1, false) or {}
+    local lines = require("mdview.core.mirror").lines(bufnr)
     -- A buffer switch is a whole-document change of the previewed room,
     -- so force a full snapshot rather than diffing against the previous
     -- buffer's content (which would be a large, pointless diff).

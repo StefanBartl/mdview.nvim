@@ -44,7 +44,7 @@ function M.push_buffer(bufnr, force)
     return
   end
 
-  local lines = api.nvim_buf_get_lines(bufnr, 0, -1, false) or {}
+  local lines = require("mdview.core.mirror").lines(bufnr)
   local prev = session.get(path)
   local old_lines = (prev and prev.lines) or {}
   local new_lines = lines
@@ -104,7 +104,7 @@ function M.store_snapshot_on_enter(bufnr)
   path = norm_path
 
   if not session.get(path) then
-    local lines = api.nvim_buf_get_lines(bufnr, 0, -1, false)
+    local lines = require("mdview.core.mirror").lines(bufnr)
     session.store(path, copy_lines(lines))
     log.debug("BufEnter snapshot stored for path: " .. path, nil, "bufenter", true)
   end

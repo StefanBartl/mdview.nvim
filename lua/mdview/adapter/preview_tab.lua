@@ -56,7 +56,7 @@ local function sync_content(source_bufnr, preview_bufnr)
   if not api.nvim_buf_is_valid(source_bufnr) or not api.nvim_buf_is_valid(preview_bufnr) then
     return
   end
-  local lines = api.nvim_buf_get_lines(source_bufnr, 0, -1, false)
+  local lines = require("mdview.core.mirror").lines(source_bufnr)
 
   local win_cursors = {}
   for _, winid in ipairs(vim.fn.win_findbuf(preview_bufnr)) do
