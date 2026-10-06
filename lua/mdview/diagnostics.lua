@@ -96,6 +96,19 @@ function M.collect()
   kv(lines, "browser.browser_autostart", b.browser_autostart)
   kv(lines, "browser.require_display", b.require_display)
 
+  section("Spotlight mirror (spotlight.nvim -> preview)")
+  kv(lines, "browser.spotlight_sync", b.spotlight_sync ~= false)
+  kv(lines, "browser.spotlight_max_matches", b.spotlight_max_matches)
+  local ok_mirror, mirror = pcall(require, "mdview.core.spotlight_mirror")
+  if ok_mirror then
+    local payload = mirror.plugin() and mirror.build() or nil
+    kv(lines, "spotlight.nvim read API", payload and "found" or "not found (nothing to mirror)")
+    if payload then
+      kv(lines, "whole-file spotlights", #payload.items)
+      kv(lines, "palette slots", #payload.colors)
+    end
+  end
+
   section("Running session")
   local state = require("mdview.core.state")
   local running = state.proc_is_running()

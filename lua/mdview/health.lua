@@ -212,6 +212,20 @@ function M.check()
     ok("color_my_ascii.nvim not installed (optional companion; would feed the preview's fenced-code colors)")
   end
 
+  -- spotlight.nvim marks tokens in the buffer. mdview mirrors its whole-file
+  -- spotlights into the preview (core/spotlight_mirror, browser.spotlight_sync);
+  -- it needs spotlight.nvim's read API, which older versions lack. Optional.
+  if require("mdview.core.spotlight_mirror").plugin() then
+    ok("spotlight.nvim detected — its whole-file spotlights are mirrored into the preview (browser.spotlight_sync)")
+  elseif has_plugin("spotlight") then
+    warn(
+      "spotlight.nvim detected, but without its read API (spotlights()) — its highlights cannot be mirrored",
+      { "Update spotlight.nvim to a version with the `User SpotlightChanged` event and `spotlights()`" }
+    )
+  else
+    ok("spotlight.nvim not installed (optional companion; would mirror its highlights into the preview)")
+  end
+
   -- mdview.nvim's own docs/install.json via lib.nvim.deps — points to
   -- `:Lib deps show`. Not a per-tool report: curl (the whole of
   -- docs/install.json) is already checked above with a mdview-specific

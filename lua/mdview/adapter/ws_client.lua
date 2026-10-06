@@ -570,6 +570,40 @@ function M.send_spans(key, json)
   http_post_nonblocking(spans_url_for(key), json or "null", function() end)
 end
 
+--- Public: push the spotlight-mirror state (spotlight.nvim's whole-file
+--- highlights and their colors, built by mdview.core.spotlight_mirror) to the
+--- relay, which fans it out to every preview tab and remembers it for tabs that
+--- join or reload later.
+---
+--- Unlike every other sidecar this takes no room key: the spotlights belong to
+--- the editor, not to a document, and apply to whatever each tab is showing.
+---
+--- `cb` reports whether the relay took it. `curl -sS` exits 0 on an HTTP error
+--- too, so success is "exit 0 AND an empty body" -- a relay older than the
+--- `/spotlight` route answers its static file server's "404 page not found",
+--- which the caller reports once as the actionable thing it is.
+---@param json string # the encoded Mdview.SpotlightPayload
+---@param cb fun(ok: boolean, err: string|nil)|nil
+---@return nil
+function M.send_spotlight(json, cb)
+  cb = cb or function() end
+  if type(json) ~= "string" or json == "" then
+    cb(false, "empty payload")
+    return
+  end
+  local port = vim.g.mdview_server_port or DEFAULT_PORT
+  local token = require("mdview.core.state").get_token() or ""
+  local url = string.format("http://localhost:%d/spotlight?token=%s", port, vim.uri_encode(token))
+  http_post_nonblocking(url, json, function(code, stdout_lines, stderr_lines)
+    if code == 0 and not stdout_lines then
+      cb(true, nil)
+      return
+    end
+    local detail = table.concat(stdout_lines or stderr_lines or { "curl exit " .. tostring(code) }, " "):sub(1, 200)
+    cb(false, detail)
+  end)
+end
+
 -- Public: ask every connected preview tab to close itself (the relay
 -- broadcasts a close signal to all rooms; the client calls window.close()).
 -- Used by :MDView stop so tabs opened in the OS default browser — which mdview

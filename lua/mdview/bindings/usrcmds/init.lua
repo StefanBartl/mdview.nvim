@@ -32,6 +32,7 @@ local breadcrumbs = require("mdview.bindings.usrcmds.breadcrumbs")
 local overlay = require("mdview.bindings.usrcmds.overlay")
 local blanklines = require("mdview.bindings.usrcmds.blanklines")
 local selection = require("mdview.bindings.usrcmds.selection")
+local spotlight = require("mdview.bindings.usrcmds.spotlight")
 local pin = require("mdview.bindings.usrcmds.pin")
 
 local M = {}
@@ -224,6 +225,15 @@ function M.attach()
       desc = "Mirror the visual selection (v/V/CTRL-V) into the preview, or stop mirroring; no argument toggles",
       run = function(ctx)
         selection.run(ctx.args.action)
+      end,
+    },
+
+    {
+      path = { "spotlight" },
+      args = { { name = "action", type = "STRING", optional = true, values = spotlight.actions } },
+      desc = "Mirror spotlight.nvim's highlights into the preview, or stop mirroring; no argument toggles",
+      run = function(ctx)
+        spotlight.run(ctx.args.action)
       end,
     },
 

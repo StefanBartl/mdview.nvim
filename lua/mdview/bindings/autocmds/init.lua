@@ -9,6 +9,7 @@ local buffer_switch = require("mdview.bindings.autocmds.buffer_switch")
 local vim_leave = require("mdview.bindings.autocmds.vim_leave")
 local scroll_sync = require("mdview.bindings.autocmds.scroll_sync")
 local selection_sync = require("mdview.bindings.autocmds.selection_sync")
+local spotlight_sync = require("mdview.bindings.autocmds.spotlight_sync")
 local breadcrumbs = require("mdview.bindings.autocmds.breadcrumbs")
 -- local on_text_change = require("mdview.bindings.autocmds.on_text_change")
 -- local bufwrite = require("mdview.bindings.autocmds.bufwrite")
@@ -32,6 +33,9 @@ function M.teardown()
   -- Drop the deduplication cache: the next session talks to a fresh tab that
   -- knows nothing about the selection this one last sent.
   pcall(require("mdview.bindings.autocmds.selection_sync").reset)
+  -- Same for the spotlight state: the next relay starts empty, so nothing may
+  -- be deduplicated against what this one was last sent.
+  pcall(require("mdview.bindings.autocmds.spotlight_sync").reset)
   pcall(require("mdview.adapter.inbound_poll").stop)
   -- live_push's trailing debounce timer (armed by a push inside the throttle
   -- window) otherwise survives teardown and fires after the session it was
@@ -66,6 +70,7 @@ function M.attach()
   live_push.attach(M.augroup_id) -- Live Markdown push (diffs + full push on write)
   scroll_sync.attach(M.augroup_id) -- nvim-to-browser scroll sync (config: scroll_sync)
   selection_sync.attach(M.augroup_id) -- visual selection mirrored into the preview (config: browser.selection_sync)
+  spotlight_sync.attach(M.augroup_id) -- spotlight.nvim's highlights mirrored into the preview (config: browser.spotlight_sync)
   breadcrumbs.attach(M.augroup_id) -- Session breadcrumbs (config: breadcrumbs); its BufEnter half goes through the hub
   vim_leave.attach(M.augroup_id) -- Stop server on VimLeave
 

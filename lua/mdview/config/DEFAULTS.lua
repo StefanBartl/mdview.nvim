@@ -38,6 +38,8 @@
 ---@field zoom number preview font-size zoom factor (1.0 = 100%, default); adjust at runtime with :MDView zoom, passed to the client as ?zoom= and pushed live
 ---@field overlays table<string, boolean> which preview overlays start enabled, e.g. { toc = false }; toggle at runtime with :MDView overlay, passed to the client as ?overlays= and pushed live
 ---@field selection_sync boolean mirror the Neovim visual selection (v / V / CTRL-V) into the preview as a highlight, live -- for showing a document to other people; off by default, switch it on for as long as you are presenting with `:MDView selection` (toggles), passed to the client as ?sel=1 and pushed live
+---@field spotlight_sync boolean mirror the spotlight.nvim highlights (whole-file spotlights) into the preview, in the same colors and live -- needs spotlight.nvim, a no-op without it; independent of spotlight.nvim's own persistence. On by default; set false to never send them to the relay/browser, or switch it for a running session with `:MDView spotlight`
+---@field spotlight_max_matches integer upper bound on the matches painted per spotlight in the preview (default 500), against a token that matches thousands of times in a large document; sent with the spotlight state
 ---@field preserve_blank_lines boolean show every blank line between blocks as extra vertical space instead of CommonMark's default (any run of blank lines collapses to one paragraph gap); off by default, toggle at runtime with `:MDView blanklines`, passed to the client as ?blanklines=1 and pushed live
 
 ---@class mdview.config.StartDefaults
@@ -236,6 +238,18 @@ return {
     -- things you are only operating on. Off costs nothing and bothers nobody,
     -- so there is no third state where the user has to disable it for good.
     selection_sync = false,
+    -- On by default: spotlight.nvim's highlights are the point of looking at
+    -- a log analysis or a case write-up in the preview, and without
+    -- spotlight.nvim installed the option does nothing at all. What it sends
+    -- is the spotlight texts and colors, to the loopback relay and the tabs
+    -- of this session -- never to anything else. It does not follow
+    -- spotlight.nvim's own persistence: a spotlight that is not persisted is
+    -- mirrored all the same, because it is on screen. Set false to keep
+    -- spotlights out of the preview (and out of what a shared screen shows).
+    spotlight_sync = true,
+    -- Per spotlight, in the browser. A token that matches 50 000 times in a
+    -- huge log would otherwise make every re-render paint 50 000 ranges.
+    spotlight_max_matches = 500,
   },
 
   start = {
