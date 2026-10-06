@@ -343,8 +343,10 @@ async function boot() {
   // blurred by default). Clicking one reveals/re-hides it; :MDViewReveal toggles
   // all at once (see applyControl).
   if (container) {
-    container.addEventListener('click', (ev) => {
-      const el = (ev.target as HTMLElement | null)?.closest?.('[data-private]') as HTMLElement | null;
+    container.addEventListener('click', ev => {
+      const el = (ev.target as HTMLElement | null)?.closest?.(
+        '[data-private]',
+      ) as HTMLElement | null;
       if (el && container.contains(el)) el.toggleAttribute('data-revealed');
     });
   }
@@ -377,11 +379,14 @@ async function boot() {
       const max = container.scrollHeight - container.clientHeight;
       const ratio = max > 0 ? container.scrollTop / max : 0;
       try {
-        void fetch(`/scrollback?token=${encodeURIComponent(token)}&key=${encodeURIComponent(key)}`, {
-          method: 'POST',
-          body: String(ratio),
-          keepalive: true,
-        });
+        void fetch(
+          `/scrollback?token=${encodeURIComponent(token)}&key=${encodeURIComponent(key)}`,
+          {
+            method: 'POST',
+            body: String(ratio),
+            keepalive: true,
+          },
+        );
       } catch {
         /* reverse scroll is best-effort */
       }
@@ -440,7 +445,12 @@ async function boot() {
       // plain-text document there's no data-sourcepos, so this is a no-op
       // (see cursorMarker.ts's pickScrollTarget fallback).
       if (lastCursorLine >= 0) {
-        updateCursorMarker(container, lastCursorLine, lastCursorCol >= 0 ? lastCursorCol : null, cursorMarkerMode);
+        updateCursorMarker(
+          container,
+          lastCursorLine,
+          lastCursorCol >= 0 ? lastCursorCol : null,
+          cursorMarkerMode,
+        );
       }
       // Same for the visual-selection mirror: the render wiped its layer, and
       // the selection it draws is still the current one.
@@ -638,7 +648,12 @@ async function boot() {
       if (Number.isFinite(cursorLine)) {
         lastCursorLine = cursorLine;
         lastCursorCol = Number.isFinite(cursorCol) ? cursorCol : -1;
-        updateCursorMarker(container, cursorLine, lastCursorCol >= 0 ? lastCursorCol : null, cursorMarkerMode);
+        updateCursorMarker(
+          container,
+          cursorLine,
+          lastCursorCol >= 0 ? lastCursorCol : null,
+          cursorMarkerMode,
+        );
         notifyOverlayCursor(cursorLine, lastCursorCol >= 0 ? lastCursorCol : 0);
       }
       // The scrollTop we just set fires a 'scroll' event; suppress reverse-scroll
