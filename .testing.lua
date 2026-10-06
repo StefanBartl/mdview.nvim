@@ -25,4 +25,24 @@ return {
   assertions = "warn",
   -- Environment variables the specs read; a child editor inherits an allowlist only (never secrets).
   env_allow = { "LIB_NVIM_PATH" },
+  -- Guards (safety nets around each case, see testing.nvim's docs/GUARDS.md). The suite passes
+  -- the fs, prompt, deprecation and scheduled-error guards cleanly, so those fail the case.
+  guards = {
+    fs = "error",
+    prompt = "error",
+    deprecation = "error",
+    scheduled_error = "error",
+    -- The process guard is on: the plugin shells out to curl (see guard_allow.spawn).
+    process_net = "error",
+    -- Still warn: buffer_switch_spec and pin_spec leave a running `curl -X POST` job to a server
+    -- nobody started (real leak of the specs), and several specs leave scratch buffers, windows,
+    -- tab pages and plugin autocmd groups behind (harmless under isolated = "file", but named).
+    state = "warn",
+  },
+  -- What the specs may do on purpose.
+  guard_allow = {
+    -- ws_client pushes buffer content with `curl -X POST` to the local relay; the specs exercise
+    -- that transport against a port without a server, so the spawn is the behavior under test.
+    spawn = { "curl" },
+  },
 }
