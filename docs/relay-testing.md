@@ -27,6 +27,7 @@ All functional endpoints are **token-gated** (`?token=<session>`), except
 | POST   | `/update`    | token + `key`  | The raw text of a document to all tabs of the `key`|
 | POST   | `/scroll`    | token + `key`  | Scroll ping `"<line>/<total>"` (ephemeral)         |
 | POST   | `/clientlog` | token          | Browser diagnostics → stdout `[client] …`          |
+| POST   | `/spotlight` | token          | spotlight.nvim's highlights + colors as JSON, to every tab; the latest is stored and seeds joining tabs |
 | GET    | `/ws`        | token + `key` + Origin | WebSocket upgrade, one room per `key`      |
 | GET    | `/`          | —              | The static client bundle (HTML/JS/WASM)            |
 
@@ -93,7 +94,25 @@ console.log("location", location.href);          // key/token/theme in the URL?
 new WebSocket(`ws://${location.host}/ws${location.search}`); // readyState === 1 ?
 ```
 
-## 5) WebSocket room isolation
+## 5) The spotlight mirror (`/spotlight`)
+
+Unlike the room-scoped endpoints, `/spotlight` takes no `key`: the state it
+carries is the editor's (spotlight.nvim's whole-file highlights and their
+colors) and goes to **every** tab. The relay keeps the latest one and sends it
+to each tab that joins afterwards, so a reloaded tab shows the highlights at
+once.
+
+```sh
+curl -sS -o /dev/null -w "%{http_code}\n" -X POST "http://localhost:45999/spotlight?token=testtok123" \
+  --data '{"type":"spotlight","items":[{"text":"token","slot":1,"line":false,"kind":"literal","ignoreCase":false}],"colors":[],"max":500}'
+# expected: 204; every open tab marks "token" in the rendered document
+```
+
+A wrong/missing token ⇒ **403**, a body over 256 KiB ⇒ **413**. A relay older
+than the route answers its static file server's `404 page not found`, which is
+how the Lua side recognises one that needs updating.
+
+## 6) WebSocket room isolation
 
 Two clients with different `key`s must **not** see each other.
 `go test ./...` in `native/server/internal/relay` covers that automatically
@@ -105,7 +124,7 @@ websocat "ws://localhost:45999/ws?token=testtok123&key=test1" \
 # without a valid Origin header -> "forbidden origin" (DNS rebinding protection)
 ```
 
-## 6) A headless smoke test of the Lua side
+## 7) A headless smoke test of the Lua side
 
 Close to what CI runs, with `lib.nvim` put on the runtimepath by hand:
 
@@ -115,7 +134,7 @@ nvim --headless -u NONE -i NONE \
   -c "luafile TESTS/lua/smoke_spec.lua" -c "qa!"
 ```
 
-## 7) Cleaning up / port occupied
+## 8) Cleaning up / port occupied
 
 ```sh
 # Windows (PowerShell)

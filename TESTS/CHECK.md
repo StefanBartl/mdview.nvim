@@ -163,3 +163,30 @@ original decision table, kept for re-runs:
 - Case 1 or 2 fails -> client-side, `languageForPath.ts` / the scroll bridge.
 - Case 3 or 4 fails -> `helper/previewable.lua` or `core/breadcrumbs.lua`.
 - Case 5 fails -> `config/init.lua`'s `ft_pattern` override leaked.
+
+---
+
+## Spotlight mirror (`browser.spotlight_sync`) — manual check
+
+What the specs cannot see: real colors on a real screen, and the latency.
+Needs spotlight.nvim and a relay built from this tree (`dev.binary_path`,
+`dev.web_root`). Open a Markdown file whose text contains a token several times
+(in a paragraph, in `inline code`, in a fenced block, in a table cell).
+
+1. `:MDView start`, then put the cursor on the token and run `:Spotlight toggle`
+   → every occurrence is marked in the browser within about a second, in the
+   same color as in Neovim; a different-case spelling of the token is **not**.
+2. Visual-select part of a word and toggle it → substrings inside longer words
+   are marked too (no word boundaries). Toggle a plain word → only whole words.
+3. Edit the buffer so the preview re-renders → the marks are still there.
+4. Remove the spotlight, `:Spotlight clear`, `:Spotlight sets switch` → the
+   preview follows each; the last one in a single update, without flicker.
+5. `:colorscheme <other>` and `:set background=light` → the colors in the
+   browser change with Neovim's.
+6. Reload the browser tab → the marks are there again at once.
+7. `:MDView spotlight off` → the marks disappear from the open tab; `on` brings
+   them back. With `browser.spotlight_sync = false` nothing is ever marked.
+8. A token that occurs more than `browser.spotlight_max_matches` times → only
+   that many are marked, and `:MDView weblogs` says one was capped.
+9. Without spotlight.nvim installed: `:MDView start` and everything else work,
+   no error anywhere, `:checkhealth mdview` notes it as an optional companion.

@@ -43,6 +43,16 @@ reloaded tab would show the content unhighlighted until the next edit arrived.
 See [FEATURES/RENDERING.md](FEATURES/RENDERING.md#nvim--the-buffers-own-colors)
 and [FEATURES/PREVIEW.md](FEATURES/PREVIEW.md#visual-selection-mirror).
 
+`/spotlight` is the second stored sidecar and the only one that belongs to no
+document: it carries spotlight.nvim's whole-file highlights and their colors
+(one JSON object, capped at 256 KiB), which are the *editor's* and apply to
+whatever each tab is showing. So it takes no room key, is broadcast to every tab
+(`\x07`-prefixed), and the relay keeps the latest one to seed any tab that joins
+or reloads — without that, a reloaded preview would show no highlights until
+the next change in Neovim. The relay stores and forwards it without looking
+inside, like `/spans`. See
+[FEATURES/PREVIEW.md](FEATURES/PREVIEW.md#spotlight-mirror).
+
 ## Local image assets
 
 The WASM renderer produces correct `<img>` markup for `![alt](path)` on its

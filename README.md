@@ -43,10 +43,20 @@ Rust/WASM module with sanitization built in — no toolchain needed to run it.
 > sides show the same thing instead of two highlighters guessing the language
 > separately. Blocks it does not paint fall through to highlight.js.
 >
+> **[spotlight.nvim](https://github.com/StefanBartl/spotlight.nvim)** —
+> color-marks tokens in the buffer (a customer id, an error code in a log
+> analysis). mdview mirrors those whole-file highlights into the preview, in the
+> same colors and live, so what you marked is marked in the document you share or
+> read back. On by default and a no-op without spotlight.nvim; independent of
+> spotlight.nvim's own persistence, so **if a shared screen or a tab left open must
+> not show what you marked, switch it off** with `browser.spotlight_sync = false`
+> or `:MDView spotlight off`. It needs a relay newer than `v0.3.0` (see
+> [Preview](docs/FEATURES/PREVIEW.md#spotlight-mirror)).
+>
 > **[documentation.nvim](https://github.com/StefanBartl/documentation.nvim)** —
 > holds the ecosystem architecture this plugin is the presentation half of.
 >
-> Both companions are soft: mdview never loads them, and `:checkhealth mdview`
+> The companions are soft: mdview never loads them, and `:checkhealth mdview`
 > only notes when they are present.
 > [lib.nvim](https://github.com/StefanBartl/lib.nvim) is the one real plugin
 > dependency — see [Requirements](docs/installation.md#requirements).

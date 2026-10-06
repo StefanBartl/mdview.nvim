@@ -21,5 +21,15 @@ buffer text to the browser, which re-renders it. A useful consequence —
   it, `"nvim"` simply has nothing to send and every block falls through. See
   [RENDERING.md](FEATURES/RENDERING.md#nvim--the-buffers-own-colors).
 
-Neither is required, and mdview never loads them; `:checkhealth mdview` just
+- **[spotlight.nvim](https://github.com/StefanBartl/spotlight.nvim)** —
+  color-marks tokens in the buffer (a customer id, an error code in a log
+  analysis). mdview mirrors its whole-file spotlights into the preview, in the
+  same colors and live: spotlight.nvim announces every change as
+  `User SpotlightChanged`, mdview re-reads `require("spotlight").spotlights()`
+  and `colors()` and paints the same tokens in the rendered document. On by
+  default, a no-op without spotlight.nvim (it is looked up, never required),
+  and switchable with `browser.spotlight_sync` / `:MDView spotlight`. See
+  [PREVIEW.md](FEATURES/PREVIEW.md#spotlight-mirror).
+
+None is required, and mdview never loads them; `:checkhealth mdview` just
 notes when they're present.

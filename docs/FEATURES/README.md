@@ -37,6 +37,9 @@ In detail in [`PREVIEW.md`](PREVIEW.md).
 - **Visual selection mirror** — what you select with `v`/`V`/`CTRL-V` is
   highlighted in the preview, for showing a document to other people. Off
   while you edit; `:MDView selection` toggles it.
+- **Spotlight mirror** — spotlight.nvim's whole-file highlights are painted
+  into the preview in the same colors, live; a no-op without spotlight.nvim.
+  `:MDView spotlight` or `browser.spotlight_sync = false` switches it off.
 - **Document pinning** — `:MDView pin` holds the preview on one document while
   you read around in other buffers, instead of the tab following every buffer
   switch.

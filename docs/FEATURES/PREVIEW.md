@@ -113,6 +113,68 @@ rather than guessed at.
 - **Usercmds:** `:MDView selection [on|off|toggle]` (no argument toggles)
 - **Config:** `browser.selection_sync` (default `false`), passed to the client as `?sel=1` when on
 
+## Spotlight mirror
+
+The highlights you set with [spotlight.nvim](https://github.com/StefanBartl/spotlight.nvim)
+show up in the preview too: mark `SYSsystosca` or `400 (Bad Request)` in Neovim
+and every occurrence in the rendered document is marked in the browser, in the
+same color, within about a second. It exists for the document you share or read
+back — a log analysis full of code blocks, a case write-up — where the markers
+you made while working would otherwise stay behind in the editor.
+
+What is mirrored is spotlight.nvim's **whole-file** spotlights (`toggle`/`add`,
+every occurrence). "This occurrence only" spotlights (`toggle_here`) are pinned
+to a buffer position, which the rendered document has no counterpart for, and
+are left out.
+
+The search follows Neovim's rules, not the browser's: the text is matched
+**literally** (never as a regex) and **case-sensitively** (unless that spotlight
+was created with `ignore_case`); a spotlight made from a visual selection matches
+any **substring**, one made from a word only **between word boundaries**. It
+looks through everything the preview renders as text — paragraphs, headings,
+lists, tables, inline `<code>` and `<pre>` blocks, including a token a code
+highlighter has split across several `<span>`s — but never across two blocks and
+never inside `<script>`, `<style>` or a form field. A spotlight in **line mode**
+tints the whole line (inside a `<pre>`) or block around its matches, more softly
+than the match itself, which is drawn on top. Where two spotlights overlap, the
+higher color slot wins.
+
+Colors come from Neovim, not from the preview's theme: the eight slots
+(`Spotlight1..8`) are read from the live highlight groups, so a colorscheme or
+`'background'` switch changes them in the browser as well. A **re-render** (every
+buffer change) repaints the highlights, as do removing a spotlight, `clear` and
+switching spotlight sets.
+
+It is painted with the CSS Custom Highlight API where the browser has it, which
+leaves the document's DOM exactly as rendered; elsewhere matches are wrapped in
+`<mark class="spotlight spotlight-N">`. At most `browser.spotlight_max_matches`
+matches (default 500) are painted per spotlight, so a token that occurs fifty
+thousand times in a log cannot make every render slow; a spotlight that hit the
+limit is reported in `:MDView weblogs`.
+
+**On by default, and a no-op without spotlight.nvim.** The mirror is independent
+of spotlight.nvim's own persistence: a spotlight that is not persisted for the
+file is mirrored all the same, because it is on screen. What leaves Neovim is the
+spotlight *texts* and colors, to the loopback relay and the preview tabs of this
+session — but if a shared screen or a tab left open must not show what you
+marked, switch it off: `browser.spotlight_sync = false`, or `:MDView spotlight
+off` for the running session (which also removes the highlights already shown).
+
+How it travels: spotlight.nvim fires a coalesced `User SpotlightChanged`;
+mdview re-reads `require("spotlight").spotlights()` and `colors()`, debounces,
+and POSTs one JSON object — only when it differs from what the relay already
+has — to the relay's `/spotlight` route. The relay broadcasts it to every tab
+(`\x07`-prefixed) and keeps the latest, so a tab that is opened or reloaded
+later is seeded with the current highlights straight away. This needs a relay
+newer than `install.version`'s `v0.3.0` pin — until the next release, point
+`dev.binary_path`/`dev.web_root` at a local build; a relay that does not know the
+route is reported once.
+
+- **Module:** `lua/mdview/bindings/autocmds/spotlight_sync.lua`, `lua/mdview/core/spotlight_mirror.lua`, `lua/mdview/adapter/ws_client.lua` (`send_spotlight`), `native/server/main.go` (`handleSpotlight`), `src/client/render/spotlightMirror.ts`
+- **Usercmds:** `:MDView spotlight [on|off|toggle]` (no argument toggles)
+- **Config:** `browser.spotlight_sync` (default `true`), `browser.spotlight_max_matches` (default `500`)
+
+
 ## Scroll sync pause/resume
 
 `:MDView sync [pause|resume|toggle]` freezes the nvim→browser scroll sync

@@ -142,6 +142,8 @@ Defaults: >lua
       external_links      = "new_tab", -- external links: "new_tab" | "same_tab"
       cursor_marker       = "line",    -- "line"|"caret"|"section"|"off"
       selection_sync      = false,     -- mirror the visual selection (v/V/C-v)
+      spotlight_sync      = true,      -- mirror spotlight.nvim's highlights
+      spotlight_max_matches = 500,     -- matches painted per spotlight
       zoom                = 1.0,       -- preview font-size zoom (:MDView zoom)
       overlays            = {          -- preview overlays (:MDView overlay)
         toc = false,                   -- floating outline, current section lit
@@ -346,6 +348,31 @@ browser.selection_sync ~
   spans and are located by their own line structure instead.
   Switch it off with |:MDView-selection|, which also clears a highlight that
   is currently drawn.
+
+browser.spotlight_sync ~
+  Mirror spotlight.nvim's whole-file highlights into the preview: a token you
+  mark in Neovim is marked in every occurrence in the rendered document, in the
+  same color, within about a second, and a re-render, removing a spotlight,
+  `clear`, switching spotlight sets and a colorscheme change all update it.
+  Default: `true`. A no-op without spotlight.nvim (it is looked up, never
+  required), and independent of spotlight.nvim's own persistence: a spotlight
+  that is not persisted is on screen, so it is mirrored. What leaves Neovim is
+  the spotlight texts and colors, to the loopback relay and this session's
+  tabs — set `false`, or use |:MDView-spotlight|, when a shared screen or a
+  tab left open must not show what you marked.
+  Only whole-file spotlights (`toggle`, `add`) are mirrored; "this occurrence
+  only" ones are pinned to a buffer position the rendered document has no
+  counterpart for. The text is matched literally and case-sensitively (unless
+  the spotlight ignores case); a spotlight made from a visual selection matches
+  any substring, one made from a word only between word boundaries. Needs a
+  relay newer than the `v0.3.0` that `install.version` pins (the `/spotlight`
+  route): point `dev.binary_path` and `dev.web_root` at a local build until
+  the next release.
+
+browser.spotlight_max_matches ~
+  Most matches painted per spotlight in the preview (default `500`), so a token
+  that occurs thousands of times in a large document stays cheap to render. A
+  spotlight that hit the limit is reported in |:MDView-weblogs|.
 
 browser.zoom ~
   Preview font-size zoom factor (`1.0` = 100%, the default). |:MDView-start|
@@ -607,6 +634,13 @@ pushes a control update over the socket.
   off clears a highlight that is drawn right now, instead of leaving it
   stranded in the tab.
 
+:MDView spotlight [action]                                *:MDView-spotlight*
+  Switches the spotlight.nvim mirror on/off (`on`|`off`|`toggle`; no argument
+  toggles) — see `browser.spotlight_sync` above. On by default, and a no-op
+  without spotlight.nvim. Switching it on sends the spotlights that are active
+  right now; switching it off sends an empty state, so the highlights already
+  shown in the open tabs disappear instead of staying behind.
+
 :MDView sync [action]                                          *:MDView-sync*
   Pauses/resumes the nvim->browser scroll sync (`pause`|`resume`|`toggle`).
   While paused, moving the cursor no longer scrolls the preview or moves its
@@ -701,6 +735,11 @@ breadcrumbs) share one autocmd, `bindings/autocmds/enter_hub.lua`.
   TextChanged, TextChangedI        Push the full current buffer content to
                                    the relay for live preview.
   BufWritePost                    Same full push, triggered on save.
+  User SpotlightChanged,           Re-read spotlight.nvim's whole-file
+  ColorScheme, OptionSet            spotlights and palette (debounced) and send
+  background                        them to the relay when they changed, so
+                                   the preview paints the same highlights;
+                                   gated behind `browser.spotlight_sync`.
   CursorMoved, CursorMovedI         Send cursor line + total lines to the
                                    relay (throttled) so the browser preview
                                    scrolls to follow. nvim-to-browser only;
