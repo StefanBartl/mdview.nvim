@@ -184,3 +184,52 @@ func TestWatch_StopsWhenStopChannelClosed(t *testing.T) {
 		t.Fatal("Watch did not return after stop was closed")
 	}
 }
+
+// A truncate-then-write save is visible as an empty file for a moment; that
+// empty read must be held back like any other unconfirmed change, and an
+// intentionally empty file must still be broadcast once it is stable.
+func TestWatch_EmptyFileIsDebouncedButStillBroadcastWhenStable(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "doc.md")
+	if err := os.WriteFile(path, []byte("full"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	b := &fakeBroadcaster{}
+	stop := make(chan struct{})
+	defer close(stop)
+	go Watch(b, "room", path, 40*time.Millisecond, stop)
+
+	if !waitFor(t, func() bool { _, p := b.snapshot(); return len(p) >= 1 }) {
+		t.Fatal("initial broadcast never arrived")
+	}
+	// Transient empty state, replaced before the next poll can confirm it.
+	if err := os.WriteFile(path, nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte("full2"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if !waitFor(t, func() bool {
+		_, p := b.snapshot()
+		return len(p) >= 2 && string(p[len(p)-1]) == "full2"
+	}) {
+		t.Fatal("expected the final content to be broadcast")
+	}
+	for _, p := range func() [][]byte { _, p := b.snapshot(); return p }() {
+		if len(p) == 0 {
+			t.Fatal("a transient empty file was broadcast")
+		}
+	}
+
+	// A deliberately emptied file that stays empty is real content.
+	if err := os.WriteFile(path, nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if !waitFor(t, func() bool {
+		_, p := b.snapshot()
+		return len(p) >= 3 && len(p[len(p)-1]) == 0
+	}) {
+		t.Fatal("a stable empty file was never broadcast")
+	}
+}

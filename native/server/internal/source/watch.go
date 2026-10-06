@@ -38,6 +38,9 @@ const maxFileBytes = 32 << 20
 // change, until stop is closed. It broadcasts once immediately so a browser tab
 // that connects before the first change still gets content.
 //
+// A change therefore reaches the browser after two polls (about 500 ms at the
+// default interval); the first read is broadcast immediately.
+//
 // A read error is reported once and then retried silently: the common cause is
 // an editor writing via a temp file and renaming over the target, during which
 // the path is briefly absent. Treating that as fatal would kill a standalone
@@ -48,7 +51,9 @@ func Watch(b Broadcaster, key, path string, interval time.Duration, stop <-chan 
 	}
 
 	var last, pending []byte
-	var reportedErr bool
+	// hasPending is separate from pending == nil because an empty file reads
+	// as an empty non-nil slice and must still count as a candidate.
+	var hasPending, reportedErr bool
 
 	read := func() {
 		content, err := readCapped(path)
@@ -67,18 +72,18 @@ func Watch(b Broadcaster, key, path string, interval time.Duration, stop <-chan 
 		// some filesystems that two saves within the same tick would look
 		// identical, and a no-op save shouldn't cost a full re-render.
 		if last != nil && bytes.Equal(last, content) {
-			pending = nil
+			pending, hasPending = nil, false
 			return
 		}
 		// A change is broadcast only once it reads the same on two polls in a
 		// row. A non-atomic save (truncate, then write) is visible mid-way as
 		// an empty or partial file; broadcasting that would flash an empty
 		// preview and re-render the real content a tick later.
-		if last != nil && !bytes.Equal(pending, content) {
-			pending = content
+		if last != nil && !(hasPending && bytes.Equal(pending, content)) {
+			pending, hasPending = content, true
 			return
 		}
-		pending = nil
+		pending, hasPending = nil, false
 		last = content
 		b.Broadcast(key, content)
 	}
