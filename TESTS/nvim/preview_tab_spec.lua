@@ -171,6 +171,27 @@ describe("preview_tab.handle_displacement", function()
     assert.is_false(preview_tab.is_open(source))
   end)
 
+  it("keeps the preview when the takeover is undone before the deferred close runs", function()
+    preview_tab.open(source)
+    local preview_buf = vim.api.nvim_get_current_buf()
+    local preview_win = vim.api.nvim_get_current_win()
+
+    -- A split that is opened and closed again within the same tick: the
+    -- BufEnter in between schedules a close, but by the time it runs focus
+    -- is back on the preview, so it must stay.
+    vim.cmd("new")
+    local split_win = vim.api.nvim_get_current_win()
+    preview_tab.handle_displacement()
+    vim.api.nvim_win_close(split_win, true)
+    assert.are.equal(preview_win, vim.api.nvim_get_current_win())
+
+    vim.wait(100)
+
+    assert.is_true(preview_tab.is_open(source))
+    assert.is_true(vim.api.nvim_buf_is_valid(preview_buf))
+    preview_tab.close(source)
+  end)
+
   it("does nothing when focus is already on the preview buffer itself", function()
     preview_tab.open(source)
     local preview_buf = vim.api.nvim_get_current_buf()

@@ -112,6 +112,25 @@ function M.close(bufnr)
   end
 end
 
+--- Whether the preview in `preview_bufnr` is still registered and no longer
+--- the buffer shown by the current window of its tabpage (so something else
+--- really is in front of it). A vanished tabpage counts as displaced; a
+--- preview that was already closed does not.
+---@internal
+---@param preview_bufnr integer
+---@return boolean
+local function still_displaced(preview_bufnr)
+  if not preview_to_source[preview_bufnr] then
+    return false
+  end
+  local tab = preview_tabpage[preview_bufnr]
+  if not tab or not api.nvim_tabpage_is_valid(tab) then
+    return true
+  end
+  local win = api.nvim_tabpage_get_win(tab)
+  return api.nvim_win_get_buf(win) ~= preview_bufnr
+end
+
 --- Close any preview whose tab has been taken over by something that isn't
 --- the preview buffer itself — a file explorer (neo-tree/NvimTree/oil/netrw)
 --- or a real file opened with `:e`. Called from the preview-tab autocmd
@@ -129,9 +148,14 @@ function M.handle_displacement()
     if preview_tabpage[preview_bufnr] == cur_tab then
       -- Something other than the preview is now active in the preview's
       -- tab. Defer the close so we don't tear windows down in the middle
-      -- of whatever autocmd (e.g. neo-tree opening) triggered this.
+      -- of whatever autocmd (e.g. neo-tree opening) triggered this. The
+      -- takeover is re-checked when the deferred call runs: a split or float
+      -- that was already closed again (focus is back on the preview) must not
+      -- cost the user the preview.
       vim.schedule(function()
-        M.close(source_bufnr)
+        if still_displaced(preview_bufnr) then
+          M.close(source_bufnr)
+        end
       end)
     end
   end
