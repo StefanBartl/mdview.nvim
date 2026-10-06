@@ -46,15 +46,24 @@ describe("mdview.core.mirror guard", function()
   it("mirror.lines returns the buffer text as a fresh table", function()
     local mirror = require("mdview.core.mirror")
     local buf = vim.api.nvim_create_buf(false, true)
-    vim.api.nvim_buf_set_lines(buf, 0, -1, false, { "a", "b" })
-    local got = mirror.lines(buf)
-    assert.are.same({ "a", "b" }, got)
-    got[1] = "x"
-    assert.are.same({ "a", "b" }, mirror.lines(buf))
-    local seen
-    mirror.lines_async(buf, function(l)
-      seen = l
+    -- A failing assertion must not leave the scratch buffer behind: the state
+    -- guard names every leak, and leaks keep that guard from being promoted
+    -- from "warn" to "error".
+    local ok, err = pcall(function()
+      vim.api.nvim_buf_set_lines(buf, 0, -1, false, { "a", "b" })
+      local got = mirror.lines(buf)
+      assert.are.same({ "a", "b" }, got)
+      got[1] = "x"
+      assert.are.same({ "a", "b" }, mirror.lines(buf))
+      local seen
+      mirror.lines_async(buf, function(l)
+        seen = l
+      end)
+      assert.are.same({ "a", "b" }, seen)
     end)
-    assert.are.same({ "a", "b" }, seen)
+    pcall(vim.api.nvim_buf_delete, buf, { force = true })
+    if not ok then
+      error(err, 0)
+    end
   end)
 end)
