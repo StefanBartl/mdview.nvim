@@ -30,6 +30,8 @@
 --- transform that cannot answer synchronously. For now it calls back at once
 --- with the synchronous result, so callers can already be written against it.
 
+local normkey = require("lib.nvim.fs.normkey")
+
 local api = vim.api
 
 local M = {}
@@ -64,20 +66,79 @@ function M.lines(bufnr)
   return read_disk(api.nvim_buf_get_name(bufnr))
 end
 
+--- The last path component in lower case, whichever separator precedes it. A
+--- cheap superset test: two spellings of one file end in the same component, so
+--- a buffer that fails it need not be looked at any closer.
+---@internal
+---@param name string
+---@return string
+local function tail_of(name)
+  return (name:match("[^/\\]*$"):lower())
+end
+
+--- Comparison key of an absolute file name: one separator style, a Windows
+--- drive letter in one case, symlinks and 8.3 short names resolved; the case of
+--- the name does not count when the editor ignores it for file names.
+---@internal
+---@param abs string
+---@return string
+local function key_of(abs)
+  local key = normkey(abs)
+  if vim.o.fileignorecase then
+    key = key:lower()
+  end
+  return key
+end
+
+--- The loaded buffer that has exactly the file `abs` open, or nil. Compares
+--- names, never patterns: `vim.fn.bufnr()` reads its argument as a file pattern
+--- that also matches inside a buffer name (`a.md` finds `other/a.md`, `xa.md`,
+--- `a.md.bak`), and `[ { ~ * ? % #` in a file name are pattern syntax (`%` is
+--- the current buffer). A buffer that is not loaded does not count: it has no
+--- text of its own, its file on disk is the answer.
+---@internal
+---@param abs string # absolute, as `fnamemodify(path, ":p")` makes it
+---@return integer|nil bufnr
+local function loaded_buffer_of(abs)
+  local tail = tail_of(abs)
+  if tail == "" then
+    return nil -- a directory
+  end
+  local key
+  for _, buf in ipairs(api.nvim_list_bufs()) do
+    if api.nvim_buf_is_loaded(buf) then
+      local name = api.nvim_buf_get_name(buf)
+      if name ~= "" and tail_of(name) == tail then
+        key = key or key_of(abs)
+        if key_of(name) == key then
+          return buf
+        end
+      end
+    end
+  end
+  return nil
+end
+
 --- Text of the document at `path` as the preview should show it: the buffer
---- that has the file open (unsaved edits included) when there is one, otherwise
---- the file on disk. `{}` when the path is neither. Always a fresh table.
+--- that has exactly this file open (unsaved edits included) when there is one,
+--- otherwise the file on disk. `{}` when the path is neither. Always a fresh
+--- table. A relative `path` is relative to the cwd, as `:MDView start a.md`
+--- passes it on as typed.
 ---@param path string
 ---@return string[] lines
 function M.lines_for_path(path)
   if type(path) ~= "string" or path == "" then
     return {}
   end
-  local bufnr = vim.fn.bufnr(path, false)
-  if bufnr ~= -1 then
+  local ok, abs = pcall(vim.fn.fnamemodify, path, ":p")
+  if not ok or type(abs) ~= "string" or abs == "" then
+    return {}
+  end
+  local bufnr = loaded_buffer_of(abs)
+  if bufnr then
     return M.lines(bufnr)
   end
-  return read_disk(path)
+  return read_disk(abs)
 end
 
 --- Asynchronous variant (placeholder for transforms that need time).
