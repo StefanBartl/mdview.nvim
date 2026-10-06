@@ -239,3 +239,43 @@ func TestRegistry_SetDocDirOverwritesOnDocumentSwitch(t *testing.T) {
 		t.Fatalf("expected the later SetDocDir to win, got %q (ok=%v)", dir, ok)
 	}
 }
+
+// The spotlight state belongs to the editor, not to a document: it reaches
+// every room, and a tab that joins later is seeded with the latest one.
+func TestRegistry_BroadcastSpotlightReachesEveryRoom(t *testing.T) {
+	r := NewRegistry()
+	a := &fakeConn{}
+	b := &fakeConn{}
+	r.Join("/doc/a.md", a)
+	r.Join("/doc/b.md", b)
+
+	r.BroadcastSpotlight([]byte("state"))
+
+	if len(a.received) != 1 || string(a.received[0]) != "state" {
+		t.Fatalf("expected room a to receive the state, got %q", a.received)
+	}
+	if len(b.received) != 1 || string(b.received[0]) != "state" {
+		t.Fatalf("expected room b to receive the state, got %q", b.received)
+	}
+}
+
+func TestRegistry_BroadcastSpotlightIsStoredAndKeepsOnlyTheLatest(t *testing.T) {
+	r := NewRegistry()
+
+	if _, ok := r.LastSpotlight(); ok {
+		t.Fatalf("expected no spotlight state before any broadcast")
+	}
+
+	r.Broadcast("/doc/a.md", []byte("content"))
+	r.BroadcastSpotlight([]byte("first"))
+	r.BroadcastSpotlight([]byte("second"))
+
+	state, ok := r.LastSpotlight()
+	if !ok || string(state) != "second" {
+		t.Fatalf("expected the latest state %q, got %q (ok=%v)", "second", state, ok)
+	}
+	content, ok := r.LastPayload("/doc/a.md")
+	if !ok || string(content) != "content" {
+		t.Fatalf("BroadcastSpotlight must not touch the content; got %q (ok=%v)", content, ok)
+	}
+}

@@ -15,11 +15,12 @@ type Conn interface {
 // is what keeps multiple open files from cross-contaminating each other's
 // preview tab.
 type Registry struct {
-	mu      sync.Mutex
-	rooms   map[string]map[Conn]struct{}
-	last    map[string][]byte
-	spans   map[string][]byte
-	docDirs map[string]string
+	mu        sync.Mutex
+	rooms     map[string]map[Conn]struct{}
+	last      map[string][]byte
+	spans     map[string][]byte
+	spotlight []byte
+	docDirs   map[string]string
 }
 
 func NewRegistry() *Registry {
@@ -97,6 +98,34 @@ func (r *Registry) BroadcastSpans(key string, payload []byte) []error {
 	r.mu.Lock()
 	r.spans[key] = payload
 	conns := r.connsForLocked(key)
+	r.mu.Unlock()
+
+	return sendAll(conns, payload)
+}
+
+// LastSpotlight returns the most recently broadcast spotlight-mirror state, if
+// any. It is global rather than per room: the spotlights are Neovim's, and mark
+// the same tokens in whatever document a tab happens to show.
+func (r *Registry) LastSpotlight() ([]byte, bool) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.spotlight, r.spotlight != nil
+}
+
+// BroadcastSpotlight stores payload as the latest spotlight-mirror state and
+// sends it to every connection in every room.
+//
+// Stored (a joining or reloading tab is seeded with it, so the highlights are
+// there at once instead of after the next change in Neovim) and global (see
+// LastSpotlight) -- the one state in the relay that belongs to no document.
+// The relay never inspects the payload, it only forwards and remembers it.
+func (r *Registry) BroadcastSpotlight(payload []byte) []error {
+	r.mu.Lock()
+	r.spotlight = payload
+	var conns []Conn
+	for key := range r.rooms {
+		conns = append(conns, r.connsForLocked(key)...)
+	}
 	r.mu.Unlock()
 
 	return sendAll(conns, payload)

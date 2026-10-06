@@ -97,6 +97,12 @@ func handleWebTransport(server *webtransport.Server, registry *relay.Registry, t
 			}
 		}
 
+		if payload, ok := registry.LastSpotlight(); ok {
+			if err := conn.Send(payload); err != nil {
+				return
+			}
+		}
+
 		// Stay until the client disconnects; broadcasts are pushed via conn.Send.
 		<-ctx.Done()
 	}

@@ -63,6 +63,11 @@ const controlMessagePrefix = "\x05"
 // SPANS_MESSAGE_PREFIX.
 const spansMessagePrefix = "\x06"
 
+// Tags a WS message as the spotlight-mirror state (JSON: the spotlight.nvim
+// highlights to paint in the preview, plus their colors). Must match
+// src/client/main.ts's SPOTLIGHT_MESSAGE_PREFIX.
+const spotlightMessagePrefix = "\x07"
+
 // wsConn adapts a *websocket.Conn to relay.Conn so relay.Registry stays
 // decoupled from the WebSocket library and can be tested without a network.
 type wsConn struct {
@@ -144,6 +149,7 @@ func main() {
 	mux.HandleFunc("/control", handleControl(registry, *token))
 	mux.HandleFunc("/diff", handleDiff(registry, *token))
 	mux.HandleFunc("/spans", handleSpans(registry, *token))
+	mux.HandleFunc("/spotlight", handleSpotlight(registry, *token))
 	mux.HandleFunc("/close", handleClose(registry, *token))
 	mux.HandleFunc("/nav", handleNav(navQueue, *token))
 	mux.HandleFunc("/toggle", handleToggle(toggleQueue, watchKey, watchPath, *token))
@@ -631,6 +637,41 @@ func handleSpans(registry *relay.Registry, token string) http.HandlerFunc {
 	}
 }
 
+const maxSpotlightBodyBytes = 256 << 10 // a list of short tokens plus eight colors
+
+// handleSpotlight fans the spotlight-mirror state (the spotlight.nvim
+// highlights and their colors, as one JSON object) out to every tab and stores
+// it as the latest. Powers the mirroring of Neovim's spotlights into the
+// preview.
+//
+// Unlike /spans it takes no key: the spotlights belong to the editor, not to a
+// document, and apply to whatever each tab is showing. Stored, like /spans, so
+// a tab that joins or reloads is seeded with the current state. The relay never
+// inspects the payload.
+func handleSpotlight(registry *relay.Registry, token string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		if !relay.ValidToken(token, r.URL.Query().Get("token")) {
+			http.Error(w, "forbidden", http.StatusForbidden)
+			return
+		}
+		body, err := io.ReadAll(io.LimitReader(r.Body, maxSpotlightBodyBytes+1))
+		if err != nil {
+			http.Error(w, "failed to read body", http.StatusBadRequest)
+			return
+		}
+		if len(body) > maxSpotlightBodyBytes {
+			http.Error(w, "payload too large", http.StatusRequestEntityTooLarge)
+			return
+		}
+		registry.BroadcastSpotlight(append([]byte(spotlightMessagePrefix), body...))
+		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
 // handleDiff fans an incremental content update (a client-tagged envelope) out
 // to key's room WITHOUT recording it as the room's last content. Full snapshots
 // still flow through /update (LastPayload), so a newly-joined tab is seeded with
@@ -949,6 +990,14 @@ func handleWS(registry *relay.Registry, token string, port int) http.HandlerFunc
 		// After the content, never before: the client applies fence highlights to
 		// a rendered document, so spans arriving first would find nothing.
 		if payload, ok := registry.LastSpans(key); ok {
+			if err := conn.Send(payload); err != nil {
+				return
+			}
+		}
+
+		// The spotlight mirror describes Neovim, not a document, so it is seeded
+		// into every room the same way.
+		if payload, ok := registry.LastSpotlight(); ok {
 			if err := conn.Send(payload); err != nil {
 				return
 			}
