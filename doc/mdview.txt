@@ -144,6 +144,7 @@ Defaults: >lua
       selection_sync      = false,     -- mirror the visual selection (v/V/C-v)
       spotlight_sync      = true,      -- mirror spotlight.nvim's highlights
       spotlight_max_matches = 500,     -- matches painted per spotlight
+      display_lang        = nil,       -- preview in another language, e.g. "en" (:MDView lang)
       zoom                = 1.0,       -- preview font-size zoom (:MDView zoom)
       overlays            = {          -- preview overlays (:MDView overlay)
         toc = false,                   -- floating outline, current section lit
@@ -373,6 +374,44 @@ browser.spotlight_max_matches ~
   Most matches painted per spotlight in the preview (default `500`), so a token
   that occurs thousands of times in a large document stays cheap to render. A
   spotlight that hit the limit is reported in |:MDView-weblogs|.
+
+browser.display_lang ~
+  Show the preview in another language than the buffer: a language code such as
+  `"en"`. Default: `nil` (off). The buffer is never touched; language.nvim
+  (looked up with pcall(require), never required otherwise) translates the text
+  line for line before it is sent, so the preview has exactly as many lines as
+  the buffer and scroll sync, the cursor marker, click-to-navigate and the
+  checkbox sync keep working. A first valid text goes out at once (translated
+  where the cache has it), paragraphs are patched in as they finish, the
+  finished document comes last; a failure keeps the original visible and is
+  reported once. Nothing goes to a translation engine unless this is set (or
+  |:MDView-lang| is used), and the first use per session names the engine.
+  Text-field sync is off while it is on; not available in standalone mode.
+  Switch at runtime with |:MDView-lang|.
+
+browser.display_lang_trigger ~
+  When a changed document is translated again: `"idle"` (default; after
+  `browser.display_lang_debounce_ms` without typing), `"save"` (on |:write|)
+  or `"manual"` (only on `:MDView lang refresh`). Never per keystroke. A buffer
+  switch and the first push translate at once unless `"manual"`.
+
+browser.display_lang_debounce_ms ~
+  Pause after the last edit before `"idle"` translates. Default: `800`.
+
+browser.display_lang_source ~
+  Source language of the buffer; `nil` (default) lets the engine detect it.
+
+browser.display_lang_engine ~
+  Engine for the display language; `nil` (default) uses language.nvim's own
+  configured one, with its fallback chain.
+
+browser.transform ~
+  A generic asynchronous hook between the buffer and the preview:
+  `function(lines, ctx, cb)`. Call `cb` with exactly as many lines as you got
+  (another length is dropped and reported once); it may call back later, and
+  the previous text stays visible meanwhile. `ctx` has `path`, `bufnr`,
+  `target`, `display_lang`, `reason` and `final`. `display_lang` is the
+  built-in user of the same pipeline and runs first.
 
 browser.zoom ~
   Preview font-size zoom factor (`1.0` = 100%, the default). |:MDView-start|
@@ -687,6 +726,16 @@ pushes a control update over the socket.
   but is blurred by default, so third-party names/numbers stay hidden during a
   screen share. Reveal one block by clicking it, or all with this command.
   Live-only — a freshly opened tab always starts hidden.
+
+:MDView lang [code]                                          *:MDView-lang*
+  Shows the preview in another language than the buffer. `<code>` (`en`, `fr`,
+  ... tab completed) switches it on, `off` restores the original at once,
+  `refresh` translates the current document again now (what the trigger
+  `"manual"` waits for); no argument reports the state: language, trigger,
+  engine and progress. Sets `browser.display_lang`; a running session re-pushes
+  the current buffer, otherwise the choice applies on the next |:MDView-start|.
+  Needs language.nvim; not available in standalone mode. See
+  `browser.display_lang` in |mdview-config|.
 
 :MDView blanklines [action]                              *:MDView-blanklines*
   Switches whether the preview shows every blank line between blocks as extra

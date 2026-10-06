@@ -34,6 +34,7 @@ local blanklines = require("mdview.bindings.usrcmds.blanklines")
 local selection = require("mdview.bindings.usrcmds.selection")
 local spotlight = require("mdview.bindings.usrcmds.spotlight")
 local pin = require("mdview.bindings.usrcmds.pin")
+local lang = require("mdview.bindings.usrcmds.lang")
 
 local M = {}
 
@@ -243,6 +244,15 @@ function M.attach()
       desc = "Hold the preview on the current document instead of following the active buffer; no argument toggles",
       run = function(ctx)
         pin.run(ctx.args.action)
+      end,
+    },
+
+    {
+      path = { "lang" },
+      args = { { name = "code", type = "STRING", optional = true, values = lang.values } },
+      desc = "Show the preview in another language (<code> | off | refresh); no argument reports the state",
+      run = function(ctx)
+        lang.run(ctx.args.code)
       end,
     },
 

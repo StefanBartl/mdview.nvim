@@ -31,6 +31,7 @@ mdview.nvim registers a single `:MDView <subcommand>` command (built via
 | `:MDView overlay <name> [on\|off\|toggle]` / `:MDView overlay list` | Mount/unmount a named overlay on the preview, or list known overlays and their state. See [PREVIEW.md](FEATURES/PREVIEW.md#overlays-floating-table-of-contents). |
 | `:MDView breadcrumbs` / `breadcrumbs export [path]` / `breadcrumbs clear` | Report, export, or clear the session's visited-section outline. See [PREVIEW.md](FEATURES/PREVIEW.md#breadcrumbs-session-outline). |
 | `:MDView reveal [on\|off\|toggle]` | Reveal/hide private (fenced) blocks in the preview; no argument toggles. See [RENDERING.md](FEATURES/RENDERING.md#private-blocks). |
+| `:MDView lang [<code>\|off\|refresh]` | Show the preview in another language than the buffer (`en`, `fr`, ...), translated line for line by language.nvim; `off` restores the original at once, `refresh` translates the current document again now; no argument reports the state (language, trigger, engine, progress). Tab-completes the common codes. Not available in standalone mode. See [PREVIEW.md](FEATURES/PREVIEW.md#display-language-translated-preview). |
 | `:MDView blanklines [on\|off\|toggle]` | Toggle blank-line handling in rendered output. See [RENDERING.md](FEATURES/RENDERING.md#blank-line-handling). |
 
 File logging is opt-in and off by default — nothing is written to disk until

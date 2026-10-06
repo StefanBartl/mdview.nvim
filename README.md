@@ -53,6 +53,14 @@ Rust/WASM module with sanitization built in — no toolchain needed to run it.
 > or `:MDView spotlight off`. It needs a relay v0.4.0 or newer (see
 > [Preview](docs/FEATURES/PREVIEW.md#spotlight-mirror)).
 >
+> **[language.nvim](https://github.com/StefanBartl/language.nvim)** —
+> translates Markdown without breaking it. With `browser.display_lang = "en"`
+> (or `:MDView lang en`) the buffer stays as it is and the preview shows the
+> translation, line for line, painted at once from the cache and completed as
+> paragraphs finish. **Off by default**: nothing of your text goes to a
+> translation engine unless you switch it on, and the first use names the engine
+> (see [Preview](docs/FEATURES/PREVIEW.md#display-language-translated-preview)).
+>
 > **[documentation.nvim](https://github.com/StefanBartl/documentation.nvim)** —
 > holds the ecosystem architecture this plugin is the presentation half of.
 >

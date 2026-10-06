@@ -226,6 +226,49 @@ function M.check()
     ok("spotlight.nvim not installed (optional companion; would mirror its highlights into the preview)")
   end
 
+  -- Display language (browser.display_lang): the preview in another language
+  -- than the buffer. Reads language.nvim's configuration and engine registry;
+  -- never prints a key, only whether the engine can work.
+  start("mdview.nvim: display language")
+  do
+    local display = require("mdview.core.display")
+    local lang = display.lang()
+    local engine = display.engine_info()
+    if not lang then
+      ok("browser.display_lang is off (the preview shows the buffer as it is; nothing goes to a translation engine)")
+    else
+      ok(("browser.display_lang = %q, trigger %s"):format(lang, display.trigger()))
+    end
+    if not engine.found then
+      if lang then
+        warn("display_lang is set, but language.nvim was not found: the preview stays original", {
+          "Install language.nvim (https://github.com/StefanBartl/language.nvim) or unset browser.display_lang",
+        })
+      else
+        ok(
+          "language.nvim not installed (optional companion; would translate the preview, see docs/companion-plugins.md)"
+        )
+      end
+    else
+      ok("language.nvim found (translate_markdown available)")
+      if engine.available then
+        ok(("translate engine %q is available (a key it needs is set)"):format(engine.engine or "?"))
+      elseif lang then
+        warn(("no usable translate engine: %s"):format(engine.err or "unknown"), {
+          "Set translate.engine in language.nvim, and its key (for example DEEPL_API_KEY for deepl)",
+          "With an `ai` engine that is not usable nothing is sent elsewhere: the preview stays original",
+        })
+      else
+        ok(
+          ("no usable translate engine yet (%s); only matters once display_lang is set"):format(engine.err or "unknown")
+        )
+      end
+    end
+    if display.lang() and require("mdview.core.state").get_server() == nil then
+      ok("no session running: the language applies on the next :MDView start")
+    end
+  end
+
   -- mdview.nvim's own docs/install.json via lib.nvim.deps — points to
   -- `:Lib deps show`. Not a per-tool report: curl (the whole of
   -- docs/install.json) is already checked above with a mdview-specific

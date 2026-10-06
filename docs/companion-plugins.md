@@ -31,5 +31,19 @@ buffer text to the browser, which re-renders it. A useful consequence —
   and switchable with `browser.spotlight_sync` / `:MDView spotlight`. See
   [PREVIEW.md](FEATURES/PREVIEW.md#spotlight-mirror).
 
+- **[language.nvim](https://github.com/StefanBartl/language.nvim)** —
+  translates Markdown without breaking it (`translate_markdown`: code, link
+  targets, front matter and HTML never go to the engine, the result has exactly
+  as many lines as the source, in-page anchors follow the translated headings,
+  a paragraph seen before comes from a cache). mdview uses it for
+  `browser.display_lang` / `:MDView lang`: the buffer stays in its language and
+  the preview shows the translation, with `deepl`, `google`, `shell`, `custom`
+  or the `ai` engine (through ai.nvim, local models included). It is looked up
+  with `pcall(require)` and never loaded otherwise; without it mdview warns once
+  and the preview stays original. Nothing is sent to an engine unless
+  `display_lang` is set, and the first use per session names the engine. See
+  [PREVIEW.md](FEATURES/PREVIEW.md#display-language-translated-preview) and
+  `:checkhealth mdview` (plugin found, engine available, key set).
+
 None is required, and mdview never loads them; `:checkhealth mdview` just
 notes when they're present.

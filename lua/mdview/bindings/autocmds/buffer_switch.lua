@@ -83,15 +83,25 @@ function M.resync(bufnr)
     if not api.nvim_buf_is_valid(bufnr) then
       return
     end
-    local lines = require("mdview.core.mirror").lines(bufnr)
-    -- A buffer switch is a whole-document change of the previewed room,
-    -- so force a full snapshot rather than diffing against the previous
-    -- buffer's content (which would be a large, pointless diff).
-    ws_client.send_content(preview_key, lines, { full = true })
-    -- The new buffer's own fence highlighting too, or the tab would keep
-    -- painting the previous document's code blocks (browser.highlighter =
-    -- "nvim"; a no-op under any other).
-    require("mdview.core.fence_spans").push(bufnr, preview_key)
+    -- The text of the new buffer as the preview should show it: with a display
+    -- transform (display language, browser.transform) a first valid text comes
+    -- at once and the finished one later, both for THIS document only (the
+    -- generation of the shared preview room drops anything older).
+    local first = true
+    require("mdview.core.mirror").lines_async(bufnr, function(lines)
+      if not first and (not api.nvim_buf_is_valid(bufnr) or pin.is_pinned()) then
+        return
+      end
+      -- A buffer switch is a whole-document change of the previewed room,
+      -- so force a full snapshot rather than diffing against the previous
+      -- buffer's content (which would be a large, pointless diff).
+      ws_client.send_content(preview_key, lines, { full = first or nil })
+      -- The new buffer's own fence highlighting too, or the tab would keep
+      -- painting the previous document's code blocks (browser.highlighter =
+      -- "nvim"; a no-op under any other).
+      require("mdview.core.fence_spans").push(bufnr, preview_key)
+      first = false
+    end, { target = preview_key, path = path, reason = "switch" })
     log.debug("reuse: pushed " .. path .. " to preview room " .. preview_key, nil, "bufswitch", true)
   end)
   return true

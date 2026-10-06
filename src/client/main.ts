@@ -20,6 +20,7 @@ import { installLinkHover } from './render/linkHover';
 import { updateCursorMarker, parseCursorMarkerMode } from './render/cursorMarker';
 import { updateSelection, parseSelection, type SourceSelection } from './render/selectionMarker';
 import { applyBlankLineSpacing, parseBlankLines } from './render/blankLines';
+import { applyLangStatus, parseLangStatus } from './render/langStatus';
 import { createSpotlightMirror } from './render/spotlightMirror';
 import { enableTaskCheckboxes, installTaskToggle } from './render/taskToggle';
 import { installFieldSync } from './render/fieldSync';
@@ -507,6 +508,7 @@ async function boot() {
       blankLines?: unknown;
       selection?: unknown;
       selectionSync?: unknown;
+      displayLang?: unknown;
     };
     try {
       msg = JSON.parse(json) as typeof msg;
@@ -550,6 +552,11 @@ async function boot() {
     }
     if (typeof msg.zoom === 'number') {
       applyZoom(msg.zoom);
+    }
+    if ('displayLang' in msg) {
+      // The preview shows a translation (browser.display_lang): say so, and
+      // whether it is still running. `false` removes the badge.
+      applyLangStatus(document, parseLangStatus(msg.displayLang));
     }
     if (typeof msg.blankLines === 'boolean' && container) {
       blankLinesEnabled = msg.blankLines;

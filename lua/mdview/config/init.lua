@@ -35,7 +35,15 @@ end
 -- table and can't be discovered by iterating it. Keyed by dotted table path.
 local KNOWN_NIL_KEYS = {
   [""] = { server_cwd = true, file_log_path = true },
-  browser = { open_url = true, resolved_browser_cmd = true, browser_args = true },
+  browser = {
+    open_url = true,
+    resolved_browser_cmd = true,
+    browser_args = true,
+    display_lang = true,
+    display_lang_source = true,
+    display_lang_engine = true,
+    transform = true,
+  },
   start = { try_push_opts = true, wait_timeout_ms = true },
   dev = { binary_path = true, web_root = true },
   standalone = { binary_path = true },
@@ -136,6 +144,20 @@ function M.merge(opts)
     if not (opts and opts.any_file ~= nil) then
       M.defaults.any_file = true
     end
+  end
+
+  -- The display transform options are checked once here, so a typo is reported
+  -- at setup() and not at the first push (the module reports each problem once
+  -- and falls back to "off"/"idle"/800 ms).
+  local b = M.defaults.browser
+  if
+    b and (b.display_lang ~= nil or b.transform ~= nil or opts and opts.browser and opts.browser.display_lang_trigger)
+  then
+    local display = require("mdview.core.display")
+    display.lang()
+    display.trigger()
+    display.debounce_ms()
+    display.active()
   end
 
   -- any_file widens preview scope from Markdown-only to every normal text

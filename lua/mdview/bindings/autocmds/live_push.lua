@@ -65,7 +65,7 @@ M._cancel_pending = cancel_pending -- exposed for teardown (bindings/autocmds/in
 -- ws_client.send_content. Pass { full = true } to force a full snapshot (e.g.
 -- on save or when seeding a freshly opened tab).
 ---@param bufnr integer
----@param opts { full?: boolean }|nil
+---@param opts { full?: boolean, reason?: string }|nil # reason: "edit"|"save"|"switch"|"enable"|"refresh" (for the display transform)
 function M.push_buffer_changes(bufnr, opts)
   if not previewable.is(bufnr) then
     log.debug("skipping buffer, not previewable", nil, "livepush", true)
@@ -94,8 +94,6 @@ function M.push_buffer_changes(bufnr, opts)
     return
   end
 
-  local lines = require("mdview.core.mirror").lines(bufnr)
-
   -- In "reuse" browser_behavior the single preview tab follows the active
   -- buffer, so route this buffer's content to the room the open tab is
   -- watching (the preview key) rather than this buffer's own path. For
@@ -103,23 +101,43 @@ function M.push_buffer_changes(bufnr, opts)
   -- the buffer's own path, i.e. the original per-document room model.
   local target = target_key.resolve(bufnr) or path
 
-  ws_client.send_content(target, lines, { full = opts and opts.full == true or nil })
-  session.store(path, lines)
+  local first = true
+  local full = opts and opts.full == true or nil
+  -- Without a display transform this runs once, synchronously, with the buffer
+  -- text. With one (a display language, browser.transform) it may run several
+  -- times: a first valid text, patches, the finished document -- each of them
+  -- with as many lines as the buffer. `original` is the buffer text itself.
+  require("mdview.core.mirror").lines_async(bufnr, function(lines, final, original)
+    -- A later answer of a transform can land after the buffer is gone or the
+    -- preview was pinned to another document meanwhile.
+    if not first and (not api.nvim_buf_is_valid(bufnr) or pin.blocks(bufnr)) then
+      return
+    end
+    ws_client.send_content(target, lines, { full = full })
 
-  -- The buffer's own fenced-code highlighting, for browser.highlighter =
-  -- "nvim". A no-op under any other highlighter, and sent after the content on
-  -- purpose: the client paints spans onto a rendered document.
-  require("mdview.core.fence_spans").push(bufnr, target)
+    -- The buffer's own fenced-code highlighting, for browser.highlighter =
+    -- "nvim". A no-op under any other highlighter, and sent after the content on
+    -- purpose: the client paints spans onto a rendered document. Fences are
+    -- never touched by a transform, and no line moves, so the spans still fit.
+    require("mdview.core.fence_spans").push(bufnr, target)
 
-  -- Tell the tab which document it's now showing whenever it changes (initial
-  -- push, or a buffer switch in "reuse" mode) — powers browser Back/Forward.
-  -- Keyed by target room so it fires once per new document, not per keystroke.
-  if M._last_doc[target] ~= path then
-    M._last_doc[target] = path
-    ws_client.send_doc(target, path)
-  end
-
-  log.debug("content push sent (target=" .. target .. ") and session stored for " .. path, nil, "livepush", true)
+    if first then
+      first = false
+      -- The bookkeeping snapshot is always the buffer text, never the transform.
+      session.store(path, original)
+      -- Tell the tab which document it's now showing whenever it changes
+      -- (initial push, or a buffer switch in "reuse" mode) — powers browser
+      -- Back/Forward. Keyed by target room so it fires once per new document,
+      -- not per keystroke.
+      if M._last_doc[target] ~= path then
+        M._last_doc[target] = path
+        ws_client.send_doc(target, path)
+      end
+    end
+    if final then
+      log.debug("content push sent (target=" .. target .. ") and session stored for " .. path, nil, "livepush", true)
+    end
+  end, { target = target, path = path, reason = opts and opts.reason or (full and "save" or "edit") })
 end
 
 --- Setup autocmds for live push and save. Called once per attach cycle from
@@ -197,7 +215,7 @@ function M.attach(group)
       log.debug("BufWritePost fired, full push, buf: " .. args.buf, nil, "livepush", true)
       -- Force a full snapshot on save: cheap resync point that reseeds
       -- the relay's LastPayload and heals any diff desync.
-      M.push_buffer_changes(args.buf, { full = true })
+      M.push_buffer_changes(args.buf, { full = true, reason = "save" })
     end)
   end
 

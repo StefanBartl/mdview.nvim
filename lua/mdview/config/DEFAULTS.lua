@@ -40,7 +40,21 @@
 ---@field selection_sync boolean mirror the Neovim visual selection (v / V / CTRL-V) into the preview as a highlight, live -- for showing a document to other people; off by default, switch it on for as long as you are presenting with `:MDView selection` (toggles), passed to the client as ?sel=1 and pushed live
 ---@field spotlight_sync boolean mirror the spotlight.nvim highlights (whole-file spotlights) into the preview, in the same colors and live -- needs spotlight.nvim, a no-op without it; independent of spotlight.nvim's own persistence. On by default; set false to never send them to the relay/browser, or switch it for a running session with `:MDView spotlight`
 ---@field spotlight_max_matches integer upper bound on the matches painted per spotlight in the preview (default 500), against a token that matches thousands of times in a large document; sent with the spotlight state
+---@field display_lang string|nil show the preview in another language than the buffer (a language code such as "en"; nil = off, default). The buffer stays as it is; language.nvim translates the text line for line before it is sent. Needs language.nvim (soft dependency); the text goes to the engine configured there, so a notice names it the first time per session. Switch at runtime with `:MDView lang <code>|off`. Not available in standalone mode.
+---@field display_lang_trigger "idle"|"save"|"manual" when a changed document is translated again: "idle" after display_lang_debounce_ms without typing (default), "save" on :write, "manual" only on `:MDView lang refresh`; never per keystroke. A buffer switch and the first push translate at once unless "manual".
+---@field display_lang_debounce_ms integer pause after the last edit before "idle" translates (default 800)
+---@field display_lang_source string|nil source language of the buffer (nil: the engine detects it)
+---@field display_lang_engine string|nil engine for the display language (nil: the one configured in language.nvim; no fallback chain when set)
+---@field transform fun(lines: string[], ctx: mdview.config.TransformCtx, cb: fun(lines: string[]))|nil generic async hook between the buffer and the preview: call cb with exactly as many lines as you got (a result of another length is dropped); it may call back later, the previous text stays visible meanwhile. display_lang is the built-in user of the same pipeline (it runs first, the hook sees its output).
 ---@field preserve_blank_lines boolean show every blank line between blocks as extra vertical space instead of CommonMark's default (any run of blank lines collapses to one paragraph gap); off by default, toggle at runtime with `:MDView blanklines`, passed to the client as ?blanklines=1 and pushed live
+
+---@class mdview.config.TransformCtx
+---@field path string normalized path of the source document
+---@field bufnr integer|nil
+---@field target string room the text goes to
+---@field display_lang string|nil
+---@field reason string "edit"|"save"|"switch"|"initial"|"enable"|"refresh"
+---@field final boolean false for the first valid text and progress patches of display_lang, true for the finished one
 
 ---@class mdview.config.StartDefaults
 ---@field push_strategy "launcher"|"try_push" initial-push strategy used by :MDView start
@@ -250,6 +264,15 @@ return {
     -- Per spotlight, in the browser. A token that matches 50 000 times in a
     -- huge log would otherwise make every re-render paint 50 000 ranges.
     spotlight_max_matches = 500,
+    -- The preview in another language than the buffer. Off (nil) by default:
+    -- nothing of your text goes to any translation engine unless you set this
+    -- or run `:MDView lang <code>`. See docs/FEATURES/PREVIEW.md.
+    display_lang = nil,
+    display_lang_trigger = "idle",
+    display_lang_debounce_ms = 800,
+    display_lang_source = nil,
+    display_lang_engine = nil,
+    transform = nil,
   },
 
   start = {

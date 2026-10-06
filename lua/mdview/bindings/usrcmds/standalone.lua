@@ -113,6 +113,18 @@ end
 ---@param file_arg string|nil # path from the route's `file` arg
 ---@param no_browser boolean|nil # true when --no-browser was passed
 function M.run(file_arg, no_browser)
+  -- The relay reads the file itself, so there is no Lua side that could
+  -- translate it. Previewing the original while the config says otherwise
+  -- would be a quiet lie; refuse and say how to proceed.
+  if require("mdview.core.display").active() then
+    notify(
+      "[mdview] standalone does not support browser.display_lang / browser.transform: the relay reads the file "
+        .. "itself, nothing could translate it. Run `:MDView lang off` (and unset browser.transform) for a "
+        .. "standalone preview of the original, or use `:MDView start` for the translated one.",
+      vim.log.levels.ERROR
+    )
+    return
+  end
   local target, err = detached.resolve_target(file_arg)
   if not target then
     notify("[mdview] standalone: " .. tostring(err), vim.log.levels.ERROR)

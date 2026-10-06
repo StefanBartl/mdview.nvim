@@ -37,9 +37,9 @@
 ---   * adapter/install.lua -- hashes the downloaded server binary and reads the
 ---     checksum list that belongs to it.
 ---
---- Future asynchronous variant: `M.lines_async(bufnr, cb)` is the slot for a
---- transform that cannot answer synchronously. For now it calls back at once
---- with the synchronous result, so callers can already be written against it.
+--- The asynchronous variants (`M.lines_async`, `M.lines_for_path_async`) hand the
+--- text to the display transform (core/display.lua) before it reaches the
+--- preview; they are what the push paths use.
 
 local normkey = require("lib.nvim.fs.normkey")
 
@@ -152,13 +152,58 @@ function M.lines_for_path(path)
   return read_disk(abs)
 end
 
---- Asynchronous variant (placeholder for transforms that need time).
---- Currently invokes `cb` synchronously with `M.lines(bufnr)`.
+--- Asynchronous variant: the display transform (`mdview.core.display`, the
+--- display language and `browser.transform`) sits behind it. `cb(lines, final)`
+--- runs once and synchronously when no transform is configured, so a plain
+--- session behaves as with `M.lines`; with one it may run several times (a first
+--- valid text, patches while paragraphs are translated, the finished document),
+--- every text with as many lines as the buffer. A result that went stale (a newer
+--- push into the same `opts.target` room, a buffer or tab switch) is never
+--- delivered.
 ---@param bufnr integer
----@param cb fun(lines: string[])
----@return nil
-function M.lines_async(bufnr, cb)
-  cb(M.lines(bufnr))
+---@param cb fun(lines: string[], final: boolean, original: string[])
+---@param opts { target?: string, path?: string, reason?: string }|nil
+---   target: room the text goes to (default: the buffer name);
+---   path: source document (default: the buffer name);
+---   reason: "edit"|"save"|"switch"|"initial"|"enable"|"refresh" (default "edit")
+---@return boolean transformed # false: `cb` ran synchronously with the plain text
+function M.lines_async(bufnr, cb, opts)
+  opts = opts or {}
+  local name = api.nvim_buf_get_name(bufnr)
+  local original = M.lines(bufnr)
+  return require("mdview.core.display").stream(
+    {
+      path = opts.path or name,
+      target = opts.target or name,
+      bufnr = bufnr,
+      reason = opts.reason,
+    },
+    original,
+    function(out, final)
+      cb(out, final, original)
+    end
+  )
+end
+
+--- `M.lines_for_path` through the display transform, like `M.lines_async`.
+---@param path string
+---@param cb fun(lines: string[], final: boolean, original: string[])
+---@param opts { target?: string, reason?: string }|nil
+---@return boolean transformed
+function M.lines_for_path_async(path, cb, opts)
+  opts = opts or {}
+  local original = M.lines_for_path(path)
+  return require("mdview.core.display").stream(
+    {
+      path = path,
+      target = opts.target or path,
+      reason = opts.reason,
+    },
+    original,
+    function(out, final)
+      cb(out, final, original)
+    end
+  )
 end
 
 return M

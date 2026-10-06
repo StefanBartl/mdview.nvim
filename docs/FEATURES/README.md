@@ -40,6 +40,10 @@ In detail in [`PREVIEW.md`](PREVIEW.md).
 - **Spotlight mirror** — spotlight.nvim's whole-file highlights are painted
   into the preview in the same colors, live; a no-op without spotlight.nvim.
   `:MDView spotlight` or `browser.spotlight_sync = false` switches it off.
+- **Display language** — the buffer stays German, the preview shows English (or
+  another language), translated line for line by language.nvim, patched in as
+  paragraphs finish, never half; off by default, `:MDView lang <code>|off`.
+  Plus the generic `browser.transform` hook it is built on.
 - **Document pinning** — `:MDView pin` holds the preview on one document while
   you read around in other buffers, instead of the tab following every buffer
   switch.

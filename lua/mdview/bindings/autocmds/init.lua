@@ -41,6 +41,8 @@ function M.teardown()
   -- window) otherwise survives teardown and fires after the session it was
   -- meant to flush is already gone (PERF-62).
   pcall(live_push._cancel_pending)
+  -- A translation still running must not push into a session that is gone.
+  pcall(require("mdview.core.display").reset)
   pcall(api.nvim_del_augroup_by_id, M.augroup_id)
   M.augroup_id = nil
 end

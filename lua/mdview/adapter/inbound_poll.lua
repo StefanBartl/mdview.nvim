@@ -336,6 +336,14 @@ local function handle_field(key, name, value)
   if type(key) ~= "string" or type(name) ~= "string" or name == "" or type(value) ~= "string" then
     return
   end
+  -- The preview shows a transformed text (a display language, browser.transform):
+  -- what the browser sends back belongs to that text, not to the buffer's, so
+  -- writing it into the buffer is off. The checkbox path stays: it reads the
+  -- real line and only flips its marker.
+  if require("mdview.core.display").active() then
+    require("mdview.core.display").note_field_ignored()
+    return
+  end
   local buf = buf_for_key(key)
   if not buf or not vim.api.nvim_buf_is_loaded(buf) then
     return

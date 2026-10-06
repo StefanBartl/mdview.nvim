@@ -350,6 +350,116 @@ inject markup (`</textarea><script>` becomes inert escaped text).
 - **Module:** `src/client/render/fieldSync.ts`, `native/server/internal/source/field.go`, `native/server/internal/relay/field.go`, `/field` route in `native/server/main.go`; `:MDView start` buffer edit in `lua/mdview/adapter/inbound_poll.lua`; sanitizer allowlist in `native/wasm-render/src/lib.rs`
 - **Config:** `sync_fields` (default `true`; `false` renders these fields read-only)
 
+## Display language (translated preview)
+
+The buffer stays as it is (say, German); the preview shows another language
+(say, English). Switch it on in the setup or at runtime:
+
+```lua
+require("mdview").setup({ browser = { display_lang = "en" } })
+```
+
+```vim
+:MDView lang en        " the preview shows English, the buffer is untouched
+:MDView lang           " report: language, trigger, engine, translating 3/12 ...
+:MDView lang refresh   " translate the current document again now
+:MDView lang off       " the original again, at once
+```
+
+It is **off by default**, and nothing of your text goes to any translation
+engine until you switch it on. The first time per session the message names
+the engine the text goes to (it follows `language.nvim`'s configuration, the
+fallback chain included, so the engine named is the one that really gets the
+text). Switching it off sends nothing any more.
+
+**How it works.** mdview is a text mirror: every push into the preview passes
+one place (`core/mirror.lua` into `core/display.lua`). The translation is done
+by [language.nvim](../companion-plugins.md) (`translate_markdown`, with `deepl`,
+`google`, `shell`, `custom` or the `ai` engine through ai.nvim). It is looked up
+with `pcall(require)` and is never a hard dependency: without it mdview warns
+once and the preview stays original. Code, link targets, front matter, HTML and
+placeholders never go to the engine, an unusable paragraph stays original, and
+the result has **exactly as many lines as the buffer**. That is what keeps every
+line-based feature valid without a change in the browser: scroll sync, the
+cursor marker, click-to-navigate, task-checkbox sync and the fenced-code spans
+(`browser.highlighter = "nvim"`).
+
+**Stale-while-revalidate.** A push is never delayed by the translation:
+
+1. a valid text goes out at once: every paragraph whose translation is cached is
+   translated, the rest is original (nothing leaves the machine for this step);
+2. the paragraphs that are translated afterwards are patched into the preview as
+   they finish (about every 150 ms at most);
+3. the finished document goes out last.
+
+Every push bumps a generation counter of the room it goes to. A result of an
+older generation (fast edits, or, with `browser.behavior = "reuse"`, a switch to
+another buffer: the one preview tab is one room for every document) is dropped
+and its run is cancelled, so one document's translation is never shown for
+another.
+
+**When it translates** (`browser.display_lang_trigger`; never per keystroke):
+
+| Trigger | The engine is asked |
+| --- | --- |
+| `"idle"` (default) | `browser.display_lang_debounce_ms` (800) after the last edit, on save, on a buffer switch, at start |
+| `"save"` | on `:write`, on a buffer switch, at start |
+| `"manual"` | only on `:MDView lang <code>` and `:MDView lang refresh` |
+
+**When it cannot.** language.nvim missing, the engine unusable (for an `ai`
+engine that is not usable, language.nvim reports it instead of using another
+third party), a request that fails, a result with the wrong line count: the
+original stays visible, the problem is reported **once**, never an empty or half
+document. A paragraph that fails stays German while the rest is English.
+
+**State in the browser.** A small badge in the corner (`Translating to en via
+google … 3/12`, `Translated to en`, `Original, translation failed: ...`) says
+that the text is a translation and how far it is. It rides the existing control
+message (`displayLang`); a relay or a client from before this feature simply
+ignores it. `:checkhealth mdview` lists language.nvim, the engine and whether it
+can work (a key it needs is set); the key itself is never printed.
+
+**Reverse paths.** Ticking a task checkbox still works: the browser names the
+line, mdview flips only the marker in the real line of the real buffer, and the
+next push translates it again. Text-field sync (writing an edited `<input>` or
+`<textarea>` back) is **off** while the preview shows a transformed text: what
+the browser sends belongs to the translation, not to the buffer.
+
+**The generic hook.** `display_lang` is the built-in user of a hook you can use
+yourself:
+
+```lua
+require("mdview").setup({ browser = {
+  transform = function(lines, ctx, cb)
+    -- ctx: path, bufnr, target, display_lang, reason, final
+    cb(my_lines) -- exactly #lines lines; may be called later
+  end,
+} })
+```
+
+`cb` may run later (or never: the previous text stays). A result of another
+length is dropped and reported once. With both set, the language runs first and
+the hook sees its output (also the cache-only first text and the patches:
+`ctx.final` tells them apart).
+
+**Not supported (by design).**
+
+- Standalone mode (`:MDView standalone`): the relay reads the file itself, so
+  there is no Lua side that could translate it. The command refuses while
+  `display_lang` or `transform` is set and says how to proceed.
+- Several tabs with different languages at once (it would need one room per
+  language).
+- Column-exact mirrors in the translated text (selection mirror, spotlight
+  matches): only whole lines keep their meaning.
+- The in-editor preview tab (`:MDView preview-tab`) shows the buffer text; it is
+  not translated.
+- A pinned preview (`:MDView pin`) holds the document as it is; turn the pin off
+  to translate it.
+
+- **Module:** `lua/mdview/core/display.lua`, `lua/mdview/core/mirror.lua` (`lines_async`), `lua/mdview/bindings/usrcmds/lang.lua`; the badge in `src/client/render/langStatus.ts`
+- **Usercmds:** `:MDView lang`
+- **Config:** `browser.display_lang` (default `nil` = off), `browser.display_lang_trigger` (`"idle"`), `browser.display_lang_debounce_ms` (`800`), `browser.display_lang_source`, `browser.display_lang_engine`, `browser.transform`
+
 ## Standalone preview (outlives Neovim)
 
 `:MDView standalone [file] [--no-browser]` hands the file to the relay

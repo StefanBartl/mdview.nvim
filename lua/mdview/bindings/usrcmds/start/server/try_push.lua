@@ -65,9 +65,15 @@ function M.try_push(path, lines, opts)
         -- Full snapshot: this is the initial seed for the room, so it
         -- must be whole text (or a full \x03 envelope under line_diff),
         -- never a diff.
-        ws_client.send_content(path, lines, { full = true })
+        -- With a display transform the first valid text comes at once and the
+        -- finished one later; the room is seeded with the first as a snapshot.
+        local first = true
+        require("mdview.core.display").stream({ path = path, target = path, reason = "initial" }, lines, function(out)
+          ws_client.send_content(path, out, { full = first or nil })
+          first = false
+          require("mdview.core.fence_spans").push(vim.api.nvim_get_current_buf(), path)
+        end)
         session.store(path, lines)
-        require("mdview.core.fence_spans").push(vim.api.nvim_get_current_buf(), path)
         log.debug(string.format("try_push: success for %s on attempt %d", path, attempt), nil, "try_push", true)
       else
         if attempt < cfg.max_attempts then
