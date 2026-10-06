@@ -14,7 +14,7 @@
 ---   $MDVIEW_PATH            mdview.nvim root (default: derived from this file)
 ---   $LIB_NVIM_PATH          lib.nvim root (the test runner uses $LIB_NVIM_DIR instead, see TESTS/minimal_init.lua)
 ---   $MDVIEW_STANDALONE_BIN  relay binary for standalone mode (needs --watch,
----                           v0.3.0+); until a release ships, point this at a
+---                           v0.3.0+); only needed to run a
 ---                           locally built native/server/mdview-server[.exe]
 
 -- Nothing inherited: no user rtp, no shada, no swapfile. `-u <this file>`
@@ -87,7 +87,7 @@ prepend_rtp(lib)
 prepend_rtp(root)
 
 -- Optional binary override lets a terminal launch use a locally built relay
--- (with --watch) before a v0.3.0 release exists — the same escape hatch as the
+-- (with --watch) ahead of the pinned release — the same escape hatch as the
 -- standalone.binary_path config key, surfaced as an env var for the wrappers.
 local overrides = {}
 if vim.env.MDVIEW_STANDALONE_BIN and vim.env.MDVIEW_STANDALONE_BIN ~= "" then

@@ -168,7 +168,7 @@ Defaults: >lua
 
     install = {
       repo    = "StefanBartl/mdview.nvim", -- override to use a fork
-      version = "v0.3.0",                  -- pin a specific release tag
+      version = "v0.4.1",                  -- pin a specific release tag
     },
 
     standalone = {
@@ -190,7 +190,7 @@ Example override: >lua
     server_port = 43219,
     browser = { browser = "firefox", browser_autostart = false },
     start   = { push_strategy = "try_push" },
-    install = { repo = "your-fork/mdview.nvim", version = "v0.3.0" },
+    install = { repo = "your-fork/mdview.nvim", version = "v0.4.1" },
   })
 <
 
@@ -365,9 +365,9 @@ browser.spotlight_sync ~
   counterpart for. The text is matched literally and case-sensitively (unless
   the spotlight ignores case); a spotlight made from a visual selection matches
   any substring, one made from a word only between word boundaries. Needs a
-  relay newer than the `v0.3.0` that `install.version` pins (the `/spotlight`
-  route): point `dev.binary_path` and `dev.web_root` at a local build until
-  the next release.
+  relay with the `/spotlight` route (v0.4.0+); `install.version` pins one that
+  has it, an older pin needs `dev.binary_path` and `dev.web_root` pointed at a
+  local build.
 
 browser.spotlight_max_matches ~
   Most matches painted per spotlight in the preview (default `500`), so a token
@@ -445,8 +445,8 @@ install.repo / install.version ~
 standalone.binary_path ~
   Relay binary |:MDView-standalone| spawns. `nil` (default) uses whichever one
   `install` resolved. Standalone mode needs a relay built with `--watch`
-  support (v0.3.0+), so until `install.version` points at such a release,
-  set this to a locally built one: >lua
+  support (v0.3.0+), which the pinned release has; set this only to run a
+  locally built one: >lua
 
     require("mdview").setup({
       standalone = {

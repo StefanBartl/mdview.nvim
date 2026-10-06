@@ -50,7 +50,7 @@ Rust/WASM module with sanitization built in — no toolchain needed to run it.
 > read back. On by default and a no-op without spotlight.nvim; independent of
 > spotlight.nvim's own persistence, so **if a shared screen or a tab left open must
 > not show what you marked, switch it off** with `browser.spotlight_sync = false`
-> or `:MDView spotlight off`. It needs a relay newer than `v0.3.0` (see
+> or `:MDView spotlight off`. It needs a relay v0.4.0 or newer (see
 > [Preview](docs/FEATURES/PREVIEW.md#spotlight-mirror)).
 >
 > **[documentation.nvim](https://github.com/StefanBartl/documentation.nvim)** —

@@ -260,7 +260,7 @@ return {
 
   install = {
     repo = "StefanBartl/mdview.nvim",
-    version = "v0.3.0",
+    version = "v0.4.1",
   },
 
   dev = {
@@ -287,8 +287,8 @@ return {
   standalone = {
     -- Relay binary `:MDView standalone` spawns. nil = whatever `install`
     -- resolved. Standalone mode needs a relay with --watch support
-    -- (v0.3.0+); until `install.version` points at such a release, set this
-    -- to a locally built one, e.g.
+    -- (v0.3.0+); the pinned release has it, set this only to run a
+    -- locally built one, e.g.
     --   standalone = { binary_path = "~/repos/mdview.nvim/native/server/mdview-server" }
     -- :MDView standalone probes the binary and says so if it's too old,
     -- rather than spawning a process that dies silently.

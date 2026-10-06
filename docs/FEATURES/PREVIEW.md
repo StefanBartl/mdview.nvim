@@ -166,9 +166,9 @@ and POSTs one JSON object — only when it differs from what the relay already
 has — to the relay's `/spotlight` route. The relay broadcasts it to every tab
 (`\x07`-prefixed) and keeps the latest, so a tab that is opened or reloaded
 later is seeded with the current highlights straight away. This needs a relay
-newer than `install.version`'s `v0.3.0` pin — until the next release, point
-`dev.binary_path`/`dev.web_root` at a local build; a relay that does not know the
-route is reported once.
+v0.4.0 or newer (the default `install.version` pin has it); with an older pin,
+point `dev.binary_path`/`dev.web_root` at a local build. A relay that does not
+know the route is reported once.
 
 - **Module:** `lua/mdview/bindings/autocmds/spotlight_sync.lua`, `lua/mdview/core/spotlight_mirror.lua`, `lua/mdview/adapter/ws_client.lua` (`send_spotlight`), `native/server/main.go` (`handleSpotlight`), `src/client/render/spotlightMirror.ts`
 - **Usercmds:** `:MDView spotlight [on|off|toggle]` (no argument toggles)
