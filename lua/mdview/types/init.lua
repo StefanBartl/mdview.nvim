@@ -12,8 +12,13 @@
 ---@field dev_local boolean developer-only flags
 
 -- == core/session ==
+-- `hash` (sha256 of the lines joined by "\n") is computed on first read, then memoized.
+---@class mdview.session.entry
+---@field lines string[]
+---@field hash string
+
 ---@class mdview.session
----@field buffers table<string, { hash: string, lines: string[] }>
+---@field buffers table<string, mdview.session.entry>
 
 -- == core/events ==
 ---@class mdview.events

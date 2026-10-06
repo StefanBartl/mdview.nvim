@@ -23,12 +23,31 @@ end
 
 -- Get cached object for path.
 ---@param path string
----@return table|nil
+---@return mdview.session.entry|nil
 function M.get(path)
   return M.buffers[path]
 end
 
--- Store buffer content snapshot (lines array) and computed hash
+-- An entry's `hash` is computed on first read and memoized, not at store time.
+-- store() runs on every throttled live push (about every 150 ms while typing)
+-- and nothing in the plugin reads the hash, so hashing eagerly cost a
+-- table.concat plus a sha256 over the whole document per push (about 20 ms at
+-- 100k lines) for a value nobody asked for. `lines` is kept by reference, so a
+-- hash read later covers the lines as they are at that moment.
+---@type metatable
+local entry_mt = {
+  __index = function(entry, key)
+    if key ~= "hash" then
+      return nil
+    end
+    local h = vim.fn.sha256(table.concat(rawget(entry, "lines") or {}, "\n"))
+    rawset(entry, "hash", h)
+    return h
+  end,
+}
+
+-- Store a buffer content snapshot (lines array) under its normalized path. The
+-- hash of the snapshot is available as `entry.hash`, computed lazily (see above).
 ---@param path string
 ---@param lines string[]
 function M.store(path, lines)
@@ -40,12 +59,7 @@ function M.store(path, lines)
     return
   end
 
-  -- sha256 is fine regardless of file size (not a bottleneck for markdown
-  -- files); table.concat's one-time allocation to build `text` is the only
-  -- cost here and is negligible at realistic markdown file sizes.
-  local text = table.concat(lines, "\n")
-  local h = vim.fn.sha256(text)
-  M.buffers[path] = { hash = h, lines = lines }
+  M.buffers[path] = setmetatable({ lines = lines }, entry_mt)
 end
 
 -- Naive line-diff (finds first/last differing line only, no LCS). Dormant —

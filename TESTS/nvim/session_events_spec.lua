@@ -34,6 +34,43 @@ describe("core.session store/get/init/shutdown", function()
     assert(entry.hash and #entry.hash > 0, "expected a computed hash")
   end)
 
+  it("store() does not hash the document; the hash is computed on first read and memoized", function()
+    -- store() runs on every throttled live push (and nothing in the plugin reads
+    -- the hash), so hashing the whole text there was pure cost on the hot path.
+    local real_sha256 = vim.fn.sha256
+    local calls = 0
+    vim.fn.sha256 = function(text)
+      calls = calls + 1
+      return real_sha256(text)
+    end
+    local ok, err = pcall(function()
+      session.init()
+      session.store("/lazy/hash.md", { "alpha", "beta" })
+      assert.are.equal(0, calls, "store() must not hash")
+
+      local entry = session.get("/lazy/hash.md")
+      assert.are.same({ "alpha", "beta" }, entry.lines)
+      assert.are.equal(0, calls, "reading .lines must not hash")
+
+      local h = entry.hash
+      assert.are.equal(1, calls, "the first read of .hash computes it")
+      assert.are.equal(real_sha256("alpha\nbeta"), h)
+
+      assert.are.equal(h, entry.hash)
+      assert.are.equal(1, calls, "a second read reuses the memoized hash")
+    end)
+    vim.fn.sha256 = real_sha256
+    if not ok then
+      error(err, 0)
+    end
+  end)
+
+  it("an entry answers nil for a field it does not have (the lazy hash is not a catch-all)", function()
+    session.init()
+    session.store("/lazy/fields.md", { "x" })
+    assert.is_nil(session.get("/lazy/fields.md").nonexistent)
+  end)
+
   it("shutdown() clears every stored buffer", function()
     session.store("/a.md", { "x" })
     session.shutdown()
