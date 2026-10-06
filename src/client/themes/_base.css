@@ -137,6 +137,185 @@ body {
   pointer-events: none;
 }
 
+/* Spotlight mirror (browser.spotlight_sync): spotlight.nvim's highlights painted
+   into the document, in the colors Neovim sends. The client sets
+   --spotlight-N-bg / -fg / -weight on :root from the live Spotlight1..8 groups
+   (and again on every colorscheme change); the fallbacks below only matter for
+   a slot Neovim sent no color for.
+
+   Two painters, same look. Where the CSS Custom Highlight API exists the text is
+   styled in place through ::highlight() and the DOM is left alone; elsewhere the
+   client wraps matches in <mark class="spotlight spotlight-N">. "Line" spotlights
+   (spotlight-line-N / .spotlight-line) tint the whole line or block more softly
+   than the match itself, so the match still stands out inside it. ::highlight()
+   cannot set font-weight, so a bold slot is bold only in the <mark> painter,
+   whose rules carry the #mdview-root prefix to outrank the theme's own `mark`
+   style. */
+#mdview-root mark.spotlight {
+  border-radius: 2px;
+  padding: 0;
+}
+
+::highlight(spotlight-1) {
+  background-color: var(--spotlight-1-bg, #ffe08a);
+  color: var(--spotlight-1-fg, #1b1b1b);
+}
+::highlight(spotlight-line-1) {
+  background-color: var(--spotlight-1-bg, #ffe08a);
+  background-color: color-mix(in srgb, var(--spotlight-1-bg, #ffe08a) 38%, transparent);
+}
+#mdview-root mark.spotlight-1 {
+  background-color: var(--spotlight-1-bg, #ffe08a);
+  color: var(--spotlight-1-fg, #1b1b1b);
+  font-weight: var(--spotlight-1-weight, inherit);
+}
+#mdview-root mark.spotlight-line.spotlight-1 {
+  background-color: var(--spotlight-1-bg, #ffe08a);
+  background-color: color-mix(in srgb, var(--spotlight-1-bg, #ffe08a) 38%, transparent);
+  color: inherit;
+  font-weight: inherit;
+}
+
+::highlight(spotlight-2) {
+  background-color: var(--spotlight-2-bg, #a8e6a1);
+  color: var(--spotlight-2-fg, #1b1b1b);
+}
+::highlight(spotlight-line-2) {
+  background-color: var(--spotlight-2-bg, #a8e6a1);
+  background-color: color-mix(in srgb, var(--spotlight-2-bg, #a8e6a1) 38%, transparent);
+}
+#mdview-root mark.spotlight-2 {
+  background-color: var(--spotlight-2-bg, #a8e6a1);
+  color: var(--spotlight-2-fg, #1b1b1b);
+  font-weight: var(--spotlight-2-weight, inherit);
+}
+#mdview-root mark.spotlight-line.spotlight-2 {
+  background-color: var(--spotlight-2-bg, #a8e6a1);
+  background-color: color-mix(in srgb, var(--spotlight-2-bg, #a8e6a1) 38%, transparent);
+  color: inherit;
+  font-weight: inherit;
+}
+
+::highlight(spotlight-3) {
+  background-color: var(--spotlight-3-bg, #9fd3ff);
+  color: var(--spotlight-3-fg, #1b1b1b);
+}
+::highlight(spotlight-line-3) {
+  background-color: var(--spotlight-3-bg, #9fd3ff);
+  background-color: color-mix(in srgb, var(--spotlight-3-bg, #9fd3ff) 38%, transparent);
+}
+#mdview-root mark.spotlight-3 {
+  background-color: var(--spotlight-3-bg, #9fd3ff);
+  color: var(--spotlight-3-fg, #1b1b1b);
+  font-weight: var(--spotlight-3-weight, inherit);
+}
+#mdview-root mark.spotlight-line.spotlight-3 {
+  background-color: var(--spotlight-3-bg, #9fd3ff);
+  background-color: color-mix(in srgb, var(--spotlight-3-bg, #9fd3ff) 38%, transparent);
+  color: inherit;
+  font-weight: inherit;
+}
+
+::highlight(spotlight-4) {
+  background-color: var(--spotlight-4-bg, #ffb3c7);
+  color: var(--spotlight-4-fg, #1b1b1b);
+}
+::highlight(spotlight-line-4) {
+  background-color: var(--spotlight-4-bg, #ffb3c7);
+  background-color: color-mix(in srgb, var(--spotlight-4-bg, #ffb3c7) 38%, transparent);
+}
+#mdview-root mark.spotlight-4 {
+  background-color: var(--spotlight-4-bg, #ffb3c7);
+  color: var(--spotlight-4-fg, #1b1b1b);
+  font-weight: var(--spotlight-4-weight, inherit);
+}
+#mdview-root mark.spotlight-line.spotlight-4 {
+  background-color: var(--spotlight-4-bg, #ffb3c7);
+  background-color: color-mix(in srgb, var(--spotlight-4-bg, #ffb3c7) 38%, transparent);
+  color: inherit;
+  font-weight: inherit;
+}
+
+::highlight(spotlight-5) {
+  background-color: var(--spotlight-5-bg, #d7b8ff);
+  color: var(--spotlight-5-fg, #1b1b1b);
+}
+::highlight(spotlight-line-5) {
+  background-color: var(--spotlight-5-bg, #d7b8ff);
+  background-color: color-mix(in srgb, var(--spotlight-5-bg, #d7b8ff) 38%, transparent);
+}
+#mdview-root mark.spotlight-5 {
+  background-color: var(--spotlight-5-bg, #d7b8ff);
+  color: var(--spotlight-5-fg, #1b1b1b);
+  font-weight: var(--spotlight-5-weight, inherit);
+}
+#mdview-root mark.spotlight-line.spotlight-5 {
+  background-color: var(--spotlight-5-bg, #d7b8ff);
+  background-color: color-mix(in srgb, var(--spotlight-5-bg, #d7b8ff) 38%, transparent);
+  color: inherit;
+  font-weight: inherit;
+}
+
+::highlight(spotlight-6) {
+  background-color: var(--spotlight-6-bg, #ffc999);
+  color: var(--spotlight-6-fg, #1b1b1b);
+}
+::highlight(spotlight-line-6) {
+  background-color: var(--spotlight-6-bg, #ffc999);
+  background-color: color-mix(in srgb, var(--spotlight-6-bg, #ffc999) 38%, transparent);
+}
+#mdview-root mark.spotlight-6 {
+  background-color: var(--spotlight-6-bg, #ffc999);
+  color: var(--spotlight-6-fg, #1b1b1b);
+  font-weight: var(--spotlight-6-weight, inherit);
+}
+#mdview-root mark.spotlight-line.spotlight-6 {
+  background-color: var(--spotlight-6-bg, #ffc999);
+  background-color: color-mix(in srgb, var(--spotlight-6-bg, #ffc999) 38%, transparent);
+  color: inherit;
+  font-weight: inherit;
+}
+
+::highlight(spotlight-7) {
+  background-color: var(--spotlight-7-bg, #9ee8e0);
+  color: var(--spotlight-7-fg, #1b1b1b);
+}
+::highlight(spotlight-line-7) {
+  background-color: var(--spotlight-7-bg, #9ee8e0);
+  background-color: color-mix(in srgb, var(--spotlight-7-bg, #9ee8e0) 38%, transparent);
+}
+#mdview-root mark.spotlight-7 {
+  background-color: var(--spotlight-7-bg, #9ee8e0);
+  color: var(--spotlight-7-fg, #1b1b1b);
+  font-weight: var(--spotlight-7-weight, inherit);
+}
+#mdview-root mark.spotlight-line.spotlight-7 {
+  background-color: var(--spotlight-7-bg, #9ee8e0);
+  background-color: color-mix(in srgb, var(--spotlight-7-bg, #9ee8e0) 38%, transparent);
+  color: inherit;
+  font-weight: inherit;
+}
+
+::highlight(spotlight-8) {
+  background-color: var(--spotlight-8-bg, #e3e38a);
+  color: var(--spotlight-8-fg, #1b1b1b);
+}
+::highlight(spotlight-line-8) {
+  background-color: var(--spotlight-8-bg, #e3e38a);
+  background-color: color-mix(in srgb, var(--spotlight-8-bg, #e3e38a) 38%, transparent);
+}
+#mdview-root mark.spotlight-8 {
+  background-color: var(--spotlight-8-bg, #e3e38a);
+  color: var(--spotlight-8-fg, #1b1b1b);
+  font-weight: var(--spotlight-8-weight, inherit);
+}
+#mdview-root mark.spotlight-line.spotlight-8 {
+  background-color: var(--spotlight-8-bg, #e3e38a);
+  background-color: color-mix(in srgb, var(--spotlight-8-bg, #e3e38a) 38%, transparent);
+  color: inherit;
+  font-weight: inherit;
+}
+
 /* Section spotlight (browser.cursor_marker = "section"): dim the blocks outside
    the cursor's section and lift the ones inside it, so a passive viewer can see
    at a glance which section is being discussed — more robust under video

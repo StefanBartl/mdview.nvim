@@ -20,6 +20,7 @@ import { installLinkHover } from './render/linkHover';
 import { updateCursorMarker, parseCursorMarkerMode } from './render/cursorMarker';
 import { updateSelection, parseSelection, type SourceSelection } from './render/selectionMarker';
 import { applyBlankLineSpacing, parseBlankLines } from './render/blankLines';
+import { createSpotlightMirror } from './render/spotlightMirror';
 import { enableTaskCheckboxes, installTaskToggle } from './render/taskToggle';
 import { installFieldSync } from './render/fieldSync';
 import {
@@ -90,6 +91,12 @@ const CONTROL_MESSAGE_PREFIX = '\x05';
 // colors per fenced code block) — must match native/server/main.go's
 // spansMessagePrefix. Powers browser.highlighter = "nvim".
 const SPANS_MESSAGE_PREFIX = '\x06';
+
+// Tags a WS message as the spotlight-mirror state (JSON: spotlight.nvim's
+// whole-file highlights plus their colors) — must match native/server/main.go's
+// spotlightMessagePrefix. The relay keeps the latest one and seeds every
+// joining tab with it, so a reload shows the highlights at once.
+const SPOTLIGHT_MESSAGE_PREFIX = '\x07';
 
 function applyScrollPing(container: HTMLElement, message: string): void {
   // Payload: "line/total/viewfrac[/col]". viewfrac (0..1) is where in the browser
@@ -342,6 +349,11 @@ async function boot() {
     });
   }
 
+  // spotlight.nvim's highlights, mirrored from Neovim (see render/spotlightMirror.ts).
+  // Holds the latest state the relay sent and repaints it after every render —
+  // the render replaces the DOM the highlights were painted on.
+  const spotlight = container ? createSpotlightMirror(container, { log: clientLog }) : null;
+
   // Opt-in reverse scroll (browser -> Neovim). While applying an incoming
   // nvim->browser scroll ping we set scrollSuppressUntil so the resulting
   // 'scroll' event doesn't bounce back to Neovim and create a feedback loop.
@@ -419,7 +431,11 @@ async function boot() {
       // Highlight fenced/plain code after the DOM is in place. Fire and
       // forget (the highlighter is async for Shiki) — it only adds/replaces
       // markup on the trusted, already-rendered DOM and never throws.
-      void highlight(highlighter, container);
+      void highlight(highlighter, container).then(() => spotlight?.reapply());
+      // The spotlights go on right away too, so a re-render does not flash
+      // them off until the highlighter has finished; the repaint above is for
+      // the code blocks it rebuilds, which takes the painted ranges with it.
+      spotlight?.reapply();
       // The render above wiped the cursor marker element; re-place it. For a
       // plain-text document there's no data-sourcepos, so this is a no-op
       // (see cursorMarker.ts's pickScrollTarget fallback).
@@ -460,6 +476,8 @@ async function boot() {
         }
         setSpans(parsed);
         await highlight(highlighter, container);
+        // The repaint of the code blocks rebuilt their text nodes.
+        spotlight?.reapply();
       } catch (err) {
         console.error('[mdview] fence spans failed', err);
       }
@@ -598,6 +616,14 @@ async function boot() {
       // Arrives on its own channel, after the content it describes, so the
       // document is already rendered and only needs repainting.
       applySpans(rawMessage.slice(SPANS_MESSAGE_PREFIX.length));
+      return;
+    }
+
+    if (rawMessage.startsWith(SPOTLIGHT_MESSAGE_PREFIX)) {
+      // Neovim's spotlights (and their colors): store and paint them. Arrives
+      // on its own channel, also right after connecting, before or after the
+      // first render — reapply() after each render covers the other order.
+      spotlight?.update(rawMessage.slice(SPOTLIGHT_MESSAGE_PREFIX.length));
       return;
     }
 
