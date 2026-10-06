@@ -78,20 +78,9 @@ local function initial_push_async(push_strategy, try_push_opts, wait_timeout, br
       return
     end
 
-    -- attempt to read buffer if open, else read file from disk
-    local bufnr = vim.fn.bufnr(norm, false)
-    local lines
-    if bufnr and bufnr ~= -1 then
-      lines = require("mdview.core.mirror").lines(bufnr)
-    else
-      -- safe file read fallback
-      local ok, content = pcall(vim.fn.readfile, norm)
-      if ok and content then
-        lines = content
-      else
-        lines = {}
-      end
-    end
+    -- The loaded buffer's text (unsaved edits included), else the file on disk;
+    -- a buffer that is known but not loaded counts as on disk, never as empty.
+    local lines = require("mdview.core.mirror").lines_for_path(norm)
 
     trypush.try_push(norm, lines, try_push_opts)
     return
@@ -250,5 +239,9 @@ end
 -- Exposed for tests: pure token-parsing logic, otherwise unreachable except
 -- through the full M.run() (which spawns a real server process).
 M._parse_start_args = parse_start_args
+
+-- Exposed for tests: the initial push, so the content it seeds the preview with
+-- can be asserted without spawning a server (try_push is stubbed by the spec).
+M._initial_push_async = initial_push_async
 
 return M

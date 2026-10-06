@@ -42,7 +42,12 @@ overrides are only for a build kept somewhere else.
   [markdown.nvim](https://github.com/StefanBartl/markdown.nvim), and they reach
   the preview for free because they change the text. The two deliberate
   exceptions are the checkbox and form-field write-backs, and both are
-  opt-in config keys.
+  opt-in config keys. The text that goes *into* the preview is read in one
+  place, `lua/mdview/core/mirror.lua` (`lines` for a buffer, `lines_for_path`
+  for a file that may not be open); a buffer that is not loaded is answered from
+  disk, never as an empty document. `TESTS/nvim/mirror_guard_spec.lua` fails on
+  any other `nvim_buf_get_lines` or `readfile` under `lua/mdview`, apart from
+  the exceptions its header lists.
 - **Companions are never loaded.** markdown.nvim and color_my_ascii.nvim are
   detected, never required. `:checkhealth mdview` notes their presence; nothing
   else may depend on it.

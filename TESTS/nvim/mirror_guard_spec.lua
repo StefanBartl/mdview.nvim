@@ -1,8 +1,10 @@
 ---@module 'tests.nvim.mirror_guard_spec'
 -- Guard against regression: the buffer text for the preview must come from
 -- mdview.core.mirror. Any other `nvim_buf_get_lines` under lua/mdview is a
--- stray read that a future transform (display language) would miss. The
--- documented exceptions are listed in the header of core/mirror.lua.
+-- stray read that a future transform (display language) would miss, and so is a
+-- raw `readfile` (the disk side of the same text: a file that is not open in a
+-- buffer is read through mirror.lines_for_path). The documented exceptions are
+-- listed in the header of core/mirror.lua.
 
 ---@diagnostic disable: undefined-global
 
@@ -13,6 +15,9 @@ local ALLOWED = {
   ["test/runner.lua"] = true,
 }
 
+-- Plain-text needles; a hit on a non-comment line outside ALLOWED is an offender.
+local FORBIDDEN = { "nvim_buf_get_lines", "readfile" }
+
 ---@return string root
 local function lua_root()
   local src = debug.getinfo(1, "S").source:sub(2)
@@ -21,7 +26,7 @@ local function lua_root()
 end
 
 describe("mdview.core.mirror guard", function()
-  it("keeps nvim_buf_get_lines out of lua/mdview except the documented exceptions", function()
+  it("keeps raw buffer/disk reads out of lua/mdview except the documented exceptions", function()
     local root = lua_root()
     local offenders = {}
     for name, kind in vim.fs.dir(root, { depth = 10 }) do
@@ -31,9 +36,13 @@ describe("mdview.core.mirror guard", function()
           local n = 0
           for line in f:lines() do
             n = n + 1
-            -- Comments may mention the function name.
-            if not line:match("^%s*%-%-") and line:find("nvim_buf_get_lines", 1, true) then
-              offenders[#offenders + 1] = name .. ":" .. n
+            -- Comments may mention the function names.
+            if not line:match("^%s*%-%-") then
+              for _, needle in ipairs(FORBIDDEN) do
+                if line:find(needle, 1, true) then
+                  offenders[#offenders + 1] = name .. ":" .. n .. " (" .. needle .. ")"
+                end
+              end
             end
           end
           f:close()
