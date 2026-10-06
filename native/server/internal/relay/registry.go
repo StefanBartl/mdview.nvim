@@ -16,16 +16,30 @@ type Conn interface {
 // preview tab.
 type Registry struct {
 	mu        sync.Mutex
-	rooms     map[string]map[Conn]struct{}
+	rooms     map[string]map[Conn]*member
 	last      map[string][]byte
 	spans     map[string][]byte
 	spotlight []byte
 	docDirs   map[string]string
 }
 
+// member is one connection in a room. Its mutex serializes everything that is
+// written to the connection, so a seed that JoinAndSeed is still delivering is
+// never overtaken by a broadcast that arrived after the join.
+type member struct {
+	mu sync.Mutex
+}
+
+// target is a snapshot entry taken for a fan-out: the connection and the lock
+// that orders writes to it.
+type target struct {
+	c Conn
+	m *member
+}
+
 func NewRegistry() *Registry {
 	return &Registry{
-		rooms:   make(map[string]map[Conn]struct{}),
+		rooms:   make(map[string]map[Conn]*member),
 		last:    make(map[string][]byte),
 		spans:   make(map[string][]byte),
 		docDirs: make(map[string]string),
@@ -51,15 +65,62 @@ func (r *Registry) DocDir(key string) (string, bool) {
 	return dir, ok
 }
 
-// Join adds c to the room for key. Call LastPayload afterwards to seed a
-// newly-joined connection with the current content.
+// Join adds c to the room for key, without seeding it. A transport that wants
+// the current state delivered uses JoinAndSeed instead: calling Join and then
+// LastPayload/LastSpans/LastSpotlight leaves a window in which a broadcast
+// reaches c first and the older state read before it is delivered after.
 func (r *Registry) Join(key string, c Conn) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	r.joinLocked(key, c)
+}
+
+// joinLocked registers c in key's room and returns its member record. Caller
+// must hold r.mu.
+func (r *Registry) joinLocked(key string, c Conn) *member {
 	if r.rooms[key] == nil {
-		r.rooms[key] = make(map[Conn]struct{})
+		r.rooms[key] = make(map[Conn]*member)
 	}
-	r.rooms[key][c] = struct{}{}
+	m := &member{}
+	r.rooms[key][c] = m
+	return m
+}
+
+// JoinAndSeed adds c to the room for key and sends it the current state: the
+// content, then the fence highlights (the client paints them onto a rendered
+// document, so they must come second), then the spotlight mirror state.
+//
+// Registration and the reading of that state happen under one lock, and
+// c's own write lock is taken before that lock is released, so a broadcast
+// that follows the join is delivered after the seed instead of before it: c
+// can never end on an older state than the one a broadcast already carried.
+// A broadcast that preceded the join is simply part of the seed.
+//
+// Returns the first send error; c stays joined, and the caller leaves the room
+// as it does after any failed connection.
+func (r *Registry) JoinAndSeed(key string, c Conn) error {
+	r.mu.Lock()
+	m := r.joinLocked(key, c)
+	m.mu.Lock()
+	seeds := make([][]byte, 0, 3)
+	if p, ok := r.last[key]; ok {
+		seeds = append(seeds, p)
+	}
+	if p, ok := r.spans[key]; ok {
+		seeds = append(seeds, p)
+	}
+	if r.spotlight != nil {
+		seeds = append(seeds, r.spotlight)
+	}
+	r.mu.Unlock()
+	defer m.mu.Unlock()
+
+	for _, p := range seeds {
+		if err := c.Send(p); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // Leave removes c from the room for key. Safe to call even if c was never
@@ -122,7 +183,7 @@ func (r *Registry) LastSpotlight() ([]byte, bool) {
 func (r *Registry) BroadcastSpotlight(payload []byte) []error {
 	r.mu.Lock()
 	r.spotlight = payload
-	var conns []Conn
+	var conns []target
 	for key := range r.rooms {
 		conns = append(conns, r.connsForLocked(key)...)
 	}
@@ -164,7 +225,7 @@ func (r *Registry) BroadcastEphemeral(key string, payload []byte) []error {
 // newly-joined connection is never seeded with it.
 func (r *Registry) BroadcastAllEphemeral(payload []byte) []error {
 	r.mu.Lock()
-	var conns []Conn
+	var conns []target
 	for key := range r.rooms {
 		conns = append(conns, r.connsForLocked(key)...)
 	}
@@ -175,18 +236,23 @@ func (r *Registry) BroadcastAllEphemeral(payload []byte) []error {
 
 // connsForLocked snapshots the current members of key's room. Caller must
 // hold r.mu.
-func (r *Registry) connsForLocked(key string) []Conn {
-	conns := make([]Conn, 0, len(r.rooms[key]))
-	for c := range r.rooms[key] {
-		conns = append(conns, c)
+func (r *Registry) connsForLocked(key string) []target {
+	conns := make([]target, 0, len(r.rooms[key]))
+	for c, m := range r.rooms[key] {
+		conns = append(conns, target{c: c, m: m})
 	}
 	return conns
 }
 
-func sendAll(conns []Conn, payload []byte) []error {
+// sendAll delivers payload to every target. Each write is taken under the
+// target's lock, which waits out a seed still on its way (see JoinAndSeed).
+func sendAll(conns []target, payload []byte) []error {
 	var errs []error
-	for _, c := range conns {
-		if err := c.Send(payload); err != nil {
+	for _, t := range conns {
+		t.m.mu.Lock()
+		err := t.c.Send(payload)
+		t.m.mu.Unlock()
+		if err != nil {
 			errs = append(errs, err)
 		}
 	}

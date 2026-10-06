@@ -87,20 +87,10 @@ func handleWebTransport(server *webtransport.Server, registry *relay.Registry, t
 
 		ctx := session.Context()
 		conn := wtConn{ctx: ctx, session: session}
-		registry.Join(key, conn)
+		// Seed the newly-joined session with the current state, like /ws.
 		defer registry.Leave(key, conn)
-
-		// Seed the newly-joined session with the current document, like /ws.
-		if payload, ok := registry.LastPayload(key); ok {
-			if err := conn.Send(payload); err != nil {
-				return
-			}
-		}
-
-		if payload, ok := registry.LastSpotlight(); ok {
-			if err := conn.Send(payload); err != nil {
-				return
-			}
+		if err := registry.JoinAndSeed(key, conn); err != nil {
+			return
 		}
 
 		// Stay until the client disconnects; broadcasts are pushed via conn.Send.

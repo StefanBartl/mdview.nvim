@@ -978,29 +978,14 @@ func handleWS(registry *relay.Registry, token string, port int) http.HandlerFunc
 
 		ctx := r.Context()
 		conn := wsConn{ctx: ctx, c: c}
-		registry.Join(key, conn)
+		// Join and seed in one step: the content, then the fence highlights (the
+		// client paints them onto a rendered document, so they must come second),
+		// then the spotlight mirror (Neovim's, not a document's, so it is seeded
+		// into every room). Doing it as Join + Last* left a window in which a
+		// broadcast reached this connection first and an older seed followed it.
 		defer registry.Leave(key, conn)
-
-		if payload, ok := registry.LastPayload(key); ok {
-			if err := conn.Send(payload); err != nil {
-				return
-			}
-		}
-
-		// After the content, never before: the client applies fence highlights to
-		// a rendered document, so spans arriving first would find nothing.
-		if payload, ok := registry.LastSpans(key); ok {
-			if err := conn.Send(payload); err != nil {
-				return
-			}
-		}
-
-		// The spotlight mirror describes Neovim, not a document, so it is seeded
-		// into every room the same way.
-		if payload, ok := registry.LastSpotlight(); ok {
-			if err := conn.Send(payload); err != nil {
-				return
-			}
+		if err := registry.JoinAndSeed(key, conn); err != nil {
+			return
 		}
 
 		// Receive-only from the browser's side; all content flows in via POST

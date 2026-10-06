@@ -2,7 +2,10 @@ package relay
 
 import (
 	"errors"
+	"fmt"
+	"sync"
 	"testing"
+	"time"
 )
 
 // fakeConn records every payload sent to it, so tests can assert exactly
@@ -278,4 +281,213 @@ func TestRegistry_BroadcastSpotlightIsStoredAndKeepsOnlyTheLatest(t *testing.T) 
 	if !ok || string(content) != "content" {
 		t.Fatalf("BroadcastSpotlight must not touch the content; got %q (ok=%v)", content, ok)
 	}
+}
+
+// slowConn blocks its first Send until released, to hold a seed "on the wire"
+// while a broadcast arrives. It records payloads in delivery order.
+type slowConn struct {
+	mu       sync.Mutex
+	received []string
+	entered  chan struct{} // closed when the first Send has started
+	release  chan struct{} // the first Send waits for this
+	once     sync.Once
+}
+
+func newSlowConn() *slowConn {
+	return &slowConn{entered: make(chan struct{}), release: make(chan struct{})}
+}
+
+func (s *slowConn) Send(payload []byte) error {
+	first := false
+	s.once.Do(func() { first = true })
+	if first {
+		close(s.entered)
+		<-s.release
+	}
+	s.mu.Lock()
+	s.received = append(s.received, string(payload))
+	s.mu.Unlock()
+	return nil
+}
+
+func (s *slowConn) got() []string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return append([]string(nil), s.received...)
+}
+
+func TestRegistry_JoinAndSeedDeliversContentSpansThenSpotlight(t *testing.T) {
+	r := NewRegistry()
+	r.Broadcast("/doc/a.md", []byte("content"))
+	r.BroadcastSpans("/doc/a.md", []byte("spans"))
+	r.BroadcastSpotlight([]byte("spotlight"))
+
+	c := &fakeConn{}
+	if err := r.JoinAndSeed("/doc/a.md", c); err != nil {
+		t.Fatalf("JoinAndSeed: %v", err)
+	}
+
+	want := []string{"content", "spans", "spotlight"}
+	if len(c.received) != len(want) {
+		t.Fatalf("expected %v, got %q", want, c.received)
+	}
+	for i, w := range want {
+		if string(c.received[i]) != w {
+			t.Fatalf("seed %d: expected %q, got %q", i, w, c.received[i])
+		}
+	}
+
+	// Joined for good: the next broadcast arrives too.
+	r.Broadcast("/doc/a.md", []byte("next"))
+	if string(c.received[len(c.received)-1]) != "next" {
+		t.Fatalf("expected the joined connection to receive later broadcasts, got %q", c.received)
+	}
+}
+
+func TestRegistry_JoinAndSeedSendsNothingWhenThereIsNoState(t *testing.T) {
+	r := NewRegistry()
+	c := &fakeConn{}
+	if err := r.JoinAndSeed("/doc/a.md", c); err != nil {
+		t.Fatalf("JoinAndSeed: %v", err)
+	}
+	if len(c.received) != 0 {
+		t.Fatalf("expected no seed, got %q", c.received)
+	}
+}
+
+func TestRegistry_JoinAndSeedReportsASendError(t *testing.T) {
+	r := NewRegistry()
+	r.Broadcast("/doc/a.md", []byte("content"))
+	c := &fakeConn{failNext: true}
+	if err := r.JoinAndSeed("/doc/a.md", c); err == nil {
+		t.Fatalf("expected the send error to be returned")
+	}
+}
+
+// The race this guards: Join, then LastPayload (old state read), then a
+// broadcast that reaches the connection, then the old state is sent after it.
+// With the seed held on the wire, a broadcast issued after the join must wait
+// for it and arrive second.
+func TestRegistry_BroadcastAfterJoinNeverOvertakesTheSeed(t *testing.T) {
+	cases := []struct {
+		name      string
+		store     func(r *Registry)
+		broadcast func(r *Registry)
+		old, new  string
+	}{
+		{
+			name:      "content",
+			store:     func(r *Registry) { r.Broadcast("/doc/a.md", []byte("old")) },
+			broadcast: func(r *Registry) { r.Broadcast("/doc/a.md", []byte("fresh")) },
+			old:       "old", new: "fresh",
+		},
+		{
+			name:      "spans",
+			store:     func(r *Registry) { r.BroadcastSpans("/doc/a.md", []byte("old")) },
+			broadcast: func(r *Registry) { r.BroadcastSpans("/doc/a.md", []byte("fresh")) },
+			old:       "old", new: "fresh",
+		},
+		{
+			name:      "spotlight",
+			store:     func(r *Registry) { r.BroadcastSpotlight([]byte("old")) },
+			broadcast: func(r *Registry) { r.BroadcastSpotlight([]byte("fresh")) },
+			old:       "old", new: "fresh",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			r := NewRegistry()
+			tc.store(r)
+
+			c := newSlowConn()
+			joined := make(chan error, 1)
+			go func() { joined <- r.JoinAndSeed("/doc/a.md", c) }()
+			<-c.entered // the old state is on the wire, the connection is registered
+
+			broadcast := make(chan struct{})
+			go func() {
+				tc.broadcast(r)
+				close(broadcast)
+			}()
+
+			// The broadcast must be held back while the seed is in flight.
+			select {
+			case <-broadcast:
+				t.Fatalf("a broadcast overtook the seed that was still being delivered")
+			case <-time.After(50 * time.Millisecond):
+			}
+
+			close(c.release)
+			if err := <-joined; err != nil {
+				t.Fatalf("JoinAndSeed: %v", err)
+			}
+			<-broadcast
+
+			got := c.got()
+			if len(got) != 2 || got[0] != tc.old || got[1] != tc.new {
+				t.Fatalf("expected [%s %s] in that order, got %q", tc.old, tc.new, got)
+			}
+		})
+	}
+}
+
+func TestRegistry_ConcurrentJoinsAndBroadcastsEndOnTheLatestState(t *testing.T) {
+	r := NewRegistry()
+	r.Broadcast("/doc/a.md", []byte("v0"))
+
+	const joiners = 20
+	conns := make([]*recordingConn, joiners)
+	var wg sync.WaitGroup
+	for i := range conns {
+		conns[i] = &recordingConn{}
+		wg.Add(1)
+		go func(c *recordingConn) {
+			defer wg.Done()
+			_ = r.JoinAndSeed("/doc/a.md", c)
+		}(conns[i])
+	}
+	for v := 1; v <= 50; v++ {
+		r.Broadcast("/doc/a.md", []byte(fmt.Sprintf("v%d", v)))
+	}
+	wg.Wait()
+	r.Broadcast("/doc/a.md", []byte("final"))
+
+	for i, c := range conns {
+		got := c.got()
+		if len(got) == 0 || got[len(got)-1] != "final" {
+			t.Fatalf("conn %d did not end on the latest state: %q", i, got)
+		}
+		// Versions never go backwards on a connection.
+		last := -1
+		for _, p := range got {
+			var n int
+			if _, err := fmt.Sscanf(p, "v%d", &n); err != nil {
+				continue
+			}
+			if n < last {
+				t.Fatalf("conn %d saw v%d after v%d: %q", i, n, last, got)
+			}
+			last = n
+		}
+	}
+}
+
+// recordingConn is a fakeConn that is safe for the concurrent test above.
+type recordingConn struct {
+	mu       sync.Mutex
+	received []string
+}
+
+func (c *recordingConn) Send(payload []byte) error {
+	c.mu.Lock()
+	c.received = append(c.received, string(payload))
+	c.mu.Unlock()
+	return nil
+}
+
+func (c *recordingConn) got() []string {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return append([]string(nil), c.received...)
 }

@@ -98,7 +98,15 @@ A room remembers its content (`LastPayload`, written by `Broadcast`) and, since
 `browser.highlighter = "nvim"`, its fence highlighting (`LastSpans`, written by
 `BroadcastSpans`). A joining connection is seeded with both, **content first** —
 the client paints spans onto a rendered document, so the other order would find
-nothing to paint.
+nothing to paint. Then the global spotlight state, if any (see below).
+
+The join and the seeding are one step, `Registry.JoinAndSeed`: the connection is
+registered and the three stored states are read under one lock, and the
+connection's own write lock is held until the seed has been sent. A broadcast
+that arrives in between waits for it, so a joining tab can never receive a
+fresh update and then an older seed on top of it (the window a separate `Join`
+followed by `LastPayload` used to leave). `/ws` and the WebTransport route both
+use it, so both are seeded alike.
 
 Stored, not ephemeral, and that distinction is the whole point: every other
 sidecar channel (`/scroll`, `/doc`, `/control`) carries a passing event that the
@@ -108,8 +116,8 @@ reloaded tab would otherwise sit there unhighlighted until the next edit
 happened to arrive.
 
 - **Module:** `native/server/internal/relay/registry.go` (`Broadcast`,
-  `BroadcastSpans`, `LastPayload`, `LastSpans`), `native/server/main.go`
-  (`handleSpans`, `handleWS`)
+  `BroadcastSpans`, `LastPayload`, `LastSpans`, `JoinAndSeed`),
+  `native/server/main.go` (`handleSpans`, `handleWS`), `native/server/webtransport.go`
 
 ## The polling bridge, browser → Neovim
 
