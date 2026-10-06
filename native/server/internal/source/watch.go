@@ -47,7 +47,7 @@ func Watch(b Broadcaster, key, path string, interval time.Duration, stop <-chan 
 		interval = DefaultInterval
 	}
 
-	var last []byte
+	var last, pending []byte
 	var reportedErr bool
 
 	read := func() {
@@ -67,8 +67,18 @@ func Watch(b Broadcaster, key, path string, interval time.Duration, stop <-chan 
 		// some filesystems that two saves within the same tick would look
 		// identical, and a no-op save shouldn't cost a full re-render.
 		if last != nil && bytes.Equal(last, content) {
+			pending = nil
 			return
 		}
+		// A change is broadcast only once it reads the same on two polls in a
+		// row. A non-atomic save (truncate, then write) is visible mid-way as
+		// an empty or partial file; broadcasting that would flash an empty
+		// preview and re-render the real content a tick later.
+		if last != nil && !bytes.Equal(pending, content) {
+			pending = content
+			return
+		}
+		pending = nil
 		last = content
 		b.Broadcast(key, content)
 	}
