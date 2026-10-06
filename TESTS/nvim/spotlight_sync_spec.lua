@@ -18,6 +18,7 @@ local cfg = require("mdview.config")
 local original_plugin = package.loaded["spotlight"]
 local original_wait_ready = ws.wait_ready
 local original_send = ws.send_spotlight
+local original_jobstart = vim.fn.jobstart
 
 -- What the stubbed spotlight.nvim currently holds.
 local items, palette
@@ -285,5 +286,54 @@ describe("spotlight_sync", function()
       spotlight_cmd.run("sideways")
       assert.is_true(cfg.defaults.browser.spotlight_sync) -- unchanged
     end)
+  end)
+end)
+
+describe("spotlight_sync with a curl that cannot be started", function()
+  local group
+  local started
+
+  before_each(function()
+    items = { { text = "SYSsystosca", slot = 1, line_mode = false, kind = "word", ignore_case = false } }
+    palette = { { slot = 1, group = "Spotlight1", fg = "#000000", bg = "#ffee00", bold = false } }
+    install_plugin()
+    sync.DEBOUNCE_MS = 15
+    cfg.defaults.browser.spotlight_sync = true
+    cfg.defaults.browser.spotlight_max_matches = 500
+    state.set_server({ stub = true })
+    ws.wait_ready = function(cb)
+      cb(true)
+    end
+    -- The real send_spotlight and http_post_nonblocking, on a jobstart that fails.
+    started = 0
+    vim.fn.jobstart = function()
+      started = started + 1
+      return -1
+    end
+    group = vim.api.nvim_create_augroup("MdviewSpotlightSyncSpec2", { clear = true })
+  end)
+
+  after_each(function()
+    sync.reset()
+    pcall(vim.api.nvim_del_augroup_by_id, group)
+    state.clear_server()
+    ws.wait_ready = original_wait_ready
+    vim.fn.jobstart = original_jobstart
+    package.loaded["spotlight"] = original_plugin
+  end)
+
+  it("does not stay 'in flight': the next change is sent instead of held back for ever", function()
+    sync.attach(group)
+    vim.wait(1000, function()
+      return started >= 1
+    end, 5)
+    assert.are.equal(1, started)
+
+    items = { { text = "second", slot = 1, line_mode = false, kind = "word", ignore_case = false } }
+    fire()
+    vim.wait(1000, function()
+      return started >= 2
+    end, 5)
+    assert.are.equal(2, started)
   end)
 end)

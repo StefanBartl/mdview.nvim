@@ -87,3 +87,101 @@ describe("ws_client.send_markdown without curl", function()
     end)
   end)
 end)
+
+--- Run `fn` with curl reported present but jobstart answering `start` (a value
+--- returned, or a function that throws). `args` collects the argv jobstart got.
+---@param start any|fun(): any
+---@param fn fun(args: string[][])
+local function with_failing_jobstart(start, fn)
+  local orig_executable, orig_jobstart = vim.fn.executable, vim.fn.jobstart
+  local args = {}
+  vim.fn.executable = function(name)
+    if name == "curl" then
+      return 1
+    end
+    return orig_executable(name)
+  end
+  vim.fn.jobstart = function(argv)
+    args[#args + 1] = argv
+    if type(start) == "function" then
+      return start()
+    end
+    return start
+  end
+
+  local ok, err = pcall(fn, args)
+
+  vim.fn.executable, vim.fn.jobstart = orig_executable, orig_jobstart
+  if not ok then
+    error(err, 0)
+  end
+end
+
+--- The temp file a POST's argv points curl at (`--data-binary @<file>`).
+---@param argv string[]
+---@return string
+local function body_file_of(argv)
+  for i, a in ipairs(argv) do
+    if a == "--data-binary" then
+      return argv[i + 1]:sub(2)
+    end
+  end
+  error("no --data-binary in " .. vim.inspect(argv))
+end
+
+describe("ws_client.send_spotlight when curl cannot be started", function()
+  local cases = {
+    { "returns -1", -1 },
+    { "returns 0", 0 },
+    {
+      "throws",
+      function()
+        error("E475: Invalid value for argument cmd: 'curl' is not executable")
+      end,
+    },
+  }
+
+  for _, case in ipairs(cases) do
+    it("answers cb(false, ...) at once when jobstart " .. case[1], function()
+      with_failing_jobstart(case[2], function(args)
+        local got
+        ws.send_spotlight('{"type":"spotlight"}', function(ok, err)
+          got = { ok, err }
+        end)
+
+        assert.is_table(got, "the callback must not be left waiting for an on_exit that never comes")
+        assert.is_false(got[1])
+        assert(tostring(got[2]):find("could not start curl", 1, true), "unexpected detail: " .. tostring(got[2]))
+        assert.are.equal(1, #args)
+        assert.is_nil(vim.uv.fs_stat(body_file_of(args[1])), "the body's temp file must not be left behind")
+      end)
+    end)
+  end
+
+  it("still reports a started job's exit through the callback", function()
+    with_failing_jobstart(7, function()
+      local got
+      ws.send_spotlight('{"type":"spotlight"}', function(ok)
+        got = ok
+      end)
+      assert.is_nil(got) -- 7 is a valid job id: the answer comes with on_exit
+    end)
+  end)
+end)
+
+describe("ws_client.wait_ready when curl cannot be started", function()
+  it("gives up with cb(false) after the timeout instead of waiting for ever", function()
+    with_failing_jobstart(-1, function()
+      ws.reset_ready()
+      local result = "not called"
+      ws.wait_ready(function(ok)
+        result = ok
+      end, 60)
+      vim.wait(2000, function()
+        return result ~= "not called"
+      end, 10)
+      assert.is_false(result)
+      assert.is_false(ws._ready)
+    end)
+  end)
+end)

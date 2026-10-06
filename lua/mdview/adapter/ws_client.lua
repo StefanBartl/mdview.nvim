@@ -104,6 +104,10 @@ end
 -- timeout for a request that was never sent.
 local CURL_MISSING = "curl not found on PATH"
 
+-- Exit code handed to a POST callback when curl could not be started at all
+-- (jobstart failed); 127 stays reserved for "curl is not installed".
+local JOBSTART_FAILED = -1
+
 -- Non-blocking curl GET
 ---@internal
 ---@param url string
@@ -114,13 +118,18 @@ local function http_get(url, cb)
     cb(127, CURL_MISSING)
     return
   end
-  fn.jobstart({ "curl", "-sS", url }, {
+  local ok, jid = pcall(fn.jobstart, { "curl", "-sS", url }, {
     stdout_buffered = true,
     stderr_buffered = true,
     on_exit = function(_, code, _)
       cb(code, nil)
     end,
   })
+  if not ok or type(jid) ~= "number" or jid <= 0 then
+    -- No on_exit will ever come: report an ordinary failed attempt, so the
+    -- health poll retries until its timeout instead of waiting forever.
+    cb(JOBSTART_FAILED, nil)
+  end
 end
 
 --- Wait until server responds on /health or timeout, then call cb(true) /
@@ -243,12 +252,16 @@ end
 -- The body travels through a temp file and an argv list, never through a
 -- shell: it is the user's buffer text, and a shell would run any `$(...)` or
 -- backtick span in it. Without curl the POST fails explicitly (a missing tool
--- is a failure, not a success with no response).
+-- is a failure, not a success with no response). The same goes for a curl that
+-- cannot be started (jobstart answers 0 or -1, or throws): no `on_exit` will ever
+-- come, so the callback is invoked right away with exit code JOBSTART_FAILED --
+-- a caller that waits on it (the spotlight mirror holds a request back while one
+-- is in flight) must not wait forever.
 ---@internal
 ---@param url URL # target URL for the POST request
 ---@param body string # request body content
 ---@param cb fun(exit_code: integer, stdout_lines: string[]|nil, stderr_lines: string[]|nil)? # optional callback invoked on completion
----@return integer|nil # job ID if curl jobstart was used, nil otherwise
+---@return integer|nil # job ID if curl was started, nil when it was not (cb has been called already)
 local function http_post_nonblocking(url, body, cb)
   cb = cb or function() end
   if fn.executable("curl") ~= 1 then
@@ -267,7 +280,7 @@ local function http_post_nonblocking(url, body, cb)
   local stderr_acc = {}
 
   local args = { "-sS", "-X", "POST", url, "--data-binary", "@" .. tmpf, "-H", "Content-Type: text/markdown" }
-  local jid = fn.jobstart(vim.list_extend({ "curl" }, args), {
+  local ok_start, jid = pcall(fn.jobstart, vim.list_extend({ "curl" }, args), {
     stdout_buffered = true,
     stderr_buffered = true,
     on_stdout = function(_, data, _)
@@ -296,6 +309,12 @@ local function http_post_nonblocking(url, body, cb)
       cb(code, (#stdout_acc > 0) and stdout_acc or nil, (#stderr_acc > 0) and stderr_acc or nil)
     end,
   })
+  if not ok_start or type(jid) ~= "number" or jid <= 0 then
+    pcall(os.remove, tmpf)
+    local reason = ok_start and ("jobstart returned " .. tostring(jid)) or tostring(jid)
+    cb(JOBSTART_FAILED, nil, { "could not start curl: " .. reason })
+    return nil
+  end
   return jid
 end
 
