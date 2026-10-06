@@ -50,7 +50,16 @@ return {
       "chmod",
       -- breadcrumbs_spec opens a .py buffer on purpose; Neovim's own python3 ftplugin then probes
       -- the python3 provider (a runtime action, not the plugin's), which only exists on CI runners.
+      -- (Neovim tries python3, python and the versioned names in turn, hence the list.)
       "python3",
+      "python",
+      "python3.9",
+      "python3.10",
+      "python3.11",
+      "python3.12",
+      "python3.13",
+      "python3.14",
+      "python3.15",
     },
   },
 }
