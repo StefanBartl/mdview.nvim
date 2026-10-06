@@ -1,7 +1,7 @@
 -- TESTS/e2e_session.lua -- a REAL :MDView session, headless: start, switch between
 -- markdown buffers, edit, stop, start again.
 --
--- Not part of the CI suite (TESTS/nvim/harness.lua): it spawns the installed relay
+-- Not part of the CI suite (scripts/test.sh): it spawns the installed relay
 -- binary, so it needs `:MDView install` to have run once, and it takes a few
 -- seconds. It exists for the things the stubbed specs cannot say -- that the
 -- BufEnter hub, the live_push autocmds and the teardown work together against a

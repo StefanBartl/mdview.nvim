@@ -118,7 +118,7 @@ Four suites, one per language:
 npm test              # client (vitest)
 npm run test:go       # relay
 npm run test:rust     # WASM renderer
-npm run test:lua      # busted, if installed
+npm run test:lua      # Lua specs (testing.nvim, needs nvim)
 npm run check:types   # tsc --noEmit
 ```
 

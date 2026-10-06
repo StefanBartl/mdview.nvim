@@ -1,33 +1,34 @@
 # Tests
 
-mdview.nvim's Lua/Neovim tests live under two roots, mirroring the
-distinction the CI `lua` job (`.github/workflows/ci.yml`) makes:
+mdview.nvim's Lua/Neovim tests live under two roots, both run by
+[testing.nvim](https://github.com/StefanBartl/testing.nvim) (`.testing.lua`
+names the roots, the dependencies and the isolation):
 
-- `TESTS/lua/*_spec.lua` — plain [busted](https://lunarmodules.github.io/busted/)
-  specs (`describe`/`it`, real `luassert`) for **pure Lua modules with no
-  `vim` global** (`.busted` puts `lua/` and a `lib.nvim` checkout on the
-  module path). Run with `busted TESTS/lua`.
+- `TESTS/lua/*_spec.lua` — `describe`/`it` specs (busted dialect, real
+  `luassert` semantics) for **pure Lua modules that need no `vim` API**.
 - `TESTS/nvim/*_spec.lua` — specs for modules that need the real Neovim API.
-  These run inside a headless Neovim instead of under busted (which has no
-  `vim`), via a tiny bundled harness (`TESTS/nvim/harness.lua`) that provides
-  just enough of busted's surface (`describe`/`it`, a small `assert`) to
-  discover and run every `TESTS/nvim/*_spec.lua`, then exits non-zero (`:cq`)
-  on any failure. The harness resolves `lib.nvim` itself (mdview.nvim hard-
-  depends on it) via `$LIB_NVIM_PATH`, a sibling `../lib.nvim` checkout,
-  `.deps/lib.nvim` (where CI clones it), or lazy.nvim's data dir — see
-  `harness.lua`'s `add_lib_nvim()`.
+
+Every spec file runs in a headless Neovim of its own. `TESTS/minimal_init.lua`
+puts the plugin and `lib.nvim` (a hard dependency of mdview.nvim) on the
+runtimepath and fails loudly, naming all four searched places, when a
+dependency is missing: `$LIB_NVIM_DIR`, `.deps/lib.nvim` (where CI clones it),
+a sibling `../lib.nvim` checkout, or `stdpath("data")/lazy/lib.nvim`.
+`testing.nvim` is looked up the same way.
 
 Run locally the same way CI does:
 
 ```sh
-busted TESTS/lua
-nvim --headless -u NONE -i NONE --cmd "set rtp+=.,../lib.nvim" -c "luafile TESTS/nvim/harness.lua" -c "qa!"
+bash scripts/test.sh                   # every spec
+bash scripts/test.sh --file config     # only files whose name contains "config"
+bash scripts/test.sh --json ir.json    # also write the machine-readable result
 ```
 
-(swap `../lib.nvim` for wherever your lib.nvim checkout actually is, or set
-`$LIB_NVIM_PATH` — see above).
+Two cases (`enter_hub_spec.lua` "reset() is safe to call twice",
+`launcher_url_spec.lua` "on other Unix, follows DISPLAY/WAYLAND_DISPLAY")
+assert nothing on some platforms; `assertions = "warn"` in `.testing.lua` lets
+them pass with a note.
 
-Neither suite calls `require("mdview").setup()`: that resolves the browser
+Neither root calls `require("mdview").setup()`: that resolves the browser
 and registers user commands, both of which are environment-sensitive (and
 setup() is itself covered directly, see below) — specs require the modules
 under test and read/patch config defaults instead, so they stay pure unit
