@@ -3,7 +3,7 @@
    dark-only theme by design, so it does not follow prefers-color-scheme;
    selecting it always yields the dimmed look. Structure lives in _base.css. */
 
-@import "./_base.css";
+@import './_base.css';
 
 :root {
   --md-fg: #adbac7;

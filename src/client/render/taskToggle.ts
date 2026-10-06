@@ -30,7 +30,7 @@ export function sourceLineOf(el: Element | null): number | null {
  */
 export function enableTaskCheckboxes(root: HTMLElement): void {
   const boxes = root.querySelectorAll<HTMLInputElement>('li > input[type="checkbox"]');
-  boxes.forEach((box) => {
+  boxes.forEach(box => {
     box.disabled = false;
     box.dataset.mdviewToggle = '1';
   });

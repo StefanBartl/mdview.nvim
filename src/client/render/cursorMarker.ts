@@ -141,12 +141,12 @@ function caretViewportBox(
   // Prefer the run that contains the column (sc..ec+1, so the position just
   // after the last byte counts). Otherwise anchor to the nearest run on the line:
   // the last run starting at/before the column (caret at its end), else the first.
-  let run = runs.find((r) => byteCol >= r.sc && byteCol <= r.ec + 1);
+  let run = runs.find(r => byteCol >= r.sc && byteCol <= r.ec + 1);
   let byteInRun: number;
   if (run) {
     byteInRun = byteCol - run.sc;
   } else {
-    const before = [...runs].reverse().find((r) => r.sc <= byteCol);
+    const before = [...runs].reverse().find(r => r.sc <= byteCol);
     if (before) {
       run = before;
       byteInRun = before.ec + 1 - before.sc; // end of that run
@@ -224,7 +224,7 @@ const SECTION_ACTIVE_CLASS = 'mdview-section-active';
 function clearSection(container: HTMLElement): void {
   container
     .querySelectorAll(`.${SECTION_DIM_CLASS}, .${SECTION_ACTIVE_CLASS}`)
-    .forEach((el) => el.classList.remove(SECTION_DIM_CLASS, SECTION_ACTIVE_CLASS));
+    .forEach(el => el.classList.remove(SECTION_DIM_CLASS, SECTION_ACTIVE_CLASS));
 }
 
 /**

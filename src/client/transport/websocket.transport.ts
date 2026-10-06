@@ -47,7 +47,7 @@ export class WebSocketTransport implements Transport {
           resolve();
         };
 
-        ws.onmessage = (ev) => {
+        ws.onmessage = ev => {
           this.onMessageCb?.(String(ev.data));
         };
 
@@ -64,7 +64,11 @@ export class WebSocketTransport implements Transport {
             // Relay not up yet — retry the first connection at a steady pace.
             setTimeout(attempt, WebSocketTransport.RETRY_MS);
           } else {
-            reject(new Error(`[mdview] could not reach the relay at ${this.url} after ${attempts} attempts`));
+            reject(
+              new Error(
+                `[mdview] could not reach the relay at ${this.url} after ${attempts} attempts`,
+              ),
+            );
           }
         };
 

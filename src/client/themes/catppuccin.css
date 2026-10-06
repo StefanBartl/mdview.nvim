@@ -3,7 +3,7 @@
    the markdown chrome (--md-*) and the highlight.js tokens (--code-*).
    Structure lives in _base.css. */
 
-@import "./_base.css";
+@import './_base.css';
 
 /* Latte (light) — default when the OS is light */
 :root {

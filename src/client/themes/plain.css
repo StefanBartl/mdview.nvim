@@ -3,7 +3,7 @@
    `theme=plain-light` / `theme=plain-dark` URL param pins one explicitly.
    Structure lives in _base.css; this file is only the palette. */
 
-@import "./_base.css";
+@import './_base.css';
 
 :root {
   --md-fg: #222222;
@@ -37,7 +37,7 @@
   }
 }
 
-:root[data-theme="light"] {
+:root[data-theme='light'] {
   --md-fg: #222222;
   --md-muted: #666666;
   --md-bg: #ffffff;
@@ -52,7 +52,7 @@
   --md-mark-bg: #fff3b0;
 }
 
-:root[data-theme="dark"] {
+:root[data-theme='dark'] {
   --md-fg: #dcdcdc;
   --md-muted: #999999;
   --md-bg: #1a1a1a;

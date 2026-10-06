@@ -2,7 +2,7 @@
    colorscheme. Dark-only by design; structure in _base.css. Overrides both the
    markdown chrome (--md-*) and the highlight.js code tokens (--code-*). */
 
-@import "./_base.css";
+@import './_base.css';
 
 :root {
   --md-fg: #c0caf5;

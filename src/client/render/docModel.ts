@@ -74,9 +74,12 @@ export function governingHeading(container: HTMLElement, line: number): HeadingI
  * Content above the first heading is its own section. Null when the document has
  * no headings (nothing to delimit).
  */
-export function sectionRange(blocks: BlockPos[], line: number): { start: number; end: number } | null {
+export function sectionRange(
+  blocks: BlockPos[],
+  line: number,
+): { start: number; end: number } | null {
   if (blocks.length === 0) return null;
-  const firstHeadingIdx = blocks.findIndex((b) => b.headingLevel !== null);
+  const firstHeadingIdx = blocks.findIndex(b => b.headingLevel !== null);
   if (firstHeadingIdx === -1) return null;
 
   let headingIdx = -1;
@@ -104,6 +107,7 @@ export function sectionRange(blocks: BlockPos[], line: number): { start: number;
 
 /** Scroll `container` so `el` sits near the top of the viewport. */
 export function scrollToBlock(container: HTMLElement, el: HTMLElement, offset = 8): void {
-  const top = el.getBoundingClientRect().top - container.getBoundingClientRect().top + container.scrollTop;
+  const top =
+    el.getBoundingClientRect().top - container.getBoundingClientRect().top + container.scrollTop;
   container.scrollTo({ top: Math.max(0, top - offset), behavior: 'smooth' });
 }

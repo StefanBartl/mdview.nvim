@@ -36,7 +36,14 @@ export function navTargetFromHref(href: string | null | undefined): string | nul
 export function installClickNav(root: HTMLElement, send: (target: string) => void): void {
   root.addEventListener('click', (ev: MouseEvent) => {
     // Respect modifier-clicks (open in new tab, etc.) — leave those alone.
-    if (ev.defaultPrevented || ev.button !== 0 || ev.metaKey || ev.ctrlKey || ev.shiftKey || ev.altKey) {
+    if (
+      ev.defaultPrevented ||
+      ev.button !== 0 ||
+      ev.metaKey ||
+      ev.ctrlKey ||
+      ev.shiftKey ||
+      ev.altKey
+    ) {
       return;
     }
     const el = ev.target as Element | null;

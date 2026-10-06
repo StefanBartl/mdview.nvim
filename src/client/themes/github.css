@@ -5,7 +5,7 @@
    setting data-theme on <html>, which wins over the media query.
    All structural rules live in _base.css — this file is only the palette. */
 
-@import "./_base.css";
+@import './_base.css';
 
 :root {
   --md-fg: #1f2328;
@@ -40,7 +40,7 @@
 }
 
 /* Explicit overrides win over the media query in both directions. */
-:root[data-theme="light"] {
+:root[data-theme='light'] {
   --md-fg: #1f2328;
   --md-muted: #59636e;
   --md-bg: #ffffff;
@@ -55,7 +55,7 @@
   --md-mark-bg: #fff8c5;
 }
 
-:root[data-theme="dark"] {
+:root[data-theme='dark'] {
   --md-fg: #f0f6fc;
   --md-muted: #9198a1;
   --md-bg: #0d1117;

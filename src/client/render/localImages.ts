@@ -31,14 +31,18 @@ export function isLocalImageSrc(src: string | null | undefined): boolean {
  * &token=…`. No-op without both key and token — matches clientLog's own
  * "missing token -> do nothing" tolerance elsewhere in this client.
  */
-export function resolveLocalImages(root: HTMLElement, key: string | null, token: string | null): void {
+export function resolveLocalImages(
+  root: HTMLElement,
+  key: string | null,
+  token: string | null,
+): void {
   if (!key || !token) return;
   root.querySelectorAll<HTMLImageElement>('img[src]').forEach(img => {
     const src = img.getAttribute('src');
     if (!isLocalImageSrc(src)) return;
     img.setAttribute(
       'src',
-      `/asset?key=${encodeURIComponent(key)}&path=${encodeURIComponent(src as string)}&token=${encodeURIComponent(token)}`
+      `/asset?key=${encodeURIComponent(key)}&path=${encodeURIComponent(src as string)}&token=${encodeURIComponent(token)}`,
     );
   });
 }

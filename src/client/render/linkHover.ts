@@ -299,9 +299,9 @@ export function installLinkHover(root: HTMLElement, opts: LinkHoverOptions): () 
   }
 
   function onOver(event: MouseEvent): void {
-    const anchor = (event.target as HTMLElement | null)?.closest?.('a[href]') as
-      | HTMLAnchorElement
-      | null;
+    const anchor = (event.target as HTMLElement | null)?.closest?.(
+      'a[href]',
+    ) as HTMLAnchorElement | null;
     if (!anchor || !root.contains(anchor)) return;
     cancel();
     const mine = generation;
