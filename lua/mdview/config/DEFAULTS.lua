@@ -260,7 +260,7 @@ return {
 
   install = {
     repo = "StefanBartl/mdview.nvim",
-    version = "v0.4.2",
+    version = "v0.4.3",
   },
 
   dev = {
