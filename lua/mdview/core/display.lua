@@ -65,8 +65,14 @@ local rooms = {}
 ---@type table<string, { n: integer, out: string[] }>
 local last = {}
 
---- The last FINISHED translation per source path (before the hook), with the
---- lines it was made from: an edit reuses it around the edited lines.
+--- The last text per source path (before the hook), with the lines it was made
+--- from: an edit reuses it around the edited lines. It is the text the latest
+--- push of the document showed, not only a finished run: the first text of a push
+--- (reused, or the cache-only parse) is entered at once, and a run that is in
+--- flight patches it in place. So an edit is compared with the push before it,
+--- and one structural edit (which takes the parse) costs one parse, not one per
+--- later push until a run finishes. A finished run replaces it by the full
+--- translation.
 ---@type table<string, { key: string, inp: string[], out: string[] }>
 local translated = {}
 
@@ -116,6 +122,20 @@ local function copy(t)
   return vim.list_slice(t or {})
 end
 
+--- Enter `text` as what the preview shows for `lines` of the document `path`.
+--- `text` is kept as it is, not copied: the run that goes on for these lines
+--- patches it in place, so the entry follows the run, and the next edit starts
+--- from what the run translated so far (not from the cache-only text it began with).
+---@internal
+---@param path string
+---@param key string # what the translation was made for (language, source, engine)
+---@param lines string[]
+---@param text string[] # exactly as many lines as `lines`
+---@return nil
+local function remember(path, key, lines, text)
+  translated[path] = { key = key, inp = copy(lines), out = text }
+end
+
 --- A list of exactly `n` strings, none of which holds a line break: the lines
 --- are joined with "\n" on the wire, so a "\n" inside one would add a line to
 --- the document and shift everything below it (scroll sync, click-to-navigate,
@@ -137,33 +157,145 @@ local function valid_lines(v, n)
   return true
 end
 
+--- The closing tags of an HTML block that runs to its end tag, wherever in the
+--- line the tag stands.
+---@type string[]
+local RAW_CLOSERS = { "</pre", "</script", "</style", "</textarea" }
+
+--- A line without content: white space, or only the markers of a quoted blank.
+---@internal
+---@param l string
+---@return boolean
+local function is_blank(l)
+  return l:match("^[%s>]*$") ~= nil
+end
+
+--- A setext underline (`===` or `---`, also in a quote): it makes the paragraph
+--- above it a heading.
+---@internal
+---@param l string
+---@return boolean
+local function is_underline(l)
+  return l:match("^[%s>]*=+%s*$") ~= nil or l:match("^[%s>]*%-+%s*$") ~= nil
+end
+
+--- A line that opens or closes an HTML block (`<div>`, `</pre>`, `<?php`,
+--- `<!-- c -->`, `<!DOCTYPE`), also in a quote.
+---@internal
+---@param l string
+---@return boolean
+local function is_html_edge(l)
+  return l:match("^[%s>]*<[%a/!?]") ~= nil
+end
+
+--- The delimiter row of a table (`|---|---|`, `:--|--:`): it makes the line above
+--- it the header of a table, and is literal itself.
+---@internal
+---@param l string
+---@return boolean
+local function is_table_rule(l)
+  return l:match("^[%s>|:%-]*$") ~= nil and l:find("|", 1, true) ~= nil and l:find("-", 1, true) ~= nil
+end
+
 --- Whether a line can change what the lines around it ARE: a fence or a math
---- block (everything below it flips between prose and code), an HTML comment, a
---- heading (the translation rewrites in-page links to the translated heading
---- slugs, so a link elsewhere depends on every heading), a setext underline or
---- the line of a front matter. Deliberately generous: a false positive only
---- costs a full parse.
+--- block (everything below it flips between prose and code), an HTML block
+--- (opening or closing it flips the lines below to or from literal), a heading
+--- (the translation rewrites in-page links to the translated heading slugs, so a
+--- link elsewhere depends on every heading), a setext underline, a thematic
+--- break (it ends a paragraph) or the line of a front matter. Deliberately
+--- generous: a false positive only costs a full parse.
 ---@internal
 ---@param l string
 ---@return boolean
 local function structural(l)
-  return l:find("```", 1, true) ~= nil
+  if
+    l:find("```", 1, true) ~= nil
     or l:find("~~~", 1, true) ~= nil
     or l:find("<!--", 1, true) ~= nil
     or l:find("-->", 1, true) ~= nil
+    or l:find("?>", 1, true) ~= nil
     or l:find("$$", 1, true) ~= nil
-    or l:match("^%s*#") ~= nil
-    or l:match("^%s*=+%s*$") ~= nil
-    or l:match("^%s*%-%-+%s*$") ~= nil
+    or is_html_edge(l)
+    or is_table_rule(l)
+    or l:match("^[%s>]*#") ~= nil
+    or is_underline(l)
+    or l:match("^[%s>]*%*[%s%*]*$") ~= nil
+    or l:match("^[%s>]*_[%s_]*$") ~= nil
     or l:match("^%+%+%+") ~= nil
+    or l:match("^%.%.%.%s*$") ~= nil
+  then
+    return true
+  end
+  if l:find("</", 1, true) then
+    local low = l:lower()
+    for _, tag in ipairs(RAW_CLOSERS) do
+      if low:find(tag, 1, true) then
+        return true
+      end
+    end
+  end
+  return false
+end
+
+--- The line from which the head of the document no longer matters: a front
+--- matter is decided by the first line (`---`) and, for `---`, by the first line
+--- with content behind it (a `key:` line makes it metadata, anything else a
+--- thematic break). An edit that starts at or before it can open or close one.
+---@internal
+---@param lines string[]
+---@return integer
+local function head_end(lines)
+  if not (lines[1] and lines[1]:match("^%-%-%-%s*$")) then
+    return 2
+  end
+  for i = 2, #lines do
+    if not lines[i]:match("^%s*$") then
+      return i
+    end
+  end
+  return #lines + 1
+end
+
+--- Whether line `i` is the `---` that closes a front matter at the top of the
+--- document (so it is no setext underline for the line above it).
+---@internal
+---@param lines string[]
+---@param i integer
+---@return boolean
+local function closes_front_matter(lines, i)
+  local head = head_end(lines)
+  local first = lines[head]
+  if i <= head or not lines[1]:match("^%-%-%-%s*$") or not (first and first:match("^[^%s:][^%s:]*:")) then
+    return false
+  end
+  for j = 2, i - 1 do
+    if lines[j]:match("^%-%-%-%s*$") or lines[j]:match("^%.%.%.%s*$") then
+      return false -- the front matter ended above
+    end
+  end
+  return lines[i]:match("^%-%-%-%s*$") ~= nil
 end
 
 --- The previous translation `out` of `inp`, laid over the edited `lines`: lines
 --- before the first and after the last changed one keep their translation, the
 --- ones in between (the edit) are the original. The result has `#lines` lines.
---- nil when the edit touches the structure of the document (see `structural`;
---- the line above and below the edit count too): what the lines around it ARE
---- can have changed then, and only a parse of the whole document knows.
+---
+--- nil when the edit touches the structure of the document: what the lines
+--- around it ARE can have changed then, and only a parse of the whole document
+--- knows. That is the case when
+---   * a changed line, in the old or in the new text, is `structural`;
+---   * the edit starts in the head of the document (see `head_end`);
+---   * a setext underline stands in the block right below the edit: the edited
+---     lines are (or were) the text of a heading;
+---   * a table's delimiter row is the line right below the edit: the edited
+---     line is (or was) its header;
+---   * the edit adds, removes or fills a blank line, and an HTML block starts
+---     in the block above it (a blank line ends one, text continues it), or the
+---     line below is one that depends on whether a paragraph is open (an HTML
+---     line, indented code).
+--- The lines around the edit are NOT scanned: typing into the blank line under
+--- a heading, or into the first line of a code block, is a plain edit, and a
+--- parse per push costs about 0.4 s at 20 000 lines.
 ---@internal
 ---@param inp string[]
 ---@param out string[]
@@ -179,14 +311,52 @@ local function reuse_translation(inp, out, lines)
   while s < n - p and s < m - p and lines[n - s] == inp[m - s] do
     s = s + 1
   end
-  for i = math.max(1, p), math.min(n, n - s + 1) do
+  if p < math.max(head_end(inp), head_end(lines)) then
+    return nil
+  end
+  local blanks_new, blanks_old = 0, 0
+  for i = p + 1, n - s do
     if structural(lines[i]) then
       return nil
     end
+    if is_blank(lines[i]) then
+      blanks_new = blanks_new + 1
+    end
   end
-  for i = math.max(1, p), math.min(m, m - s + 1) do
+  for i = p + 1, m - s do
     if structural(inp[i]) then
       return nil
+    end
+    if is_blank(inp[i]) then
+      blanks_old = blanks_old + 1
+    end
+  end
+  -- Everything below the edit is the unchanged tail (s lines, up to the end).
+  -- A delimiter row right below makes the edited line the header of a table.
+  if s > 0 and is_table_rule(lines[n - s + 1]) then
+    return nil
+  end
+  for i = n - s + 1, n do
+    if is_blank(lines[i]) then
+      break
+    end
+    if is_underline(lines[i]) and not closes_front_matter(lines, i) then
+      return nil
+    end
+  end
+  -- p >= 2 here, so both last lines before the tail exist.
+  local flips = blanks_new ~= blanks_old or is_blank(lines[n - s]) ~= is_blank(inp[m - s])
+  if flips then
+    local below = lines[n - s + 1]
+    if below and (below:match("^<") or below:match("^ ? ? ?\t") or below:match("^    ")) then
+      return nil
+    end
+    local i = p
+    while i >= 1 and not is_blank(lines[i]) do
+      if is_html_edge(lines[i]) then
+        return nil
+      end
+      i = i - 1
     end
   end
   local res = {}
@@ -783,7 +953,7 @@ function M.stream(src, lines, on_text)
           )
         )
       end
-      translated[src.path] = { key = reuse_key, inp = copy(lines), out = copy(res) }
+      remember(src.path, reuse_key, lines, copy(res))
       set_status({
         state = "done",
         lang = lang,
@@ -827,15 +997,17 @@ function M.stream(src, lines, on_text)
     end
   end
 
-  -- An edit of a document that was translated before: the finished translation
-  -- of everything around the edit is reused as it is, the edited lines show
-  -- the original until the pause. This is a plain comparison of lines; the
-  -- cache-only step below parses the WHOLE document (about 0.3 s for 20 000
-  -- lines), and an edit makes a push every 150 ms.
+  -- An edit of a document that was shown before: the translation of everything
+  -- around the edit is reused as it is (compared with the text of the push
+  -- before, see `translated`), the edited lines show the original until the
+  -- pause. This is a plain comparison of lines; the cache-only step below parses
+  -- the WHOLE document (about 0.3 s for 20 000 lines), and an edit makes a push
+  -- every 150 ms.
   local prev = translated[src.path]
   local reused = reason == "edit" and prev and prev.key == reuse_key and reuse_translation(prev.inp, prev.out, lines)
   if reused then
     current = reused
+    remember(src.path, reuse_key, lines, current)
     deliver(copy(current), false)
     after_first_text()
     return true
@@ -859,6 +1031,9 @@ function M.stream(src, lines, on_text)
     else
       current = copy(lines)
     end
+    -- The text of a parse: the next edit is compared with it (a structural
+    -- edit makes the parse, a plain one after it needs none).
+    remember(src.path, reuse_key, lines, current)
     deliver(copy(current), false)
     after_first_text()
   end)
@@ -921,5 +1096,8 @@ function M.set_lang(code)
   end
   return true, nil
 end
+
+-- For the specs: the line-wise reuse of a translation and its guard.
+M._reuse_translation = reuse_translation
 
 return M

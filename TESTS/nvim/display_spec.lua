@@ -983,11 +983,24 @@ describe("display.stream: an edit of a translated document", function()
     fake.calls = {}
   end
 
+  -- The edit starts below the head of the document (the first two lines: a front
+  -- matter is decided there, so an edit of them takes the parse).
+  local HEAD = { "kopf", "" }
+  local HEAD_TR = { "head", "" }
+
+  local function doc(...)
+    return vim.list_extend(vim.list_slice(HEAD), { ... })
+  end
+
+  local function tr(...)
+    return vim.list_extend(vim.list_slice(HEAD_TR), { ... })
+  end
+
   it("shows the translation around the edit at once and parses nothing (no cache-only run)", function()
-    translated_once({ "eins", "zwei", "drei" }, { "one", "two", "three" })
-    local got = run("edit", { "eins", "zwei!", "drei" })
+    translated_once(doc("eins", "zwei", "drei"), tr("one", "two", "three"))
+    local got = run("edit", doc("eins", "zwei!", "drei"))
     assert.are.equal(1, #got.texts, "synchronous, before any translator answer")
-    assert.are.same({ "one", "zwei!", "three" }, got.texts[1])
+    assert.are.same(tr("one", "zwei!", "three"), got.texts[1])
     assert.is_false(got.finals[1])
     for _, c in ipairs(fake.calls) do
       assert.is_falsy(c.opts.cache_only, "no cache-only parse per edit")
@@ -995,12 +1008,12 @@ describe("display.stream: an edit of a translated document", function()
   end)
 
   it("follows inserted and deleted lines", function()
-    translated_once({ "eins", "zwei", "drei" }, { "one", "two", "three" })
-    local ins = run("edit", { "eins", "neu", "zwei", "drei" })
-    assert.are.same({ "one", "neu", "two", "three" }, ins.texts[1])
-    translated_once({ "eins", "zwei", "drei" }, { "one", "two", "three" })
-    local del = run("edit", { "eins", "drei" })
-    assert.are.same({ "one", "three" }, del.texts[1])
+    translated_once(doc("eins", "zwei", "drei"), tr("one", "two", "three"))
+    local ins = run("edit", doc("eins", "neu", "zwei", "drei"))
+    assert.are.same(tr("one", "neu", "two", "three"), ins.texts[1])
+    translated_once(doc("eins", "zwei", "drei"), tr("one", "two", "three"))
+    local del = run("edit", doc("eins", "drei"))
+    assert.are.same(tr("one", "three"), del.texts[1])
   end)
 
   it("still runs the full translation after the pause", function()
@@ -1078,26 +1091,124 @@ describe("display.stream: an edit that changes the structure is not served from 
     fake.calls = {}
   end
 
-  it("an opened fence does not show the prose below it translated (the parse decides)", function()
-    translated_once({ "eins", "zwei", "drei" }, { "one", "two", "three" })
-    local got = run("edit", { "eins", "```", "zwei", "drei" })
-    assert.is_nil(got.texts[1], "no reuse: answered by the cache-only parse")
+  --- The text of the cache-only parse a structural edit takes (the fake answers
+  --- from `fake.cache`, the rest stays original).
+  local function parsed(got)
+    assert.is_nil(got.texts[1], "no reuse: answered by the cache-only parse, not at once")
     assert.is_true(settle(function()
       return got.texts[1] ~= nil
     end))
-    assert.are.same({ "eins", "```", "zwei", "drei" }, got.texts[1])
+    return got.texts[1]
+  end
+
+  -- The edits start below the head of the document (its first two lines decide a
+  -- front matter, so an edit of them takes the parse anyway).
+  local BASE = { "kopf", "", "eins", "zwei", "drei" }
+  local BASE_TR = { "head", "", "one", "two", "three" }
+
+  it("an opened fence does not show the prose below it translated (the parse decides)", function()
+    translated_once(BASE, BASE_TR)
+    local got = run("edit", { "kopf", "", "eins", "```", "zwei", "drei" })
+    assert.are.same({ "kopf", "", "eins", "```", "zwei", "drei" }, parsed(got))
+  end)
+
+  -- language.nvim's segmenter reads everything below these as literal (up to the
+  -- end tag, or up to the next blank line), exactly as below a fence.
+  for _, opener in ipairs({ "<pre>", "<script>", "<style>", "<textarea>", "<details>", "<div>", "<?php" }) do
+    it(("an inserted %s line does not show the prose below it translated"):format(opener), function()
+      translated_once(BASE, BASE_TR)
+      local got = run("edit", { "kopf", "", "eins", opener, "zwei", "drei" })
+      assert.are.same({ "kopf", "", "eins", opener, "zwei", "drei" }, parsed(got))
+    end)
+  end
+
+  it("a deleted closing </pre> does not leave the prose below it translated", function()
+    local old = { "kopf", "", "<pre>", "eins", "</pre>", "", "zwei" }
+    translated_once(old, { "head", "", "<pre>", "eins", "</pre>", "", "two" })
+    local got = run("edit", { "kopf", "", "<pre>", "eins", "", "zwei" })
+    assert.are.same({ "kopf", "", "<pre>", "eins", "", "zwei" }, parsed(got))
+  end)
+
+  it("a blank line that ends an HTML block is not shown with the lines below it still literal", function()
+    translated_once({ "kopf", "", "<div>", "eins", "zwei", "" }, { "head", "", "<div>", "eins", "zwei", "" })
+    local got = run("edit", { "kopf", "", "<div>", "", "zwei", "" })
+    assert.are.same({ "kopf", "", "<div>", "", "zwei", "" }, parsed(got))
   end)
 
   it("an edited heading is not shown next to links that were rewritten for the old heading", function()
-    translated_once({ "# Titel", "siehe [x](#titel)" }, { "# Title", "see [x](#title)" })
-    local got = run("edit", { "# Titel 2", "siehe [x](#titel)" })
+    translated_once({ "kopf", "", "# Titel", "siehe [x](#titel)" }, { "head", "", "# Title", "see [x](#title)" })
+    local got = run("edit", { "kopf", "", "# Titel 2", "siehe [x](#titel)" })
     assert.is_nil(got.texts[1])
   end)
 
-  it("a plain edit next to a heading that stays is still reused", function()
-    translated_once({ "# Titel", "", "eins", "zwei" }, { "# Title", "", "one", "two" })
-    local got = run("edit", { "# Titel", "", "eins", "zwei!" })
-    assert.are.same({ "# Title", "", "one", "zwei!" }, got.texts[1])
+  it("an edited setext heading is not reused either (its underline is below the edit)", function()
+    translated_once(
+      { "kopf", "", "Titel", "=====", "siehe [x](#titel)" },
+      { "head", "", "Title", "=====", "see [x](#title)" }
+    )
+    local got = run("edit", { "kopf", "", "Titel 2", "=====", "siehe [x](#titel)" })
+    assert.is_nil(got.texts[1])
+  end)
+
+  it("a plain edit two lines under a heading is reused", function()
+    translated_once({ "kopf", "", "# Titel", "", "eins", "zwei" }, { "head", "", "# Title", "", "one", "two" })
+    local got = run("edit", { "kopf", "", "# Titel", "", "eins", "zwei!" })
+    assert.are.same({ "head", "", "# Title", "", "one", "zwei!" }, got.texts[1])
+  end)
+
+  it("a plain edit directly under a heading, and one directly inside a fence, are reused", function()
+    translated_once({ "kopf", "", "# Titel", "", "eins" }, { "head", "", "# Title", "", "one" })
+    local under = run("edit", { "kopf", "", "# Titel", "neu", "eins" })
+    assert.are.same({ "head", "", "# Title", "neu", "one" }, under.texts[1], "no parse for the neighbour")
+    translated_once({ "kopf", "", "```", "code", "```", "eins" }, { "head", "", "```", "code", "```", "one" })
+    local inside = run("edit", { "kopf", "", "```", "code2", "```", "eins" })
+    assert.are.same({ "head", "", "```", "code2", "```", "one" }, inside.texts[1], "no parse for the fence lines")
+    for _, c in ipairs(fake.calls) do
+      assert.is_falsy(c.opts.cache_only)
+    end
+  end)
+
+  it("after a structural edit the next plain edit is answered from that parse, not parsed again", function()
+    fake.cache = { eins = "one", zwei = "two", drei = "three" }
+    translated_once({ "kopf", "", "eins", "zwei", "drei", "vier" }, { "head", "", "one", "two", "three", "vier" })
+    local heading = run("edit", { "kopf", "", "# Neu", "eins", "zwei", "drei", "vier" })
+    assert.are.same({ "kopf", "", "# Neu", "one", "two", "three", "vier" }, parsed(heading))
+    fake.calls = {}
+    local plain = run("edit", { "kopf", "", "# Neu", "eins", "zwei", "drei", "vier!" })
+    assert.are.same(
+      { "kopf", "", "# Neu", "one", "two", "three", "vier!" },
+      plain.texts[1],
+      "at once, around the edit as the parse left it"
+    )
+    for _, c in ipairs(fake.calls) do
+      assert.is_falsy(c.opts.cache_only, "the whole document is not parsed for every push")
+    end
+  end)
+
+  it("two plain edits with a heading between them are both answered at once (no run in between)", function()
+    local base = { "kopf", "", "eins", "", "# Titel", "", "zwei", "drei" }
+    translated_once(base, { "head", "", "one", "", "# Title", "", "two", "three" })
+    local first = run("edit", { "kopf", "", "eins!", "", "# Titel", "", "zwei", "drei" })
+    assert.are.same({ "head", "", "eins!", "", "# Title", "", "two", "three" }, first.texts[1])
+    local second = run("edit", { "kopf", "", "eins!", "", "# Titel", "", "zwei", "drei!" })
+    assert.are.same({ "head", "", "eins!", "", "# Title", "", "two", "drei!" }, second.texts[1])
+    for _, c in ipairs(fake.calls) do
+      assert.is_falsy(c.opts.cache_only)
+    end
+  end)
+
+  it("an edit while the run is still going keeps the paragraphs it translated so far", function()
+    run("refresh", BASE)
+    assert.is_true(settle(function()
+      return #fake.full() == 1
+    end))
+    fake.full()[1].unit(3, 3, { "one" })
+    fake.calls = {}
+    local edit = run("edit", { "kopf", "", "eins", "zwei", "drei!" })
+    assert.are.same({ "kopf", "", "one", "zwei", "drei!" }, edit.texts[1])
+    -- The patch above armed the coalescing timer of the pushes (150 ms): let it
+    -- run out, so no handle of this case is open in the next one.
+    vim.wait(200)
   end)
 
   it("a translator that throws after it answered does not put the original over the result", function()

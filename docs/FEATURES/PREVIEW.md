@@ -392,16 +392,38 @@ cursor marker, click-to-navigate, task-checkbox sync and the fenced-code spans
 
 1. a valid text goes out at once: every paragraph whose translation is cached is
    translated, the rest is original (nothing leaves the machine for this step).
-   For an edit of a document that was translated before, this is a plain line
-   comparison instead (the finished translation around the edited lines is kept,
-   the edited lines are original until the pause), because the cache lookup
-   parses the whole document and an edit pushes every 150 ms. An edit that
-   touches the structure (a fence, a math block, an HTML comment, a heading or
-   a setext underline, front matter; the line above and below count too) takes
-   the cache lookup after all: it can change what the lines around it are, and
-   in-page links follow the translated headings. Within a paragraph that is
-   edited in only some of its lines, the other lines keep their translation
-   until the pause;
+   For an edit of a document that was shown before, this is a plain line
+   comparison instead (the translation around the edited lines is kept, the
+   edited lines are original until the pause), because the cache lookup parses
+   the whole document (about 0.4 s at 20 000 lines) and an edit pushes every
+   150 ms. The comparison is made with the text the push before it showed, so
+   edits in several places one after the other (under the `save` and `manual`
+   triggers no run finishes in between) and an edit while a run is still going
+   (it keeps what that run translated so far) all stay cheap. An edit that
+   touches the structure takes the cache lookup after all:
+   it can change what the lines around it are, and in-page links follow the
+   translated headings. That is an edit (old or new text) of
+   - a fence, a math block, an HTML comment, or a line that opens or closes an
+     HTML block (`<pre>`, `<script>`, `<div>`, `</pre>`, `<?php`, also in a
+     quote),
+   - a heading, a setext underline (`===`, `---`, also one anywhere in the
+     block below the edit: the edited lines are the text of that heading), a
+     thematic break, or the line of a front matter,
+   - the first two lines of the document (a front matter is decided there; with
+     a `---` front matter, up to its first line with content),
+   - a blank line added, removed or filled while an HTML block starts in the
+     block above it, or above a line that depends on an open paragraph (a lone
+     tag, indented code).
+
+   The lines around such an edit are not part of it: typing into the blank line
+   under a heading or into a code block is a plain edit. After a structural
+   edit the next plain one is compared with the parse that answered it, so one
+   structural edit costs one cache lookup, not one per push until the next run.
+   The check is a heuristic on lines, not a parser: what it does not look at (a
+   list item or a table that the edit starts or ends) keeps the old translation
+   of the lines around it until the pause, and the full run then corrects it.
+   Within a paragraph that is edited in only some of its lines, the other lines
+   keep their translation until the pause;
 2. the paragraphs that are translated afterwards are patched into the preview as
    they finish (about every 150 ms at most);
 3. the finished document goes out last.
