@@ -19,17 +19,12 @@ local buffer_switch = require("mdview.bindings.autocmds.buffer_switch")
 local bcfg = require("mdview.config.browser")
 local normalize = require("mdview.helper.normalize")
 
--- Capture where each channel routes (or that it sent nothing at all).
+-- Capture where each channel routes (or that it sent nothing at all). The
+-- stubs live from before_each to after_each: a describe body runs at
+-- collection time, so stubs installed and restored there are gone again when
+-- the cases run, and every push would spawn a real `curl -X POST` job.
 local last_content, last_scroll
-local orig_content, orig_scroll = ws.send_content, ws.send_scroll
----@diagnostic disable-next-line: duplicate-set-field
-ws.send_content = function(key)
-  last_content = key
-end
----@diagnostic disable-next-line: duplicate-set-field
-ws.send_scroll = function(key)
-  last_scroll = key
-end
+local orig_content, orig_scroll, orig_doc = ws.send_content, ws.send_scroll, ws.send_doc
 
 local function make_md_buffer(name)
   local buf = vim.api.nvim_create_buf(true, false)
@@ -47,6 +42,30 @@ describe("mdview.core.pin", function()
   local A_key = normalize.path(vim.api.nvim_buf_get_name(pinned_buf))
   local B_key = normalize.path(vim.api.nvim_buf_get_name(other_buf))
   local PREVIEW_KEY = "some/other/preview/room.md"
+
+  before_each(function()
+    ---@diagnostic disable-next-line: duplicate-set-field
+    ws.send_content = function(key)
+      last_content = key
+    end
+    ---@diagnostic disable-next-line: duplicate-set-field
+    ws.send_scroll = function(key)
+      last_scroll = key
+    end
+    -- push_buffer_changes also announces the document (a second POST).
+    ---@diagnostic disable-next-line: duplicate-set-field
+    ws.send_doc = function() end
+  end)
+
+  -- restore: a leaked pin would silently swallow every later spec's pushes.
+  after_each(function()
+    pin.clear()
+    state.set_preview_key(nil)
+    bcfg.defaults.behavior = "reuse"
+    ws.send_content = orig_content
+    ws.send_scroll = orig_scroll
+    ws.send_doc = orig_doc
+  end)
 
   -- scroll_sync reads the CURRENT window's cursor, so the buffer under test
   -- has to be the current one when its ping is sent.
@@ -161,13 +180,6 @@ describe("mdview.core.pin", function()
     state.set_preview_key(nil)
     assert.is_false(buffer_switch.resync(other_buf))
   end)
-
-  -- restore: a leaked pin would silently swallow every later spec's pushes.
-  pin.clear()
-  state.set_preview_key(nil)
-  bcfg.defaults.behavior = "reuse"
-  ws.send_content = orig_content
-  ws.send_scroll = orig_scroll
 end)
 
 -- The real BufEnter path, not just the gate it consults: a pin is only worth
@@ -181,23 +193,38 @@ describe("buffer_switch under a document pin", function()
 
   local pushed
   local orig_wait, orig_send = ws.wait_ready, ws.send_content
-  -- Readiness is a live /health probe; short-circuit it so the push is
-  -- synchronous and the assertion below doesn't race a timer.
-  ---@diagnostic disable-next-line: duplicate-set-field
-  ws.wait_ready = function(cb)
-    cb(true)
-  end
-  ---@diagnostic disable-next-line: duplicate-set-field
-  ws.send_content = function(key)
-    pushed = key
-  end
 
-  state.set_server({ stub = true })
-  state.set_preview_key(PREVIEW_KEY)
-  bcfg.defaults.behavior = "reuse"
+  before_each(function()
+    -- Readiness is a live /health probe; short-circuit it so the push is
+    -- synchronous and the assertion below doesn't race a timer.
+    ---@diagnostic disable-next-line: duplicate-set-field
+    ws.wait_ready = function(cb)
+      cb(true)
+    end
+    ---@diagnostic disable-next-line: duplicate-set-field
+    ws.send_content = function(key)
+      pushed = key
+    end
+    ---@diagnostic disable-next-line: duplicate-set-field
+    ws.send_doc = function() end
 
-  -- Through the BufEnter hub, which is how a session wires it.
-  buffer_switch.attach()
+    state.set_server({ stub = true })
+    state.set_preview_key(PREVIEW_KEY)
+    bcfg.defaults.behavior = "reuse"
+
+    -- Through the BufEnter hub, which is how a session wires it.
+    buffer_switch.attach()
+  end)
+
+  after_each(function()
+    require("mdview.bindings.autocmds.enter_hub").reset()
+    pin.clear()
+    state.set_server(nil)
+    state.set_preview_key(nil)
+    ws.wait_ready = orig_wait
+    ws.send_content = orig_send
+    ws.send_doc = orig_doc
+  end)
 
   --- Enter `buf` the way a user would, so BufEnter really fires.
   local function enter(buf)
@@ -235,12 +262,4 @@ describe("buffer_switch under a document pin", function()
     assert.is_false(pin.is_pinned())
     assert.are.equal(PREVIEW_KEY, pushed)
   end)
-
-  -- restore
-  require("mdview.bindings.autocmds.enter_hub").reset()
-  pin.clear()
-  state.set_server(nil)
-  state.set_preview_key(nil)
-  ws.wait_ready = orig_wait
-  ws.send_content = orig_send
 end)

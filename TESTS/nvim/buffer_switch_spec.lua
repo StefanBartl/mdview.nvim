@@ -13,12 +13,11 @@ local bcfg = require("mdview.config.browser")
 local normalize = require("mdview.helper.normalize")
 
 -- Capture where content is routed. live_push calls send_content; stub it.
+-- The stub lives from before_each to after_each: the describe body runs at
+-- collection time, so a stub installed and restored there would be gone again
+-- when the cases run, and live_push would spawn a real `curl -X POST` job.
 local last_key
-local orig = ws.send_content
----@diagnostic disable-next-line: duplicate-set-field
-ws.send_content = function(key)
-  last_key = key
-end
+local orig, orig_doc = ws.send_content, ws.send_doc
 
 local function make_md_buffer(name)
   local buf = vim.api.nvim_create_buf(true, false)
@@ -35,6 +34,23 @@ describe("live_push routing by browser.behavior", function()
   local buf = make_md_buffer("mdview_spec_B.md")
   local B_key = normalize.path(vim.api.nvim_buf_get_name(buf))
   local PREVIEW_KEY = "some/other/preview/room.md"
+
+  before_each(function()
+    ---@diagnostic disable-next-line: duplicate-set-field
+    ws.send_content = function(key)
+      last_key = key
+    end
+    -- push_buffer_changes also announces the document (a second POST).
+    ---@diagnostic disable-next-line: duplicate-set-field
+    ws.send_doc = function() end
+  end)
+
+  after_each(function()
+    ws.send_content = orig
+    ws.send_doc = orig_doc
+    state.set_preview_key(nil)
+    bcfg.defaults.behavior = "reuse"
+  end)
 
   it("reuse -> targets the open tab's preview key", function()
     state.set_preview_key(PREVIEW_KEY)
@@ -66,7 +82,4 @@ describe("live_push routing by browser.behavior", function()
     live.push_buffer_changes(buf)
     assert.are.equal(B_key, last_key)
   end)
-
-  -- restore
-  ws.send_content = orig
 end)
