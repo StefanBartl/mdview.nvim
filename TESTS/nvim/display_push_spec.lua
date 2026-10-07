@@ -410,3 +410,97 @@ describe("config validation and :checkhealth", function()
     package.preload["language"] = nil
   end)
 end)
+
+describe("the first text of a display transform arrives after the push call returned", function()
+  local a
+  before_each(function()
+    install()
+    a = make_buf("mdview_spec_display_first.md", { "eins", "zwei" })
+    config.defaults.browser.display_lang = "en"
+  end)
+  after_each(function()
+    restore()
+    pcall(vim.api.nvim_buf_delete, a, { force = true })
+  end)
+
+  it("live_push: a buffer wiped before even the cache-only text arrived sends nothing", function()
+    live.push_buffer_changes(a, { full = true, reason = "save" })
+    vim.api.nvim_buf_delete(a, { force = true })
+    vim.wait(100, function()
+      return false
+    end, 10)
+    assert.are.equal(0, #sent)
+    assert.are.equal(0, #docs)
+  end)
+
+  it("buffer_switch: a buffer wiped before the first text arrived sends nothing", function()
+    state.set_preview_key("the/one/preview/room")
+    assert.is_true(buffer_switch.resync(a))
+    vim.api.nvim_buf_delete(a, { force = true })
+    vim.wait(100, function()
+      return false
+    end, 10)
+    assert.are.equal(0, #sent)
+  end)
+end)
+
+describe(":MDView lang off restores the document the tab shows, not only the current buffer", function()
+  local lang = require("mdview.bindings.usrcmds.lang")
+  local bcfg = require("mdview.config.browser")
+  local a, b, scratch, behavior
+  before_each(function()
+    install()
+    behavior = bcfg.defaults.behavior
+    a = make_buf("mdview_spec_display_offA.md", { "a-eins" })
+    b = make_buf("mdview_spec_display_offB.md", { "b-eins" })
+    scratch = vim.api.nvim_create_buf(false, true) -- a scratch buffer: not previewable
+    state.get_server = function()
+      return { running = true }
+    end
+    state.set_preview_key(nil)
+    session.init()
+    config.defaults.browser.display_lang = "en"
+  end)
+  after_each(function()
+    bcfg.defaults.behavior = behavior
+    restore()
+    for _, buf in ipairs({ a, b, scratch }) do
+      pcall(vim.api.nvim_buf_delete, buf, { force = true })
+    end
+  end)
+
+  it("reuse: focus in a scratch buffer, the tab still shows document A", function()
+    bcfg.defaults.behavior = "reuse"
+    live.push_buffer_changes(a, { full = true, reason = "save" })
+    assert.is_true(settle(function()
+      return #full_runs() == 1
+    end))
+    full_runs()[1].cb(true, { "A-EINS" }, { failed = 0 })
+    assert.is_true(settle(function()
+      return sent[#sent].lines[1] == "A-EINS"
+    end))
+    vim.api.nvim_set_current_buf(scratch)
+    local n = #sent
+    lang.run("off")
+    assert.are.equal(n + 1, #sent, "the original of A went out")
+    assert.are.same({ "a-eins" }, sent[#sent].lines)
+  end)
+
+  it("one room per document: every shown document is restored", function()
+    bcfg.defaults.behavior = "new_tab"
+    live.push_buffer_changes(a, { full = true, reason = "save" })
+    live.push_buffer_changes(b, { full = true, reason = "save" })
+    assert.is_true(settle(function()
+      return #full_runs() == 2
+    end))
+    vim.api.nvim_set_current_buf(scratch)
+    local n = #sent
+    lang.run("off")
+    local originals = {}
+    for i = n + 1, #sent do
+      originals[#originals + 1] = sent[i].lines[1]
+    end
+    table.sort(originals)
+    assert.are.same({ "a-eins", "b-eins" }, originals)
+  end)
+end)

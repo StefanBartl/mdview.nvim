@@ -542,7 +542,13 @@ describe("display.stream with display_lang", function()
 
   it("names the engine in the opt-in notice, once per session", function()
     run("switch", { "a" })
+    assert.is_true(settle(function()
+      return #fake.full() == 1
+    end))
     run("switch", { "b" })
+    assert.is_true(settle(function()
+      return #fake.full() == 2
+    end))
     assert.are.equal(1, count_notes('"fakeengine"'))
     assert.are.equal(1, count_notes("may leave this machine"))
   end)
@@ -664,5 +670,360 @@ describe("display.status and the browser badge", function()
     assert.are.same({ "translating", "done", "done" }, states)
     assert.are.equal("fakeengine", sent[2].displayLang.engine)
     assert.are.equal("en", sent[2].displayLang.lang)
+  end)
+end)
+
+describe("display.stream against a misbehaving translator and stress", function()
+  before_each(function()
+    setup_env({ display_lang = "en", display_lang_debounce_ms = 20 })
+  end)
+  after_each(teardown_env)
+
+  local function run(reason, lines, target, path)
+    local got = collector()
+    display.stream({ path = path or "a.md", target = target or "a.md", reason = reason }, lines, got.fn)
+    return got
+  end
+
+  local function full_started(n)
+    return settle(function()
+      return #fake.full() == n
+    end)
+  end
+
+  local function finished(got)
+    return settle(function()
+      return got.finals[#got.finals] == true
+    end)
+  end
+
+  it("a translated line with a line break is a broken line count: the original stays", function()
+    local got = run("switch", { "a", "b" })
+    assert.is_true(full_started(1))
+    fake.full()[1].finish({ "A\nX", "B" })
+    assert.is_true(finished(got))
+    assert.are.same({ "a", "b" }, got.texts[#got.texts])
+    assert.are.equal(1, count_notes("did not keep the line count"))
+  end)
+
+  it("a patch with a line break, or a fractional first line, is skipped", function()
+    local got = run("switch", { "a", "b", "c" })
+    assert.is_true(full_started(1))
+    local call = fake.full()[1]
+    call.unit(1, 1, { "A\nX" })
+    call.opts.on_unit({ first = 1.5, last = 2, lines = { "x", "y" }, done = 1, total = 2 })
+    vim.wait(260)
+    for _, t in ipairs(got.texts) do
+      assert.are.same({ "a", "b", "c" }, t)
+    end
+  end)
+
+  it("browser.transform returning a line with a line break is dropped", function()
+    config.defaults.browser.display_lang = nil
+    config.defaults.browser.transform = function(lines, _, cb)
+      cb({ lines[1] .. "\nmore", lines[2] })
+    end
+    local got = collector()
+    display.stream({ path = "h.md", target = "h.md", reason = "switch" }, { "x", "y" }, got.fn)
+    assert.is_true(finished(got))
+    assert.are.same({ "x", "y" }, got.texts[#got.texts])
+  end)
+
+  it("a pending patch never lands after the finished document", function()
+    local got = run("switch", { "a", "b" })
+    assert.is_true(full_started(1))
+    local call = fake.full()[1]
+    call.unit(1, 1, { "A" })
+    call.finish({ "A", "B" })
+    assert.is_true(finished(got))
+    local n = #got.texts
+    vim.wait(300) -- longer than the patch coalescing window
+    assert.are.equal(n, #got.texts, "nothing is sent after the final text")
+    assert.is_true(got.finals[#got.finals])
+    assert.are.same({ "A", "B" }, got.texts[#got.texts])
+  end)
+
+  it("on_unit after the callback changes nothing", function()
+    local got = run("switch", { "a", "b" })
+    assert.is_true(full_started(1))
+    local call = fake.full()[1]
+    call.finish({ "A", "B" })
+    assert.is_true(finished(got))
+    local n = #got.texts
+    call.opts.on_unit({ first = 1, last = 1, lines = { "Z" }, done = 1, total = 1 })
+    vim.wait(260)
+    assert.are.equal(n, #got.texts)
+  end)
+
+  it("a callback that fires twice is taken once: a late failure does not undo the translation", function()
+    local got = run("switch", { "a" })
+    assert.is_true(full_started(1))
+    local call = fake.full()[1]
+    call.finish({ "A" })
+    assert.is_true(finished(got))
+    local n = #got.texts
+    call.fail("boom")
+    vim.wait(50)
+    assert.are.equal(n, #got.texts)
+    assert.are.same({ "A" }, got.texts[#got.texts])
+    assert.are.equal("done", display.status().state)
+    assert.are.equal(0, count_notes("boom"))
+  end)
+
+  it("a translator that throws leaves the original and speaks once, never raises", function()
+    fake.translate_markdown = function()
+      error("kaputt")
+    end
+    local ok, got = pcall(run, "switch", { "a", "b" })
+    assert.is_true(ok, tostring(got))
+    assert.is_true(finished(got))
+    assert.are.same({ "a", "b" }, got.texts[#got.texts])
+    assert.are.equal("failed", display.status().state)
+    assert.are.equal(1, count_notes("kaputt"))
+  end)
+
+  it("a translator that answers the cache-only step synchronously keeps the handle of the real run", function()
+    local cancelled = {}
+    local n = 0
+    package.loaded["language"].translate_markdown = function(lines, opts, cb)
+      n = n + 1
+      local id = n
+      if opts.cache_only then
+        cb(true, vim.list_slice(lines), {})
+      end
+      return {
+        cancel = function()
+          cancelled[#cancelled + 1] = id
+        end,
+      }
+    end
+    run("switch", { "a" }, "sync-room")
+    -- call 1: cache-only (answered inside the call), call 2: the real run
+    assert.are.equal(2, n)
+    display.cancel_all()
+    assert.are.same({ 2 }, cancelled, "the run in flight is cancelled, not the finished cache-only call")
+  end)
+
+  it("removing the option by config makes the run in flight stale: nothing arrives, the token says so", function()
+    local got = run("switch", { "a" })
+    assert.is_true(full_started(1))
+    local call = fake.full()[1]
+    local tok = call.opts.token
+    assert.are.equal(tok.generation, tok.current())
+    config.defaults.browser.display_lang = nil
+    assert.are_not.equal(tok.generation, tok.current())
+    local n = #got.texts
+    call.unit(1, 1, { "LATE" })
+    call.finish({ "LATE" })
+    vim.wait(260)
+    assert.are.equal(n, #got.texts)
+    for _, t in ipairs(got.texts) do
+      assert.are_not.same({ "LATE" }, t)
+    end
+  end)
+
+  it("a plain stream after the option vanished tells the browser to drop the badge", function()
+    local control = require("mdview.adapter.control")
+    local orig = control.send
+    local sent = {}
+    control.send = function(fields, room)
+      sent[#sent + 1] = { fields = fields, room = room }
+      return true
+    end
+    run("switch", { "a" }, "room-a")
+    assert.is_true(full_started(1))
+    config.defaults.browser.display_lang = nil
+    local got = collector()
+    display.stream({ path = "a.md", target = "room-a", reason = "edit" }, { "a" }, got.fn)
+    control.send = orig
+    local last_msg = sent[#sent]
+    assert.is_false(last_msg.fields.displayLang)
+    assert.are.equal("room-a", last_msg.room)
+  end)
+
+  it("the badge goes to the room the text belongs to", function()
+    local control = require("mdview.adapter.control")
+    local orig = control.send
+    local rooms = {}
+    control.send = function(_, room)
+      rooms[#rooms + 1] = room
+      return true
+    end
+    run("switch", { "a" }, "room-x")
+    assert.is_true(full_started(1))
+    control.send = orig
+    assert.is_true(#rooms > 0)
+    for _, r in ipairs(rooms) do
+      assert.are.equal("room-x", r)
+    end
+  end)
+
+  it("an engine that is not usable gets no notice (nothing is sent) and no fallback", function()
+    package.loaded["language.translate.providers.registry"].resolve = function()
+      return nil, "translate engine 'ai' is not usable: no model"
+    end
+    local got = run("switch", { "a" })
+    assert.is_true(full_started(1))
+    fake.full()[1].fail("translate engine 'ai' is not usable: no model")
+    assert.is_true(finished(got))
+    assert.are.same({ "a" }, got.texts[#got.texts])
+    assert.are.equal(0, count_notes("may leave this machine"))
+    assert.are.equal("failed", display.status().state)
+  end)
+
+  it("names the engine again when another one takes over", function()
+    run("switch", { "a" })
+    assert.is_true(full_started(1))
+    package.loaded["language.translate.providers.registry"].resolve = function()
+      return { name = "deepl" }, nil
+    end
+    run("switch", { "b" })
+    assert.is_true(full_started(2))
+    assert.are.equal(1, count_notes('"fakeengine"'))
+    assert.are.equal(1, count_notes('"deepl"'))
+  end)
+
+  it("a long multi-line engine error is cut to one short line", function()
+    local got = run("switch", { "a" })
+    assert.is_true(full_started(1))
+    fake.full()[1].fail(("x"):rep(500) .. "\nsecond line")
+    assert.is_true(finished(got))
+    local msg = display.status().message
+    assert.is_true(#msg <= 210)
+    assert.is_nil(msg:find("\n", 1, true))
+  end)
+
+  it("a stale debounce timer callback does not cancel the timer of a newer stream", function()
+    config.defaults.browser.display_lang_debounce_ms = 60
+    local wrapped = {}
+    local orig_wrap = vim.schedule_wrap
+    vim.schedule_wrap = function(fn)
+      return function(...)
+        wrapped[#wrapped + 1] = { fn = fn, args = { ... } }
+      end
+    end
+    local ok, err = pcall(function()
+      run("edit", { "a" }) -- timer 1
+      assert.is_true(settle(function()
+        return #wrapped >= 1
+      end))
+      -- The libuv callback of timer 1 has fired (its wrapper is queued), and a
+      -- newer stream takes the room before the queued call runs.
+      run("edit", { "a2" })
+      local n = #wrapped
+      assert.is_true(settle(function()
+        for _, c in ipairs(fake.calls) do
+          if c.opts.cache_only and c.lines[1] == "a2" and c.finished then
+            return true
+          end
+        end
+        return false
+      end))
+      local stale = wrapped[1]
+      stale.fn(unpack(stale.args)) -- the queued, now stale, call runs
+      assert.is_true(
+        settle(function()
+          return #wrapped > n
+        end),
+        "the newer stream's timer still fires"
+      )
+    end)
+    vim.schedule_wrap = orig_wrap
+    assert.is_true(ok, tostring(err))
+  end)
+end)
+
+describe("display.stream with browser.transform: what is shown while the hook runs", function()
+  before_each(function()
+    setup_env()
+  end)
+  after_each(teardown_env)
+
+  it("keeps the hook's lines that did not change and shows the changed ones as they are", function()
+    config.defaults.browser.transform = function(lines, _, cb)
+      local out = {}
+      for i, l in ipairs(lines) do
+        out[i] = l:upper()
+      end
+      cb(out)
+    end
+    local first = collector()
+    display.stream({ path = "u.md", target = "u.md", reason = "switch" }, { "ab", "cd" }, first.fn)
+    assert.is_true(settle(function()
+      return first.finals[#first.finals] == true
+    end))
+    config.defaults.browser.display_lang_trigger = "manual"
+    local second = collector()
+    display.stream({ path = "u.md", target = "u.md", reason = "edit" }, { "ab", "cx" }, second.fn)
+    assert.are.same({ "AB", "cx" }, second.texts[1], "the edited line is not an old output of the hook")
+  end)
+end)
+
+describe("display.stream: an edit of a translated document", function()
+  before_each(function()
+    setup_env({ display_lang = "en", display_lang_debounce_ms = 20 })
+  end)
+  after_each(teardown_env)
+
+  local function run(reason, lines, target)
+    local got = collector()
+    display.stream({ path = "e.md", target = target or "e.md", reason = reason }, lines, got.fn)
+    return got
+  end
+
+  local function translated_once(lines, result)
+    local got = run("switch", lines)
+    assert.is_true(settle(function()
+      return #fake.full() == 1
+    end))
+    fake.full()[1].finish(result)
+    assert.is_true(settle(function()
+      return got.finals[#got.finals] == true
+    end))
+    fake.calls = {}
+  end
+
+  it("shows the translation around the edit at once and parses nothing (no cache-only run)", function()
+    translated_once({ "eins", "zwei", "drei" }, { "one", "two", "three" })
+    local got = run("edit", { "eins", "zwei!", "drei" })
+    assert.are.equal(1, #got.texts, "synchronous, before any translator answer")
+    assert.are.same({ "one", "zwei!", "three" }, got.texts[1])
+    assert.is_false(got.finals[1])
+    for _, c in ipairs(fake.calls) do
+      assert.is_falsy(c.opts.cache_only, "no cache-only parse per edit")
+    end
+  end)
+
+  it("follows inserted and deleted lines", function()
+    translated_once({ "eins", "zwei", "drei" }, { "one", "two", "three" })
+    local ins = run("edit", { "eins", "neu", "zwei", "drei" })
+    assert.are.same({ "one", "neu", "two", "three" }, ins.texts[1])
+    translated_once({ "eins", "zwei", "drei" }, { "one", "two", "three" })
+    local del = run("edit", { "eins", "drei" })
+    assert.are.same({ "one", "three" }, del.texts[1])
+  end)
+
+  it("still runs the full translation after the pause", function()
+    translated_once({ "eins", "zwei" }, { "one", "two" })
+    run("edit", { "eins", "zwei!" })
+    assert.is_true(settle(function()
+      return #fake.full() == 1
+    end))
+  end)
+
+  it("does not reuse the translation of another display language", function()
+    translated_once({ "eins", "zwei" }, { "one", "two" })
+    config.defaults.browser.display_lang = "fr"
+    local got = run("edit", { "eins", "zwei!" })
+    assert.is_true(settle(function()
+      return #got.texts >= 1
+    end))
+    assert.are.same({ "eins", "zwei!" }, got.texts[1])
+  end)
+
+  it("a switch back to a document is not served from the old translation", function()
+    translated_once({ "eins", "zwei" }, { "one", "two" })
+    local got = run("switch", { "eins", "zwei" })
+    assert.is_falsy(got.texts[1], "answers through the cache-only run, not at once")
   end)
 end)

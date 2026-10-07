@@ -385,7 +385,8 @@ browser.display_lang ~
   where the cache has it), paragraphs are patched in as they finish, the
   finished document comes last; a failure keeps the original visible and is
   reported once. Nothing goes to a translation engine unless this is set (or
-  |:MDView-lang| is used), and the first use per session names the engine.
+  |:MDView-lang| is used), and right before the first request the message names
+  the engine (again when another one takes over).
   Text-field sync is off while it is on; not available in standalone mode.
   Switch at runtime with |:MDView-lang|.
 

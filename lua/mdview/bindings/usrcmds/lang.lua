@@ -69,7 +69,7 @@ local function describe()
   end
   local info = display.engine_info()
   if not info.found then
-    parts[#parts + 1] = "language.nvim not found: the preview stays original"
+    parts[#parts + 1] = (info.err or "language.nvim not found") .. ": the preview stays original"
   elseif info.available then
     parts[#parts + 1] = ("engine %s"):format(info.engine or "?")
   else
@@ -92,18 +92,89 @@ end
 --- a running session and a previewable buffer; otherwise the setting waits for
 --- the next push.
 ---@internal
+---@param path string # normalized path
+---@return integer|nil bufnr # the loaded buffer that has this file open
+local function buffer_of(path)
+  local normalize = require("mdview.helper.normalize")
+  for _, buf in ipairs(vim.api.nvim_list_bufs()) do
+    if vim.api.nvim_buf_is_loaded(buf) then
+      local name = vim.api.nvim_buf_get_name(buf)
+      if name ~= "" and normalize.path(name) == path then
+        return buf
+      end
+    end
+  end
+  return nil
+end
+
+--- The buffers whose preview has to be pushed again after a change: the
+--- document(s) the tab(s) show, which is not always the current buffer (focus
+--- may sit in a terminal or a Lua file; in "reuse" mode one tab shows one
+--- document, a pin holds a document, other behaviors keep one room per
+--- document). Without this `:MDView lang off` would leave the translation on
+--- screen until the next edit.
+---@internal
+---@return integer[]
+local function shown_buffers()
+  local previewable = require("mdview.helper.previewable")
+  local pin = require("mdview.core.pin")
+  local live = require("mdview.bindings.autocmds.live_push")
+  local reuse = (require("mdview.config.browser").defaults.behavior or "reuse") == "reuse"
+  local list, seen = {}, {}
+  local function add(buf)
+    if buf and not seen[buf] and vim.api.nvim_buf_is_valid(buf) and previewable.is(buf) then
+      seen[buf] = true
+      list[#list + 1] = buf
+    end
+  end
+  local function add_path(path)
+    if type(path) == "string" and path ~= "" then
+      add(buffer_of(path))
+    end
+  end
+
+  local cur = vim.api.nvim_get_current_buf()
+  if pin.is_pinned() then
+    add_path(pin.get())
+  elseif reuse then
+    -- One tab, one document: the current buffer when it is one, else the one
+    -- the tab followed last.
+    add(cur)
+    if #list == 0 then
+      add_path(require("mdview.bindings.autocmds.buffer_switch")._last)
+    end
+    if #list == 0 then
+      for _, p in pairs(live._last_doc) do
+        add_path(p)
+      end
+    end
+  else
+    add(cur)
+    for _, p in pairs(live._last_doc) do
+      add_path(p)
+    end
+  end
+  return list
+end
+
+---@internal
 ---@param reason "enable"|"refresh"
 ---@return boolean pushed
 local function repush(reason)
   if not state.get_server() then
     return false
   end
-  local buf = vim.api.nvim_get_current_buf()
+  local bufs = shown_buffers()
   require("mdview.adapter.ws_client").wait_ready(function(ok)
-    if not ok or not vim.api.nvim_buf_is_valid(buf) then
+    if not ok then
       return
     end
-    require("mdview.bindings.autocmds.live_push").push_buffer_changes(buf, { full = true, reason = reason })
+    local live = require("mdview.bindings.autocmds.live_push")
+    for _, buf in ipairs(bufs) do
+      if vim.api.nvim_buf_is_valid(buf) then
+        live.push_buffer_changes(buf, { full = true, reason = reason })
+      end
+    end
   end)
   return true
 end
@@ -146,7 +217,11 @@ function M.run(arg)
   end
   if not display.language() then
     notify(
-      "[mdview] display language set to " .. arg .. ", but language.nvim was not found: the preview stays original",
+      "[mdview] display language set to "
+        .. arg
+        .. ", but "
+        .. display.language_problem()
+        .. ": the preview stays original",
       vim.log.levels.WARN
     )
     return

@@ -65,9 +65,16 @@ local rooms = {}
 ---@type table<string, { n: integer, out: string[] }>
 local last = {}
 
+--- The last FINISHED translation per source path (before the hook), with the
+--- lines it was made from: an edit reuses it around the edited lines.
+---@type table<string, { key: string, inp: string[], out: string[] }>
+local translated = {}
+
 ---@type table<string, boolean>
 local reported = {}
-local privacy_noted = false
+--- The engine the privacy notice named last (nil: none yet this session).
+---@type string|nil
+local privacy_noted = nil
 
 ---@class mdview.display.Status
 ---@field state "off"|"idle"|"translating"|"done"|"failed"|"unavailable"
@@ -79,6 +86,9 @@ local privacy_noted = false
 ---@type mdview.display.Status
 local status = { state = "off" }
 local status_sent = ""
+--- Room of the latest stream: the badge goes to the tab that shows that text.
+---@type string|nil
+local status_target = nil
 
 ---@internal
 ---@return table
@@ -106,6 +116,11 @@ local function copy(t)
   return vim.list_slice(t or {})
 end
 
+--- A list of exactly `n` strings, none of which holds a line break: the lines
+--- are joined with "\n" on the wire, so a "\n" inside one would add a line to
+--- the document and shift everything below it (scroll sync, click-to-navigate,
+--- checkboxes).
+---@internal
 ---@param v any
 ---@param n integer
 ---@return boolean
@@ -114,11 +129,57 @@ local function valid_lines(v, n)
     return false
   end
   for i = 1, n do
-    if type(v[i]) ~= "string" then
+    local s = v[i]
+    if type(s) ~= "string" or s:find("\n", 1, true) then
       return false
     end
   end
   return true
+end
+
+--- The previous translation `out` of `inp`, laid over the edited `lines`: lines
+--- before the first and after the last changed one keep their translation, the
+--- ones in between (the edit) are the original. The result has `#lines` lines.
+---@internal
+---@param inp string[]
+---@param out string[]
+---@param lines string[]
+---@return string[]
+local function reuse_translation(inp, out, lines)
+  local n, m = #lines, #inp
+  local p = 0
+  while p < n and p < m and lines[p + 1] == inp[p + 1] do
+    p = p + 1
+  end
+  local s = 0
+  while s < n - p and s < m - p and lines[n - s] == inp[m - s] do
+    s = s + 1
+  end
+  local res = {}
+  for i = 1, p do
+    res[i] = out[i]
+  end
+  for i = p + 1, n - s do
+    res[i] = lines[i]
+  end
+  for k = 0, s - 1 do
+    res[n - k] = out[m - k]
+  end
+  return res
+end
+
+--- One short line of an outside message (an engine's error text) for a
+--- notification and the browser badge.
+---@internal
+---@param msg any
+---@return string
+local function short(msg)
+  local s = tostring(msg):gsub("%s+", " ")
+  s = vim.trim(s)
+  if #s > 200 then
+    s = s:sub(1, 200) .. "..."
+  end
+  return s
 end
 
 --- The configured display language, or nil when the option is off or not a
@@ -195,6 +256,17 @@ function M.language()
   return nil
 end
 
+--- Why `M.language()` is nil: not installed, or installed without
+--- `translate_markdown` (a version older than the Markdown translation).
+---@return string
+function M.language_problem()
+  local ok, lang = pcall(require, "language")
+  if ok and type(lang) == "table" then
+    return "language.nvim is too old (it has no translate_markdown, update it)"
+  end
+  return "language.nvim not found"
+end
+
 ---@class mdview.display.EngineInfo
 ---@field found boolean # language.nvim is installed
 ---@field engine string|nil # the engine the text would go to
@@ -207,7 +279,7 @@ end
 ---@return mdview.display.EngineInfo
 function M.engine_info()
   if not M.language() then
-    return { found = false, available = false, err = "language.nvim not found" }
+    return { found = false, available = false, err = M.language_problem() }
   end
   local ok_cfg, cfgmod = pcall(require, "language.config")
   local tr = ok_cfg and type(cfgmod.get) == "function" and cfgmod.get().translate or {}
@@ -289,7 +361,8 @@ local function push_status(force)
     return
   end
   status_sent = encoded
-  pcall(require("mdview.adapter.control").send, { displayLang = payload })
+  -- To the room the state belongs to (not whatever buffer is current now).
+  pcall(require("mdview.adapter.control").send, { displayLang = payload }, status_target)
 end
 
 ---@internal
@@ -316,12 +389,14 @@ function M.reset(keep_notices)
     cancel_room(r)
   end
   last = {}
+  translated = {}
   reported = {}
   if not keep_notices then
-    privacy_noted = false
+    privacy_noted = nil
   end
   status = { state = "off" }
   status_sent = ""
+  status_target = nil
 end
 
 --- Whether `reason` starts the full (slow) run under the configured trigger.
@@ -342,13 +417,16 @@ end
 ---@internal
 ---@param lang string
 ---@return nil
-local function privacy_notice(lang)
-  if privacy_noted then
+---@param info mdview.display.EngineInfo # what language.nvim resolves right now
+local function privacy_notice(lang, info)
+  -- No usable engine: nothing is sent (the run fails and the original stays),
+  -- so there is nothing to announce. A different engine than the last one named
+  -- (the config changed, another engine took over) is announced again.
+  if not info.available or privacy_noted == (info.engine or "?") then
     return
   end
-  privacy_noted = true
-  local info = M.engine_info()
-  local engine = info.engine or "?"
+  privacy_noted = info.engine or "?"
+  local engine = privacy_noted
   local msg = (
     "display_lang = %q: the text of the previewed document is sent to the translation engine %q "
     .. "(language.nvim) and may leave this machine. Nothing is sent while the option is off (`:MDView lang off`)."
@@ -428,6 +506,11 @@ function M.stream(src, lines, on_text)
   if not lang and not f then
     if status.state ~= "off" then
       M.reset(true)
+      -- The option went away without `:MDView lang off` (a config change): the
+      -- tab still shows the badge of the old state.
+      status_target = src.target
+      push_status(true)
+      status_target = nil
     end
     on_text(lines, true)
     return false
@@ -437,8 +520,10 @@ function M.stream(src, lines, on_text)
   if lang then
     lib = M.language()
     if not lib then
-      report_once("display_lang needs language.nvim, which was not found: the preview stays original")
-      set_status({ state = "unavailable", lang = lang, message = "language.nvim not found" })
+      local why = M.language_problem()
+      report_once("display_lang needs language.nvim (" .. why .. "): the preview stays original")
+      status_target = src.target
+      set_status({ state = "unavailable", lang = lang, message = why })
       lang = nil
       if not f then
         on_text(lines, true)
@@ -446,17 +531,22 @@ function M.stream(src, lines, on_text)
       end
     end
   end
-  if lang then
-    privacy_notice(lang)
-  end
 
+  status_target = src.target
   local room = room_of(src.target)
   -- Bump first: cancelling a run calls its callback, which must find itself stale.
   room.gen = room.gen + 1
   cancel_room(room)
   local gen = room.gen
+  --- The option this stream was started for. Switching it off or to another
+  --- code by a config change (not `:MDView lang`, which cancels everything)
+  --- makes the stream stale as well: nothing of the old setting is shown.
+  local started_lang = lang
+  --- What a finished translation of this document was made for.
+  local reuse_key =
+    table.concat({ lang or "", browser_cfg().display_lang_source or "", browser_cfg().display_lang_engine or "" }, "|")
   local function is_stale()
-    return room.gen ~= gen
+    return room.gen ~= gen or (started_lang ~= nil and M.lang() ~= started_lang)
   end
 
   local reason = src.reason or "edit"
@@ -472,7 +562,7 @@ function M.stream(src, lines, on_text)
         return
       end
       if not lang and final then
-        last[src.path] = { n = #res, out = copy(res) }
+        last[src.path] = { n = #res, inp = copy(lines), out = copy(res) }
       end
       on_text(res, final)
       -- A tab opened after the last status change has not seen it: say it again
@@ -488,17 +578,27 @@ function M.stream(src, lines, on_text)
     if is_stale() then
       return
     end
+    msg = short(msg)
     report_once("display_lang: " .. msg .. "; the preview shows the original")
     set_status({ state = "failed", lang = lang, engine = status.engine, message = msg })
     deliver(lines, true)
   end
 
   if not lang then
-    -- Hook only. Show the last output of this document at once when it still
-    -- fits, else the original; the hook then replaces it.
-    -- (Already a hooked output, or the plain original: it skips the hook.)
+    -- Hook only. Show the last output of this document at once: the lines that
+    -- did not change since then as the hook made them, the changed ones as they
+    -- are; the hook then replaces it.
     local prev = last[src.path]
-    on_text(copy((prev and prev.n == #lines) and prev.out or lines), false)
+    local shown
+    if prev and prev.n == #lines then
+      shown = {}
+      for i = 1, #lines do
+        shown[i] = (prev.inp[i] == lines[i]) and prev.out[i] or lines[i]
+      end
+    else
+      shown = copy(lines)
+    end
+    on_text(shown, false)
     if do_run then
       local function run_hook()
         if is_stale() then
@@ -514,6 +614,11 @@ function M.stream(src, lines, on_text)
             M.debounce_ms(),
             0,
             vim.schedule_wrap(function()
+              -- A newer stream may have replaced this timer between the libuv
+              -- callback and now: it must not cancel the newer one's.
+              if is_stale() then
+                return
+              end
               cancel_room(room)
               run_hook()
             end)
@@ -528,10 +633,12 @@ function M.stream(src, lines, on_text)
 
   ---@type string[]
   local current = copy(lines)
+  --- The full run reported back (or failed to start): no patch may follow it.
+  local run_over = false
 
   local function patch_flush()
     room.patch_pending = false
-    if not is_stale() then
+    if not run_over and not is_stale() then
       deliver(copy(current), false)
     end
   end
@@ -541,6 +648,7 @@ function M.stream(src, lines, on_text)
       return
     end
     local info = M.engine_info()
+    privacy_notice(lang, info)
     set_status({ state = "translating", lang = lang, engine = info.engine, done = 0, total = nil })
     local opts = {
       target = lang,
@@ -549,17 +657,24 @@ function M.stream(src, lines, on_text)
       token = {
         generation = gen,
         current = function()
+          -- Another generation, or the option changed under the run: the
+          -- translator stops asking its engine at the next request.
+          if M.lang() ~= started_lang then
+            return -1
+          end
           return room.gen
         end,
       },
       on_unit = function(ev)
-        if is_stale() or type(ev) ~= "table" then
+        if run_over or is_stale() or type(ev) ~= "table" then
           return
         end
         local first, lastl, got = ev.first, ev.last, ev.lines
         if
           type(first) ~= "number"
           or type(lastl) ~= "number"
+          or first ~= math.floor(first)
+          or lastl ~= math.floor(lastl)
           or first < 1
           or lastl > #current
           or lastl < first
@@ -578,16 +693,19 @@ function M.stream(src, lines, on_text)
         push_status(false)
       end,
     }
-    local handle = lib.translate_markdown(copy(lines), opts, function(ok, res, rinfo)
-      if is_stale() then
+    local ok_start, handle = pcall(lib.translate_markdown, copy(lines), opts, function(ok, res, rinfo)
+      -- Exactly once, whatever the translator does: a second call, or a call
+      -- after a newer stream took over, changes nothing.
+      if run_over or is_stale() then
         return
       end
+      run_over = true
       room.handle = nil
       if not ok then
         if res == "stale" or res == "cancelled" then
           return
         end
-        fail(tostring(res))
+        fail(res)
         return
       end
       if not valid_lines(res, #lines) then
@@ -601,15 +719,16 @@ function M.stream(src, lines, on_text)
         return
       end
       local failed = type(rinfo) == "table" and tonumber(rinfo.failed) or 0
-      if failed and failed > 0 then
+      if failed > 0 then
         local first_err = type(rinfo.errors) == "table" and rinfo.errors[1] or nil
         report_once(
           ("display_lang: %d paragraph(s) could not be translated and stay original%s"):format(
             failed,
-            first_err and (" (" .. tostring(first_err) .. ")") or ""
+            first_err and (" (" .. short(first_err) .. ")") or ""
           )
         )
       end
+      translated[src.path] = { key = reuse_key, inp = copy(lines), out = copy(res) }
       set_status({
         state = "done",
         lang = lang,
@@ -618,27 +737,20 @@ function M.stream(src, lines, on_text)
       })
       deliver(res, true)
     end)
-    -- The callback never runs before translate_markdown has returned.
-    room.handle = handle
-  end
-
-  -- Step 1: a valid text at once, from the cache only (nothing leaves the machine).
-  local pre = lib.translate_markdown(copy(lines), {
-    target = lang,
-    source = browser_cfg().display_lang_source,
-    engine = browser_cfg().display_lang_engine,
-    cache_only = true,
-  }, function(ok, res)
-    if is_stale() then
+    if not ok_start then
+      run_over = true
+      fail("translate_markdown failed: " .. tostring(handle))
       return
     end
-    room.handle = nil
-    if ok and valid_lines(res, #lines) then
-      current = copy(res)
-    else
-      current = copy(lines)
+    -- The callback never runs before translate_markdown has returned, but a
+    -- translator that does must not leave a finished handle behind.
+    if not run_over then
+      room.handle = handle
     end
-    deliver(copy(current), false)
+  end
+
+  --- What follows the first text: wait for the trigger, or start the full run.
+  local function after_first_text()
     if not do_run then
       set_status({ state = "idle", lang = lang, message = "waiting for " .. M.trigger() })
       return
@@ -655,6 +767,10 @@ function M.stream(src, lines, on_text)
         M.debounce_ms(),
         0,
         vim.schedule_wrap(function()
+          -- See the hook-only timer: only the stream that owns it may cancel it.
+          if is_stale() then
+            return
+          end
           cancel_room(room)
           full_run()
         end)
@@ -662,8 +778,49 @@ function M.stream(src, lines, on_text)
     else
       full_run()
     end
+  end
+
+  -- An edit of a document that was translated before: the finished translation
+  -- of everything around the edit is reused as it is, the edited lines show
+  -- the original until the pause. This is a plain comparison of lines; the
+  -- cache-only step below parses the WHOLE document (about 0.3 s for 20 000
+  -- lines), and an edit makes a push every 150 ms.
+  local prev = translated[src.path]
+  if reason == "edit" and prev and prev.key == reuse_key then
+    current = reuse_translation(prev.inp, prev.out, lines)
+    deliver(copy(current), false)
+    after_first_text()
+    return true
+  end
+
+  -- Step 1: a valid text at once, from the cache only (nothing leaves the machine).
+  local pre_over = false
+  local ok_pre, pre = pcall(lib.translate_markdown, copy(lines), {
+    target = lang,
+    source = browser_cfg().display_lang_source,
+    engine = browser_cfg().display_lang_engine,
+    cache_only = true,
+  }, function(ok, res)
+    if pre_over or is_stale() then
+      return
+    end
+    pre_over = true
+    room.handle = nil
+    if ok and valid_lines(res, #lines) then
+      current = copy(res)
+    else
+      current = copy(lines)
+    end
+    deliver(copy(current), false)
+    after_first_text()
   end)
-  room.handle = pre
+  if not ok_pre then
+    fail("translate_markdown failed: " .. tostring(pre))
+    return true
+  end
+  if not pre_over then
+    room.handle = pre
+  end
   return true
 end
 
@@ -687,6 +844,7 @@ function M.cancel_all()
     cancel_room(r)
   end
   last = {}
+  translated = {}
 end
 
 --- Switch the display language at runtime. `nil` turns it off.
@@ -702,7 +860,7 @@ function M.set_lang(code)
   if code == nil then
     status = { state = "off" }
     push_status(true)
-    privacy_noted = false
+    privacy_noted = nil
   else
     status = { state = "idle", lang = code }
   end

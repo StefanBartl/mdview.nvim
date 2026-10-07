@@ -88,8 +88,13 @@ function M.resync(bufnr)
     -- at once and the finished one later, both for THIS document only (the
     -- generation of the shared preview room drops anything older).
     local first = true
+    local returned = false
     require("mdview.core.mirror").lines_async(bufnr, function(lines)
-      if not first and (not api.nvim_buf_is_valid(bufnr) or pin.is_pinned()) then
+      -- An answer that comes after lines_async returned (all but the plain
+      -- synchronous one; language.nvim never calls back before it returned,
+      -- not even for the first text) can find the buffer gone or the preview
+      -- pinned meanwhile.
+      if returned and (not api.nvim_buf_is_valid(bufnr) or pin.is_pinned()) then
         return
       end
       -- A buffer switch is a whole-document change of the previewed room,
@@ -102,6 +107,7 @@ function M.resync(bufnr)
       require("mdview.core.fence_spans").push(bufnr, preview_key)
       first = false
     end, { target = preview_key, path = path, reason = "switch" })
+    returned = true
     log.debug("reuse: pushed " .. path .. " to preview room " .. preview_key, nil, "bufswitch", true)
   end)
   return true

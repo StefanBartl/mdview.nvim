@@ -108,9 +108,10 @@ function M.push_buffer_changes(bufnr, opts)
   -- times: a first valid text, patches, the finished document -- each of them
   -- with as many lines as the buffer. `original` is the buffer text itself.
   require("mdview.core.mirror").lines_async(bufnr, function(lines, final, original)
-    -- A later answer of a transform can land after the buffer is gone or the
-    -- preview was pinned to another document meanwhile.
-    if not first and (not api.nvim_buf_is_valid(bufnr) or pin.blocks(bufnr)) then
+    -- The answer of a transform comes later (even the first text: language.nvim
+    -- never calls back before it has returned) and can land after the buffer is
+    -- gone or the preview was pinned to another document meanwhile.
+    if not api.nvim_buf_is_valid(bufnr) or pin.blocks(bufnr) then
       return
     end
     ws_client.send_content(target, lines, { full = full })

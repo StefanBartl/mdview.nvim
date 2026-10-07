@@ -367,10 +367,14 @@ require("mdview").setup({ browser = { display_lang = "en" } })
 ```
 
 It is **off by default**, and nothing of your text goes to any translation
-engine until you switch it on. The first time per session the message names
-the engine the text goes to (it follows `language.nvim`'s configuration, the
-fallback chain included, so the engine named is the one that really gets the
-text). Switching it off sends nothing any more.
+engine until you switch it on. Right before the first request of a session the
+message names the engine the text goes to (it follows `language.nvim`'s
+configuration, the fallback chain included, so the engine named is the one that
+really gets the text; it is named again if another engine takes over). With an
+engine that is not usable nothing is sent and there is no notice, only the
+failure message. Switching it off sends nothing any more: a run in flight is
+cancelled, its late answers are dropped, and the original of every document a
+tab shows goes out again at once.
 
 **How it works.** mdview is a text mirror: every push into the preview passes
 one place (`core/mirror.lua` into `core/display.lua`). The translation is done
@@ -387,7 +391,11 @@ cursor marker, click-to-navigate, task-checkbox sync and the fenced-code spans
 **Stale-while-revalidate.** A push is never delayed by the translation:
 
 1. a valid text goes out at once: every paragraph whose translation is cached is
-   translated, the rest is original (nothing leaves the machine for this step);
+   translated, the rest is original (nothing leaves the machine for this step).
+   For an edit of a document that was translated before, this is a plain line
+   comparison instead (the finished translation around the edited lines is kept,
+   the edited lines are original until the pause), because the cache lookup
+   parses the whole document and an edit pushes every 150 ms;
 2. the paragraphs that are translated afterwards are patched into the preview as
    they finish (about every 150 ms at most);
 3. the finished document goes out last.
@@ -438,7 +446,9 @@ require("mdview").setup({ browser = {
 ```
 
 `cb` may run later (or never: the previous text stays). A result of another
-length is dropped and reported once. With both set, the language runs first and
+length, or with a line that itself contains a line break, is dropped and
+reported once. While the hook runs, the lines that did not change since its last
+result show that result, the edited ones are original. With both set, the language runs first and
 the hook sees its output (also the cache-only first text and the patches:
 `ctx.final` tells them apart).
 

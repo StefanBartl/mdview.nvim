@@ -41,7 +41,7 @@ buffer text to the browser, which re-renders it. A useful consequence —
   or the `ai` engine (through ai.nvim, local models included). It is looked up
   with `pcall(require)` and never loaded otherwise; without it mdview warns once
   and the preview stays original. Nothing is sent to an engine unless
-  `display_lang` is set, and the first use per session names the engine. See
+  `display_lang` is set, and the first request names the engine. See
   [PREVIEW.md](FEATURES/PREVIEW.md#display-language-translated-preview) and
   `:checkhealth mdview` (plugin found, engine available, key set).
 

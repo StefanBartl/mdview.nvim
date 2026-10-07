@@ -13,15 +13,16 @@ local M = {}
 --- Send a live control update to the open preview tab.
 --- No-op when no session is running or no target room can be resolved.
 ---@param fields table # e.g. { cursor = "caret" } or { zoom = 1.2 }
+---@param room string|nil # room to send to; nil: the room of the current buffer
 ---@return boolean sent
-function M.send(fields)
+function M.send(fields, room)
   if type(fields) ~= "table" or vim.tbl_isempty(fields) then
     return false
   end
   if not require("mdview.core.state").get_server() then
     return false
   end
-  local key = target_key.resolve(0)
+  local key = (type(room) == "string" and room ~= "") and room or target_key.resolve(0)
   if not key then
     return false
   end

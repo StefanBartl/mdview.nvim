@@ -241,9 +241,12 @@ function M.check()
     end
     if not engine.found then
       if lang then
-        warn("display_lang is set, but language.nvim was not found: the preview stays original", {
-          "Install language.nvim (https://github.com/StefanBartl/language.nvim) or unset browser.display_lang",
-        })
+        warn(
+          "display_lang is set, but " .. (engine.err or "language.nvim was not found") .. ": the preview stays original",
+          {
+            "Install language.nvim (https://github.com/StefanBartl/language.nvim) or unset browser.display_lang",
+          }
+        )
       else
         ok(
           "language.nvim not installed (optional companion; would translate the preview, see docs/companion-plugins.md)"
