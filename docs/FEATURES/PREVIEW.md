@@ -395,7 +395,13 @@ cursor marker, click-to-navigate, task-checkbox sync and the fenced-code spans
    For an edit of a document that was translated before, this is a plain line
    comparison instead (the finished translation around the edited lines is kept,
    the edited lines are original until the pause), because the cache lookup
-   parses the whole document and an edit pushes every 150 ms;
+   parses the whole document and an edit pushes every 150 ms. An edit that
+   touches the structure (a fence, a math block, an HTML comment, a heading or
+   a setext underline, front matter; the line above and below count too) takes
+   the cache lookup after all: it can change what the lines around it are, and
+   in-page links follow the translated headings. Within a paragraph that is
+   edited in only some of its lines, the other lines keep their translation
+   until the pause;
 2. the paragraphs that are translated afterwards are patched into the preview as
    they finish (about every 150 ms at most);
 3. the finished document goes out last.

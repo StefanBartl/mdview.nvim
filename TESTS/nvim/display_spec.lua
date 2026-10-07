@@ -1053,3 +1053,106 @@ describe("display.stream: the buffer is wiped while the run is in flight", funct
     assert.are.equal(n, #got.texts)
   end)
 end)
+
+describe("display.stream: an edit that changes the structure is not served from the old translation", function()
+  before_each(function()
+    setup_env({ display_lang = "en", display_lang_debounce_ms = 20, display_lang_trigger = "manual" })
+  end)
+  after_each(teardown_env)
+
+  local function run(reason, lines)
+    local got = collector()
+    display.stream({ path = "s.md", target = "s.md", reason = reason }, lines, got.fn)
+    return got
+  end
+
+  local function translated_once(lines, result)
+    local got = run("refresh", lines)
+    assert.is_true(settle(function()
+      return #fake.full() == 1
+    end))
+    fake.full()[1].finish(result)
+    assert.is_true(settle(function()
+      return got.finals[#got.finals] == true
+    end))
+    fake.calls = {}
+  end
+
+  it("an opened fence does not show the prose below it translated (the parse decides)", function()
+    translated_once({ "eins", "zwei", "drei" }, { "one", "two", "three" })
+    local got = run("edit", { "eins", "```", "zwei", "drei" })
+    assert.is_nil(got.texts[1], "no reuse: answered by the cache-only parse")
+    assert.is_true(settle(function()
+      return got.texts[1] ~= nil
+    end))
+    assert.are.same({ "eins", "```", "zwei", "drei" }, got.texts[1])
+  end)
+
+  it("an edited heading is not shown next to links that were rewritten for the old heading", function()
+    translated_once({ "# Titel", "siehe [x](#titel)" }, { "# Title", "see [x](#title)" })
+    local got = run("edit", { "# Titel 2", "siehe [x](#titel)" })
+    assert.is_nil(got.texts[1])
+  end)
+
+  it("a plain edit next to a heading that stays is still reused", function()
+    translated_once({ "# Titel", "", "eins", "zwei" }, { "# Title", "", "one", "two" })
+    local got = run("edit", { "# Titel", "", "eins", "zwei!" })
+    assert.are.same({ "# Title", "", "one", "zwei!" }, got.texts[1])
+  end)
+
+  it("a translator that throws after it answered does not put the original over the result", function()
+    local got = run("enable", { "a" })
+    assert.is_true(settle(function()
+      return #fake.full() == 1
+    end))
+    fake.calls = {}
+    local real = fake.translate_markdown
+    fake.translate_markdown = function(lines, opts, cb)
+      if not opts.cache_only then
+        cb(true, { "A" }, { failed = 0 })
+        error("late boom")
+      end
+      return real(lines, opts, cb)
+    end
+    local got2 = run("refresh", { "a" })
+    assert.is_true(settle(function()
+      return got2.finals[#got2.finals] == true
+    end))
+    assert.are.same({ "A" }, got2.texts[#got2.texts])
+    vim.wait(60)
+    assert.are.same({ "A" }, got2.texts[#got2.texts])
+    assert.is_truthy(got)
+  end)
+end)
+
+describe("display.stream: a debounce timer of a stream that went stale on its own", function()
+  before_each(function()
+    setup_env({ display_lang = "en", display_lang_debounce_ms = 10 })
+  end)
+  after_each(teardown_env)
+
+  local function open_timers()
+    local n = 0
+    (vim.uv or vim.loop).walk(function(h)
+      if h:get_type() == "timer" and not h:is_closing() then
+        n = n + 1
+      end
+    end)
+    return n
+  end
+
+  it("is closed after it fired (a wiped buffer does not leave a handle behind)", function()
+    vim.wait(40)
+    local before = open_timers()
+    local buf = vim.api.nvim_create_buf(true, false)
+    display.stream({ path = "t.md", target = "t.md", bufnr = buf, reason = "edit" }, { "a" }, function() end)
+    -- The debounce timer is armed once the cache-only text came.
+    assert.is_true(vim.wait(500, function()
+      return open_timers() > before
+    end, 1))
+    vim.api.nvim_buf_delete(buf, { force = true })
+    vim.wait(120)
+    assert.are.equal(before, open_timers())
+    assert.are.equal(0, #fake.full(), "and the engine was never asked")
+  end)
+end)

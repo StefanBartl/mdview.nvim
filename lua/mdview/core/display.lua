@@ -137,14 +137,38 @@ local function valid_lines(v, n)
   return true
 end
 
+--- Whether a line can change what the lines around it ARE: a fence or a math
+--- block (everything below it flips between prose and code), an HTML comment, a
+--- heading (the translation rewrites in-page links to the translated heading
+--- slugs, so a link elsewhere depends on every heading), a setext underline or
+--- the line of a front matter. Deliberately generous: a false positive only
+--- costs a full parse.
+---@internal
+---@param l string
+---@return boolean
+local function structural(l)
+  return l:find("```", 1, true) ~= nil
+    or l:find("~~~", 1, true) ~= nil
+    or l:find("<!--", 1, true) ~= nil
+    or l:find("-->", 1, true) ~= nil
+    or l:find("$$", 1, true) ~= nil
+    or l:match("^%s*#") ~= nil
+    or l:match("^%s*=+%s*$") ~= nil
+    or l:match("^%s*%-%-+%s*$") ~= nil
+    or l:match("^%+%+%+") ~= nil
+end
+
 --- The previous translation `out` of `inp`, laid over the edited `lines`: lines
 --- before the first and after the last changed one keep their translation, the
 --- ones in between (the edit) are the original. The result has `#lines` lines.
+--- nil when the edit touches the structure of the document (see `structural`;
+--- the line above and below the edit count too): what the lines around it ARE
+--- can have changed then, and only a parse of the whole document knows.
 ---@internal
 ---@param inp string[]
 ---@param out string[]
 ---@param lines string[]
----@return string[]
+---@return string[]|nil
 local function reuse_translation(inp, out, lines)
   local n, m = #lines, #inp
   local p = 0
@@ -154,6 +178,16 @@ local function reuse_translation(inp, out, lines)
   local s = 0
   while s < n - p and s < m - p and lines[n - s] == inp[m - s] do
     s = s + 1
+  end
+  for i = math.max(1, p), math.min(n, n - s + 1) do
+    if structural(lines[i]) then
+      return nil
+    end
+  end
+  for i = math.max(1, p), math.min(m, m - s + 1) do
+    if structural(inp[i]) then
+      return nil
+    end
   end
   local res = {}
   for i = 1, p do
@@ -332,6 +366,35 @@ local function cancel_room(r)
     pcall(h.cancel)
   end
   r.patch_pending = false
+end
+
+--- Run `fn` once after the debounce, owning `room.timer` until then. A timer
+--- whose room moved on (a newer stream, a cancel) closes itself, so none is left
+--- open when the stream went stale without a cancel (wiped buffer, option removed
+--- by config). `fn` checks for staleness itself.
+---@internal
+---@param room mdview.display.Room
+---@param fn fun()
+---@return boolean started # false: no timer could be made (the caller runs `fn` now)
+local function debounce(room, fn)
+  local timer = (vim.uv or vim.loop).new_timer()
+  if not timer then
+    return false
+  end
+  room.timer = timer
+  timer:start(
+    M.debounce_ms(),
+    0,
+    vim.schedule_wrap(function()
+      if room.timer == timer then
+        cancel_room(room)
+      elseif not timer:is_closing() then
+        timer:close()
+      end
+      fn()
+    end)
+  )
+  return true
 end
 
 --- Tell the browser what state the preview is in (a small badge; an older
@@ -611,22 +674,10 @@ function M.stream(src, lines, on_text)
         deliver(lines, true)
       end
       if debounced then
-        local timer = (vim.uv or vim.loop).new_timer()
-        if timer then
-          room.timer = timer
-          timer:start(
-            M.debounce_ms(),
-            0,
-            vim.schedule_wrap(function()
-              -- A newer stream may have replaced this timer between the libuv
-              -- callback and now: it must not cancel the newer one's.
-              if is_stale() then
-                return
-              end
-              cancel_room(room)
-              run_hook()
-            end)
-          )
+        if not debounce(room, function()
+          run_hook()
+        end) then
+          run_hook()
         end
       else
         run_hook()
@@ -742,8 +793,15 @@ function M.stream(src, lines, on_text)
       deliver(res, true)
     end)
     if not ok_start then
+      -- A run that already reported (and was shown) before it threw keeps its
+      -- result: the original must not replace a finished translation.
+      local reported_back = run_over
       run_over = true
-      fail("translate_markdown failed: " .. tostring(handle))
+      if reported_back then
+        report_once("display_lang: translate_markdown failed after it answered: " .. short(handle))
+      else
+        fail("translate_markdown failed: " .. tostring(handle))
+      end
       return
     end
     -- The callback never runs before translate_markdown has returned, but a
@@ -761,24 +819,9 @@ function M.stream(src, lines, on_text)
     end
     if debounced then
       set_status({ state = "idle", lang = lang, message = "waiting for a pause" })
-      local timer = (vim.uv or vim.loop).new_timer()
-      if not timer then
+      if not debounce(room, full_run) then
         full_run()
-        return
       end
-      room.timer = timer
-      timer:start(
-        M.debounce_ms(),
-        0,
-        vim.schedule_wrap(function()
-          -- See the hook-only timer: only the stream that owns it may cancel it.
-          if is_stale() then
-            return
-          end
-          cancel_room(room)
-          full_run()
-        end)
-      )
     else
       full_run()
     end
@@ -790,8 +833,9 @@ function M.stream(src, lines, on_text)
   -- cache-only step below parses the WHOLE document (about 0.3 s for 20 000
   -- lines), and an edit makes a push every 150 ms.
   local prev = translated[src.path]
-  if reason == "edit" and prev and prev.key == reuse_key then
-    current = reuse_translation(prev.inp, prev.out, lines)
+  local reused = reason == "edit" and prev and prev.key == reuse_key and reuse_translation(prev.inp, prev.out, lines)
+  if reused then
+    current = reused
     deliver(copy(current), false)
     after_first_text()
     return true
@@ -819,7 +863,14 @@ function M.stream(src, lines, on_text)
     after_first_text()
   end)
   if not ok_pre then
-    fail("translate_markdown failed: " .. tostring(pre))
+    if pre_over then
+      -- The callback ran inside the call (and started the full run, which may
+      -- have finished): what threw is not the cache-only step, and whatever is
+      -- shown by now stays.
+      report_once("display_lang: translate_markdown failed: " .. short(pre))
+    else
+      fail("translate_markdown failed: " .. tostring(pre))
+    end
     return true
   end
   if not pre_over then
