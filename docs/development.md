@@ -168,4 +168,27 @@ hop — is [Testing the relay by hand](relay-testing.md). The line-diff
 transport has its own benchmark harness, see
 [diff-harness.md](diff-harness.md).
 
+### The reuse guard of the translated preview
+
+An edit of a translated document keeps the old translation around the edited
+lines and only parses the whole document when the edit can change what the lines
+around it are ([Display language](FEATURES/PREVIEW.md#display-language-translated-preview)).
+The specs pin that guard case by case (`TESTS/nvim/display_reuse_spec.lua`); they
+cannot ask language.nvim's real segmenter, which is no dependency of the suite.
+`scripts/fuzz_reuse_guard.lua` does: it compares the guard with the segmenter on
+random edits and counts the edits it reused although a line outside the edit
+changed from prose to literal or back (holes).
+
+```bash
+LIB_NVIM_DIR=../lib.nvim LANGUAGE_NVIM_DIR=../language.nvim \
+  nvim --headless -u NONE -l scripts/fuzz_reuse_guard.lua [seed] [runs] [doc.md ...]
+```
+
+With no document it fuzzes random documents of structural lines (a stress test);
+with documents it edits those. Run it after a change to the guard in
+`lua/mdview/core/display.lua` or to language.nvim's segmenter; `$SHOW=1` prints
+the first holes and `$MAX_HOLES=n` makes it exit 1 above that number. It is not
+zero by design (the guard reads lines, it is no parser), so compare the number
+before and after a change.
+
 **Contributions are welcome** – whether it's a bugfix, optimization, or new feature idea.
