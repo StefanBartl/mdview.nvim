@@ -1027,3 +1027,29 @@ describe("display.stream: an edit of a translated document", function()
     assert.is_falsy(got.texts[1], "answers through the cache-only run, not at once")
   end)
 end)
+
+describe("display.stream: the buffer is wiped while the run is in flight", function()
+  before_each(function()
+    setup_env({ display_lang = "en", display_lang_debounce_ms = 20 })
+  end)
+  after_each(teardown_env)
+
+  it("the run goes stale (the engine is not asked any more) and nothing arrives", function()
+    local buf = vim.api.nvim_create_buf(true, false)
+    local got = collector()
+    display.stream({ path = "w.md", target = "w.md", bufnr = buf, reason = "switch" }, { "a" }, got.fn)
+    assert.is_true(settle(function()
+      return #fake.full() == 1
+    end))
+    local call = fake.full()[1]
+    local tok = call.opts.token
+    assert.are.equal(tok.generation, tok.current())
+    vim.api.nvim_buf_delete(buf, { force = true })
+    assert.are_not.equal(tok.generation, tok.current())
+    local n = #got.texts
+    call.unit(1, 1, { "A" })
+    call.finish({ "A" })
+    vim.wait(260)
+    assert.are.equal(n, #got.texts)
+  end)
+end)

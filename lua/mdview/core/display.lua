@@ -545,8 +545,12 @@ function M.stream(src, lines, on_text)
   --- What a finished translation of this document was made for.
   local reuse_key =
     table.concat({ lang or "", browser_cfg().display_lang_source or "", browser_cfg().display_lang_engine or "" }, "|")
+  --- The buffer of this document is gone (:bwipeout): nothing of it goes on.
+  local function gone()
+    return src.bufnr ~= nil and not vim.api.nvim_buf_is_valid(src.bufnr)
+  end
   local function is_stale()
-    return room.gen ~= gen or (started_lang ~= nil and M.lang() ~= started_lang)
+    return room.gen ~= gen or (started_lang ~= nil and M.lang() ~= started_lang) or gone()
   end
 
   local reason = src.reason or "edit"
@@ -659,7 +663,7 @@ function M.stream(src, lines, on_text)
         current = function()
           -- Another generation, or the option changed under the run: the
           -- translator stops asking its engine at the next request.
-          if M.lang() ~= started_lang then
+          if M.lang() ~= started_lang or gone() then
             return -1
           end
           return room.gen

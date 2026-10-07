@@ -404,7 +404,8 @@ Every push bumps a generation counter of the room it goes to. A result of an
 older generation (fast edits, or, with `browser.behavior = "reuse"`, a switch to
 another buffer: the one preview tab is one room for every document) is dropped
 and its run is cancelled, so one document's translation is never shown for
-another.
+another. Wiping the buffer (or removing the option from the config) stops its run
+the same way.
 
 **When it translates** (`browser.display_lang_trigger`; never per keystroke):
 
