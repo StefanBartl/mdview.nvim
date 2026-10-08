@@ -65,6 +65,19 @@ end
 -- which registers a real :MDView user command as a side effect.
 M._log_level_routes = log_level_routes
 
+--- One line per overlay for the option float (the cheatsheet on the command
+--- line), taken from the overlay manifest so a new overlay needs no second
+--- entry here.
+---@internal
+---@return table<string, string>
+local function overlay_enum_desc()
+  local out = {}
+  for name, spec in pairs(overlay.known) do
+    out[name] = (spec.desc:gsub("^%l", string.upper))
+  end
+  return out
+end
+
 ---@return nil
 function M.attach()
   local routes = {
@@ -147,7 +160,15 @@ function M.attach()
 
     {
       path = { "theme" },
-      args = { { name = "name", type = "STRING", optional = true, values = theme.known } },
+      args = {
+        {
+          name = "name",
+          type = "STRING",
+          optional = true,
+          values = theme.known,
+          desc = "Preview theme, optionally with a -light or -dark suffix",
+        },
+      },
       desc = "Switch the preview theme (optionally -light/-dark); no argument reports the current theme",
       run = function(ctx)
         theme.run(ctx.args.name)
@@ -219,7 +240,21 @@ function M.attach()
     -- (no reload) and records the choice for the next start.
     {
       path = { "cursor" },
-      args = { { name = "mode", type = "STRING", optional = true, values = cursor.modes } },
+      args = {
+        {
+          name = "mode",
+          type = "STRING",
+          optional = true,
+          values = cursor.modes,
+          enum_desc = {
+            line = "Line marker in the left gutter (default)",
+            caret = "Exact caret at the cursor column",
+            section = "Spotlight the current heading section, dim the rest",
+            off = "No cursor marker",
+            toggle = "Flip the section spotlight on and off",
+          },
+        },
+      },
       desc = "Set the Neovim-cursor marker in the preview (line|caret|section|off|toggle — toggle flips section on/off)",
       run = function(ctx)
         cursor.run(ctx.args.mode)
@@ -228,7 +263,15 @@ function M.attach()
 
     {
       path = { "selection" },
-      args = { { name = "action", type = "STRING", optional = true, values = selection.actions } },
+      args = {
+        {
+          name = "action",
+          type = "STRING",
+          optional = true,
+          values = selection.actions,
+          desc = "Mirror the visual selection into the preview (no argument toggles)",
+        },
+      },
       desc = "Mirror the visual selection (v/V/CTRL-V) into the preview, or stop mirroring; no argument toggles",
       run = function(ctx)
         selection.run(ctx.args.action)
@@ -237,7 +280,15 @@ function M.attach()
 
     {
       path = { "spotlight" },
-      args = { { name = "action", type = "STRING", optional = true, values = spotlight.actions } },
+      args = {
+        {
+          name = "action",
+          type = "STRING",
+          optional = true,
+          values = spotlight.actions,
+          desc = "Mirror spotlight.nvim highlights into the preview (no argument toggles)",
+        },
+      },
       desc = "Mirror spotlight.nvim's highlights into the preview, or stop mirroring; no argument toggles",
       run = function(ctx)
         spotlight.run(ctx.args.action)
@@ -246,7 +297,16 @@ function M.attach()
 
     {
       path = { "pin" },
-      args = { { name = "action", type = "STRING", optional = true, values = pin.actions } },
+      args = {
+        {
+          name = "action",
+          type = "STRING",
+          optional = true,
+          values = pin.actions,
+          desc = "Hold the preview on its current document (no argument toggles)",
+          enum_desc = { status = "Report whether the preview is pinned" },
+        },
+      },
       desc = "Hold the preview on the current document instead of following the active buffer; no argument toggles",
       run = function(ctx)
         pin.run(ctx.args.action)
@@ -255,7 +315,15 @@ function M.attach()
 
     {
       path = { "lang" },
-      args = { { name = "code", type = "STRING", optional = true, values = lang.values } },
+      args = {
+        {
+          name = "code",
+          type = "STRING",
+          optional = true,
+          values = lang.values,
+          desc = "Language code, off (original again) or refresh (translate again)",
+        },
+      },
       desc = "Show the preview in another language (<code> | off | refresh); no argument reports the state",
       run = function(ctx)
         lang.run(ctx.args.code)
@@ -264,7 +332,18 @@ function M.attach()
 
     {
       path = { "sync" },
-      args = { { name = "action", type = "STRING", optional = true, values = sync.actions } },
+      args = {
+        {
+          name = "action",
+          type = "STRING",
+          optional = true,
+          values = sync.actions,
+          enum_desc = {
+            pause = "Stop scrolling the preview and moving its cursor marker",
+            resume = "Follow the Neovim cursor again",
+          },
+        },
+      },
       desc = "Pause/resume the nvim->browser scroll sync; no argument reports the state",
       run = function(ctx)
         sync.run(ctx.args.action)
@@ -273,7 +352,15 @@ function M.attach()
 
     {
       path = { "zoom" },
-      args = { { name = "step", type = "STRING", optional = true, values = zoom.actions } },
+      args = {
+        {
+          name = "step",
+          type = "STRING",
+          optional = true,
+          values = zoom.actions,
+          desc = "+ or - by 10%, reset to 100%, or a factor (1.5) / percent (150)",
+        },
+      },
       desc = "Adjust the preview font-size zoom (+ | - | reset | <factor>)",
       run = function(ctx)
         zoom.run(ctx.args.step)
@@ -282,7 +369,15 @@ function M.attach()
 
     {
       path = { "reveal" },
-      args = { { name = "action", type = "STRING", optional = true, values = reveal.actions } },
+      args = {
+        {
+          name = "action",
+          type = "STRING",
+          optional = true,
+          values = reveal.actions,
+          desc = "Reveal the blurred private blocks in the preview, or hide them",
+        },
+      },
       desc = "Reveal/hide all private (```private) blocks in the preview",
       run = function(ctx)
         reveal.run(ctx.args.action)
@@ -292,8 +387,20 @@ function M.attach()
     {
       path = { "overlay" },
       args = {
-        { name = "name", type = "STRING", optional = true, values = overlay.names() },
-        { name = "action", type = "STRING", optional = true, values = { "on", "off", "toggle" } },
+        {
+          name = "name",
+          type = "STRING",
+          optional = true,
+          values = overlay.names(),
+          enum_desc = overlay_enum_desc(),
+        },
+        {
+          name = "action",
+          type = "STRING",
+          optional = true,
+          values = { "on", "off", "toggle" },
+          desc = "Show or hide the overlay (default: toggle)",
+        },
       },
       desc = "Toggle a preview overlay (floating TOC, …); no name lists them",
       run = function(ctx)
@@ -310,7 +417,15 @@ function M.attach()
 
     {
       path = { "blanklines" },
-      args = { { name = "action", type = "STRING", optional = true, values = blanklines.actions } },
+      args = {
+        {
+          name = "action",
+          type = "STRING",
+          optional = true,
+          values = blanklines.actions,
+          desc = "Show every blank line as extra space; off collapses them (default)",
+        },
+      },
       desc = "Show every blank line as extra space, or collapse them (CommonMark default); no argument toggles",
       run = function(ctx)
         blanklines.run(ctx.args.action)

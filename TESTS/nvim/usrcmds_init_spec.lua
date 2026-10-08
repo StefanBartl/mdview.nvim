@@ -60,7 +60,7 @@ describe("usrcmds.attach", function()
     assert.is_true(ok2)
   end)
 
-  it("describes every flag and key=value pair of :MDView in lib.nvim's option float", function()
+  it("describes every flag, key=value pair and argument of :MDView in lib.nvim's option float", function()
     local composer = require("lib.nvim.bindings.usercmd.composer")
     -- A lib.nvim older than `help.undocumented` cannot answer the question; that is a missing
     -- feature of the dependency, not a defect of this plugin.
@@ -72,9 +72,42 @@ describe("usrcmds.attach", function()
     assert.is_not_nil(composer.registry().MDView, ":MDView is registered through the composer")
 
     local missing = {}
-    for _, m in ipairs(composer.help.undocumented("MDView")) do
-      missing[#missing + 1] = ("%s %s"):format(m.route, m.name)
+    -- `args = true` also lists the positional arguments (an older lib.nvim ignores it).
+    for _, m in ipairs(composer.help.undocumented("MDView", { args = true })) do
+      missing[#missing + 1] = ("%s %s %s"):format(m.route, m.kind, m.name)
     end
-    assert.are.equal(0, #missing, ":MDView options without a help text: " .. table.concat(missing, ", "))
+    assert.are.equal(0, #missing, ":MDView options and arguments without a help text: " .. table.concat(missing, ", "))
+  end)
+
+  it("keeps the argument texts of :MDView to one short line without a trailing full stop", function()
+    local composer = require("lib.nvim.bindings.usercmd.composer")
+    local entries = require("lib.nvim.bindings.usercmd.composer.help.entries")
+    if type(composer.help.undocumented) ~= "function" then
+      return
+    end
+
+    usrcmds.attach()
+    local walked = 0
+    ---@param label string
+    ---@param text string
+    local function check(label, text)
+      walked = walked + 1
+      assert.is_false(text:find("\n", 1, true) ~= nil, label .. " is one line")
+      assert.is_true(#text <= 80, label .. " stays short (" .. #text .. " chars)")
+      assert.is_false(text:find("%.$") ~= nil, label .. " has no trailing full stop")
+    end
+    for _, route in ipairs(composer.registry().MDView:spec().routes or {}) do
+      local path = table.concat(route.path, " ")
+      for _, arg in ipairs(route.args or {}) do
+        local text = entries.arg_desc and entries.arg_desc(arg) or arg.desc
+        if text then
+          check((":MDView %s %s"):format(path, arg.name), text)
+        end
+        for value, vtext in pairs(arg.enum_desc or {}) do
+          check((":MDView %s %s = %s"):format(path, arg.name, value), vtext)
+        end
+      end
+    end
+    assert.is_true(walked > 0, "the routes' argument texts were actually walked")
   end)
 end)
