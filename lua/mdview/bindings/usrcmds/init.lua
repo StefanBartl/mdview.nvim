@@ -99,7 +99,13 @@ function M.attach()
     {
       path = { "standalone" },
       args = { { name = "file", type = "PATH", optional = true } },
-      flags = { { name = "no-browser", bool = true } },
+      flags = {
+        {
+          name = "no-browser",
+          bool = true,
+          desc = "Do not open a browser tab; the URL is shown in a notification",
+        },
+      },
       desc = "Preview via the relay's own file watcher, with no Neovim in the chain",
       run = function(ctx)
         standalone.run(ctx.args.file, ctx.flags["no-browser"])

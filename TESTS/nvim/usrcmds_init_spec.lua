@@ -59,4 +59,22 @@ describe("usrcmds.attach", function()
     assert.is_true(ok1)
     assert.is_true(ok2)
   end)
+
+  it("describes every flag and key=value pair of :MDView in lib.nvim's option float", function()
+    local composer = require("lib.nvim.bindings.usercmd.composer")
+    -- A lib.nvim older than `help.undocumented` cannot answer the question; that is a missing
+    -- feature of the dependency, not a defect of this plugin.
+    if type(composer.help.undocumented) ~= "function" then
+      return
+    end
+
+    usrcmds.attach()
+    assert.is_not_nil(composer.registry().MDView, ":MDView is registered through the composer")
+
+    local missing = {}
+    for _, m in ipairs(composer.help.undocumented("MDView")) do
+      missing[#missing + 1] = ("%s %s"):format(m.route, m.name)
+    end
+    assert.are.equal(0, #missing, ":MDView options without a help text: " .. table.concat(missing, ", "))
+  end)
 end)
