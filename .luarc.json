@@ -1,6 +1,6 @@
 {
   "runtime.version": "LuaJIT",
-  "diagnostics.globals": ["vim"],
+  "diagnostics.globals": [],
   "workspace.checkThirdParty": false,
   "workspace.ignoreDir": [".claude", ".deps"],
   "telemetry.enable": false
