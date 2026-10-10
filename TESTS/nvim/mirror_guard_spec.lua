@@ -57,28 +57,56 @@ local function io_open_reads(line)
   return not (mode and mode:match("^[wa]") ~= nil)
 end
 
---- Tools whose job is to print a file.
-local READER_TOOLS = { "cat", "head", "tail", "more", "less", "Get-Content", "type", "gc" }
+--- Patterns for `external_reader`, built once. Tools that are everyday words
+--- (`head`, `tail`, `more`, `less`, `type`, `gc`) only count where the line
+--- shows they are a command, never as a bare string literal: `{ "head", "body" }`
+--- is a list of HTML tags.
+---@type string[]
+local READER_PATTERNS = {}
+do
+  -- Tools nobody uses as a plain word in a string.
+  for _, tool in ipairs({ "cat", "Get%-Content" }) do
+    READER_PATTERNS[#READER_PATTERNS + 1] = "[\"']" .. tool .. "[\"']"
+  end
+  -- Tools that take a file: first element of an argv table whose next element is
+  -- not a literal (a literal next to it makes it a list of words), or the first
+  -- element of the table handed straight to a spawn call (also with literals after it).
+  for _, tool in ipairs({ "head", "tail", "more", "less", "type" }) do
+    READER_PATTERNS[#READER_PATTERNS + 1] = "{%s*[\"']" .. tool .. "[\"']%s*,%s*[^\"'%s]"
+    READER_PATTERNS[#READER_PATTERNS + 1] = "system%w*%s*%(%s*{%s*[\"']" .. tool .. "[\"']%s*,"
+    READER_PATTERNS[#READER_PATTERNS + 1] = "jobstart%s*%(%s*{%s*[\"']" .. tool .. "[\"']%s*,"
+  end
+  -- A command string: system("head x"), systemlist('type x'), io.popen("more x").
+  for _, tool in ipairs({ "cat", "head", "tail", "more", "less", "type", "Get%-Content", "gc" }) do
+    READER_PATTERNS[#READER_PATTERNS + 1] = "system%w*%s*%(%s*[\"']%s*" .. tool .. "%s"
+    READER_PATTERNS[#READER_PATTERNS + 1] = "popen%s*%(%s*[\"']%s*" .. tool .. "%s"
+  end
+  -- The Windows shell: cmd /c type <file>.
+  READER_PATTERNS[#READER_PATTERNS + 1] = "[\"']/c[\"']%s*,%s*[\"']type[\"']"
+end
 
 --- A source line starts an external program that prints a file: `systemlist("cat x")`,
---- `vim.system({ "cat", path })`, `io.popen("type x")`. A string literal that is
---- exactly a reader tool counts on its own (the argv is often split over lines);
---- the tools that are also everyday words (`type`, `gc`) only inside a command string.
+--- `vim.system({ "cat", path })`, `io.popen("type x")`.
 ---@param line string
 ---@return boolean
 local function external_reader(line)
-  for _, tool in ipairs(READER_TOOLS) do
-    local quoted = "[\"']" .. tool:gsub("%p", "%%%0") .. "[\"']"
-    if tool ~= "type" and tool ~= "gc" and line:find(quoted) then
-      return true
-    end
-    local in_command = "system%w*%s*%(%s*[\"']%s*" .. tool:gsub("%p", "%%%0") .. "%s"
-    local in_popen = "popen%s*%(%s*[\"']%s*" .. tool:gsub("%p", "%%%0") .. "%s"
-    if line:find(in_command) or line:find(in_popen) then
+  for _, pattern in ipairs(READER_PATTERNS) do
+    if line:find(pattern) then
       return true
     end
   end
   return false
+end
+
+--- The spellings of ex `:read` (`:redo` is `:red`, not one of them).
+local EX_READ_NAMES = { "r", "re", "rea", "read" }
+
+--- Patterns for `ex_read`, built once.
+---@type string[]
+local EX_READ_PATTERNS = {}
+for _, name in ipairs(EX_READ_NAMES) do
+  -- A command string, optionally with a range: "read x", "0r x", "$read !cat x".
+  EX_READ_PATTERNS[#EX_READ_PATTERNS + 1] = "[\"']%s*[%d%$%%%.,']*%s*" .. name .. "[ !]"
 end
 
 --- A source line runs an ex command that reads a file or a command's output
@@ -86,13 +114,20 @@ end
 ---@param line string
 ---@return boolean
 local function ex_read(line)
-  if line:find("vim%.cmd%.r[ea]*d?%f[^%w_]") then
-    return true
+  for _, name in ipairs(EX_READ_NAMES) do
+    if line:find("vim%.cmd%." .. name .. "%f[^%w_]") then
+      return true
+    end
   end
   if not (line:find("vim%.cmd") or line:find("nvim_command") or line:find("nvim_exec")) then
     return false
   end
-  return line:find("[\"']%s*[%d%$%%%.,']*%s*r[ea]*d?[ !]") ~= nil
+  for _, pattern in ipairs(EX_READ_PATTERNS) do
+    if line:find(pattern) then
+      return true
+    end
+  end
+  return false
 end
 
 ---@class MirrorGuardRule
@@ -282,10 +317,18 @@ describe("mdview.core.mirror guard", function()
       { "external reader (cat, type, …)", 'local l = vim.fn.system("type " .. path)' },
       { "external reader (cat, type, …)", 'vim.system({ "cat", path }, {}, cb)' },
       { "external reader (cat, type, …)", '  "Get-Content",' },
+      { "external reader (cat, type, …)", 'vim.system({ "head", "-n", "5", path }, {}, cb)' },
+      { "external reader (cat, type, …)", 'local argv = { "tail", path }' },
+      { "external reader (cat, type, …)", 'vim.fn.jobstart({ "less", "-F", path })' },
+      { "external reader (cat, type, …)", 'vim.system({ "cmd", "/c", "type", path })' },
+      { "external reader (cat, type, …)", 'local l = vim.fn.system("more " .. path)' },
       { "ex :read", 'vim.cmd("read " .. vim.fn.fnameescape(path))' },
       { "ex :read", 'vim.cmd("0r " .. path)' },
       { "ex :read", 'vim.cmd("$read !cat x")' },
       { "ex :read", "vim.cmd.read(path)" },
+      { "ex :read", 'vim.cmd("r " .. path)' },
+      { "ex :read", 'vim.cmd("re " .. path)' },
+      { "ex :read", 'vim.api.nvim_command("1,3read " .. path)' },
     }
     for _, case in ipairs(READS) do
       it(("forbids %s in any other file: %s"):format(case[1], case[2]), function()
@@ -308,6 +351,12 @@ describe("mdview.core.mirror guard", function()
       { "a command that is not a reader", 'vim.system({ "curl", url }, {}, cb)' },
       { "an ex command that merely contains read", 'vim.cmd("setlocal readonly")' },
       { "an ex command that is not read", 'vim.cmd("redraw")' },
+      { "redo, which is :red", 'vim.cmd("red ")' },
+      { "a colour called red", 'vim.cmd("highlight Foo guifg=" .. "red ")' },
+      { "vim.cmd.redraw", "vim.cmd.redraw()" },
+      { "html tag names", 'local tags = { "head", "body" }' },
+      { "html tag names passed on", 'render({ "head", "body" })' },
+      { "html tag names, one of them quoted alone", 'local t = "head"' },
     }
     for _, case in ipairs(NOT_READS) do
       it(("does not flag %s"):format(case[1]), function()
