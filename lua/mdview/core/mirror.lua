@@ -16,8 +16,10 @@
 ---
 --- Everything else under lua/mdview stays away from the raw read routes (a
 --- buffer's lines or text, a file's lines or bytes). The guard spec
---- TESTS/nvim/mirror_guard_spec.lua lists the forbidden routes and fails on any
---- use outside the documented exceptions. An exception is granted per route,
+--- TESTS/nvim/mirror_guard_spec.lua lists the known forbidden routes and fails on
+--- any use outside the documented exceptions. It is a denylist over source lines,
+--- a tripwire for the honest mistake: a route it does not list, a call split over
+--- several lines or a name built at run time is not seen. An exception is granted per route,
 --- never per file: a file that may read the real buffer may not read a file
 --- from disk because of that, and the other way round.
 ---

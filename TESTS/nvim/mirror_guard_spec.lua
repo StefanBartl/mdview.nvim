@@ -1,8 +1,15 @@
 ---@module 'tests.nvim.mirror_guard_spec'
 -- Guard against regression: the text for the preview, from a buffer or from a
--- file, must come from mdview.core.mirror. Any raw read route under lua/mdview
--- (the buffer API, the file API, the Vimscript and luv equivalents of both) is a
--- stray read that a future transform (display language) would miss.
+-- file, must come from mdview.core.mirror. Any KNOWN raw read route under
+-- lua/mdview (the buffer API, the file API, the Vimscript and luv equivalents of
+-- both, an external reader such as `cat`, an ex `:read`) is a stray read that a
+-- future transform (display language) would miss.
+--
+-- This is a denylist over source lines, a tripwire and not a proof: it cannot
+-- see a route it does not list, a call split over several lines, or a function
+-- reached through a name built at run time. It catches the honest mistake (and
+-- the lazy alias: `local open = io.open`, `pcall(io.open, ...)`), not an
+-- attempt to hide a read. A new route that turns up gets a rule and a case below.
 --
 -- An exception is granted per ROUTE, not per file: a file that may read the real
 -- buffer is not thereby allowed to read a file from disk. The exceptions are
@@ -28,16 +35,64 @@ end
 --- A source line opens a file with `io.open` in a mode that can read: a mode
 --- literal that does not start with `w` or `a`, a mode that is not a literal, no
 --- mode at all, or a call whose closing parenthesis is on a later line (the mode
---- is not visible, so it is not assumed to be a write).
+--- is not visible, so it is not assumed to be a write). `io.open` handed on as a
+--- value (`pcall(io.open, path, "r")`, `local open = io.open`) counts too: a
+--- literal write mode in the `pcall` is understood, an alias never is.
 ---@param line string
 ---@return boolean
 local function io_open_reads(line)
   local call = line:match("%f[%w_]io%.open%s*(%b())")
-  if not call then
-    return line:find("%f[%w_]io%.open%s*%(") ~= nil
+  if call then
+    local mode = call:match(",%s*[\"']([^\"']*)[\"']%s*%)$")
+    return not (mode and mode:match("^[wa]") ~= nil)
   end
-  local mode = call:match(",%s*[\"']([^\"']*)[\"']%s*%)$")
+  if line:find("%f[%w_]io%.open%s*%(") then
+    return true
+  end
+  if not line:find("%f[%w_]io%.open%f[^%w_]") then
+    return false
+  end
+  local args = line:match("pcall%s*%(%s*io%.open%s*,(.-)%)")
+  local mode = args and args:match(",%s*[\"']([^\"']*)[\"']%s*$")
   return not (mode and mode:match("^[wa]") ~= nil)
+end
+
+--- Tools whose job is to print a file.
+local READER_TOOLS = { "cat", "head", "tail", "more", "less", "Get-Content", "type", "gc" }
+
+--- A source line starts an external program that prints a file: `systemlist("cat x")`,
+--- `vim.system({ "cat", path })`, `io.popen("type x")`. A string literal that is
+--- exactly a reader tool counts on its own (the argv is often split over lines);
+--- the tools that are also everyday words (`type`, `gc`) only inside a command string.
+---@param line string
+---@return boolean
+local function external_reader(line)
+  for _, tool in ipairs(READER_TOOLS) do
+    local quoted = "[\"']" .. tool:gsub("%p", "%%%0") .. "[\"']"
+    if tool ~= "type" and tool ~= "gc" and line:find(quoted) then
+      return true
+    end
+    local in_command = "system%w*%s*%(%s*[\"']%s*" .. tool:gsub("%p", "%%%0") .. "%s"
+    local in_popen = "popen%s*%(%s*[\"']%s*" .. tool:gsub("%p", "%%%0") .. "%s"
+    if line:find(in_command) or line:find(in_popen) then
+      return true
+    end
+  end
+  return false
+end
+
+--- A source line runs an ex command that reads a file or a command's output
+--- into the buffer: `vim.cmd("read x")`, `:0r !cat x`, `vim.cmd.read(...)`.
+---@param line string
+---@return boolean
+local function ex_read(line)
+  if line:find("vim%.cmd%.r[ea]*d?%f[^%w_]") then
+    return true
+  end
+  if not (line:find("vim%.cmd") or line:find("nvim_command") or line:find("nvim_exec")) then
+    return false
+  end
+  return line:find("[\"']%s*[%d%$%%%.,']*%s*r[ea]*d?[ !]") ~= nil
 end
 
 ---@class MirrorGuardRule
@@ -58,11 +113,21 @@ local RULES = {
   { route = "getbufoneline", hit = word("getbufoneline"), allowed = {} },
   { route = "getline", hit = word("getline"), allowed = {} },
   { route = "get_node_text", hit = word("get_node_text"), allowed = {} },
+  { route = "nvim_get_current_line", hit = word("nvim_get_current_line"), allowed = {} },
+  { route = "getregion", hit = word("getregion"), allowed = {} },
+  { route = "getregionpos", hit = word("getregionpos"), allowed = {} },
+  { route = "matchbufline", hit = word("matchbufline"), allowed = {} },
   -- The disk side: a file that is not open in a buffer is read by mirror.lines_for_path.
   { route = "readfile", hit = word("readfile"), allowed = { MIRROR } },
   { route = "readblob", hit = word("readblob"), allowed = {} },
   { route = "fs_read", hit = word("fs_read"), allowed = {} },
   { route = "io.lines", hit = word("io.lines"), allowed = {} },
+  { route = "io.input", hit = word("io.input"), allowed = {} },
+  { route = "io.read", hit = word("io.read"), allowed = {} },
+  { route = "io.popen", hit = word("io.popen"), allowed = {} },
+  { route = "vim.secure.read", hit = word("vim.secure.read"), allowed = {} },
+  { route = "external reader (cat, type, …)", hit = external_reader, allowed = {} },
+  { route = "ex :read", hit = ex_read, allowed = {} },
   -- Only the read modes: the log, a temp file or a report is written with io.open too.
   { route = "io.open (read mode)", hit = io_open_reads, allowed = { "adapter/install.lua" } },
 }
@@ -202,6 +267,25 @@ describe("mdview.core.mirror guard", function()
       { "io.open (read mode)", "local f = io.open(path, mode)" },
       { "io.open (read mode)", 'local f = io.open("a.txt")' },
       { "io.open (read mode)", "local f = io.open(" },
+      { "nvim_get_current_line", "local l = vim.api.nvim_get_current_line()" },
+      { "getregion", "local r = vim.fn.getregion(a, b)" },
+      { "getregionpos", "local r = vim.fn.getregionpos(a, b)" },
+      { "matchbufline", "local m = vim.fn.matchbufline(b, 'x', 1, '$')" },
+      { "vim.secure.read", "local t = vim.secure.read(path)" },
+      { "io.input", "io.input(path)" },
+      { "io.read", "local t = io.read('a')" },
+      { "io.popen", "local p = io.popen('ls')" },
+      { "io.open (read mode)", 'local ok, f = pcall(io.open, path, "r")' },
+      { "io.open (read mode)", "local ok, f = pcall(io.open, path)" },
+      { "io.open (read mode)", "local open = io.open" },
+      { "external reader (cat, type, …)", 'local l = vim.fn.systemlist("cat " .. path)' },
+      { "external reader (cat, type, …)", 'local l = vim.fn.system("type " .. path)' },
+      { "external reader (cat, type, …)", 'vim.system({ "cat", path }, {}, cb)' },
+      { "external reader (cat, type, …)", '  "Get-Content",' },
+      { "ex :read", 'vim.cmd("read " .. vim.fn.fnameescape(path))' },
+      { "ex :read", 'vim.cmd("0r " .. path)' },
+      { "ex :read", 'vim.cmd("$read !cat x")' },
+      { "ex :read", "vim.cmd.read(path)" },
     }
     for _, case in ipairs(READS) do
       it(("forbids %s in any other file: %s"):format(case[1], case[2]), function()
@@ -218,6 +302,12 @@ describe("mdview.core.mirror guard", function()
       { "a longer identifier", "local lines = getlines(b)" },
       { "a name that merely contains a route", "local x = my_readfile(path)" },
       { "a directory read", "local d = uv.fs_readdir(handle)" },
+      { "a pcall of io.open in write mode", 'local ok, f = pcall(io.open, path, "w")' },
+      { "a pcall of io.open in append mode", "local ok, f = pcall(io.open, path, 'a')" },
+      { "a field called type", 'local t = { "type", "name" }' },
+      { "a command that is not a reader", 'vim.system({ "curl", url }, {}, cb)' },
+      { "an ex command that merely contains read", 'vim.cmd("setlocal readonly")' },
+      { "an ex command that is not read", 'vim.cmd("redraw")' },
     }
     for _, case in ipairs(NOT_READS) do
       it(("does not flag %s"):format(case[1]), function()
