@@ -582,7 +582,7 @@ const maxControlBodyBytes = 1 << 10 // a small JSON control object
 
 // handleControl broadcasts a live preview-control update (small JSON body, e.g.
 // {"cursor":"caret"} / {"zoom":1.2}) to key's room, tagged with
-// controlMessagePrefix. Ephemeral like /scroll and /doc — a transient control
+// controlMessagePrefix. Ephemeral like /scroll — a transient control
 // signal, not the room's content. Powers runtime commands (:MDViewCursor,
 // :MDViewZoom) that change the open tab without a reload.
 func handleControl(registry *relay.Registry, token string) http.HandlerFunc {
@@ -617,10 +617,10 @@ func handleControl(registry *relay.Registry, token string) http.HandlerFunc {
 // JavaScript.
 //
 // Stored rather than ephemeral (unlike /scroll and /control; /doc is kept too)
-// because it describes the current document rather than a passing event: a reloaded tab is
-// seeded with LastPayload's content, and would otherwise show it unhighlighted
-// until the next edit happened to arrive. The relay never inspects the payload,
-// it only forwards and remembers the bytes.
+// because it describes the current document rather than a passing event: a
+// reloaded tab is seeded with LastPayload's content, and would otherwise show it
+// unhighlighted until the next edit happened to arrive. The relay never inspects
+// the payload, it only forwards and remembers the bytes.
 func handleSpans(registry *relay.Registry, token string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
