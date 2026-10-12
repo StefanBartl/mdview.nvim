@@ -111,3 +111,16 @@ export function postText(
 ): Promise<WriteBackResult> {
   return post(fetchFn, url, body, 'text/plain', keepalive);
 }
+
+/**
+ * Send a checkbox toggle: the "<line>:<0|1>" body, with the line it was
+ * computed against (`target.expected`) so a stale toggle is dropped.
+ */
+export function postToggle(
+  fetchFn: typeof fetch,
+  target: WriteBackTarget,
+  line: number,
+  checked: boolean,
+): Promise<WriteBackResult> {
+  return postText(fetchFn, writeBackUrl('/toggle', target), `${line}:${checked ? 1 : 0}`, true);
+}

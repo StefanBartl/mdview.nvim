@@ -35,7 +35,10 @@ import {
   dispatchOverlayControl,
 } from './render/overlays';
 import { currentDocument, installHistory, onDocChange } from './render/history';
-import { WRITE_BACK_MESSAGES, postJson, postText, writeBackUrl } from './render/writeBack';
+import { createRenderGate } from './render/renderGate';
+import { createScrollFollower, parseCursorFields } from './render/scrollFollow';
+import { parseControl } from './render/controlMessage';
+import { WRITE_BACK_MESSAGES, postJson, postToggle, writeBackUrl } from './render/writeBack';
 import { highlight, parseHighlighter } from './highlight';
 import init, { render_markdown } from './wasm-render/mdview_wasm_render.js';
 
@@ -305,16 +308,13 @@ async function boot() {
       // Resolves false when the relay refused it: the box goes back to what the
       // source still says, and the person is told, instead of a tick that was
       // never saved.
-      return postText(
-        fetch,
-        writeBackUrl('/toggle', { token, key, doc: currentDocument(), expected }),
-        `${line}:${checked ? 1 : 0}`,
-        true,
-      ).then(result => {
-        if (result === 'ok') return true;
-        showToast(WRITE_BACK_MESSAGES[result]);
-        return false;
-      });
+      return postToggle(fetch, { token, key, doc: currentDocument(), expected }, line, checked).then(
+        result => {
+          if (result === 'ok') return true;
+          showToast(WRITE_BACK_MESSAGES[result]);
+          return false;
+        },
+      );
     });
   }
 
@@ -343,11 +343,10 @@ async function boot() {
   // makes a stale edit fail instead of overwriting newer text. Renders are held
   // back while an editor is open (see renderDocument) and flushed on close.
   let editEnabled = params.get('edit') === '1';
-  let deferredText: string | null = null;
   // The newest text there is: the one held back behind an open editor, else the
   // one on screen. A re-render that is not caused by a push (a control update)
   // must start from this, or it would put the older text back.
-  const currentText = (): string => deferredText ?? lastText;
+  const currentText = (): string => gate.current(lastText);
   const toast = (message: string): void => showToast(message);
   const sendBlockEdit = (edit: BlockEdit): void => {
     clientLog(`edit: lines ${edit.start}-${edit.end} (${edit.text.length} chars)`);
@@ -360,10 +359,13 @@ async function boot() {
     });
   };
   let blockEditor: BlockEditor | null = null;
-  // The newest scroll ping that arrived while an editor was open (see onClose).
-  let skippedScroll: string | null = null;
-  let scrollSuppressUntil = 0;
-  const SCROLL_SUPPRESS_MS = 250;
+  // Keeps the newest scroll ping that arrived while an editor was open (see
+  // onClose) and the window in which a scroll event is the echo of a ping.
+  const scrollFollower = createScrollFollower({
+    apply: ping => {
+      if (container) applyScrollPing(container, ping);
+    },
+  });
   if (container) {
     container.classList.toggle('mdview-edit', editEnabled);
     blockEditor = installBlockEdit(container, {
@@ -372,11 +374,8 @@ async function boot() {
       isEnabled: () => editEnabled,
       send: sendBlockEdit,
       onClose: () => {
-        if (deferredText !== null) {
-          const text = deferredText;
-          deferredText = null;
-          renderDocument(text); // re-places the cursor marker and the selection itself
-        } else if (container) {
+        // A held-back render re-places the cursor marker and the selection itself.
+        if (!gate.release() && container) {
           // Pings that arrived while the block was hidden could not place these.
           if (lastCursorLine >= 0) {
             updateCursorMarker(
@@ -390,12 +389,7 @@ async function boot() {
         }
         // The scroll ping that was skipped (its block had no position) is
         // applied now, so the preview follows Neovim again.
-        if (container && skippedScroll !== null) {
-          const ping = skippedScroll;
-          skippedScroll = null;
-          applyScrollPing(container, ping);
-          scrollSuppressUntil = Date.now() + SCROLL_SUPPRESS_MS;
-        }
+        scrollFollower.catchUp();
       },
     });
   }
@@ -432,7 +426,7 @@ async function boot() {
   const spotlight = container ? createSpotlightMirror(container, { log: clientLog }) : null;
 
   // Opt-in reverse scroll (browser -> Neovim). While applying an incoming
-  // nvim->browser scroll ping we set scrollSuppressUntil so the resulting
+  // nvim->browser scroll ping the scroll follower suppresses sends so the resulting
   // 'scroll' event doesn't bounce back to Neovim and create a feedback loop.
   if (container && params.get('rscroll') === '1') {
     // Visible hint that reverse scroll is on, so a viewer knows they may scroll
@@ -446,7 +440,7 @@ async function boot() {
     let lastSent = 0;
     container.addEventListener('scroll', () => {
       const now = Date.now();
-      if (now < scrollSuppressUntil) return; // caused by an incoming ping
+      if (scrollFollower.suppressed()) return; // caused by an incoming ping
       if (now - lastSent < 120) return; // throttle
       lastSent = now;
       const max = container.scrollHeight - container.clientHeight;
@@ -484,15 +478,8 @@ async function boot() {
   // module for Markdown (output already sanitized inside WASM — safe to
   // assign to innerHTML), or as a single highlighted code block for anything
   // else (built via DOM APIs, not innerHTML — see render/plainText.ts).
-  const renderDocument = (text: string): void => {
+  const renderNow = (text: string): void => {
     if (!container) return;
-    // An open block editor sits in the DOM this render would replace: hold the
-    // text back and render it when the editor closes. `lastText` stays the text
-    // the DOM was rendered from, which is what an edit's `expected` is cut from.
-    if (blockEditor?.isEditing()) {
-      deferredText = text;
-      return;
-    }
     try {
       if (docIsMarkdown) {
         // Rendered first: if the renderer throws, the DOM is untouched and
@@ -552,6 +539,17 @@ async function boot() {
     }
   };
 
+  // An open block editor sits in the DOM a render would replace: the gate holds
+  // the text back and renders it when the editor closes. `lastText` stays the
+  // text the DOM was rendered from, which is what an edit's `expected` is cut from.
+  const gate = createRenderGate({
+    isHeld: () => blockEditor?.isEditing() === true,
+    render: renderNow,
+  });
+  const renderDocument = (text: string): void => {
+    if (container) gate.push(text);
+  };
+
   // Apply a fence-highlight payload from Neovim, then repaint the code blocks.
   // Only ever sent while browser.highlighter = "nvim"; under any other
   // highlighter the Lua side never collects it, so this stays unused. A
@@ -581,43 +579,18 @@ async function boot() {
   // Apply a live control update (:MDViewCursor / :MDViewZoom). Best-effort: a
   // malformed payload is ignored rather than breaking the preview.
   const applyControl = (json: string): void => {
-    let msg: {
-      cursor?: unknown;
-      zoom?: unknown;
-      reveal?: unknown;
-      overlay?: unknown;
-      overlays?: unknown;
-      overlayData?: unknown;
-      blankLines?: unknown;
-      selection?: unknown;
-      selectionSync?: unknown;
-      displayLang?: unknown;
-      editBlocks?: unknown;
-      notice?: unknown;
-    };
-    try {
-      msg = JSON.parse(json) as typeof msg;
-    } catch {
-      return;
-    }
+    const msg = parseControl(json);
+    if (!msg) return;
     // Overlay toggles: a single {name, on} or a batch {name: bool, …}.
-    if (msg.overlay && typeof msg.overlay === 'object') {
-      const o = msg.overlay as { name?: unknown; on?: unknown };
-      if (typeof o.name === 'string' && typeof o.on === 'boolean') setOverlay(o.name, o.on);
-    }
-    if (msg.overlays && typeof msg.overlays === 'object') {
-      setOverlays(msg.overlays as Record<string, boolean>);
-    }
+    if (msg.overlay) setOverlay(msg.overlay.name, msg.overlay.on);
+    if (msg.overlays) setOverlays(msg.overlays);
     // Overlay-addressed payload: {overlayData: {name, data}}.
-    if (msg.overlayData && typeof msg.overlayData === 'object') {
-      const d = msg.overlayData as { name?: unknown; data?: unknown };
-      if (typeof d.name === 'string') dispatchOverlayControl(d.name, d.data);
-    }
-    if (typeof msg.reveal === 'boolean' && container) {
+    if (msg.overlayData) dispatchOverlayControl(msg.overlayData.name, msg.overlayData.data);
+    if (msg.reveal !== undefined && container) {
       // Reveal/hide all private blocks at once (:MDViewReveal).
       container.classList.toggle('mdview-reveal-all', msg.reveal);
     }
-    if (typeof msg.cursor === 'string') {
+    if (msg.cursor !== undefined) {
       const mode = parseCursorMarkerMode(msg.cursor);
       cursorMarkerMode = mode;
       const needSourceMap = mode === 'caret' || selectionEnabled;
@@ -636,32 +609,32 @@ async function boot() {
         );
       }
     }
-    if (typeof msg.zoom === 'number') {
+    if (msg.zoom !== undefined) {
       applyZoom(msg.zoom);
     }
-    if ('displayLang' in msg) {
+    if (msg.hasDisplayLang) {
       // The preview shows a translation (browser.display_lang): say so, and
       // whether it is still running. `false` removes the badge.
       applyLangStatus(document, parseLangStatus(msg.displayLang));
     }
-    if (typeof msg.blankLines === 'boolean' && container) {
+    if (msg.blankLines !== undefined && container) {
       blankLinesEnabled = msg.blankLines;
       // Blocks are already in the DOM — just add/remove spacers, no re-render.
       applyBlankLineSpacing(container, blankLinesEnabled);
     }
-    if (typeof msg.notice === 'string' && msg.notice !== '') {
+    if (msg.notice !== undefined) {
       // A short message from Neovim for the person at the preview, e.g. that a
       // block edit was not applied. Shown as text, never as markup.
-      toast(msg.notice.slice(0, 200));
+      toast(msg.notice);
     }
-    if (typeof msg.editBlocks === 'boolean' && container) {
+    if (msg.editBlocks !== undefined && container) {
       // `:MDView edit` switching block editing on/off for this session. Off
       // closes an open editor without sending its content.
       editEnabled = msg.editBlocks;
       container.classList.toggle('mdview-edit', editEnabled);
       if (!editEnabled) blockEditor?.cancel();
     }
-    if (typeof msg.selectionSync === 'boolean' && container) {
+    if (msg.selectionSync !== undefined && container) {
       // `:MDView selection` switching the mirror on/off for this session. The
       // mirror places its rectangles from the renderer's inline source-position
       // spans, so enabling it re-renders once to get them -- deliberately here,
@@ -678,7 +651,7 @@ async function boot() {
         renderDocument(currentText());
       }
     }
-    if ('selection' in msg && container) {
+    if (msg.hasSelection && container) {
       // `false` (Neovim left visual mode, or :MDView selection off) parses to
       // null, which clears the highlight.
       lastSelection = parseSelection(msg.selection);
@@ -749,28 +722,24 @@ async function boot() {
       // to or to put the cursor bar on: the ping still updates the remembered
       // cursor line, the placement happens again after the editor closed.
       const editing = blockEditor?.isEditing() === true;
-      if (!editing) applyScrollPing(container, rawMessage);
-      else skippedScroll = rawMessage;
+      // The scrollTop it sets fires a 'scroll' event; the follower suppresses
+      // reverse-scroll sends briefly so it doesn't echo back to Neovim.
+      scrollFollower.receive(rawMessage, editing);
       // The same ping carries the cursor line (and column) — update the marker.
-      const fields = rawMessage.slice(SCROLL_MESSAGE_PREFIX.length).split('/');
-      const cursorLine = Number(fields[0]);
-      const cursorCol = Number(fields[3]);
-      if (Number.isFinite(cursorLine)) {
-        lastCursorLine = cursorLine;
-        lastCursorCol = Number.isFinite(cursorCol) ? cursorCol : -1;
+      const cursor = parseCursorFields(rawMessage.slice(SCROLL_MESSAGE_PREFIX.length));
+      if (cursor) {
+        lastCursorLine = cursor.line;
+        lastCursorCol = cursor.col;
         if (!editing) {
           updateCursorMarker(
             container,
-            cursorLine,
+            cursor.line,
             lastCursorCol >= 0 ? lastCursorCol : null,
             cursorMarkerMode,
           );
         }
-        notifyOverlayCursor(cursorLine, lastCursorCol >= 0 ? lastCursorCol : 0);
+        notifyOverlayCursor(cursor.line, lastCursorCol >= 0 ? lastCursorCol : 0);
       }
-      // The scrollTop we just set fires a 'scroll' event; suppress reverse-scroll
-      // sends briefly so it doesn't echo back to Neovim (feedback loop).
-      scrollSuppressUntil = Date.now() + SCROLL_SUPPRESS_MS;
       return;
     }
 
