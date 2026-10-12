@@ -35,6 +35,12 @@ local M = {}
 ---@type table<string, boolean>
 local watch_support_cache = {}
 
+--- The relay's flag listing per binary (from the same probe), so a later flag
+--- such as --edit can be checked without a second spawn.
+---@internal
+---@type table<string, string>
+local usage_cache = {}
+
 --- Does `bin` understand --watch?
 ---
 --- Worth checking before spawning: standalone mode needs a relay built with
@@ -59,6 +65,7 @@ local function supports_watch(bin, cb)
   local function record(out)
     local supported = type(out) == "string" and out:find("-watch", 1, true) ~= nil
     watch_support_cache[bin] = supported
+    usage_cache[bin] = type(out) == "string" and out or ""
     cb(supported)
   end
 
@@ -205,6 +212,18 @@ function M.run(file_arg, no_browser)
     }
     if no_browser then
       args[#args + 1] = "--open=false"
+    end
+    -- Block editing (edit_blocks): only passed to a relay that lists the flag;
+    -- an older one would reject it and exit, silently, since it is detached.
+    if defaults.edit_blocks == true then
+      if (usage_cache[bin] or ""):find("-edit", 1, true) then
+        args[#args + 1] = "--edit"
+      else
+        notify(
+          "[mdview] standalone: this relay binary has no --edit support; block editing is off for this preview.",
+          vim.log.levels.WARN
+        )
+      end
     end
 
     local pid, spawn_err = detached.spawn(bin, args, vim.fn.fnamemodify(target, ":h"))

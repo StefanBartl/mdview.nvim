@@ -168,6 +168,10 @@ local function resolve_browser_url(opts)
   if cfg.sync_fields == false then
     url = url .. "&fields=0"
   end
+  -- Block editing is opt-in: only signal when on.
+  if cfg.edit_blocks == true then
+    url = url .. "&edit=1"
+  end
 
   return url
 end

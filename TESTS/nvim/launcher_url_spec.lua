@@ -21,6 +21,7 @@ local function with_clean_state(fn)
   local browser0 = vim.deepcopy(bcfg.defaults)
   local exp0 = vim.deepcopy(config.defaults.experimental)
   local sync_cb0, sync_f0 = config.defaults.sync_checkboxes, config.defaults.sync_fields
+  local edit0 = config.defaults.edit_blocks
   local g_dev0, g_srv0, g_wt0 = vim.g.mdview_dev_port, vim.g.mdview_server_port, vim.g.mdview_wt_cert_hash
 
   local ok, err = pcall(fn)
@@ -34,6 +35,7 @@ local function with_clean_state(fn)
   end
   config.defaults.sync_checkboxes = sync_cb0
   config.defaults.sync_fields = sync_f0
+  config.defaults.edit_blocks = edit0
   vim.g.mdview_dev_port = g_dev0
   vim.g.mdview_server_port = g_srv0
   vim.g.mdview_wt_cert_hash = g_wt0
@@ -211,6 +213,18 @@ describe("launcher.resolve_browser_url", function()
       local q = query_of(launcher.resolve_browser_url({ key = "k" }))
       assert.are.equal("0", q.sync)
       assert.are.equal("0", q.fields)
+    end)
+  end)
+
+  it("edit only appears (as 1) when block editing is on", function()
+    with_clean_state(function()
+      bcfg.defaults.open_url = nil
+      state.set_token("t")
+      config.defaults.edit_blocks = false
+      assert.is_nil(query_of(launcher.resolve_browser_url({ key = "k" })).edit)
+
+      config.defaults.edit_blocks = true
+      assert.are.equal("1", query_of(launcher.resolve_browser_url({ key = "k" })).edit)
     end)
   end)
 end)

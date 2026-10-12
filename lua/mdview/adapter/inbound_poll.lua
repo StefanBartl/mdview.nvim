@@ -6,6 +6,7 @@
 --   * GET /scrollback (experimental.reverse_scroll)   — browser scroll position
 --   * GET /toggle     (sync_checkboxes, default on)   — task-list checkbox ticks
 --   * GET /field      (sync_fields, default on)       — text-field write-back
+--   * GET /edit       (edit_blocks, default off)      — block edits (source lines)
 -- Only the enabled endpoints are polled; the timer runs only if at least one is
 -- enabled. curl is already a hard dependency, and every polled event is
 -- latency-tolerant enough for a poll.
@@ -36,6 +37,7 @@ local nav_inflight = false
 local scroll_inflight = false
 local toggle_inflight = false
 local field_inflight = false
+local edit_inflight = false
 
 ---@internal
 ---@param endpoint string
@@ -420,6 +422,99 @@ end
 
 -- ---- lifecycle -------------------------------------------------------------
 
+-- ---- block edit (browser -> nvim buffer) -----------------------------------
+
+-- Replace the 1-based, inclusive buffer lines start..end_ of the buffer showing
+-- `key` with `text`, but only while those lines are still `expected`: the edit
+-- was made against the text the preview was rendered from, and a buffer that
+-- moved on since must not be overwritten by it. Standalone never reaches here
+-- (the relay edits the file). Only the one range is replaced, so marks, folds
+-- and the rest of the undo history stay put, and `u` takes the edit back as one
+-- step.
+---@internal
+---@param key string
+---@param start integer
+---@param end_ integer
+---@param expected string
+---@param text string
+---@return nil
+local function handle_edit(key, start, end_, expected, text)
+  if type(key) ~= "string" or type(expected) ~= "string" or type(text) ~= "string" then
+    return
+  end
+  if type(start) ~= "number" or type(end_) ~= "number" or start < 1 or end_ < start then
+    return
+  end
+  -- The preview shows a transformed text (browser.transform / a display
+  -- language): the lines it sent back belong to that text, not the buffer's.
+  if require("mdview.core.display").active() then
+    require("mdview.core.display").note_field_ignored()
+    return
+  end
+  local buf = buf_for_key(key)
+  if not buf or not vim.api.nvim_buf_is_loaded(buf) then
+    return
+  end
+  local function norm(s)
+    return (s:gsub("\r\n", "\n"))
+  end
+  local function resync()
+    -- Show the buffer's real text again, so the tab does not keep a block that
+    -- was refused.
+    pcall(require("mdview.bindings.autocmds.live_push").push_buffer_changes, buf, { full = true })
+  end
+  if end_ > vim.api.nvim_buf_line_count(buf) then
+    notify("[mdview] preview edit dropped: the lines changed in the buffer", vim.log.levels.WARN)
+    resync()
+    return
+  end
+  local current = table.concat(vim.api.nvim_buf_get_lines(buf, start - 1, end_, false), "\n")
+  if current ~= norm(expected) then
+    notify("[mdview] preview edit dropped: the lines changed in the buffer", vim.log.levels.WARN)
+    resync()
+    return
+  end
+  local lines = vim.split(norm(text), "\n", { plain = true })
+  vim.api.nvim_buf_set_lines(buf, start - 1, end_, false, lines)
+  -- nvim_buf_set_lines doesn't fire TextChanged, so push explicitly.
+  pcall(require("mdview.bindings.autocmds.live_push").push_buffer_changes, buf, { full = true })
+end
+
+---@internal
+---@return nil
+local function poll_edit()
+  if edit_inflight then
+    return
+  end
+  edit_inflight = true
+  vim.fn.jobstart({ "curl", "-sS", "--max-time", "2", url_for("edit") }, {
+    stdout_buffered = true,
+    on_stdout = function(_, data)
+      if not data then
+        return
+      end
+      local body = vim.trim(table.concat(data, "\n"))
+      if body == "" or body == "null" then
+        return
+      end
+      local ok, arr = pcall(vim.json.decode, body)
+      if not ok or type(arr) ~= "table" then
+        return
+      end
+      vim.schedule(function()
+        for _, r in ipairs(arr) do
+          if type(r) == "table" then
+            handle_edit(r.key, r.start, r["end"], r.expected, r.text)
+          end
+        end
+      end)
+    end,
+    on_exit = function()
+      edit_inflight = false
+    end,
+  })
+end
+
 ---@internal
 ---@return nil
 local function tick()
@@ -443,6 +538,9 @@ local function tick()
   if cfg.sync_fields ~= false then
     poll_field()
   end
+  if cfg.edit_blocks == true then
+    poll_edit()
+  end
 end
 
 --- Start polling. No-op unless at least one inbound feature is enabled.
@@ -454,7 +552,7 @@ function M.start()
   end
   local exp = experimental()
   local cfg = require("mdview.config").defaults
-  local sync = cfg.sync_checkboxes ~= false or cfg.sync_fields ~= false
+  local sync = cfg.sync_checkboxes ~= false or cfg.sync_fields ~= false or cfg.edit_blocks == true
   if not (exp.click_navigate == true or exp.reverse_scroll == true or sync) then
     return
   end
@@ -487,5 +585,6 @@ M._handle_nav = handle_nav
 M._handle_scroll = handle_scroll
 M._handle_toggle = handle_toggle
 M._handle_field = handle_field
+M._handle_edit = handle_edit
 
 return M

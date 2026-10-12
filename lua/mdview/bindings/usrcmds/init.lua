@@ -32,6 +32,7 @@ local breadcrumbs = require("mdview.bindings.usrcmds.breadcrumbs")
 local overlay = require("mdview.bindings.usrcmds.overlay")
 local blanklines = require("mdview.bindings.usrcmds.blanklines")
 local selection = require("mdview.bindings.usrcmds.selection")
+local edit = require("mdview.bindings.usrcmds.edit")
 local spotlight = require("mdview.bindings.usrcmds.spotlight")
 local pin = require("mdview.bindings.usrcmds.pin")
 local lang = require("mdview.bindings.usrcmds.lang")
@@ -275,6 +276,23 @@ function M.attach()
       desc = "Mirror the visual selection (v/V/CTRL-V) into the preview, or stop mirroring; no argument toggles",
       run = function(ctx)
         selection.run(ctx.args.action)
+      end,
+    },
+
+    {
+      path = { "edit" },
+      args = {
+        {
+          name = "action",
+          type = "STRING",
+          optional = true,
+          values = edit.actions,
+          desc = "Edit blocks in the preview and write them back (no argument toggles)",
+        },
+      },
+      desc = "Click a block in the preview to edit its source lines, or stop; no argument toggles",
+      run = function(ctx)
+        edit.run(ctx.args.action)
       end,
     },
 

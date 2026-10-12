@@ -99,6 +99,7 @@
 ---@field scroll_sync_top_offset number in "top" mode, fraction (0..1) down from the viewport top to place the line (0 = glued to top)
 ---@field sync_checkboxes boolean let ticking a GFM task-list checkbox in the preview write back to the source: standalone rewrites the file directly, :MDView start edits the buffer (polled, since Neovim has no WebSocket client). Default true; set false to render checkboxes read-only and stop the browser->Neovim poll
 ---@field sync_fields boolean let editing a raw-HTML text field (`<input name=…>` / `<textarea name=…>`) in the preview write its value back to the source, matched by the `name` attribute (raw HTML has no source position). Standalone rewrites the file, :MDView start edits the buffer (polled). Default true; set false to render such fields read-only
+---@field edit_blocks boolean let a click on a block in the preview open its source lines for editing and write the edit back: standalone rewrites the file (the relay's --edit), :MDView start edits the buffer (polled). An edit against changed lines is refused. Default false; :MDView edit switches it for the running session
 ---@field breadcrumbs boolean record session breadcrumbs (which document + heading section over time) for :MDView breadcrumbs (default true)
 ---@field open_preview_tab boolean :MDView start opens an nvim-tab preview (Treesitter-highlighted mirror, no browser/relay HTML) instead of the browser
 ---@field browser mdview.config.BrowserDefaults
@@ -209,6 +210,15 @@ return {
   -- Standalone rewrites the file; :MDView start edits the buffer via the same
   -- browser->Neovim poll. Default on; false renders such fields read-only.
   sync_fields = true,
+
+  -- Block editing in the preview: clicking a heading, paragraph, list item,
+  -- code block, table or quote swaps it for a text field holding its source
+  -- lines; committing (blur / Ctrl+Enter) writes them back. Standalone rewrites
+  -- the file (with --edit); :MDView start edits the buffer via the same
+  -- browser->Neovim poll, as one undo step. An edit made against lines that have
+  -- changed since the render is refused, not applied. Off by default (a click
+  -- on text would otherwise open an editor); :MDView edit switches it live.
+  edit_blocks = false,
 
   open_preview_tab = false,
 
