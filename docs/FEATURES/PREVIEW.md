@@ -357,8 +357,10 @@ inject markup (`</textarea><script>` becomes inert escaped text). In
 `:MDView start` only the lines that differ are replaced in the buffer, so marks,
 folds and extmarks on the lines around the field stay where they are.
 
-`name` must be unique within the document (it's the anchor). Only double-quoted
-`name="…"` is recognized. The sanitizer permits `<input>` `name`/`value`/
+`name` must be unique within the document (it's the anchor). The tag is read
+attribute by attribute: `name` and `value` may be double- or single-quoted, a `>`
+inside a quoted value does not end the tag, and `data-name`, `username` or
+`data-value` are other attributes. The sanitizer permits `<input>` `name`/`value`/
 `placeholder` and `<textarea>` `name`/`placeholder`/`rows`/`cols` — never
 `formaction`, `form`, or any `on*` handler, so a hostile field still can't act.
 

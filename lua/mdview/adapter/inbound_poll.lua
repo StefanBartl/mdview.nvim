@@ -632,6 +632,99 @@ local function apply_buffer_text(buf, new_text, old, key)
   push_result(buf, key)
 end
 
+-- Opening tags `<tagname ...>` of `text` as { start, end } byte positions. A
+-- quoted attribute value may hold a `>`, so the end is the first `>` outside
+-- quotes. Mirrors the tag expressions of native/server/internal/source/field.go.
+---@internal
+---@param text string
+---@param tagname string
+---@return integer[][]
+local function opening_tags(text, tagname)
+  local found = {}
+  local open = "<" .. tagname
+  local init = 1
+  while true do
+    local s = text:find(open, init, true)
+    if not s then
+      break
+    end
+    local after = text:sub(s + #open, s + #open)
+    if after == "" or after:match("[%s/>]") then
+      local i, quote, e = s + #open, nil, nil
+      while i <= #text do
+        local c = text:sub(i, i)
+        if quote then
+          if c == quote then
+            quote = nil
+          end
+        elseif c == '"' or c == "'" then
+          quote = c
+        elseif c == ">" then
+          e = i
+          break
+        end
+        i = i + 1
+      end
+      if not e then
+        break
+      end
+      found[#found + 1] = { s, e }
+      init = e + 1
+    else
+      init = s + #open
+    end
+  end
+  return found
+end
+
+-- The attributes of the tag `tag`, read after its first `from` bytes: name,
+-- unquoted value, and where each sits (from its name to the end of its value).
+---@internal
+---@param tag string
+---@param from integer
+---@return { name: string, value: string, s: integer, e: integer }[]
+local function tag_attributes(tag, from)
+  local list = {}
+  local pos = from + 1
+  while pos <= #tag do
+    local _, ne, name = tag:find("^%s+([^%s\"'<>/=]+)", pos)
+    if not ne then
+      pos = pos + 1
+    else
+      local ns = ne - #name + 1
+      local e, value = ne, ""
+      local ve, v
+      local q = tag:match("^%s*=%s*([\"'])", ne + 1)
+      if q then
+        _, ve, v = tag:find("^%s*=%s*" .. q .. "([^" .. q .. "]*)" .. q, ne + 1)
+      else
+        _, ve, v = tag:find("^%s*=%s*([^%s\"'<>=`]+)", ne + 1)
+      end
+      if ve then
+        e, value = ve, v
+      end
+      list[#list + 1] = { name = name, value = value, s = ns, e = e }
+      pos = e + 1
+    end
+  end
+  return list
+end
+
+-- Does the attribute called `name` of `tag` say `want`?
+---@internal
+---@param tag string
+---@param from integer
+---@param want string
+---@return boolean
+local function tag_has_name(tag, from, want)
+  for _, a in ipairs(tag_attributes(tag, from)) do
+    if a.name == "name" then
+      return a.value == want
+    end
+  end
+  return false
+end
+
 -- Set the syncable field named `name` in the buffer showing `key` to `value`,
 -- then push. Located by the `name` attribute (raw HTML has no source position),
 -- like the Go side. Standalone never reaches here (the relay edits the file).
@@ -665,39 +758,44 @@ local function handle_field(key, name, value, doc)
     end
     local old_lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
     local text = table.concat(old_lines, "\n")
-    local q = vim.pesc(name)
 
-    -- textarea first (explicit close, unambiguous body). `.` in Lua patterns
-    -- matches newlines, so a multi-line body is handled. `%s` before `name=`: a
-    -- boundary, so `data-name="x"` is not the field called `x`.
-    local ta_open, ta_body_start = text:find('<textarea[^>]*%sname="' .. q .. '"[^>]*>')
-    if ta_open then
-      local close_start = text:find("</textarea>", ta_body_start + 1, true)
-      if close_start then
-        local new_text = text:sub(1, ta_body_start) .. escape_text(value) .. text:sub(close_start)
-        apply_buffer_text(buf, new_text, old_lines, key)
-        return
+    -- textarea first (explicit close, unambiguous body). The field is the tag
+    -- whose attribute called exactly `name` says `name`: `data-name="x"` is not
+    -- the field called `x`, and a `>` inside a quoted value does not end the tag.
+    for _, pos in ipairs(opening_tags(text, "textarea")) do
+      if tag_has_name(text:sub(pos[1], pos[2]), #"<textarea", name) then
+        local close_start = text:find("</textarea>", pos[2] + 1, true)
+        if close_start then
+          local new_text = text:sub(1, pos[2]) .. escape_text(value) .. text:sub(close_start)
+          apply_buffer_text(buf, new_text, old_lines, key)
+          return
+        end
       end
     end
 
     -- input: find the tag by name, then set/insert its value attribute.
-    local in_start, in_end = text:find('<input[^>]*%sname="' .. q .. '"[^>]*>')
-    if in_start then
-      local tag = text:sub(in_start, in_end)
-      local repl = 'value="' .. escape_attr(value) .. '"'
-      local new_tag
-      if tag:find('value="[^"]*"') then
-        new_tag = (tag:gsub('value="[^"]*"', function()
-          return repl
-        end, 1))
-      elseif tag:sub(-2) == "/>" then
-        new_tag = tag:sub(1, -3):gsub("%s+$", "") .. " " .. repl .. "/>"
-      else
-        new_tag = tag:sub(1, -2):gsub("%s+$", "") .. " " .. repl .. ">"
+    for _, pos in ipairs(opening_tags(text, "input")) do
+      local tag = text:sub(pos[1], pos[2])
+      if tag_has_name(tag, #"<input", name) then
+        local repl = 'value="' .. escape_attr(value) .. '"'
+        local new_tag
+        for _, a in ipairs(tag_attributes(tag, #"<input")) do
+          if a.name == "value" then
+            new_tag = tag:sub(1, a.s - 1) .. repl .. tag:sub(a.e + 1)
+            break
+          end
+        end
+        if not new_tag then
+          if tag:sub(-2) == "/>" then
+            new_tag = tag:sub(1, -3):gsub("%s+$", "") .. " " .. repl .. "/>"
+          else
+            new_tag = tag:sub(1, -2):gsub("%s+$", "") .. " " .. repl .. ">"
+          end
+        end
+        local new_text = text:sub(1, pos[1] - 1) .. new_tag .. text:sub(pos[2] + 1)
+        apply_buffer_text(buf, new_text, old_lines, key)
+        return
       end
-      local new_text = text:sub(1, in_start - 1) .. new_tag .. text:sub(in_end + 1)
-      apply_buffer_text(buf, new_text, old_lines, key)
-      return
     end
     refuse(key, buf, "preview edit", ("there is no text field named %s any more"):format(name))
   end)
