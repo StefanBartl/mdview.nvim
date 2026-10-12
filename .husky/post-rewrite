@@ -1,5 +1,7 @@
 #!/usr/bin/env sh
-# After `git pull --rebase` / `git rebase` / `git commit --amend`.
+# After `git pull --rebase` / `git rebase` (a `commit --amend` goes through
+# post-commit): rebuild once, for the whole rewrite.
 [ "$1" = "rebase" ] || exit 0
-sh "$(git rev-parse --show-toplevel)/scripts/rebuild-changed.sh" ORIG_HEAD HEAD
+s="$(dirname -- "$0")/../scripts/rebuild-changed.sh"
+[ -f "$s" ] && sh "$s" ORIG_HEAD HEAD
 exit 0

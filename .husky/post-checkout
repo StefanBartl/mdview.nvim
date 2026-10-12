@@ -1,6 +1,10 @@
 #!/usr/bin/env sh
 # After a branch switch ($3 = 1): rebuild what differs between the two branches.
+# Not for `git worktree add` (the previous HEAD is all zeros) and not while a
+# rebase moves HEAD around.
 [ "$3" = "1" ] || exit 0
 [ "$1" = "$2" ] && exit 0
-sh "$(git rev-parse --show-toplevel)/scripts/rebuild-changed.sh" "$1" "$2"
+case "$1" in 000000*) exit 0 ;; esac
+s="$(dirname -- "$0")/../scripts/rebuild-changed.sh"
+[ -f "$s" ] && sh "$s" "$1" "$2" norebase
 exit 0

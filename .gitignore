@@ -4,6 +4,8 @@ native/wasm-render/pkg/
 src/client/wasm-render/
 native/server/mdview-server
 native/server/mdview-server.exe
+native/server/mdview-server.new*
+native/server/mdview-server.old*
 native/server/.goreleaser-dist/
 release-assets/
 

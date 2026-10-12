@@ -11,7 +11,7 @@
 // through cmd.exe on Windows, where `$(...)` is not a thing.
 
 import { execFileSync } from 'node:child_process';
-import { existsSync, renameSync, rmSync } from 'node:fs';
+import { existsSync, readdirSync, renameSync, rmSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -48,23 +48,69 @@ const output = `mdview-server${goexe}`;
 // but the file can still be renamed out of the way. The session keeps running
 // the old build until it is restarted; every start after that gets the new one.
 const fresh = `mdview-server.new${goexe}`;
+const freshPath = join(serverDir, fresh);
 const target = join(serverDir, output);
-const aside = join(serverDir, `mdview-server.old${goexe}`);
+// A unique name: an earlier build's `.old` may still be the image of a running
+// relay, which can be neither deleted nor replaced.
+const aside = join(serverDir, `mdview-server.old-${process.pid}${goexe}`);
+
+/** Delete a file if it can be deleted; a running image or a missing file is fine. */
+function tryRemove(path) {
+  try {
+    rmSync(path, { force: true });
+  } catch {
+    /* in use by a running relay: the next build sweeps it */
+  }
+}
+
+// Leftovers of earlier swaps (and of an interrupted build).
+for (const name of readdirSync(serverDir)) {
+  if (name.startsWith('mdview-server.old') || name.startsWith('mdview-server.new')) {
+    tryRemove(join(serverDir, name));
+  }
+}
 
 go(['build', '-o', fresh, '.']);
-rmSync(aside, { force: true }); // (fails quietly while that old build still runs)
+
+let movedAside = false;
 if (existsSync(target)) {
   try {
     renameSync(target, aside);
+    movedAside = true;
   } catch (err) {
-    rmSync(join(serverDir, fresh), { force: true });
+    tryRemove(freshPath);
     console.error(`[build:go] ${target} is in use and cannot be moved: ${err.message}`);
     console.error('[build:go] stop the session (:MDView stop) and build again.');
     process.exit(1);
   }
 }
-renameSync(join(serverDir, fresh), target);
-rmSync(aside, { force: true });
+
+// A scanner or indexer may hold the new file for a moment: a few short retries,
+// and if it still does not go in, the old build goes back instead of leaving no
+// relay at all.
+let swapped = false;
+let lastError;
+for (let attempt = 0; attempt < 6 && !swapped; attempt++) {
+  try {
+    renameSync(freshPath, target);
+    swapped = true;
+  } catch (err) {
+    lastError = err;
+    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 100 * (attempt + 1));
+  }
+}
+if (!swapped) {
+  if (movedAside) {
+    try {
+      renameSync(aside, target);
+    } catch {
+      /* nothing more to do: the message below names the files */
+    }
+  }
+  console.error(`[build:go] could not put ${freshPath} in place: ${lastError?.message}`);
+  process.exit(1);
+}
+if (movedAside) tryRemove(aside);
 console.log(`[build:go] ${target}`);
 
 // A build from before this script wrote the extension-less name next door. On

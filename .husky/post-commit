@@ -1,5 +1,7 @@
 #!/usr/bin/env sh
 # Keep the local dev build artifacts fresh after every commit (see
-# scripts/rebuild-changed.sh); never blocks the commit itself.
-sh "$(git rev-parse --show-toplevel)/scripts/rebuild-changed.sh" HEAD^ HEAD
+# scripts/rebuild-changed.sh); never blocks the commit itself. The script is
+# looked up next to this hook, so a worktree whose branch lacks it is harmless.
+s="$(dirname -- "$0")/../scripts/rebuild-changed.sh"
+[ -f "$s" ] && sh "$s" HEAD^ HEAD norebase
 exit 0
