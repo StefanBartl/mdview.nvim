@@ -319,12 +319,18 @@ line ending and the item text are all preserved. A line that no longer holds a
 task marker (a re-render racing a rapid edit) is left untouched rather than
 corrupted.
 
-The toggle names the document the tab is showing (the `doc` parameter), and
-Neovim edits that document's buffer. This matters under `browser.behavior =
-"reuse"`, where one tab follows the active buffer and its room key stays the
-path of the first document; only a buffer mdview itself previews is ever
-written to. Text-field sync and [block editing](#block-editing) work the same
-way.
+Which buffer is written is decided by Neovim, not by the request: it is the
+document Neovim last pushed into the tab's room (a content push or a buffer
+switch records it, and announces it to the tab). That matters under
+`browser.behavior = "reuse"`, where one tab follows the active buffer and its
+room key stays the path of the first document, and for a tab that was reloaded
+and has not been told which document it shows. The tab also names the document
+it believes it shows (the `doc` parameter); a request that names another one
+than the room holds is dropped (the tab is behind) instead of guessed at, and
+only a buffer mdview itself previews is ever written to. A toggle carries the
+text of its line, so one that arrives after another write-back moved the lines
+does not tick the neighbour. Text-field sync and [block editing](#block-editing)
+work the same way.
 
 - **Module:** `src/client/render/taskToggle.ts`, `native/server/internal/source/toggle.go`, `native/server/internal/relay/toggle.go`, `/toggle` route in `native/server/main.go`; `:MDView start` buffer edit in `lua/mdview/adapter/inbound_poll.lua`
 - **Config:** `sync_checkboxes` (default `true`; `false` renders checkboxes read-only and, in start mode, stops the browser→Neovim poll)
@@ -381,9 +387,14 @@ note ("Not saved: …") and Neovim warns, instead of one side overwriting the ot
 - **`:MDView start`**: Neovim replaces only that line range of the buffer (marks,
   folds and the rest of the undo history stay), as **one undo step** — `u` takes
   the edit back. The buffer is then modified; save as usual. The buffer is the
-  one of the document the tab is showing (also under `browser.behavior =
-  "reuse"`, where the tab follows the active buffer), and only a buffer mdview
-  itself previews is ever edited, never just any loaded one.
+  one of the document Neovim last pushed into the tab's room (also under
+  `browser.behavior = "reuse"`, where the tab follows the active buffer), and
+  only a buffer mdview itself previews is ever edited, never just any loaded one.
+  An edit that finds the buffer changed, not modifiable, or the document on
+  screen different is refused and the tab says why ("Not saved: …"). While you
+  are typing in Insert mode in that buffer the edit waits (up to about five
+  seconds) so it does not join your undo block. A CRLF file loaded as `unix`
+  (lines ending in `^M`) is edited and keeps its endings.
 - **Standalone** (`:MDView standalone`, `mdview-server --watch … --edit`): the relay
   replaces the lines in the file. Everything outside the range stays byte for byte
   (also a file whose lines end differently), the trailing newline is kept, and it
@@ -396,9 +407,17 @@ note ("Not saved: …") and Neovim warns, instead of one side overwriting the ot
   blocks (the click is their reveal), a display language / `browser.transform`
   preview (the lines it shows are not the buffer's), and links, checkboxes and
   form fields, which keep their own job.
-- Leaving the window (alt-tab) does not commit half-typed text; moving focus
-  elsewhere in the page does. Enter that confirms an IME composition is not a
-  commit.
+- Leaving the window (alt-tab) does not commit half-typed text (an unchanged
+  editor is closed, so the preview does not stand still); moving focus elsewhere
+  in the page commits. Enter that confirms an IME composition is not a commit.
+  A block of one line commits on Enter (Shift+Enter adds a line break); a longer
+  one on Ctrl+Enter. The editor is a textarea either way, so pasted lines are
+  kept and a paragraph can be split.
+- A block that contains a private block (a list item or a quote around a
+  ` ```private ` fence) is not editable either: its source lines hold the
+  hidden text.
+- Not yet: editing with the keyboard alone (a block can only be opened with a
+  click), and keeping what you typed when an edit is refused.
 
 **Off by default**, because a click on text would otherwise open an editor.
 `:MDView edit [on|off|toggle]` switches it for the running session (an open
