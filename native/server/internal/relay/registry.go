@@ -21,6 +21,7 @@ type Registry struct {
 	spans     map[string][]byte
 	spotlight []byte
 	docDirs   map[string]string
+	docs      map[string][]byte
 }
 
 // member is one connection in a room. Its mutex serializes everything that is
@@ -43,6 +44,7 @@ func NewRegistry() *Registry {
 		last:    make(map[string][]byte),
 		spans:   make(map[string][]byte),
 		docDirs: make(map[string]string),
+		docs:    make(map[string][]byte),
 	}
 }
 
@@ -87,8 +89,11 @@ func (r *Registry) joinLocked(key string, c Conn) *member {
 }
 
 // JoinAndSeed adds c to the room for key and sends it the current state: the
-// content, then the fence highlights (the client paints them onto a rendered
-// document, so they must come second), then the spotlight mirror state.
+// content, then the name of the document it belongs to (a tab that follows the
+// active buffer renders by that name, and the ping is sent once per switch, so a
+// reloaded tab would never learn it), then the fence highlights (the client
+// paints them onto a rendered document, so they must come after it), then the
+// spotlight mirror state.
 //
 // Registration and the reading of that state happen under one lock, and
 // c's own write lock is taken before that lock is released, so a broadcast
@@ -102,8 +107,11 @@ func (r *Registry) JoinAndSeed(key string, c Conn) error {
 	r.mu.Lock()
 	m := r.joinLocked(key, c)
 	m.mu.Lock()
-	seeds := make([][]byte, 0, 3)
+	seeds := make([][]byte, 0, 4)
 	if p, ok := r.last[key]; ok {
+		seeds = append(seeds, p)
+	}
+	if p, ok := r.docs[key]; ok {
 		seeds = append(seeds, p)
 	}
 	if p, ok := r.spans[key]; ok {
@@ -200,6 +208,18 @@ func (r *Registry) BroadcastSpotlight(payload []byte) []error {
 func (r *Registry) Broadcast(key string, payload []byte) []error {
 	r.mu.Lock()
 	r.last[key] = payload
+	conns := r.connsForLocked(key)
+	r.mu.Unlock()
+
+	return sendAll(conns, payload)
+}
+
+// BroadcastDoc fans a "previewed document changed" payload out to key's room
+// like BroadcastEphemeral and also keeps it as the room's latest, so JoinAndSeed
+// can tell a tab that joins later which document the content belongs to.
+func (r *Registry) BroadcastDoc(key string, payload []byte) []error {
+	r.mu.Lock()
+	r.docs[key] = payload
 	conns := r.connsForLocked(key)
 	r.mu.Unlock()
 

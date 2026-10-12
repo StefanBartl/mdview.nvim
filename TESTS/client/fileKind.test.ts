@@ -38,19 +38,25 @@ describe('shownPath', () => {
 
 describe('needsRerenderAfterDocChange', () => {
   it('is false before anything was rendered', () => {
-    expect(needsRerenderAfterDocChange(null, '/a/x.md')).toBe(false);
+    expect(needsRerenderAfterDocChange(null, null, '/a/x.md')).toBe(false);
   });
 
   it('is false for a Markdown document after a Markdown render', () => {
-    expect(needsRerenderAfterDocChange(true, '/a/x.md')).toBe(false);
+    expect(needsRerenderAfterDocChange(true, '/b/y.md', '/a/x.md')).toBe(false);
   });
 
   it('is true when the kind changed, in either direction', () => {
-    expect(needsRerenderAfterDocChange(false, '/a/x.md')).toBe(true); // code view -> Markdown
-    expect(needsRerenderAfterDocChange(true, '/a/x.lua')).toBe(true); // Markdown -> code view
+    expect(needsRerenderAfterDocChange(false, '/b/y.lua', '/a/x.md')).toBe(true); // code view -> Markdown
+    expect(needsRerenderAfterDocChange(true, '/b/y.md', '/a/x.lua')).toBe(true); // Markdown -> code view
   });
 
-  it('is true for a code view, whose language comes from the path', () => {
-    expect(needsRerenderAfterDocChange(false, '/a/x.lua')).toBe(true);
+  it('is false for a code view of the same language, true for another language', () => {
+    expect(needsRerenderAfterDocChange(false, '/b/y.lua', '/a/x.lua')).toBe(false);
+    expect(needsRerenderAfterDocChange(false, '/b/y.ts', '/a/x.tsx')).toBe(false);
+    expect(needsRerenderAfterDocChange(false, '/b/y.ts', '/a/x.py')).toBe(true);
+  });
+
+  it('is false for the very document that was rendered (a repeated ping)', () => {
+    expect(needsRerenderAfterDocChange(false, '/a/x.lua', '/a/x.lua')).toBe(false);
   });
 });

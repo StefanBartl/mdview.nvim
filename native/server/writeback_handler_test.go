@@ -203,3 +203,33 @@ func TestWriteBackRoutes_RejectAMalformedQueryAndATooLongKey(t *testing.T) {
 		}
 	}
 }
+
+// A document ping the relay has seen is replayed to a tab that joins later (a
+// reload), right after the content: the ping is sent once per buffer switch and
+// the tab renders by the name it carries.
+func TestHandleDoc_ReplaysThePingToALateJoiner(t *testing.T) {
+	registry := relay.NewRegistry()
+	registry.Broadcast("room.md", []byte("content"))
+	h := handleDoc(registry, testToken)
+
+	target := "/doc?token=" + url.QueryEscape(testToken) + "&key=room.md"
+	rec := httptest.NewRecorder()
+	h(rec, httptest.NewRequest(http.MethodPost, target, strings.NewReader("/x/other.py")))
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("status = %d, want 204", rec.Code)
+	}
+
+	late := &recordingConn{}
+	if err := registry.JoinAndSeed("room.md", late); err != nil {
+		t.Fatalf("JoinAndSeed: %v", err)
+	}
+	want := []string{"content", docMessagePrefix + "/x/other.py"}
+	if len(late.received) != len(want) {
+		t.Fatalf("seeds = %q, want %q", late.received, want)
+	}
+	for i, w := range want {
+		if late.received[i] != w {
+			t.Fatalf("seed %d = %q, want %q", i, late.received[i], w)
+		}
+	}
+}

@@ -320,7 +320,8 @@ const maxDocBodyBytes = 8 << 10 // a document path
 
 // handleDoc broadcasts a "previewed document changed" signal (the new document
 // path) to key's room, tagged with docMessagePrefix. Ephemeral like /scroll —
-// a transient signal, not the room's content. The client uses it to push a
+// a transient signal, not the room's content (the latest one is replayed to a
+// tab that joins later). The client uses it to push a
 // browser-history entry so Back/Forward navigate between documents.
 func handleDoc(registry *relay.Registry, token string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -346,7 +347,8 @@ func handleDoc(registry *relay.Registry, token string) http.HandlerFunc {
 		// <img> target rendered from this document's markdown needs it to
 		// resolve against, see handleAsset.
 		registry.SetDocDir(key, filepath.Dir(string(body)))
-		registry.BroadcastEphemeral(key, append([]byte(docMessagePrefix), body...))
+		// Kept as the room's latest, so a tab that reloads is told the document too.
+		registry.BroadcastDoc(key, append([]byte(docMessagePrefix), body...))
 		w.WriteHeader(http.StatusNoContent)
 	}
 }

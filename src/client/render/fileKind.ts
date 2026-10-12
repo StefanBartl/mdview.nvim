@@ -7,6 +7,8 @@
 // query param is needed: any_file (Lua side) is what decides
 // whether a non-Markdown path ever reaches the client at all.
 
+import { languageForPath } from '../highlight/languageForPath';
+
 const MARKDOWN_EXTENSIONS = new Set(['md', 'markdown', 'mdx']);
 
 /** Extension (lowercase, no dot), or '' if `path` has none. */
@@ -35,15 +37,18 @@ export function shownPath(doc: string | null, key: string): string {
 /**
  * After a doc ping: must the text on screen be rendered again? The content of a
  * buffer switch arrives BEFORE the ping that names its document, so it was
- * rendered as the previous document's kind. `renderedAsMarkdown` is null before
- * anything was rendered. A code view is always redone: its language comes from
- * the path.
+ * rendered as the previous document's kind. `renderedAsMarkdown` and
+ * `renderedPath` (the path that render went by) are null before anything was
+ * rendered. A code view is redone only when its language differs: it comes from
+ * the path, and a second identical highlight pass is wasted work.
  */
 export function needsRerenderAfterDocChange(
   renderedAsMarkdown: boolean | null,
+  renderedPath: string | null,
   doc: string,
 ): boolean {
-  if (renderedAsMarkdown === null) return false;
+  if (renderedAsMarkdown === null || renderedPath === null) return false;
   const markdown = isMarkdownPath(doc);
-  return !markdown || markdown !== renderedAsMarkdown;
+  if (markdown !== renderedAsMarkdown) return true;
+  return !markdown && languageForPath(doc) !== languageForPath(renderedPath);
 }
