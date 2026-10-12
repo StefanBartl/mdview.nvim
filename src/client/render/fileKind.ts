@@ -21,3 +21,29 @@ function extOf(path: string): string {
 export function isMarkdownPath(path: string): boolean {
   return MARKDOWN_EXTENSIONS.has(extOf(path));
 }
+
+/**
+ * The path that decides how a text is rendered: the document Neovim announced
+ * for this tab, else the room's path. They differ under `browser.behavior =
+ * "reuse"`, where the room keeps the first document's path for the whole
+ * session while the tab follows the active buffer.
+ */
+export function shownPath(doc: string | null, key: string): string {
+  return doc || key;
+}
+
+/**
+ * After a doc ping: must the text on screen be rendered again? The content of a
+ * buffer switch arrives BEFORE the ping that names its document, so it was
+ * rendered as the previous document's kind. `renderedAsMarkdown` is null before
+ * anything was rendered. A code view is always redone: its language comes from
+ * the path.
+ */
+export function needsRerenderAfterDocChange(
+  renderedAsMarkdown: boolean | null,
+  doc: string,
+): boolean {
+  if (renderedAsMarkdown === null) return false;
+  const markdown = isMarkdownPath(doc);
+  return !markdown || markdown !== renderedAsMarkdown;
+}
