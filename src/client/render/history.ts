@@ -41,9 +41,13 @@ export function currentDocument(): string | null {
   return currentDoc;
 }
 
-/** Record that the previewed document changed to `path` (from a doc ping). */
-export function onDocChange(path: string): void {
-  if (!path || path === currentDoc) return;
+/**
+ * Record that the previewed document changed to `path` (from a doc ping).
+ * Returns whether it did: the relay replays the latest ping when a tab (re)joins,
+ * and for the document already shown nothing changed.
+ */
+export function onDocChange(path: string): boolean {
+  if (!path || path === currentDoc) return false;
   if (viaPopstate) {
     viaPopstate = false; // this change was Back/Forward — don't push again
   } else if (currentDoc === null) {
@@ -52,4 +56,5 @@ export function onDocChange(path: string): void {
     history.pushState({ mdviewDoc: path }, ''); // user navigated to a new document
   }
   currentDoc = path;
+  return true;
 }

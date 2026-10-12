@@ -706,8 +706,7 @@ async function boot() {
       // The relay replays the latest ping when the socket reconnects: for the
       // document that is already shown nothing changed, and the mirrored
       // selection must stay.
-      const sameDocument = announced === currentDocument();
-      onDocChange(announced);
+      const changed = onDocChange(announced);
       // The content of a buffer switch came before this ping, so it was rendered
       // as the previous document: do it again when the kind of document differs.
       if (container && needsRerenderAfterDocChange(renderedAsMarkdown, renderedPath, announced)) {
@@ -715,7 +714,7 @@ async function boot() {
       }
       // A selection addresses lines of the document it was made in; carrying
       // it into the next one would highlight unrelated text.
-      if (!sameDocument) {
+      if (changed) {
         lastSelection = null;
         if (container) updateSelection(container, null);
       }

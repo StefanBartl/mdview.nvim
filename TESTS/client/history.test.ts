@@ -40,3 +40,13 @@ describe('browser history for the preview', () => {
     expect(history.length).toBe(len);
   });
 });
+
+describe('onDocChange reports whether the document changed', () => {
+  it('is true for a new document and false for the one already shown or an empty name', () => {
+    installHistory({ navigateTo: vi.fn() });
+    expect(onDocChange('/proj/a.md')).toBe(true); // first document
+    expect(onDocChange('/proj/a.md')).toBe(false); // replayed ping after a reconnect
+    expect(onDocChange('')).toBe(false);
+    expect(onDocChange('/proj/b.md')).toBe(true);
+  });
+});
