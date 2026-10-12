@@ -319,6 +319,13 @@ line ending and the item text are all preserved. A line that no longer holds a
 task marker (a re-render racing a rapid edit) is left untouched rather than
 corrupted.
 
+The toggle names the document the tab is showing (the `doc` parameter), and
+Neovim edits that document's buffer. This matters under `browser.behavior =
+"reuse"`, where one tab follows the active buffer and its room key stays the
+path of the first document; only a buffer mdview itself previews is ever
+written to. Text-field sync and [block editing](#block-editing) work the same
+way.
+
 - **Module:** `src/client/render/taskToggle.ts`, `native/server/internal/source/toggle.go`, `native/server/internal/relay/toggle.go`, `/toggle` route in `native/server/main.go`; `:MDView start` buffer edit in `lua/mdview/adapter/inbound_poll.lua`
 - **Config:** `sync_checkboxes` (default `true`; `false` renders checkboxes read-only and, in start mode, stops the browser→Neovim poll)
 
@@ -340,7 +347,9 @@ GFM task item), the field can't be located by line — instead it's matched by i
 `name` attribute: the relay/Neovim scans the source for `name="…"` and rewrites
 just that `<input>`'s `value` or that `<textarea>`'s body. The value is
 HTML-escaped on the way in, so it round-trips and can't break out of the tag or
-inject markup (`</textarea><script>` becomes inert escaped text).
+inject markup (`</textarea><script>` becomes inert escaped text). In
+`:MDView start` only the lines that differ are replaced in the buffer, so marks,
+folds and extmarks on the lines around the field stay where they are.
 
 `name` must be unique within the document (it's the anchor). Only double-quoted
 `name="…"` is recognized. The sanitizer permits `<input>` `name`/`value`/
