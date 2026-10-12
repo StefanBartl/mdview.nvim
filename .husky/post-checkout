@@ -6,5 +6,5 @@
 [ "$1" = "$2" ] && exit 0
 case "$1" in 000000*) exit 0 ;; esac
 s="$(dirname -- "$0")/../scripts/rebuild-changed.sh"
-[ -f "$s" ] && sh "$s" "$1" "$2" norebase
+[ -f "$s" ] && sh "$s" "$1" "$2" checkout
 exit 0

@@ -729,24 +729,25 @@ local function tag_attributes(tag, from)
   local list = {}
   local pos = from + 1
   while pos <= #tag do
-    local _, ne, name = tag:find("^%s+([^%s\"'<>/=]+)", pos)
+    -- White space is [ \t\r\n\f] as in the relay's \s: Lua's %s also takes \v.
+    local _, ne, name = tag:find("^[ \t\r\n\f]+([^ \t\r\n\f\"'<>/=]+)", pos)
     if not ne then
       pos = pos + 1
     else
       local ns = ne - #name + 1
       local e, value = ne, ""
       local ve, v
-      local q = tag:match("^%s*=%s*([\"'])", ne + 1)
+      local q = tag:match("^[ \t\r\n\f]*=[ \t\r\n\f]*([\"'])", ne + 1)
       if q then
-        _, ve, v = tag:find("^%s*=%s*" .. q .. "([^" .. q .. "]*)" .. q, ne + 1)
+        _, ve, v = tag:find("^[ \t\r\n\f]*=[ \t\r\n\f]*" .. q .. "([^" .. q .. "]*)" .. q, ne + 1)
       else
-        _, ve, v = tag:find("^%s*=%s*([^%s\"'<>=`]+)", ne + 1)
+        _, ve, v = tag:find("^[ \t\r\n\f]*=[ \t\r\n\f]*([^ \t\r\n\f\"'<>=`]+)", ne + 1)
       end
       if ve then
         e, value = ve, v
       else
         -- `value=` with nothing after it: the `=` still belongs to the attribute
-        local _, eq = tag:find("^%s*=%s*", ne + 1)
+        local _, eq = tag:find("^[ \t\r\n\f]*=[ \t\r\n\f]*", ne + 1)
         if eq then
           e = eq
         end

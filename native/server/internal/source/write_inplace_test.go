@@ -16,28 +16,36 @@ func useInPlace(t *testing.T) {
 	t.Cleanup(func() { createTemp = old })
 }
 
-// A write that fails halfway leaves the old text, whether the new text was
-// shorter or longer than it.
+// A write that fails leaves the old text, whether what got into the file before
+// the failure was shorter or longer than the original (the restore must cut the
+// file back to the original length).
 func TestWriteInPlace_FailedWriteRestoresTheOriginal(t *testing.T) {
-	for _, tc := range []struct{ name, src string }{
-		{"new text longer", "- [ ] a\n"},
-		{"new text shorter", "- [ ] a very long first line of the document\n- [ ] b\n"},
+	long := "a much longer replacement for the first line that the original never had"
+	for _, tc := range []struct {
+		name  string
+		write func(f *os.File, data []byte)
+		text  string // what replaces line 1
+	}{
+		{"half of a longer text got in", func(f *os.File, data []byte) { _, _ = f.WriteAt(data[:len(data)/2], 0) }, long},
+		{"all of a longer text got in", func(f *os.File, data []byte) { _, _ = f.WriteAt(data, 0) }, long},
+		{"half of a shorter text got in", func(f *os.File, data []byte) { _, _ = f.WriteAt(data[:len(data)/2], 0) }, "y"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			useInPlace(t)
-			path := writeTemp(t, tc.src)
+			src := "first line of the document\nsecond line\n"
+			path := writeTemp(t, src)
 			boom := errors.New("disk full")
 			old := writeAt
 			writeAt = func(f *os.File, data []byte) error {
-				_, _ = f.WriteAt(data[:len(data)/2], 0) // half of it got there
+				tc.write(f, data)
 				return boom
 			}
 			defer func() { writeAt = old }()
 
-			if err := ToggleCheckbox(path, 1, true); !errors.Is(err, boom) {
+			if err := ReplaceLines(path, 1, 1, "first line of the document", tc.text); !errors.Is(err, boom) {
 				t.Fatalf("err = %v, want the write error", err)
 			}
-			if got := read(t, path); got != tc.src {
+			if got := read(t, path); got != src {
 				t.Fatalf("the original was not put back: %q", got)
 			}
 		})

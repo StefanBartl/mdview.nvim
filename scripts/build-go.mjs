@@ -52,7 +52,9 @@ const freshPath = join(serverDir, fresh);
 const target = join(serverDir, output);
 // A unique name: an earlier build's `.old` may still be the image of a running
 // relay, which can be neither deleted nor replaced.
-const aside = join(serverDir, `mdview-server.old-${process.pid}${goexe}`);
+const aside = join(serverDir, `mdview-server.old-${process.pid}-${Date.now()}${goexe}`);
+// What a swap leaves behind: exactly these names, nothing a user may have put there.
+const leftover = /^mdview-server\.(old-[\d-]+|new)(\.exe)?$/;
 
 /** Delete a file if it can be deleted; a running image or a missing file is fine. */
 function tryRemove(path) {
@@ -65,12 +67,18 @@ function tryRemove(path) {
 
 // Leftovers of earlier swaps (and of an interrupted build).
 for (const name of readdirSync(serverDir)) {
-  if (name.startsWith('mdview-server.old') || name.startsWith('mdview-server.new')) {
+  if (leftover.test(name)) {
     tryRemove(join(serverDir, name));
   }
 }
 
-go(['build', '-o', fresh, '.']);
+try {
+  go(['build', '-o', fresh, '.']);
+} catch (err) {
+  // Go has already printed its diagnostics; no stack trace on top of them.
+  tryRemove(freshPath);
+  process.exit(typeof err.status === 'number' ? err.status : 1);
+}
 
 let movedAside = false;
 if (existsSync(target)) {
@@ -108,6 +116,9 @@ if (!swapped) {
     }
   }
   console.error(`[build:go] could not put ${freshPath} in place: ${lastError?.message}`);
+  if (movedAside && existsSync(aside)) {
+    console.error(`[build:go] the previous relay is at ${aside} — move it back to ${target}`);
+  }
   process.exit(1);
 }
 if (movedAside) tryRemove(aside);

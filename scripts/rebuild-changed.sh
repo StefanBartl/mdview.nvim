@@ -11,6 +11,8 @@
 #
 #   norebase   do nothing while a rebase is running: it replays every commit
 #              through post-commit, and post-rewrite builds once at the end.
+#   checkout   the same for a checkout, except when the rebase has nothing left
+#              to replay (then no post-rewrite follows).
 #
 # MDVIEW_NO_REBUILD=1 switches it off.
 
@@ -20,11 +22,25 @@
 # relative to it), also when started by hand from a subfolder.
 cd "$(git rev-parse --show-toplevel)" || exit 0
 
-if [ "$3" = "norebase" ]; then
-  for d in rebase-merge rebase-apply; do
-    [ -d "$(git rev-parse --git-path "$d")" ] && exit 0
-  done
-fi
+case "$3" in
+  norebase)
+    for d in rebase-merge rebase-apply; do
+      [ -d "$(git rev-parse --git-path "$d")" ] && exit 0
+    done
+    ;;
+  checkout)
+    # The checkout a rebase starts with (onto the new base) is followed by
+    # post-rewrite; one that has nothing left to replay (a fast-forward rebase)
+    # is not, so that one builds here.
+    if [ -d "$(git rev-parse --git-path rebase-apply)" ]; then
+      exit 0
+    fi
+    todo="$(git rev-parse --git-path rebase-merge)/git-rebase-todo"
+    if [ -d "$(git rev-parse --git-path rebase-merge)" ] && grep -qE '^[a-z]' "$todo" 2>/dev/null; then
+      exit 0
+    fi
+    ;;
+esac
 
 from="$1"
 to="${2:-HEAD}"
@@ -51,11 +67,13 @@ echo "$changed" | grep -qE '^(native/server/|scripts/build-go\.mjs$)' && rebuild
 [ -f native/server/mdview-server ] || [ -f native/server/mdview-server.exe ] || rebuild_go=1
 
 if [ "$rebuild_client" = "1" ]; then
-  if [ -d node_modules ] && command -v wasm-pack >/dev/null 2>&1; then
-    echo "[rebuild] client/wasm sources changed -> npm run build"
+  # vite in node_modules/.bin: a bare node_modules folder (a cache that vitest
+  # or vite created) does not mean the dependencies are installed.
+  if [ -e node_modules/.bin/vite ] && command -v wasm-pack >/dev/null 2>&1; then
+    echo "[rebuild] client/wasm sources changed or dist/client is missing -> npm run build"
     npm run build || echo "[rebuild] WARNING: client build failed — the dev bundle may be stale"
   else
-    echo "[rebuild] client sources changed, but node_modules or wasm-pack is missing — skipped (npm ci; see docs/development.md)"
+    echo "[rebuild] dist/client is out of date, but the dependencies or wasm-pack are missing — skipped (npm ci; see docs/development.md)"
     rebuild_client=0
   fi
 fi
@@ -65,7 +83,7 @@ if [ "$rebuild_go" = "1" ]; then
     echo "[rebuild] relay server sources changed -> npm run build:go"
     npm run build:go || echo "[rebuild] WARNING: relay build failed — the dev binary may be stale (is a session running? :MDView stop)"
   else
-    echo "[rebuild] relay sources changed, but Go is not on PATH — skipped"
+    echo "[rebuild] the relay is out of date or missing, but Go is not on PATH — skipped"
     rebuild_go=0
   fi
 fi

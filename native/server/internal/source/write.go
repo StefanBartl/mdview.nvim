@@ -164,8 +164,10 @@ func renameReplacing(from, to string, original []byte) error {
 
 // writeInPlace is writeThrough for a folder that takes no new file: compare,
 // then rewrite the document itself. One handle does both, so the text that is
-// compared is the text that is replaced (there is no gap in which another
-// program's save could be cut off), and the file is only emptied by the write.
+// compared is the text that is replaced. That narrows the gap in which another
+// program's save could be cut off to the moment between the read and the write
+// (it cannot be closed without file locking), and the file is only emptied by
+// the write itself.
 func writeInPlace(target string, data, original []byte) error {
 	if beforeRename != nil {
 		beforeRename()
@@ -176,10 +178,15 @@ func writeInPlace(target string, data, original []byte) error {
 	if err != nil {
 		return err
 	}
-	current, err := io.ReadAll(f)
+	// Bounded: the file may have grown since the size check of loadWatched.
+	current, err := io.ReadAll(io.LimitReader(f, maxFileBytes+1))
 	if err != nil {
 		_ = f.Close()
 		return err
+	}
+	if len(current) > maxFileBytes {
+		_ = f.Close()
+		return fmt.Errorf("file is over the %d byte limit", maxFileBytes)
 	}
 	if !bytes.Equal(current, original) {
 		_ = f.Close()
