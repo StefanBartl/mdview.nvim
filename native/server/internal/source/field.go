@@ -78,7 +78,7 @@ func isTagStart(s string, loc []int, open string) bool {
 		return true
 	}
 	switch s[loc[0]+len(open)] {
-	case ' ', '\t', '\r', '\n', '/', '>':
+	case ' ', '\t', '\r', '\n', '\f', '/', '>':
 		return true
 	}
 	return false
@@ -148,7 +148,7 @@ func setInputValue(tag, value string) string {
 	// Insert before the closing bracket, preserving a self-closing "/>".
 	// TrimRight so an existing space before "/>" doesn't become a double space.
 	if strings.HasSuffix(tag, "/>") {
-		return strings.TrimRight(tag[:len(tag)-2], " ") + " " + repl + "/>"
+		return strings.TrimRight(tag[:len(tag)-2], " \t\r\n\f") + " " + repl + "/>"
 	}
-	return strings.TrimRight(tag[:len(tag)-1], " ") + " " + repl + ">"
+	return strings.TrimRight(tag[:len(tag)-1], " \t\r\n\f") + " " + repl + ">"
 }

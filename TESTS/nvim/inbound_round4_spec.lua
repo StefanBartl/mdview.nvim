@@ -186,6 +186,46 @@ describe("inbound write-backs, round 4", function()
     assert.are.equal('<input type="text" name="title">', lines()[3])
   end)
 
+  it("24: a buffer deleted while changes wait for the user to stop typing: every change is reported", function()
+    local gone = make_buf("mdview_spec_round4_gone.md", { '<input type="text" name="title">' })
+    local GONE = assert(normalize.path(vim.api.nvim_buf_get_name(gone)))
+    local ROOM2 = "mdview_spec_round4_room2.md"
+    live._last_doc[ROOM2] = GONE
+    vim.api.nvim_set_current_buf(gone)
+    typing(true)
+    inbound._handle_field(ROOM2, "title", "one", GONE)
+    inbound._handle_field(ROOM2, "title", "two", GONE)
+    vim.api.nvim_set_current_buf(shown)
+    vim.api.nvim_buf_delete(gone, { force = true })
+    typing(false)
+    vim.wait(1500, function()
+      return #notices >= 2
+    end, 20)
+    assert.are.equal(2, #notices)
+    assert.is_truthy(notices[1].msg.notice:find("buffer is gone", 1, true))
+    live._last_doc[ROOM2] = nil
+  end)
+
+  it("24: the 'waits until you stop typing' notice comes again after the wait was cut short", function()
+    local gone = make_buf("mdview_spec_round4_gone2.md", { "x" })
+    vim.api.nvim_set_current_buf(gone)
+    typing(true)
+    inbound._when_not_inserting(gone, function() end)
+    local first = #notes
+    vim.api.nvim_set_current_buf(shown)
+    vim.api.nvim_buf_delete(gone, { force = true })
+    vim.wait(600, function()
+      return false
+    end, 50)
+    local again = make_buf("mdview_spec_round4_gone3.md", { "y" })
+    vim.api.nvim_set_current_buf(again)
+    inbound._when_not_inserting(again, function() end)
+    assert.is_true(first >= 1)
+    assert.is_true(#notes >= first + 1)
+    vim.api.nvim_set_current_buf(shown)
+    vim.api.nvim_buf_delete(again, { force = true })
+  end)
+
   it("24: an error inside a queued change is reported, and the next change still runs", function()
     local calls = 0
     display.active = function()

@@ -217,7 +217,8 @@ end
 -- Time of the user's last keystroke (`vim.uv.now()` ms), for `when_not_inserting`.
 local TYPING_WINDOW_MS = 1000
 local last_key_ms = 0
-local wait_said = false -- the "waits until you stop typing" notice is shown once per wait
+---@type table<integer, boolean>
+local wait_said = {} -- per buffer: the "waits until you stop typing" notice is shown once per wait
 vim.on_key(function()
   last_key_ms = vim.uv.now()
 end, vim.api.nvim_create_namespace("mdview_inbound_keys"))
@@ -230,30 +231,40 @@ end, vim.api.nvim_create_namespace("mdview_inbound_keys"))
 -- says so once), then applies anyway. When it applies in insert mode, the undo
 -- block is cut before and after it, so `u` takes back the browser's edit alone.
 -- `fn` re-checks everything it relies on, as the buffer may have changed.
+-- `on_gone` is called instead of `fn` when the buffer is deleted while waiting.
 ---@internal
 ---@param buf integer
 ---@param fn fun()
+---@param on_gone fun()|nil
 ---@param tries integer|nil
 ---@return nil
-local function when_not_inserting(buf, fn, tries)
+local function when_not_inserting(buf, fn, on_gone, tries)
   tries = tries or 0
   local mode = vim.api.nvim_get_mode().mode:sub(1, 1)
   local inserting = (mode == "i" or mode == "R") and vim.api.nvim_get_current_buf() == buf
   local typing = inserting and (vim.uv.now() - last_key_ms) < TYPING_WINDOW_MS
   if typing and tries < 20 then
-    if not wait_said then
-      wait_said = true
+    if not wait_said[buf] then
+      wait_said[buf] = true
       notify("[mdview] a change from the preview waits until you stop typing", vim.log.levels.INFO)
     end
     vim.defer_fn(function()
       if vim.api.nvim_buf_is_valid(buf) then
-        when_not_inserting(buf, fn, tries + 1)
+        when_not_inserting(buf, fn, on_gone, tries + 1)
+      else
+        wait_said[buf] = nil
+        if on_gone then
+          on_gone()
+        end
       end
     end, 250)
     return
   end
-  wait_said = false
+  wait_said[buf] = nil
   if not vim.api.nvim_buf_is_valid(buf) then
+    if on_gone then
+      on_gone()
+    end
     return
   end
   if inserting then
@@ -308,7 +319,9 @@ local function enqueue(buf, req, fn)
   q.active = true
   -- Give up on the queue: every change still in it is reported, none vanishes.
   local function abandon(reason)
-    queues[buf] = nil
+    if queues[buf] == q then
+      queues[buf] = nil
+    end
     for _, item in ipairs(q.items) do
       refuse_no_buffer(item.req.key, item.req.what, reason)
     end
@@ -347,6 +360,12 @@ local function enqueue(buf, req, fn)
         notify(("[mdview] preview change failed: %s"):format(tostring(why)), vim.log.levels.ERROR)
       end
       step()
+    end, function()
+      -- deleted while the change waited for the user to stop typing
+      if queues[buf] == q then
+        refuse_no_buffer(nxt.req.key, nxt.req.what, "the buffer is gone")
+        abandon("the buffer is gone")
+      end
     end)
     if not ok then
       notify(("[mdview] preview change failed: %s"):format(tostring(err)), vim.log.levels.ERROR)
@@ -519,7 +538,9 @@ local function handle_toggle(key, line, checked, doc, expected)
       else
         -- Under a display language the browser rendered a translated text, so
         -- only the part a translation leaves alone can be compared: the indent
-        -- and the bullet in front of the marker.
+        -- and the bullet in front of the marker. (So equal neighbours cannot be
+        -- told apart, and a transform that rewrites the bullet or the indent
+        -- makes the tick be refused: the text it shows is not the buffer's.)
         local want_pre = want_line:match("^(%s*[-*+] %[)[ xX]%]")
         if want_pre and want_pre ~= cur:match("^(%s*[-*+] %[)") then
           refuse(key, buf, what, "the lines changed in the buffer")
@@ -664,7 +685,10 @@ local function opening_tags(text, tagname)
       break
     end
     local after = text:sub(s + #open, s + #open)
-    if after == "" or after:match("[%s/>]") then
+    -- "<inputx" is not a tag of this name at all (the relay word boundary); "<input-x"
+    -- is one tag of another name, skipped as a whole: what its quoted values
+    -- hold is not a tag of ours.
+    if not after:match("[%w_]") then
       local i, quote, e = s + #open, nil, nil
       while i <= #text do
         local c = text:sub(i, i)
@@ -681,7 +705,9 @@ local function opening_tags(text, tagname)
         i = i + 1
       end
       if e then
-        found[#found + 1] = { s, e }
+        if after == "" or after:match("[ \t\r\n\f/>]") then
+          found[#found + 1] = { s, e }
+        end
         init = e + 1
       else
         init = s + #open -- an unclosed quote: look at the next tag
@@ -809,9 +835,9 @@ local function handle_field(key, name, value, doc)
         end
         if not new_tag then
           if tag:sub(-2) == "/>" then
-            new_tag = tag:sub(1, -3):gsub("%s+$", "") .. " " .. repl .. "/>"
+            new_tag = tag:sub(1, -3):gsub("[ \t\r\n\f]+$", "") .. " " .. repl .. "/>"
           else
-            new_tag = tag:sub(1, -2):gsub("%s+$", "") .. " " .. repl .. ">"
+            new_tag = tag:sub(1, -2):gsub("[ \t\r\n\f]+$", "") .. " " .. repl .. ">"
           end
         end
         local new_text = text:sub(1, pos[1] - 1) .. new_tag .. text:sub(pos[2] + 1)

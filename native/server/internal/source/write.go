@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -162,36 +163,58 @@ func renameReplacing(from, to string, original []byte) error {
 }
 
 // writeInPlace is writeThrough for a folder that takes no new file: compare,
-// then rewrite the document itself.
+// then rewrite the document itself. One handle does both, so the text that is
+// compared is the text that is replaced (there is no gap in which another
+// program's save could be cut off), and the file is only emptied by the write.
 func writeInPlace(target string, data, original []byte) error {
 	if beforeRename != nil {
 		beforeRename()
 	}
-	if err := sameAsOriginal(target, original); err != nil {
-		return err
-	}
 	// Never create: the file was there a moment ago, and a vanished one is not
 	// to be resurrected with an arbitrary mode.
-	f, err := os.OpenFile(target, os.O_WRONLY|os.O_TRUNC, 0)
+	f, err := os.OpenFile(target, os.O_RDWR, 0)
 	if err != nil {
 		return err
 	}
-	// O_TRUNC has already cut the file: if the write fails (disk full), put the
-	// old text back as well as possible rather than leave an empty document.
-	restore := func() {
-		_, _ = f.WriteAt(original, 0)
-		_ = f.Truncate(int64(len(original)))
-		_ = f.Sync()
-	}
-	if _, err := f.Write(data); err != nil {
-		restore()
+	current, err := io.ReadAll(f)
+	if err != nil {
 		_ = f.Close()
 		return err
+	}
+	if !bytes.Equal(current, original) {
+		_ = f.Close()
+		return ErrStale
+	}
+
+	// A failed write leaves the file part new, part old: put the old text back
+	// as well as possible, and say when that failed too.
+	fail := func(werr error) error {
+		if _, rerr := f.WriteAt(original, 0); rerr != nil {
+			_ = f.Close()
+			return fmt.Errorf("%w (the old text could not be put back: %v)", werr, rerr)
+		}
+		if rerr := f.Truncate(int64(len(original))); rerr != nil {
+			_ = f.Close()
+			return fmt.Errorf("%w (the old text could not be put back: %v)", werr, rerr)
+		}
+		_ = f.Sync()
+		_ = f.Close()
+		return werr
+	}
+	if err := writeAt(f, data); err != nil {
+		return fail(err)
+	}
+	if err := f.Truncate(int64(len(data))); err != nil {
+		return fail(err)
 	}
 	if err := f.Sync(); err != nil {
-		restore()
-		_ = f.Close()
-		return err
+		return fail(err)
 	}
 	return f.Close()
+}
+
+// writeAt is a test seam: the first step of writeInPlace that changes the file.
+var writeAt = func(f *os.File, data []byte) error {
+	_, err := f.WriteAt(data, 0)
+	return err
 }

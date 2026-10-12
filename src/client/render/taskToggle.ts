@@ -39,7 +39,7 @@ export function enableTaskCheckboxes(root: HTMLElement): void {
 /** Toggles of one box that the relay has not answered yet. */
 const inFlight = new WeakMap<
   HTMLInputElement,
-  { pending: number; saved: boolean; failed: boolean }
+  { pending: number; saved: boolean; savedSeq: number; seq: number; failed: boolean }
 >();
 
 /**
@@ -73,18 +73,33 @@ export function installTaskToggle(
       // to the state the source was last known to have.
       let st = inFlight.get(box);
       if (!st) {
-        st = { pending: 0, saved: !checked, failed: false };
+        st = { pending: 0, saved: !checked, savedSeq: 0, seq: 0, failed: false };
         inFlight.set(box, st);
       }
       st.pending++;
-      void sent.then(ok => {
-        if (ok) st.saved = checked;
-        else st.failed = true;
-        if (--st.pending > 0) return;
-        inFlight.delete(box);
-        // (A box that a re-render replaced meanwhile already shows the source.)
-        if (st.failed && box.isConnected) box.checked = st.saved;
-      });
+      const mine = ++st.seq;
+      // A send that throws counts as refused, so the box can never stay stuck.
+      void sent
+        .then(
+          ok => ok,
+          () => false,
+        )
+        .then(ok => {
+          // The relay applies the clicks in order: the newest one it saved is the
+          // state of the source, whichever answer arrives last.
+          if (ok) {
+            if (mine > st.savedSeq) {
+              st.saved = checked;
+              st.savedSeq = mine;
+            }
+          } else {
+            st.failed = true;
+          }
+          if (--st.pending > 0) return;
+          inFlight.delete(box);
+          // (A box that a re-render replaced meanwhile already shows the source.)
+          if (st.failed && box.isConnected) box.checked = st.saved;
+        });
     }
   });
 }

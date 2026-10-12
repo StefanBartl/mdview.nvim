@@ -15,6 +15,10 @@ func TestSetFieldValue_ParityCases(t *testing.T) {
 		{"quotes inside a quoted name stay", `<input name="'t'">`, "'t'", "x", `<input name="'t'" value="x">`},
 		{"an unclosed quote hides only its own tag", "<input name=a value=\"x>\n<input name=\"t\">", "t", "v", "<input name=a value=\"x>\n<input name=\"t\" value=\"v\">"},
 		{"a bare attribute is kept", `<input disabled name="t">`, "t", "x", `<input disabled name="t" value="x">`},
+		{"white space before the closing bracket goes", "<input\n  name=\"t\"\n>", "t", "x", "<input\n  name=\"t\" value=\"x\">"},
+		{"a tab before a self closing bracket goes", "<input name=\"t\"\t/>", "t", "x", "<input name=\"t\" value=\"x\"/>"},
+		{"a custom element hides what its values hold", "<input-x title='<input name=\"t\">'>", "t", "x", "<input-x title='<input name=\"t\">'>"},
+		{"a form feed separates attributes", "<input\fname=\"t\">", "t", "x", "<input\fname=\"t\" value=\"x\">"},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
