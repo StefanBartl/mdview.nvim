@@ -832,10 +832,12 @@ func handleToggle(queue *relay.ToggleQueue, watchKey, watchPath, token string) h
 			if !ok {
 				return
 			}
+			// A line too long to be carried in a URL is not a reason to drop the
+			// tick: it is applied without the stale-line guard (the client omits
+			// it above the same bound, so this only meets a client that does not).
 			expected := q.Get("expected")
 			if len(expected) > maxExpectedLen {
-				http.Error(w, "expected too long", http.StatusBadRequest)
-				return
+				expected = ""
 			}
 			body, err := io.ReadAll(io.LimitReader(r.Body, maxToggleBodyBytes))
 			if err != nil {

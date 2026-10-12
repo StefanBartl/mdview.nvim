@@ -150,10 +150,31 @@ func TestHandleToggle_NeovimModeQueuesTheExpectedLine(t *testing.T) {
 	}
 
 	long := "/toggle?token=" + testToken + "&key=room.md&expected=" + strings.Repeat("x", maxExpectedLen+1)
+	// over the bound the tick is not lost: it is queued without the guard
 	rec = httptest.NewRecorder()
 	h(rec, httptest.NewRequest(http.MethodPost, long, strings.NewReader("3:1")))
-	if rec.Code != http.StatusBadRequest {
-		t.Fatalf("long expected: status = %d, want 400", rec.Code)
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("long expected: status = %d, want 204", rec.Code)
+	}
+	got = queue.Drain()
+	if len(got) != 1 || got[0].Expected != "" || got[0].Line != 3 {
+		t.Fatalf("long expected queued = %+v, want line 3 without an expected line", got)
+	}
+}
+
+func TestHandleToggle_StandaloneLongExpectedStillTicks(t *testing.T) {
+	p := mustWriteFile(t, t.TempDir(), "doc.md", "- [ ] "+strings.Repeat("w", maxExpectedLen)+"\n")
+	key := filepath.ToSlash(p)
+	h := handleToggle(relay.NewToggleQueue(), key, p, testToken)
+
+	target := "/toggle?token=" + testToken + "&key=" + url.QueryEscape(key) + "&expected=" + url.QueryEscape("- [ ] "+strings.Repeat("w", maxExpectedLen))
+	rec := httptest.NewRecorder()
+	h(rec, httptest.NewRequest(http.MethodPost, target, strings.NewReader("1:1")))
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("status = %d, want 204", rec.Code)
+	}
+	if got := readFile(t, p); !strings.HasPrefix(got, "- [x] ") {
+		t.Fatalf("not ticked: %q", got[:10])
 	}
 }
 

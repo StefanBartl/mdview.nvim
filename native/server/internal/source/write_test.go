@@ -173,3 +173,121 @@ func TestReplaceLines_NeverFailsBecauseTheWatcherIsReading(t *testing.T) {
 		}
 	}
 }
+
+// stubRename replaces the rename seams for one test.
+func stubRename(t *testing.T, rename func(from, to string) error, retryable func(error) bool) {
+	t.Helper()
+	oldRename, oldRetry, oldDelays := renameFile, isRetryableError, retryDelays
+	renameFile, isRetryableError = rename, retryable
+	retryDelays = []time.Duration{time.Millisecond, time.Millisecond, time.Millisecond}
+	t.Cleanup(func() { renameFile, isRetryableError, retryDelays = oldRename, oldRetry, oldDelays })
+}
+
+var errSharing = errors.New("sharing violation")
+
+func TestWriteThrough_RetriesASharingErrorUntilItGoesThrough(t *testing.T) {
+	path := writeTemp(t, "a\nold\nb\n")
+	calls := 0
+	stubRename(t, func(from, to string) error {
+		calls++
+		if calls < 3 {
+			return errSharing
+		}
+		return os.Rename(from, to)
+	}, func(err error) bool { return errors.Is(err, errSharing) })
+
+	if err := ReplaceLines(path, 2, 2, "old", "new"); err != nil {
+		t.Fatal(err)
+	}
+	if calls != 3 {
+		t.Fatalf("rename called %d times, want 3", calls)
+	}
+	if got, want := read(t, path), "a\nnew\nb\n"; got != want {
+		t.Fatalf("got %q want %q", got, want)
+	}
+}
+
+// Another program saves while the edit waits for the sharing violation to end:
+// the retry must compare again and refuse, not rename over that save.
+func TestWriteThrough_RetryComparesTheFileAgain(t *testing.T) {
+	path := writeTemp(t, "a\nold\nb\n")
+	external := "a\nsomeone else\nb\n"
+	calls := 0
+	stubRename(t, func(from, to string) error {
+		calls++
+		if err := os.WriteFile(path, []byte(external), 0o644); err != nil {
+			t.Error(err)
+		}
+		return errSharing
+	}, func(err error) bool { return errors.Is(err, errSharing) })
+
+	err := ReplaceLines(path, 2, 2, "old", "mine")
+	if !errors.Is(err, ErrStale) {
+		t.Fatalf("err = %v, want ErrStale", err)
+	}
+	if calls != 1 {
+		t.Fatalf("rename called %d times, want 1 (the second attempt must stop at the comparison)", calls)
+	}
+	if got := read(t, path); got != external {
+		t.Fatalf("the other program's save was overwritten: %q", got)
+	}
+}
+
+func TestWriteThrough_OtherRenameErrorsAreNotRetried(t *testing.T) {
+	path := writeTemp(t, "a\nold\nb\n")
+	calls := 0
+	boom := errors.New("not a sharing error")
+	stubRename(t, func(from, to string) error { calls++; return boom },
+		func(err error) bool { return errors.Is(err, errSharing) })
+
+	if err := ReplaceLines(path, 2, 2, "old", "new"); !errors.Is(err, boom) {
+		t.Fatalf("err = %v, want the rename error", err)
+	}
+	if calls != 1 {
+		t.Fatalf("rename called %d times, want 1", calls)
+	}
+	entries, _ := os.ReadDir(filepath.Dir(path))
+	if len(entries) != 1 {
+		t.Fatalf("folder holds %d entries, want only the file (a temp file was left)", len(entries))
+	}
+}
+
+func TestWriteThrough_GivesUpAfterTheLastRetry(t *testing.T) {
+	path := writeTemp(t, "a\nold\nb\n")
+	calls := 0
+	stubRename(t, func(from, to string) error { calls++; return errSharing },
+		func(err error) bool { return errors.Is(err, errSharing) })
+
+	if err := ReplaceLines(path, 2, 2, "old", "new"); !errors.Is(err, errSharing) {
+		t.Fatalf("err = %v, want the sharing error", err)
+	}
+	if want := len(retryDelays) + 1; calls != want {
+		t.Fatalf("rename called %d times, want %d", calls, want)
+	}
+}
+
+// A folder that takes no new file: the writable document is rewritten in place,
+// still after the same comparison.
+func TestWriteThrough_FallsBackToWritingInPlace(t *testing.T) {
+	path := writeTemp(t, "- [ ] a\n- [ ] b\n")
+	old := createTemp
+	createTemp = func(string, string) (*os.File, error) { return nil, os.ErrPermission }
+	defer func() { createTemp = old }()
+
+	if err := ToggleCheckbox(path, 2, true); err != nil {
+		t.Fatal(err)
+	}
+	if got, want := read(t, path), "- [ ] a\n- [x] b\n"; got != want {
+		t.Fatalf("got %q want %q", got, want)
+	}
+
+	external := "- [ ] a\n- [ ] changed\n"
+	beforeRename = func() { _ = os.WriteFile(path, []byte(external), 0o644) }
+	defer func() { beforeRename = nil }()
+	if err := ToggleCheckbox(path, 1, true); !errors.Is(err, ErrStale) {
+		t.Fatalf("err = %v, want ErrStale", err)
+	}
+	if got := read(t, path); got != external {
+		t.Fatalf("the other program's save was overwritten: %q", got)
+	}
+}

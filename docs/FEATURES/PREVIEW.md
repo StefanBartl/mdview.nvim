@@ -392,13 +392,17 @@ note ("Not saved: …") and Neovim warns, instead of one side overwriting the ot
   only a buffer mdview itself previews is ever edited, never just any loaded one.
   An edit that finds the buffer changed, not modifiable, or the document on
   screen different is refused and the tab says why ("Not saved: …"). While you
-  are typing in Insert mode in that buffer the edit waits (up to about five
-  seconds) so it does not join your undo block. A CRLF file loaded as `unix`
+  are typing in Insert mode in that buffer (a key in the last second) the edit
+  waits, up to about five seconds, and says so; if you merely stand in Insert
+  mode it is applied at once, as its own undo step. A CRLF file loaded as `unix`
   (lines ending in `^M`) is edited and keeps its endings.
 - **Standalone** (`:MDView standalone`, `mdview-server --watch … --edit`): the relay
   replaces the lines in the file. Everything outside the range stays byte for byte
   (also a file whose lines end differently), the trailing newline is kept, and it
-  is written atomically (temp file + rename). A symbolic link stays a link: the
+  is written atomically (temp file + rename; on Windows a rename blocked by another
+  program is retried for a few tens of milliseconds, comparing the file again each
+  time). In a folder that takes no new file it is rewritten in place instead, after
+  the same comparison but not atomically. A symbolic link stays a link: the
   file it points at is rewritten. The relay refuses an edit (403) unless it was
   started with `--edit`, and one that finds the file changed on disk (409).
 - While an editor is open, incoming renders are held back and run when it closes,

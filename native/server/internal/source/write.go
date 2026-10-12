@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"runtime"
 	"sync"
 	"time"
 )
@@ -66,13 +65,19 @@ func loadWatched(path string) (target string, content []byte, perm os.FileMode, 
 // folder, flushed, then renamed over it, so a reader never sees half of it.
 //
 // `original` is what the caller read and based `data` on. It is compared with
-// the file once more as the last step before the rename; if another program
-// saved the file meanwhile the write is refused with ErrStale. That narrows the
-// window to the rename itself — without file locking it cannot be closed.
+// the file once more as the last step before every rename attempt; if another
+// program saved the file meanwhile the write is refused with ErrStale. That
+// narrows the window to the rename itself — without file locking it cannot be
+// closed. When the folder takes no new file, the document is rewritten in place
+// instead (see writeInPlace): the same comparison, but not atomic.
 func writeThrough(target string, data, original []byte, perm os.FileMode) error {
-	tmp, err := os.CreateTemp(filepath.Dir(target), ".mdview-edit-*")
+	tmp, err := createTemp(filepath.Dir(target), ".mdview-edit-*")
 	if err != nil {
-		return err
+		// The folder cannot take a new file (read-only folder, a share without
+		// create rights) although the document itself is writable: write it in
+		// place. Not atomic — a reader may see it half written — but the same
+		// comparison with `original` still applies.
+		return writeInPlace(target, data, original)
 	}
 	tmpName := tmp.Name()
 	cleanup := func() { _ = os.Remove(tmpName) }
@@ -97,22 +102,29 @@ func writeThrough(target string, data, original []byte, perm os.FileMode) error 
 		return err
 	}
 
-	if beforeRename != nil {
-		beforeRename()
+	if err := renameReplacing(tmpName, target, original); err != nil {
+		cleanup()
+		return err
 	}
+	return nil
+}
+
+// Test seams for the rename retry.
+var (
+	createTemp       = os.CreateTemp
+	renameFile       = os.Rename
+	isRetryableError = isSharingViolation
+	retryDelays      = []time.Duration{10 * time.Millisecond, 20 * time.Millisecond, 40 * time.Millisecond}
+)
+
+// sameAsOriginal reports whether the file at `target` still holds `original`.
+func sameAsOriginal(target string, original []byte) error {
 	again, err := os.ReadFile(target)
 	if err != nil {
-		cleanup()
 		return err
 	}
 	if !bytes.Equal(again, original) {
-		cleanup()
 		return ErrStale
-	}
-
-	if err := renameReplacing(tmpName, target); err != nil {
-		cleanup()
-		return err
 	}
 	return nil
 }
@@ -120,20 +132,47 @@ func writeThrough(target string, data, original []byte, perm os.FileMode) error 
 // renameReplacing renames over an existing file. On Windows the rename fails
 // while any other program has the target open without share-delete (a virus
 // scanner, an indexer, a sync client, an editor's file watcher), usually for a
-// few milliseconds; it is retried briefly before giving up.
-func renameReplacing(from, to string) error {
-	attempts := 1
-	if runtime.GOOS == "windows" {
-		attempts = 6
-	}
-	var err error
-	for i := 0; i < attempts; i++ {
-		if err = os.Rename(from, to); err == nil {
+// few milliseconds. Only such a sharing error is retried (briefly: writeMu is
+// held meanwhile), and every attempt first compares the file with `original`
+// again, as another program may have saved it while this one waited. Any other
+// error, a missing target included, ends it at once.
+func renameReplacing(from, to string, original []byte) error {
+	for i := 0; ; i++ {
+		if beforeRename != nil {
+			beforeRename()
+		}
+		if err := sameAsOriginal(to, original); err != nil {
+			return err
+		}
+		err := renameFile(from, to)
+		if err == nil {
 			return nil
 		}
-		if i < attempts-1 {
-			time.Sleep(time.Duration(25*(i+1)) * time.Millisecond)
+		if i >= len(retryDelays) || !isRetryableError(err) {
+			return err
 		}
+		time.Sleep(retryDelays[i])
 	}
-	return err
+}
+
+// writeInPlace is writeThrough for a folder that takes no new file: compare,
+// then rewrite the document itself.
+func writeInPlace(target string, data, original []byte) error {
+	if beforeRename != nil {
+		beforeRename()
+	}
+	if err := sameAsOriginal(target, original); err != nil {
+		return err
+	}
+	// Never create: the file was there a moment ago, and a vanished one is not
+	// to be resurrected with an arbitrary mode.
+	f, err := os.OpenFile(target, os.O_WRONLY|os.O_TRUNC, 0)
+	if err != nil {
+		return err
+	}
+	if _, err := f.Write(data); err != nil {
+		_ = f.Close()
+		return err
+	}
+	return f.Close()
 }
