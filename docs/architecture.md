@@ -34,11 +34,14 @@ the relay forwards verbatim without inspecting it: `/scroll` (cursor position),
 1 KiB), and `/spans` (the buffer's own fence highlighting, for
 `browser.highlighter = "nvim"`).
 
-`/spans` is the one exception to "sidecars are ephemeral". The others carry a
-passing event that the next one supersedes; fence highlighting describes the
-current document, so the relay stores the last one per room alongside — never
-instead of — the content, and seeds a joining tab with both. Without that, a
-reloaded tab would show the content unhighlighted until the next edit arrived.
+`/spans` and `/doc` are the exceptions to "sidecars are ephemeral". The others
+carry a passing event that the next one supersedes; fence highlighting and the
+name of the shown document describe the current document, so the relay stores the
+last one of each per room alongside — never instead of — the content, and seeds a
+joining tab with them (content, `/doc`, `/spans`, then the spotlight state).
+Without that, a reloaded tab would show the content unhighlighted until the next
+edit arrived, and a tab that follows the active buffer (`reuse`) would not know
+which renderer the content needs.
 
 See [FEATURES/RENDERING.md](FEATURES/RENDERING.md#nvim--the-buffers-own-colors)
 and [FEATURES/PREVIEW.md](FEATURES/PREVIEW.md#visual-selection-mirror).

@@ -108,12 +108,13 @@ fresh update and then an older seed on top of it (the window a separate `Join`
 followed by `LastPayload` used to leave). `/ws` and the WebTransport route both
 use it, so both are seeded alike.
 
-Stored, not ephemeral, and that distinction is the whole point: every other
-sidecar channel (`/scroll`, `/doc`, `/control`) carries a passing event that the
-next one supersedes, so seeding a late joiner with it would be wrong. Fence
-highlighting describes the *current* document, exactly like the content does. A
-reloaded tab would otherwise sit there unhighlighted until the next edit
-happened to arrive.
+Stored, not ephemeral, and that distinction is the whole point: the sidecar
+channels `/scroll` and `/control` carry a passing event that the next one
+supersedes, so seeding a late joiner with it would be wrong. Fence highlighting
+describes the *current* document, exactly like the content does. A reloaded tab
+would otherwise sit there unhighlighted until the next edit happened to arrive.
+`/doc` is stored for the same reason (the name of the shown document, which a tab
+that follows the active buffer renders by) and replayed right after the content.
 
 - **Module:** `native/server/internal/relay/registry.go` (`Broadcast`,
   `BroadcastSpans`, `LastPayload`, `LastSpans`, `JoinAndSeed`),

@@ -84,4 +84,30 @@ describe('block editor on a document with lone CRs', () => {
     expect(field.value).toBe('c');
     expect(notify).not.toHaveBeenCalled();
   });
+
+  it('commits that last block without a CR in expected, and sends nothing when unchanged', () => {
+    const html = '<p data-sourcepos="3:1-3:1">c</p>';
+    const text = 'a\r\nb\r\nc\r';
+    const enter = (field: Element) =>
+      field.dispatchEvent(new window.KeyboardEvent('keydown', { bubbles: true, key: 'Enter' }));
+
+    const unchanged = setup(text, html);
+    click(unchanged.root.querySelector('p')!);
+    enter(unchanged.root.querySelector('.mdview-block-editor')!);
+    expect(unchanged.send).not.toHaveBeenCalled();
+    document.body.innerHTML = '';
+
+    const changed = setup(text, html);
+    click(changed.root.querySelector('p')!);
+    const field = changed.root.querySelector('.mdview-block-editor') as HTMLTextAreaElement;
+    field.value = 'd';
+    enter(field);
+    expect(changed.send).toHaveBeenCalledTimes(1);
+    expect(changed.send.mock.calls[0][0]).toMatchObject({
+      start: 3,
+      end: 3,
+      expected: 'c',
+      text: 'd',
+    });
+  });
 });
