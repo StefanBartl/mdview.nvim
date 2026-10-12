@@ -188,9 +188,10 @@ local function target_buffer(key, doc)
     return nil, "the preview is not showing a document from this session"
   end
   if type(doc) == "string" and doc ~= "" and doc ~= shown then
-    -- The tab is behind: its document ping got lost (the relay does not replay
-    -- it to a tab that connected later). Say again what is shown, so a retry
-    -- by the person is not refused the same way for ever.
+    -- The tab is behind: its document ping got lost (the relay replays the
+    -- latest one to a tab that joins, but not to one that missed a single ping
+    -- while connected). Say again what is shown, so a retry by the person is
+    -- not refused the same way for ever.
     pcall(require("mdview.adapter.ws_client").send_doc, key, shown)
     return nil, "the document on screen changed; try again"
   end

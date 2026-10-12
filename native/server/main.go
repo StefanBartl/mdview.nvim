@@ -616,8 +616,8 @@ func handleControl(registry *relay.Registry, token string) http.HandlerFunc {
 // blocks with exactly what Neovim shows rather than re-guessing the language in
 // JavaScript.
 //
-// Stored rather than ephemeral (unlike /scroll, /doc and /control) because it
-// describes the current document rather than a passing event: a reloaded tab is
+// Stored rather than ephemeral (unlike /scroll and /control; /doc is kept too)
+// because it describes the current document rather than a passing event: a reloaded tab is
 // seeded with LastPayload's content, and would otherwise show it unhighlighted
 // until the next edit happened to arrive. The relay never inspects the payload,
 // it only forwards and remembers the bytes.
