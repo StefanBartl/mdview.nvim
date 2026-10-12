@@ -405,6 +405,12 @@ note ("Not saved: …") and Neovim warns, instead of one side overwriting the ot
   the same comparison but not atomically. A symbolic link stays a link: the
   file it points at is rewritten. The relay refuses an edit (403) unless it was
   started with `--edit`, and one that finds the file changed on disk (409).
+- Changes from the preview reach a buffer **in the order they were made** (one queue per
+  buffer), and any that cannot be applied -- the lines moved, the line is no longer a
+  checkbox, the field is gone, the buffer is read-only -- say so ("Not saved: …" in the
+  tab, a warning in Neovim) and the tab gets the buffer text back. A tab that is behind
+  (its document ping was lost) is told what is shown and asked to try again. Renaming the
+  shown buffer (`:file`, `:saveas`) announces the new path to the tab.
 - While an editor is open, incoming renders are held back and run when it closes,
   so a push never pulls the field out from under you.
 - Not editable: the frontmatter table (it has no source position), private

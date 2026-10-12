@@ -48,6 +48,19 @@ local function url_for(endpoint)
   return string.format("http://localhost:%d/%s?token=%s", port, endpoint, vim.uri_encode(token))
 end
 
+-- Report a failure of a request handler (it is never silent) and carry on.
+---@internal
+---@param what string
+---@param fn function
+---@param ... any
+---@return nil
+local function safe(what, fn, ...)
+  local ok, err = pcall(fn, ...)
+  if not ok then
+    notify(("[mdview] preview %s failed: %s"):format(what, tostring(err)), vim.log.levels.ERROR)
+  end
+end
+
 ---@internal
 ---@return table
 local function experimental()
@@ -78,7 +91,10 @@ local function handle_nav(key, href)
   if is_absolute(href) then
     target = href
   else
-    local dir = vim.fn.fnamemodify(key, ":h")
+    -- Relative to the document on screen: the room is the first document of the
+    -- session under "reuse".
+    local base = require("mdview.bindings.autocmds.live_push").shown_document(key) or key
+    local dir = vim.fn.fnamemodify(base, ":h")
     target = vim.fn.simplify(dir .. "/" .. href)
   end
   local norm = require("mdview.helper.normalize").path(target)
@@ -116,7 +132,7 @@ local function poll_nav()
       vim.schedule(function()
         for _, r in ipairs(arr) do
           if type(r) == "table" then
-            handle_nav(r.key, r.href)
+            safe("navigation", handle_nav, r.key, r.href)
           end
         end
       end)
@@ -172,7 +188,11 @@ local function target_buffer(key, doc)
     return nil, "the preview is not showing a document from this session"
   end
   if type(doc) == "string" and doc ~= "" and doc ~= shown then
-    return nil, "the document on screen changed"
+    -- The tab is behind: its document ping got lost (the relay does not replay
+    -- it to a tab that connected later). Say again what is shown, so a retry
+    -- by the person is not refused the same way for ever.
+    pcall(require("mdview.adapter.ws_client").send_doc, key, shown)
+    return nil, "the document on screen changed; try again"
   end
   local buf = buf_for_key(shown)
   if not buf or not vim.api.nvim_buf_is_loaded(buf) then
@@ -249,6 +269,92 @@ local function when_not_inserting(buf, fn, tries)
   fn()
 end
 
+-- Per-buffer FIFO of the changes the browser asked for. Each one waits for the
+-- user to stop typing (`when_not_inserting`), and a later one must not overtake
+-- an earlier one that is still waiting: field "first" in Insert mode, Esc, field
+-- "second" has to end with "second". `queues[buf]` is the live queue of a
+-- buffer; `M.stop` drops them all, and a closure of a dropped queue does nothing.
+---@type table<integer, { items: fun()[], active: boolean }>
+local queues = {}
+
+-- Run `fn` for `buf` after the changes queued before it, once the user is not
+-- typing there. An error in `fn` is reported and does not stop the queue.
+---@internal
+---@param buf integer
+---@param fn fun()
+---@return nil
+local function enqueue(buf, fn)
+  local q = queues[buf]
+  if not q then
+    q = { items = {}, active = false }
+    queues[buf] = q
+  end
+  q.items[#q.items + 1] = fn
+  if q.active then
+    return
+  end
+  q.active = true
+  local function step()
+    if queues[buf] ~= q then
+      return -- stopped meanwhile
+    end
+    local nxt = table.remove(q.items, 1)
+    if not nxt or not vim.api.nvim_buf_is_valid(buf) then
+      queues[buf] = nil
+      return
+    end
+    when_not_inserting(buf, function()
+      if queues[buf] ~= q then
+        return
+      end
+      safe("change", nxt)
+      step()
+    end)
+  end
+  step()
+end
+
+-- The buffer text changed for a request of the tab in room `key`: push it so
+-- every view shows it. The push goes to the room Neovim currently feeds; a tab
+-- of an older room (after a second :MDView open) is brought up to date as well.
+---@internal
+---@param buf integer
+---@param key string
+---@return nil
+local function push_result(buf, key)
+  local live = require("mdview.bindings.autocmds.live_push")
+  pcall(live.push_buffer_changes, buf, { full = true })
+  if require("mdview.helper.target_key").resolve(buf) ~= key then
+    pcall(live.push_buffer_changes, buf, { full = true, room = key })
+  end
+end
+
+-- A change from the preview was not applied: say so in Neovim and in the tab,
+-- and put the buffer's real text back into the tab, so a checkbox or field it
+-- changed on its own goes back to what the buffer says.
+---@internal
+---@param key string # the room of the tab
+---@param buf integer
+---@param what string # "preview edit" | "preview checkbox"
+---@param message string
+---@return nil
+local function refuse(key, buf, what, message)
+  notify(("[mdview] %s dropped: %s"):format(what, message), vim.log.levels.WARN)
+  tell_tab(key, message)
+  push_result(buf, key)
+end
+
+-- The same for a request that found no buffer to apply to.
+---@internal
+---@param key string
+---@param what string
+---@param why string|nil
+---@return nil
+local function refuse_no_buffer(key, what, why)
+  notify(("[mdview] %s dropped: %s"):format(what, tostring(why)), vim.log.levels.WARN)
+  tell_tab(key, tostring(why))
+end
+
 ---@internal
 ---@param key string
 ---@param ratio number
@@ -257,7 +363,8 @@ local function handle_scroll(key, ratio)
   if type(key) ~= "string" or type(ratio) ~= "number" then
     return
   end
-  local buf = buf_for_key(key)
+  -- The room is not the document under "reuse": scroll the shown one.
+  local buf = buf_for_key(require("mdview.bindings.autocmds.live_push").shown_document(key) or key)
   if not buf then
     return
   end
@@ -351,20 +458,20 @@ local function handle_toggle(key, line, checked, doc, expected)
   if type(key) ~= "string" or type(line) ~= "number" or line < 1 or line ~= math.floor(line) then
     return
   end
-  local buf = target_buffer(key, doc)
+  local buf, why = target_buffer(key, doc)
   if not buf then
+    refuse_no_buffer(key, "preview checkbox", why)
     return
   end
-  when_not_inserting(buf, function()
+  local what = "preview checkbox"
+  enqueue(buf, function()
     if vim.bo[buf].modifiable ~= true then
-      notify("[mdview] preview checkbox dropped: the buffer is not modifiable", vim.log.levels.WARN)
+      refuse(key, buf, what, "the buffer is not modifiable")
       return
     end
-    if line > vim.api.nvim_buf_line_count(buf) then
-      return
-    end
-    local raw = vim.api.nvim_buf_get_lines(buf, line - 1, line, false)[1]
+    local raw = line <= vim.api.nvim_buf_line_count(buf) and vim.api.nvim_buf_get_lines(buf, line - 1, line, false)[1]
     if not raw then
+      refuse(key, buf, what, "the lines changed in the buffer")
       return
     end
     -- A buffer loaded with 'fileformat' unix from a CRLF file keeps a "\r".
@@ -373,7 +480,9 @@ local function handle_toggle(key, line, checked, doc, expected)
       local want_line = expected:gsub("\r$", "")
       if not require("mdview.core.display").active() then
         if neutral_marker(cur) ~= neutral_marker(want_line) then
-          return -- the lines moved since the render: not the checkbox that was ticked
+          -- the lines moved since the render: not the checkbox that was ticked
+          refuse(key, buf, what, "the lines changed in the buffer")
+          return
         end
       else
         -- Under a display language the browser rendered a translated text, so
@@ -381,26 +490,30 @@ local function handle_toggle(key, line, checked, doc, expected)
         -- and the bullet in front of the marker.
         local want_pre = want_line:match("^(%s*[-*+] %[)[ xX]%]")
         if want_pre and want_pre ~= cur:match("^(%s*[-*+] %[)") then
+          refuse(key, buf, what, "the lines changed in the buffer")
           return
         end
       end
     end
     local pre, state, post = cur:match("^(%s*[-*+] %[)([ xX])(%].*)$")
     if not pre then
-      return -- not a checkbox line; don't corrupt it
+      -- not a checkbox line; don't corrupt it
+      refuse(key, buf, what, "that line is no longer a checkbox")
+      return
     end
     local want = checked and "x" or " "
     if state == want then
       return -- already in the requested state
     end
-    local ok =
+    local ok, err =
       pcall(vim.api.nvim_buf_set_lines, buf, line - 1, line, false, { pre .. want .. post .. (cr > 0 and "\r" or "") })
     if not ok then
+      refuse(key, buf, what, tostring(err))
       return
     end
     -- Neovim fires TextChanged for a change of the current buffer only; push
     -- explicitly so a buffer shown elsewhere is updated in the preview as well.
-    pcall(require("mdview.bindings.autocmds.live_push").push_buffer_changes, buf, { full = true })
+    push_result(buf, key)
   end)
 end
 
@@ -428,7 +541,7 @@ local function poll_toggle()
       vim.schedule(function()
         for _, r in ipairs(arr) do
           if type(r) == "table" then
-            pcall(handle_toggle, r.key, r.line, r.checked, r.doc, r.expected)
+            safe("checkbox", handle_toggle, r.key, r.line, r.checked, r.doc, r.expected)
           end
         end
       end)
@@ -475,8 +588,9 @@ end
 ---@param buf integer
 ---@param new_text string
 ---@param old string[] # the buffer's lines the text was derived from
+---@param key string # the room of the tab whose request this is
 ---@return nil
-local function apply_buffer_text(buf, new_text, old)
+local function apply_buffer_text(buf, new_text, old, key)
   local new = vim.split(new_text, "\n", { plain = true })
 
   local first = 1
@@ -495,10 +609,10 @@ local function apply_buffer_text(buf, new_text, old)
   local ok, err =
     pcall(vim.api.nvim_buf_set_lines, buf, first - 1, old_last, false, vim.list_slice(new, first, new_last))
   if not ok then
-    notify("[mdview] preview edit dropped: " .. tostring(err), vim.log.levels.WARN)
+    refuse(key, buf, "preview edit", tostring(err))
     return
   end
-  pcall(require("mdview.bindings.autocmds.live_push").push_buffer_changes, buf, { full = true })
+  push_result(buf, key)
 end
 
 -- Set the syncable field named `name` in the buffer showing `key` to `value`,
@@ -522,13 +636,14 @@ local function handle_field(key, name, value, doc)
     require("mdview.core.display").note_field_ignored()
     return
   end
-  local buf = target_buffer(key, doc)
+  local buf, why = target_buffer(key, doc)
   if not buf then
+    refuse_no_buffer(key, "preview edit", why)
     return
   end
-  when_not_inserting(buf, function()
+  enqueue(buf, function()
     if vim.bo[buf].modifiable ~= true then
-      notify("[mdview] preview edit dropped: the buffer is not modifiable", vim.log.levels.WARN)
+      refuse(key, buf, "preview edit", "the buffer is not modifiable")
       return
     end
     local old_lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
@@ -543,7 +658,7 @@ local function handle_field(key, name, value, doc)
       local close_start = text:find("</textarea>", ta_body_start + 1, true)
       if close_start then
         local new_text = text:sub(1, ta_body_start) .. escape_text(value) .. text:sub(close_start)
-        apply_buffer_text(buf, new_text, old_lines)
+        apply_buffer_text(buf, new_text, old_lines, key)
         return
       end
     end
@@ -564,8 +679,10 @@ local function handle_field(key, name, value, doc)
         new_tag = tag:sub(1, -2):gsub("%s+$", "") .. " " .. repl .. ">"
       end
       local new_text = text:sub(1, in_start - 1) .. new_tag .. text:sub(in_end + 1)
-      apply_buffer_text(buf, new_text, old_lines)
+      apply_buffer_text(buf, new_text, old_lines, key)
+      return
     end
+    refuse(key, buf, "preview edit", ("there is no text field named %s any more"):format(name))
   end)
 end
 
@@ -593,7 +710,7 @@ local function poll_field()
       vim.schedule(function()
         for _, r in ipairs(arr) do
           if type(r) == "table" then
-            pcall(handle_field, r.key, r.name, r.value, r.doc)
+            safe("field", handle_field, r.key, r.name, r.value, r.doc)
           end
         end
       end)
@@ -659,26 +776,18 @@ local function handle_edit(key, start, end_, expected, text, doc)
   end
   local buf, why = target_buffer(key, doc)
   if not buf then
-    notify("[mdview] preview edit dropped: " .. tostring(why), vim.log.levels.WARN)
-    tell_tab(key, tostring(why))
+    refuse_no_buffer(key, "preview edit", why)
     return
   end
 
-  -- Say that the edit was not applied, and put the buffer's real text back
-  -- into the tab.
-  local function refuse(message)
-    notify("[mdview] preview edit dropped: " .. message, vim.log.levels.WARN)
-    tell_tab(key, message)
-    pcall(require("mdview.bindings.autocmds.live_push").push_buffer_changes, buf, { full = true })
-  end
-
-  when_not_inserting(buf, function()
+  local what = "preview edit"
+  enqueue(buf, function()
     if vim.bo[buf].modifiable ~= true then
-      refuse("the buffer is not modifiable")
+      refuse(key, buf, what, "the buffer is not modifiable")
       return
     end
     if end_ > vim.api.nvim_buf_line_count(buf) then
-      refuse("the lines changed in the buffer")
+      refuse(key, buf, what, "the lines changed in the buffer")
       return
     end
 
@@ -687,8 +796,11 @@ local function handle_edit(key, start, end_, expected, text, doc)
     for i, l in ipairs(old) do
       shown[i] = (l:gsub("\r$", ""))
     end
-    if table.concat(shown, "\n") ~= (expected:gsub("\r\n", "\n")) then
-      refuse("the lines changed in the buffer")
+    -- The browser's `expected` has no "\r\n"; a CRLF block it read from a buffer
+    -- loaded as unix can still end in a lone "\r" on its last line.
+    local want = expected:gsub("\r\n", "\n"):gsub("\r$", "")
+    if table.concat(shown, "\n") ~= want then
+      refuse(key, buf, what, "the lines changed in the buffer")
       return
     end
 
@@ -704,12 +816,12 @@ local function handle_edit(key, start, end_, expected, text, doc)
 
     local ok, err = pcall(vim.api.nvim_buf_set_lines, buf, start - 1, end_, false, lines)
     if not ok then
-      refuse(tostring(err))
+      refuse(key, buf, what, tostring(err))
       return
     end
     -- Neovim fires TextChanged for a change of the current buffer only; push
     -- explicitly so a buffer shown elsewhere is updated in the preview as well.
-    pcall(require("mdview.bindings.autocmds.live_push").push_buffer_changes, buf, { full = true })
+    push_result(buf, key)
   end)
 end
 
@@ -737,7 +849,7 @@ local function poll_edit()
       vim.schedule(function()
         for _, r in ipairs(arr) do
           if type(r) == "table" then
-            pcall(handle_edit, r.key, r.start, r["end"], r.expected, r.text, r.doc)
+            safe("edit", handle_edit, r.key, r.start, r["end"], r.expected, r.text, r.doc)
           end
         end
       end)
@@ -812,6 +924,9 @@ function M.stop()
   toggle_inflight = false
   field_inflight = false
   edit_inflight = false
+  -- Changes still waiting for the user to stop typing belong to the session that
+  -- ended: their closures see the queue is gone and do nothing.
+  queues = {}
 end
 
 -- Exposed for headless tests.

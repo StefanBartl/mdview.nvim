@@ -87,7 +87,7 @@ M._cancel_pending = cancel_pending -- exposed for teardown (bindings/autocmds/in
 -- ws_client.send_content. Pass { full = true } to force a full snapshot (e.g.
 -- on save or when seeding a freshly opened tab).
 ---@param bufnr integer
----@param opts { full?: boolean, reason?: string }|nil # reason: "edit"|"save"|"switch"|"enable"|"refresh" (for the display transform)
+---@param opts { full?: boolean, reason?: string, room?: string }|nil # room: push to this room instead of the current one; reason: "edit"|"save"|"switch"|"enable"|"refresh" (for the display transform)
 function M.push_buffer_changes(bufnr, opts)
   if not previewable.is(bufnr) then
     log.debug("skipping buffer, not previewable", nil, "livepush", true)
@@ -121,7 +121,9 @@ function M.push_buffer_changes(bufnr, opts)
   -- watching (the preview key) rather than this buffer's own path. For
   -- "new_tab"/"manual" — and whenever no tab has been opened yet — push to
   -- the buffer's own path, i.e. the original per-document room model.
-  local target = target_key.resolve(bufnr) or path
+  -- `opts.room`: bring a tab of another room up to date (a write-back request of
+  -- an older tab, see inbound_poll), instead of the room Neovim feeds now.
+  local target = opts and opts.room or target_key.resolve(bufnr) or path
 
   local first = true
   local full = opts and opts.full == true or nil
@@ -247,6 +249,29 @@ function M.attach(group)
     opts_b.group = group
   end
   autocmd.create("BufWritePost", on_write, opts_b)
+
+  -- :file / :saveas gives the shown buffer another name. The room remembers the
+  -- old path as the document on screen, which no buffer carries any more, so a
+  -- write-back would find none. Pushing the (current) buffer announces the new
+  -- path, as any push of a document does.
+  local function on_rename(args)
+    if args.buf ~= api.nvim_get_current_buf() then
+      return
+    end
+    ws_client.wait_ready(function(ok)
+      if ok and api.nvim_buf_is_valid(args.buf) then
+        M.push_buffer_changes(args.buf, { full = true, reason = "refresh" })
+      end
+    end)
+  end
+  local opts_c = {
+    pattern = defaults.ft_pattern,
+    desc = "[mdview] Announce a renamed document to the browser preview",
+  }
+  if group then
+    opts_c.group = group
+  end
+  autocmd.create("BufFilePost", on_rename, opts_c)
 end
 
 return M
