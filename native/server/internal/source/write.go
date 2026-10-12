@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"sync"
@@ -77,7 +78,12 @@ func writeThrough(target string, data, original []byte, perm os.FileMode) error 
 		// create rights) although the document itself is writable: write it in
 		// place. Not atomic — a reader may see it half written — but the same
 		// comparison with `original` still applies.
-		return writeInPlace(target, data, original)
+		// Only for a permission problem: a full disk or an exhausted handle
+		// table would fail the in-place write as well, and halfway through it.
+		if errors.Is(err, fs.ErrPermission) {
+			return writeInPlace(target, data, original)
+		}
+		return err
 	}
 	tmpName := tmp.Name()
 	cleanup := func() { _ = os.Remove(tmpName) }
@@ -170,7 +176,20 @@ func writeInPlace(target string, data, original []byte) error {
 	if err != nil {
 		return err
 	}
+	// O_TRUNC has already cut the file: if the write fails (disk full), put the
+	// old text back as well as possible rather than leave an empty document.
+	restore := func() {
+		_, _ = f.WriteAt(original, 0)
+		_ = f.Truncate(int64(len(original)))
+		_ = f.Sync()
+	}
 	if _, err := f.Write(data); err != nil {
+		restore()
+		_ = f.Close()
+		return err
+	}
+	if err := f.Sync(); err != nil {
+		restore()
 		_ = f.Close()
 		return err
 	}

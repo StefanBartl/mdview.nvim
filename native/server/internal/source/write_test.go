@@ -3,6 +3,7 @@ package source
 import (
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -271,7 +272,7 @@ func TestWriteThrough_GivesUpAfterTheLastRetry(t *testing.T) {
 func TestWriteThrough_FallsBackToWritingInPlace(t *testing.T) {
 	path := writeTemp(t, "- [ ] a\n- [ ] b\n")
 	old := createTemp
-	createTemp = func(string, string) (*os.File, error) { return nil, os.ErrPermission }
+	createTemp = func(string, string) (*os.File, error) { return nil, fs.ErrPermission }
 	defer func() { createTemp = old }()
 
 	if err := ToggleCheckbox(path, 2, true); err != nil {
@@ -289,5 +290,21 @@ func TestWriteThrough_FallsBackToWritingInPlace(t *testing.T) {
 	}
 	if got := read(t, path); got != external {
 		t.Fatalf("the other program's save was overwritten: %q", got)
+	}
+}
+
+// A full disk (or any createTemp error that is not a permission problem) must
+// not turn into a truncating in-place write.
+func TestWriteThrough_NoInPlaceFallbackForANonPermissionError(t *testing.T) {
+	path := writeTemp(t, "- [ ] a\n")
+	old := createTemp
+	createTemp = func(string, string) (*os.File, error) { return nil, errors.New("no space left on device") }
+	defer func() { createTemp = old }()
+
+	if err := ToggleCheckbox(path, 1, true); err == nil {
+		t.Fatal("expected the createTemp error")
+	}
+	if got, want := read(t, path), "- [ ] a\n"; got != want {
+		t.Fatalf("the document was touched: %q", got)
 	}
 }
