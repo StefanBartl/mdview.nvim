@@ -101,6 +101,12 @@ function M.resync(bufnr)
       -- so force a full snapshot rather than diffing against the previous
       -- buffer's content (which would be a large, pointless diff).
       ws_client.send_content(preview_key, lines, { full = first or nil })
+      -- Name the document now in the room: write-backs from the tab (checkbox,
+      -- text field, block edit) are applied to the buffer of THIS document, and
+      -- a tab that reloads has no other way to learn which one it is showing.
+      if first then
+        require("mdview.bindings.autocmds.live_push").announce_document(preview_key, path)
+      end
       -- The new buffer's own fence highlighting too, or the tab would keep
       -- painting the previous document's code blocks (browser.highlighter =
       -- "nvim"; a no-op under any other).

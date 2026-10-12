@@ -329,10 +329,13 @@ describe("reverse paths while the preview shows a transformed text", function()
     })
     vim.api.nvim_set_current_buf(buf)
     key = normalize.path(vim.api.nvim_buf_get_name(buf))
+    -- the room holds this document, as a push of it would have recorded
+    require("mdview.bindings.autocmds.live_push")._last_doc[key] = key
     config.defaults.browser.display_lang = "en"
   end)
   after_each(function()
     restore()
+    require("mdview.bindings.autocmds.live_push")._last_doc[key] = nil
     pcall(vim.api.nvim_buf_delete, buf, { force = true })
   end)
 

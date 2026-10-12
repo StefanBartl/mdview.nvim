@@ -24,11 +24,33 @@ vim.api.nvim_set_current_buf(buf)
 
 local KEY = assert(normalize.path(vim.api.nvim_buf_get_name(buf)), "the fixture buffer has a name")
 
+-- The room of the tab holds this document: what a push of it records (and what
+-- the write-back handlers trust, not the request). The transport is stubbed so
+-- the pushes a write-back triggers do not spawn real `curl` jobs.
+local live = require("mdview.bindings.autocmds.live_push")
+local ws = require("mdview.adapter.ws_client")
+local ws_orig = { content = ws.send_content, doc = ws.send_doc, control = ws.send_control }
+
 local function line(n)
   return vim.api.nvim_buf_get_lines(buf, n - 1, n, false)[1]
 end
 
 describe("inbound_poll._handle_toggle", function()
+  before_each(function()
+    live._last_doc[KEY] = KEY
+    ---@diagnostic disable-next-line: duplicate-set-field
+    ws.send_content = function() end
+    ---@diagnostic disable-next-line: duplicate-set-field
+    ws.send_doc = function() end
+    ---@diagnostic disable-next-line: duplicate-set-field
+    ws.send_control = function() end
+  end)
+
+  after_each(function()
+    live._last_doc[KEY] = nil
+    ws.send_content, ws.send_doc, ws.send_control = ws_orig.content, ws_orig.doc, ws_orig.control
+  end)
+
   it("checks an unchecked box on the given line", function()
     inbound._handle_toggle(KEY, 3, true)
     assert.are.equal("- [x] alpha", line(3))

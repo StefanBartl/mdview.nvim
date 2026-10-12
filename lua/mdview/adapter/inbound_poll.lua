@@ -147,26 +147,79 @@ local function buf_for_key(key)
 end
 
 -- The buffer a browser write-back (checkbox, text field, block edit) belongs
--- to: the one of the document the tab is showing (`doc`), `key` when the tab did
--- not say. `key` is the room of the tab; with `browser.behavior = "reuse"` that
--- is the path of the FIRST document for the whole session while the tab follows
--- the active buffer, so it only names the right buffer by accident.
+-- to: the one of the document Neovim last put into the room of the tab.
+--
+-- `key` is the room of the tab. With `browser.behavior = "reuse"` that is the
+-- path of the FIRST document for the whole session, while the tab follows the
+-- active buffer; so the room says nothing about which document is on screen.
+-- Neovim knows (it pushed it: `live_push.shown_document`, kept up to date by
+-- content pushes and buffer switches), and that is what is edited: not what the
+-- request claims, which a tab that reloaded does not know at all and a stale one
+-- gets wrong. A request that names a different document than the room holds is
+-- refused (the tab is behind); a room Neovim never pushed a document into is not
+-- a room of this session.
 --
 -- Only buffers mdview itself previews qualify: the token that reaches this
 -- module belongs to the relay, it is not a licence to rewrite any loaded buffer.
 ---@internal
----@param key string
----@param doc string|nil
----@return integer|nil
+---@param key string # the room of the tab
+---@param doc string|nil # the document the tab says it shows
+---@return integer|nil buf
+---@return string|nil reason # why there is none, in words for the person at the tab
 local function target_buffer(key, doc)
-  local buf = buf_for_key((type(doc) == "string" and doc ~= "") and doc or key)
+  local shown = require("mdview.bindings.autocmds.live_push").shown_document(key)
+  if not shown then
+    return nil, "the preview is not showing a document from this session"
+  end
+  if type(doc) == "string" and doc ~= "" and doc ~= shown then
+    return nil, "the document on screen changed"
+  end
+  local buf = buf_for_key(shown)
   if not buf or not vim.api.nvim_buf_is_loaded(buf) then
-    return nil
+    return nil, "the document is not loaded"
   end
   if not require("mdview.helper.previewable").is(buf) then
-    return nil
+    return nil, "the document is not one mdview previews"
   end
   return buf
+end
+
+-- Tell the person at the tab (room `key`) why a write-back was not applied.
+-- A no-op without a running session.
+---@internal
+---@param key string
+---@param message string
+---@return nil
+local function tell_tab(key, message)
+  pcall(require("mdview.adapter.control").send, { notice = "Not saved: " .. message }, key)
+end
+
+-- Run `fn` when the user is not typing in `buf`. A change made to the buffer
+-- while its owner is in Insert (or Replace) mode there is joined into the undo
+-- block of what they type, so one `u` would take back their words and the
+-- browser's edit together. Waits briefly (up to ~5 s), then applies anyway: a
+-- user who stays in insert mode must not hold the browser's edit forever.
+-- `fn` re-checks everything it relies on, as the buffer may have changed.
+---@internal
+---@param buf integer
+---@param fn fun()
+---@param tries integer|nil
+---@return nil
+local function when_not_inserting(buf, fn, tries)
+  tries = tries or 0
+  local mode = vim.api.nvim_get_mode().mode:sub(1, 1)
+  local typing = (mode == "i" or mode == "R") and vim.api.nvim_get_current_buf() == buf
+  if typing and tries < 20 then
+    vim.defer_fn(function()
+      if vim.api.nvim_buf_is_valid(buf) then
+        when_not_inserting(buf, fn, tries + 1)
+      end
+    end, 250)
+    return
+  end
+  if vim.api.nvim_buf_is_valid(buf) then
+    fn()
+  end
 end
 
 ---@internal
@@ -237,22 +290,24 @@ end
 
 -- ---- task-list checkbox toggle (browser -> nvim buffer) --------------------
 
--- Flip the GFM task-list checkbox on 1-based `line` of the buffer showing
--- `key` to `checked`, then push the change so the preview reflects it. Standalone
--- mode never reaches here (the relay edits the file itself); this is the
--- :MDView start path, where the buffer — possibly with unsaved edits — is the
--- source of truth the relay must not touch. A line that no longer holds a task
--- marker is left alone (a re-render can race a rapid edit).
+-- Flip the GFM task-list checkbox on 1-based `line` of the buffer showing the
+-- document of the tab to `checked`, then push the change so the preview
+-- reflects it. Standalone mode never reaches here (the relay edits the file
+-- itself); this is the :MDView start path, where the buffer — possibly with
+-- unsaved edits — is the source of truth the relay must not touch.
 --
--- `doc` is the document the tab is showing; the buffer is looked up by it (see
--- `target_buffer`), `key` being only the room of the tab.
+-- `expected` is the text of that line as the browser rendered it: another
+-- write-back that arrived first (a text field that gained lines, a block edit)
+-- may have moved the lines, and the tick must not land on the neighbour. A
+-- line that no longer holds a task marker is left alone as well.
 ---@internal
----@param key string
+---@param key string # the room of the tab
 ---@param line integer
 ---@param checked boolean
----@param doc string|nil
+---@param doc string|nil # the document the tab says it shows (see `target_buffer`)
+---@param expected string|nil
 ---@return nil
-local function handle_toggle(key, line, checked, doc)
+local function handle_toggle(key, line, checked, doc, expected)
   if type(key) ~= "string" or type(line) ~= "number" or line < 1 or line ~= math.floor(line) then
     return
   end
@@ -260,28 +315,40 @@ local function handle_toggle(key, line, checked, doc)
   if not buf then
     return
   end
-  if vim.bo[buf].modifiable ~= true then
-    notify("[mdview] preview checkbox dropped: the buffer is not modifiable", vim.log.levels.WARN)
-    return
-  end
-  if line > vim.api.nvim_buf_line_count(buf) then
-    return
-  end
-  local cur = vim.api.nvim_buf_get_lines(buf, line - 1, line, false)[1]
-  if not cur then
-    return
-  end
-  local pre, state, post = cur:match("^(%s*[-*+] %[)([ xX])(%].*)$")
-  if not pre then
-    return -- not a checkbox line; don't corrupt it
-  end
-  local want = checked and "x" or " "
-  if state == want then
-    return -- already in the requested state
-  end
-  vim.api.nvim_buf_set_lines(buf, line - 1, line, false, { pre .. want .. post })
-  -- nvim_buf_set_lines doesn't fire TextChanged, so push explicitly.
-  pcall(require("mdview.bindings.autocmds.live_push").push_buffer_changes, buf, { full = true })
+  when_not_inserting(buf, function()
+    if vim.bo[buf].modifiable ~= true then
+      notify("[mdview] preview checkbox dropped: the buffer is not modifiable", vim.log.levels.WARN)
+      return
+    end
+    if line > vim.api.nvim_buf_line_count(buf) then
+      return
+    end
+    local raw = vim.api.nvim_buf_get_lines(buf, line - 1, line, false)[1]
+    if not raw then
+      return
+    end
+    -- A buffer loaded with 'fileformat' unix from a CRLF file keeps a "\r".
+    local cur, cr = raw:gsub("\r$", "")
+    if type(expected) == "string" and expected ~= "" and cur ~= (expected:gsub("\r$", "")) then
+      return -- the lines moved since the render: not the checkbox that was ticked
+    end
+    local pre, state, post = cur:match("^(%s*[-*+] %[)([ xX])(%].*)$")
+    if not pre then
+      return -- not a checkbox line; don't corrupt it
+    end
+    local want = checked and "x" or " "
+    if state == want then
+      return -- already in the requested state
+    end
+    local ok =
+      pcall(vim.api.nvim_buf_set_lines, buf, line - 1, line, false, { pre .. want .. post .. (cr > 0 and "\r" or "") })
+    if not ok then
+      return
+    end
+    -- Neovim fires TextChanged for a change of the current buffer only; push
+    -- explicitly so a buffer shown elsewhere is updated in the preview as well.
+    pcall(require("mdview.bindings.autocmds.live_push").push_buffer_changes, buf, { full = true })
+  end)
 end
 
 ---@internal
@@ -308,7 +375,7 @@ local function poll_toggle()
       vim.schedule(function()
         for _, r in ipairs(arr) do
           if type(r) == "table" then
-            handle_toggle(r.key, r.line, r.checked, r.doc)
+            pcall(handle_toggle, r.key, r.line, r.checked, r.doc, r.expected)
           end
         end
       end)
@@ -354,9 +421,9 @@ end
 ---@internal
 ---@param buf integer
 ---@param new_text string
+---@param old string[] # the buffer's lines the text was derived from
 ---@return nil
-local function apply_buffer_text(buf, new_text)
-  local old = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
+local function apply_buffer_text(buf, new_text, old)
   local new = vim.split(new_text, "\n", { plain = true })
 
   local first = 1
@@ -406,43 +473,47 @@ local function handle_field(key, name, value, doc)
   if not buf then
     return
   end
-  if vim.bo[buf].modifiable ~= true then
-    notify("[mdview] preview edit dropped: the buffer is not modifiable", vim.log.levels.WARN)
-    return
-  end
-  local text = table.concat(vim.api.nvim_buf_get_lines(buf, 0, -1, false), "\n")
-  local q = vim.pesc(name)
-
-  -- textarea first (explicit close, unambiguous body). `.` in Lua patterns
-  -- matches newlines, so a multi-line body is handled.
-  local ta_open, ta_body_start = text:find('<textarea[^>]*name="' .. q .. '"[^>]*>')
-  if ta_open then
-    local close_start = text:find("</textarea>", ta_body_start + 1, true)
-    if close_start then
-      local new_text = text:sub(1, ta_body_start) .. escape_text(value) .. text:sub(close_start)
-      apply_buffer_text(buf, new_text)
+  when_not_inserting(buf, function()
+    if vim.bo[buf].modifiable ~= true then
+      notify("[mdview] preview edit dropped: the buffer is not modifiable", vim.log.levels.WARN)
       return
     end
-  end
+    local old_lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
+    local text = table.concat(old_lines, "\n")
+    local q = vim.pesc(name)
 
-  -- input: find the tag by name, then set/insert its value attribute.
-  local in_start, in_end = text:find('<input[^>]*name="' .. q .. '"[^>]*>')
-  if in_start then
-    local tag = text:sub(in_start, in_end)
-    local repl = 'value="' .. escape_attr(value) .. '"'
-    local new_tag
-    if tag:find('value="[^"]*"') then
-      new_tag = (tag:gsub('value="[^"]*"', function()
-        return repl
-      end, 1))
-    elseif tag:sub(-2) == "/>" then
-      new_tag = tag:sub(1, -3):gsub("%s+$", "") .. " " .. repl .. "/>"
-    else
-      new_tag = tag:sub(1, -2):gsub("%s+$", "") .. " " .. repl .. ">"
+    -- textarea first (explicit close, unambiguous body). `.` in Lua patterns
+    -- matches newlines, so a multi-line body is handled. `%s` before `name=`: a
+    -- boundary, so `data-name="x"` is not the field called `x`.
+    local ta_open, ta_body_start = text:find('<textarea[^>]*%sname="' .. q .. '"[^>]*>')
+    if ta_open then
+      local close_start = text:find("</textarea>", ta_body_start + 1, true)
+      if close_start then
+        local new_text = text:sub(1, ta_body_start) .. escape_text(value) .. text:sub(close_start)
+        apply_buffer_text(buf, new_text, old_lines)
+        return
+      end
     end
-    local new_text = text:sub(1, in_start - 1) .. new_tag .. text:sub(in_end + 1)
-    apply_buffer_text(buf, new_text)
-  end
+
+    -- input: find the tag by name, then set/insert its value attribute.
+    local in_start, in_end = text:find('<input[^>]*%sname="' .. q .. '"[^>]*>')
+    if in_start then
+      local tag = text:sub(in_start, in_end)
+      local repl = 'value="' .. escape_attr(value) .. '"'
+      local new_tag
+      if tag:find('value="[^"]*"') then
+        new_tag = (tag:gsub('value="[^"]*"', function()
+          return repl
+        end, 1))
+      elseif tag:sub(-2) == "/>" then
+        new_tag = tag:sub(1, -3):gsub("%s+$", "") .. " " .. repl .. "/>"
+      else
+        new_tag = tag:sub(1, -2):gsub("%s+$", "") .. " " .. repl .. ">"
+      end
+      local new_text = text:sub(1, in_start - 1) .. new_tag .. text:sub(in_end + 1)
+      apply_buffer_text(buf, new_text, old_lines)
+    end
+  end)
 end
 
 ---@internal
@@ -469,7 +540,7 @@ local function poll_field()
       vim.schedule(function()
         for _, r in ipairs(arr) do
           if type(r) == "table" then
-            handle_field(r.key, r.name, r.value, r.doc)
+            pcall(handle_field, r.key, r.name, r.value, r.doc)
           end
         end
       end)
@@ -493,27 +564,26 @@ local function is_line_number(n)
 end
 
 -- Replace the 1-based, inclusive buffer lines start..end_ of the buffer showing
--- `doc` (the document the tab is showing; `key` when the tab did not say) with
--- `text`, but only while those lines are still `expected`: the edit was made
--- against the text the preview was rendered from, and a buffer that moved on
--- since must not be overwritten by it. Standalone never reaches here (the relay
--- edits the file). Only the one range is replaced, so marks, folds and the rest
--- of the undo history stay put, and `u` takes the edit back as one step.
+-- the document of the tab (see `target_buffer`) with `text`, but only while
+-- those lines are still `expected`: the edit was made against the text the
+-- preview was rendered from, and a buffer that moved on since must not be
+-- overwritten by it. Standalone never reaches here (the relay edits the file).
+-- Only the one range is replaced, so marks, folds and the rest of the undo
+-- history stay put, and `u` takes the edit back as one step.
 --
--- `key` is the room of the tab. With `browser.behavior = "reuse"` that is the
--- first document's path for the whole session, while the tab follows the active
--- buffer: the buffer to edit is the one for `doc`, and `key` is only where the
--- answer goes.
+-- A buffer whose lines carry a "\r" (a CRLF file loaded with 'fileformat' unix)
+-- is compared without it, and the new lines get the ending of the lines they
+-- replace; the browser never sees the "\r".
 --
--- The token that reaches this function belongs to the relay, not to a licence
--- to rewrite any loaded buffer: only buffers mdview itself previews are edited.
+-- Every refusal is reported to the tab (`notice`), because to the person
+-- editing the block would otherwise just lose their text.
 ---@internal
----@param key string
+---@param key string # the room of the tab
 ---@param start integer
 ---@param end_ integer
 ---@param expected string
 ---@param text string
----@param doc string|nil
+---@param doc string|nil # the document the tab says it shows
 ---@return nil
 local function handle_edit(key, start, end_, expected, text, doc)
   if type(key) ~= "string" or type(expected) ~= "string" or type(text) ~= "string" then
@@ -522,55 +592,72 @@ local function handle_edit(key, start, end_, expected, text, doc)
   if not is_line_number(start) or not is_line_number(end_) or end_ < start then
     return
   end
-  -- Switched off since the edit was queued (`:MDView edit off`).
+  -- Switched off since the edit was queued (`:MDView edit off`): said so by the
+  -- command itself.
   if require("mdview.config").defaults.edit_blocks ~= true then
     return
   end
   -- The preview shows a transformed text (browser.transform / a display
   -- language): the lines it sent back belong to that text, not the buffer's.
   if require("mdview.core.display").active() then
-    require("mdview.core.display").note_field_ignored()
+    notify("[mdview] preview edit dropped: the preview shows a translation, not the buffer", vim.log.levels.INFO)
+    tell_tab(key, "the preview shows a translation, not the file")
     return
   end
-  local buf = target_buffer(key, doc)
+  local buf, why = target_buffer(key, doc)
   if not buf then
+    notify("[mdview] preview edit dropped: " .. tostring(why), vim.log.levels.WARN)
+    tell_tab(key, tostring(why))
     return
   end
 
-  -- Tell the person at the preview that the edit was not applied (the browser
-  -- would otherwise just show their text vanish), say so in Neovim too, and put
-  -- the buffer's real text back into the tab.
+  -- Say that the edit was not applied, and put the buffer's real text back
+  -- into the tab.
   local function refuse(message)
     notify("[mdview] preview edit dropped: " .. message, vim.log.levels.WARN)
-    pcall(require("mdview.adapter.control").send, { notice = "Not saved: " .. message }, key)
+    tell_tab(key, message)
     pcall(require("mdview.bindings.autocmds.live_push").push_buffer_changes, buf, { full = true })
   end
 
-  if vim.bo[buf].modifiable ~= true then
-    refuse("the buffer is not modifiable")
-    return
-  end
-  if end_ > vim.api.nvim_buf_line_count(buf) then
-    refuse("the lines changed in the buffer")
-    return
-  end
-  local function norm(s)
-    return (s:gsub("\r\n", "\n"))
-  end
-  local current = table.concat(vim.api.nvim_buf_get_lines(buf, start - 1, end_, false), "\n")
-  if current ~= norm(expected) then
-    refuse("the lines changed in the buffer")
-    return
-  end
+  when_not_inserting(buf, function()
+    if vim.bo[buf].modifiable ~= true then
+      refuse("the buffer is not modifiable")
+      return
+    end
+    if end_ > vim.api.nvim_buf_line_count(buf) then
+      refuse("the lines changed in the buffer")
+      return
+    end
 
-  local lines = vim.split(norm(text), "\n", { plain = true })
-  local ok, err = pcall(vim.api.nvim_buf_set_lines, buf, start - 1, end_, false, lines)
-  if not ok then
-    refuse(tostring(err))
-    return
-  end
-  -- nvim_buf_set_lines doesn't fire TextChanged, so push explicitly.
-  pcall(require("mdview.bindings.autocmds.live_push").push_buffer_changes, buf, { full = true })
+    local old = vim.api.nvim_buf_get_lines(buf, start - 1, end_, false)
+    local shown = {}
+    for i, l in ipairs(old) do
+      shown[i] = (l:gsub("\r$", ""))
+    end
+    if table.concat(shown, "\n") ~= (expected:gsub("\r\n", "\n")) then
+      refuse("the lines changed in the buffer")
+      return
+    end
+
+    local lines = vim.split((text:gsub("\r\n", "\n")), "\n", { plain = true })
+    if old[1]:sub(-1) == "\r" then
+      local last_cr = old[#old]:sub(-1) == "\r"
+      for i = 1, #lines do
+        if i < #lines or last_cr then
+          lines[i] = lines[i] .. "\r"
+        end
+      end
+    end
+
+    local ok, err = pcall(vim.api.nvim_buf_set_lines, buf, start - 1, end_, false, lines)
+    if not ok then
+      refuse(tostring(err))
+      return
+    end
+    -- Neovim fires TextChanged for a change of the current buffer only; push
+    -- explicitly so a buffer shown elsewhere is updated in the preview as well.
+    pcall(require("mdview.bindings.autocmds.live_push").push_buffer_changes, buf, { full = true })
+  end)
 end
 
 ---@internal
@@ -597,7 +684,7 @@ local function poll_edit()
       vim.schedule(function()
         for _, r in ipairs(arr) do
           if type(r) == "table" then
-            handle_edit(r.key, r.start, r["end"], r.expected, r.text, r.doc)
+            pcall(handle_edit, r.key, r.start, r["end"], r.expected, r.text, r.doc)
           end
         end
       end)
@@ -671,6 +758,7 @@ function M.stop()
   scroll_inflight = false
   toggle_inflight = false
   field_inflight = false
+  edit_inflight = false
 end
 
 -- Exposed for headless tests.

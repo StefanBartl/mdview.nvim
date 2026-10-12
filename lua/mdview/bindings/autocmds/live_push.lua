@@ -26,6 +26,28 @@ local M = {}
 ---@type table<string, string>
 M._last_doc = {}
 
+--- The document Neovim last put into `room`: what the tab of that room shows.
+--- `nil` for a room it never pushed a document into.
+---@param room string
+---@return string|nil
+function M.shown_document(room)
+  return M._last_doc[room]
+end
+
+--- Record (and announce to the tab) that `path` is the document now shown in
+--- `room`. Called for every push of a document into a room: the content push of
+--- an edit or a save, and the content push of a buffer switch. A no-op when it
+--- already is that document.
+---@param room string
+---@param path string # normalized document path
+---@return nil
+function M.announce_document(room, path)
+  if M._last_doc[room] ~= path then
+    M._last_doc[room] = path
+    ws_client.send_doc(room, path)
+  end
+end
+
 ---@internal
 ---@return integer
 local function now_ms()
@@ -130,10 +152,7 @@ function M.push_buffer_changes(bufnr, opts)
       -- (initial push, or a buffer switch in "reuse" mode) — powers browser
       -- Back/Forward. Keyed by target room so it fires once per new document,
       -- not per keystroke.
-      if M._last_doc[target] ~= path then
-        M._last_doc[target] = path
-        ws_client.send_doc(target, path)
-      end
+      M.announce_document(target, path)
     end
     if final then
       log.debug("content push sent (target=" .. target .. ") and session stored for " .. path, nil, "livepush", true)
