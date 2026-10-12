@@ -62,9 +62,16 @@ export interface BlockEdit extends LineRange {
   text: string;
 }
 
-/** The lines of a document, with CRLF read as one line break. */
+/**
+ * The lines of a document, with CRLF read as one line break. A CR that ends the
+ * text (a CRLF file Neovim loaded as `unix` has one on every line, and the push
+ * joins the lines without a final newline) is not part of the last line.
+ */
 export function splitLines(text: string): string[] {
-  return text.replace(/\r\n/g, '\n').split('\n');
+  const lines = text.replace(/\r\n/g, '\n').split('\n');
+  const last = lines.length - 1;
+  if (lines[last].endsWith('\r')) lines[last] = lines[last].slice(0, -1);
+  return lines;
 }
 
 /**
@@ -72,10 +79,11 @@ export function splitLines(text: string): string[] {
  * such a CR as a line ending, the relay and Neovim split lines on LF only: the
  * line numbers of the rendered blocks then no longer point at the same lines of
  * the source, and an edit would rewrite the wrong ones. Such a document is not
- * edited from the preview.
+ * edited from the preview. A CR that ends the text moves nothing (it opens no
+ * further line) and is fine: that is how a CRLF file loaded as `unix` ends.
  */
 export function hasBareCr(text: string): boolean {
-  return /\r(?!\n)/.test(text);
+  return /\r(?!\n|$)/.test(text);
 }
 
 /** Said when a document with bare CRs is clicked or ticked (see `hasBareCr`). */
