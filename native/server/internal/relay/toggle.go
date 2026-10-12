@@ -10,6 +10,7 @@ import "sync"
 // unsaved changes the relay must not clobber).
 type ToggleRequest struct {
 	Key     string `json:"key"`
+	Doc     string `json:"doc,omitempty"`
 	Line    int    `json:"line"`
 	Checked bool   `json:"checked"`
 }

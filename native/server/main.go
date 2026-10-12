@@ -753,6 +753,10 @@ func handleNav(queue *relay.NavQueue, token string) http.HandlerFunc {
 
 const maxToggleBodyBytes = 32 // "<line>:<0|1>"
 
+// maxDocLen bounds the `doc` a write-back names (the path of the document the
+// tab is showing): it ends up in a queue Neovim drains, and no real path is longer.
+const maxDocLen = 4096
+
 // handleToggle is the browser->source bridge for GFM task-list checkboxes. On
 // POST the browser sends "<line>:<0|1>" for a room — the 1-based source line of
 // the ticked checkbox and its new state. How it's applied depends on who owns
@@ -793,6 +797,11 @@ func handleToggle(queue *relay.ToggleQueue, watchKey, watchPath, token string) h
 				http.Error(w, "invalid toggle payload", http.StatusBadRequest)
 				return
 			}
+			doc := r.URL.Query().Get("doc")
+			if len(doc) > maxDocLen {
+				http.Error(w, "doc too long", http.StatusBadRequest)
+				return
+			}
 
 			if watchKey != "" && key == watchKey {
 				// Standalone: apply straight to the watched file.
@@ -803,7 +812,7 @@ func handleToggle(queue *relay.ToggleQueue, watchKey, watchPath, token string) h
 				}
 			} else {
 				// Neovim-driven: hand it off for Neovim to apply to its buffer.
-				queue.Push(relay.ToggleRequest{Key: key, Line: line, Checked: checked})
+				queue.Push(relay.ToggleRequest{Key: key, Doc: doc, Line: line, Checked: checked})
 			}
 			w.WriteHeader(http.StatusNoContent)
 		default:
@@ -870,6 +879,11 @@ func handleField(queue *relay.FieldQueue, watchKey, watchPath, token string) htt
 				http.Error(w, "invalid field payload", http.StatusBadRequest)
 				return
 			}
+			doc := r.URL.Query().Get("doc")
+			if len(doc) > maxDocLen {
+				http.Error(w, "doc too long", http.StatusBadRequest)
+				return
+			}
 
 			if watchKey != "" && key == watchKey {
 				if err := source.SetFieldValue(watchPath, req.Name, req.Value); err != nil {
@@ -878,7 +892,7 @@ func handleField(queue *relay.FieldQueue, watchKey, watchPath, token string) htt
 					return
 				}
 			} else {
-				queue.Push(relay.FieldRequest{Key: key, Name: req.Name, Value: req.Value})
+				queue.Push(relay.FieldRequest{Key: key, Doc: doc, Name: req.Name, Value: req.Value})
 			}
 			w.WriteHeader(http.StatusNoContent)
 		default:
@@ -890,7 +904,8 @@ func handleField(queue *relay.FieldQueue, watchKey, watchPath, token string) htt
 const maxEditBodyBytes = 256 << 10 // a block's lines, before and after; generous for a long code block
 
 // handleEdit is the browser->source bridge for block editing. On POST the
-// browser sends JSON {start, end, expected, text}: replace the 1-based source
+// browser sends JSON {start, end, expected, text} (and names the document it is
+// showing in the `doc` query parameter): replace the 1-based source
 // lines start..end, which it rendered as `expected`, with `text`. Standalone
 // applies it to the watched file in place (refused with 409 when the lines are
 // no longer `expected`, and with 403 unless the relay was started with --edit:
@@ -923,7 +938,6 @@ func handleEdit(queue *relay.EditQueue, watchKey, watchPath, token string, stand
 				return
 			}
 			var req struct {
-				Doc      string `json:"doc"`
 				Start    int    `json:"start"`
 				End      int    `json:"end"`
 				Expected string `json:"expected"`
@@ -931,6 +945,11 @@ func handleEdit(queue *relay.EditQueue, watchKey, watchPath, token string, stand
 			}
 			if err := json.Unmarshal(body, &req); err != nil || req.Start < 1 || req.End < req.Start {
 				http.Error(w, "invalid edit payload", http.StatusBadRequest)
+				return
+			}
+			doc := r.URL.Query().Get("doc")
+			if len(doc) > maxDocLen {
+				http.Error(w, "doc too long", http.StatusBadRequest)
 				return
 			}
 
@@ -950,7 +969,7 @@ func handleEdit(queue *relay.EditQueue, watchKey, watchPath, token string, stand
 					return
 				}
 			} else {
-				queue.Push(relay.EditRequest{Key: key, Doc: req.Doc, Start: req.Start, End: req.End, Expected: req.Expected, Text: req.Text})
+				queue.Push(relay.EditRequest{Key: key, Doc: doc, Start: req.Start, End: req.End, Expected: req.Expected, Text: req.Text})
 			}
 			w.WriteHeader(http.StatusNoContent)
 		default:

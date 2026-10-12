@@ -8,6 +8,7 @@ import "sync"
 // checkbox toggle it's carried as-is rather than encoded into a compact string.
 type FieldRequest struct {
 	Key   string `json:"key"`
+	Doc   string `json:"doc,omitempty"`
 	Name  string `json:"name"`
 	Value string `json:"value"`
 }

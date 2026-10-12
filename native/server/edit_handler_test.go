@@ -15,7 +15,15 @@ import (
 
 func editPost(t *testing.T, h http.HandlerFunc, key, token, body string) *httptest.ResponseRecorder {
 	t.Helper()
+	return editPostDoc(t, h, key, "", token, body)
+}
+
+func editPostDoc(t *testing.T, h http.HandlerFunc, key, doc, token, body string) *httptest.ResponseRecorder {
+	t.Helper()
 	target := "/edit?token=" + url.QueryEscape(token) + "&key=" + url.QueryEscape(key)
+	if doc != "" {
+		target += "&doc=" + url.QueryEscape(doc)
+	}
 	req := httptest.NewRequest(http.MethodPost, target, strings.NewReader(body))
 	rec := httptest.NewRecorder()
 	h(rec, req)
@@ -130,8 +138,7 @@ func TestHandleEdit_NeovimModeCarriesTheDocument(t *testing.T) {
 	h := handleEdit(queue, "", "", testToken, false)
 
 	// the tab's room is "room.md" but it is showing "other.md" (reuse behavior)
-	body := `{"doc":"/notes/other.md","start":2,"end":2,"expected":"old","text":"new"}`
-	if rec := editPost(t, h, "room.md", testToken, body); rec.Code != http.StatusNoContent {
+	if rec := editPostDoc(t, h, "room.md", "/notes/other.md", testToken, editBody); rec.Code != http.StatusNoContent {
 		t.Fatalf("status = %d, want 204", rec.Code)
 	}
 	got := queue.Drain()
