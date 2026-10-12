@@ -170,3 +170,24 @@ func TestReplaceLines_ConcurrentEditsOfDifferentLinesAreAllKept(t *testing.T) {
 		}
 	}
 }
+
+// A hard link is not a symlink: the file is replaced by a rename, so the edited
+// name gets the new content and the other name keeps the old one (the link is
+// split). This pins that documented limitation (docs/PREVIEW.md, "Editing
+// blocks") so a change in it is a decision, not an accident.
+func TestReplaceLines_SplitsAHardLink(t *testing.T) {
+	path := writeTemp(t, "a\nb\nc\n")
+	other := path + ".link"
+	if err := os.Link(path, other); err != nil {
+		t.Skipf("hard links not available here: %v", err)
+	}
+	if err := ReplaceLines(path, 2, 2, "b", "B"); err != nil {
+		t.Fatal(err)
+	}
+	if got, want := read(t, path), "a\nB\nc\n"; got != want {
+		t.Fatalf("edited name: got %q want %q", got, want)
+	}
+	if got, want := read(t, other), "a\nb\nc\n"; got != want {
+		t.Fatalf("other name keeps the old text: got %q want %q", got, want)
+	}
+}

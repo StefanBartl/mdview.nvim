@@ -440,7 +440,10 @@ note ("Not saved: …") and Neovim warns, instead of one side overwriting the ot
   program is retried for a few tens of milliseconds, comparing the file again each
   time). In a folder that takes no new file it is rewritten in place instead, after
   the same comparison but not atomically. A symbolic link stays a link: the
-  file it points at is rewritten. The relay refuses an edit (403) unless it was
+  file it points at is rewritten. A **hard link** is not preserved: the rename
+  gives the edited name a new file, so another name linked to the old one keeps the
+  old text, and owner and ACL entries of the old file are not carried over (the
+  permission bits are). The relay refuses an edit (403) unless it was
   started with `--edit`, and one that finds the file changed on disk (409).
 - Changes from the preview reach a buffer **in the order they were made** (one queue per
   buffer), and any that cannot be applied -- the lines moved, the line is no longer a
@@ -454,6 +457,15 @@ note ("Not saved: …") and Neovim warns, instead of one side overwriting the ot
   blocks (the click is their reveal), a display language / `browser.transform`
   preview (the lines it shows are not the buffer's), and links, checkboxes and
   form fields, which keep their own job.
+- Also not editable (nor can its checkboxes be ticked): a document with a lone CR
+  line ending (a `\r` that is no part of a CRLF). The renderer counts it as a line
+  break, the relay and Neovim do not, so the block line numbers would name other
+  source lines. The click says so; edit such a file in Neovim.
+- `:MDView edit on|off` is remembered by the tab across a reload (per tab and
+  session, in `sessionStorage`); a new session starts from `edit_blocks` again.
+- A tab that follows the active buffer (`reuse`) renders by the document on screen,
+  not by the first one: switching from Markdown to a code file and back changes the
+  renderer with the ping that names the document.
 - Inside the field Tab indents (nested lists, code); Shift+Tab, Ctrl/Cmd+Enter or a click
   elsewhere leave it and commit. The field grows with its content.
 - A checkbox or text field the relay refuses to save is put back (checkbox) and the
