@@ -483,6 +483,7 @@ async function boot() {
   // Decided per render from the document on screen (see shownPath), not from the
   // room's key: under browser.behavior = "reuse" the key stays the first document.
   let renderedAsMarkdown: boolean | null = null;
+  let renderedPath: string | null = null;
 
   // Render the current document into the preview container: through the WASM
   // module for Markdown (output already sanitized inside WASM — safe to
@@ -494,6 +495,7 @@ async function boot() {
     const docIsMarkdown = isMarkdownPath(docPath);
     try {
       renderedAsMarkdown = docIsMarkdown;
+      renderedPath = docPath;
       if (docIsMarkdown) {
         // Rendered first: if the renderer throws, the DOM is untouched and
         // `lastText` still names the text that DOM was rendered from.
@@ -704,7 +706,7 @@ async function boot() {
       onDocChange(announced);
       // The content of a buffer switch came before this ping, so it was rendered
       // as the previous document: do it again when the kind of document differs.
-      if (container && needsRerenderAfterDocChange(renderedAsMarkdown, announced)) {
+      if (container && needsRerenderAfterDocChange(renderedAsMarkdown, renderedPath, announced)) {
         renderDocument(currentText());
       }
       // A selection addresses lines of the document it was made in; carrying

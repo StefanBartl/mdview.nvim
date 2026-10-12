@@ -5,18 +5,25 @@
 
 import { describe, it, expect, vi } from 'vitest';
 
+const hooks = vi.hoisted(() => ({ onLoad: undefined as (() => void) | undefined }));
+
 vi.mock('shiki/engine/javascript', () => ({ createJavaScriptRegexEngine: () => ({}) }));
 vi.mock('shiki', () => {
   const hl = {
     getLoadedThemes: () => ['github-dark'],
     getLoadedLanguages: () => ['js'],
     loadTheme: async () => undefined,
-    loadLanguage: async () => undefined,
+    // Awaited for a language that is not loaded yet: the point at which an editor
+    // can open on the block while the highlighter is busy.
+    loadLanguage: async () => {
+      await Promise.resolve();
+      hooks.onLoad?.();
+    },
     codeToHtml: (code: string) => `<pre class="shiki"><code>HL:${code}</code></pre>`,
   };
   return {
     createHighlighter: async () => hl,
-    bundledLanguages: { js: {} },
+    bundledLanguages: { js: {}, py: {} },
     bundledThemes: { 'github-dark': {} },
   };
 });
@@ -51,5 +58,22 @@ describe('highlightAll (shiki)', () => {
     expect(pres[0].classList.contains('shiki')).toBe(false);
     expect(pres[0].textContent).toBe('a()');
     expect(pres[1].classList.contains('shiki')).toBe(true);
+  });
+
+  it('leaves a block alone that the editor hides while its language loads', async () => {
+    const root = setup('<pre data-sourcepos="1:1-3:3"><code class="language-py">a()</code></pre>');
+    const pre = root.querySelector('pre')!;
+    hooks.onLoad = () => {
+      pre.style.display = 'none';
+    };
+    try {
+      await highlightAll(root);
+    } finally {
+      hooks.onLoad = undefined;
+    }
+    const pres = root.querySelectorAll('pre');
+    expect(pres).toHaveLength(1);
+    expect(pres[0].classList.contains('shiki')).toBe(false);
+    expect(pres[0].textContent).toBe('a()');
   });
 });

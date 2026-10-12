@@ -458,14 +458,18 @@ note ("Not saved: …") and Neovim warns, instead of one side overwriting the ot
   preview (the lines it shows are not the buffer's), and links, checkboxes and
   form fields, which keep their own job.
 - Also not editable (nor can its checkboxes be ticked): a document with a lone CR
-  line ending (a `\r` that is no part of a CRLF). The renderer counts it as a line
-  break, the relay and Neovim do not, so the block line numbers would name other
-  source lines. The click says so; edit such a file in Neovim.
+  line ending (a `\r` in the middle of the text that is no part of a CRLF). The
+  renderer counts it as a line break, the relay and Neovim do not, so the block line
+  numbers would name other source lines. The click says so; edit such a file in
+  Neovim. A CR that ends the text is fine: a CRLF file loaded with `fileformat=unix`
+  ends that way.
 - `:MDView edit on|off` is remembered by the tab across a reload (per tab and
   session, in `sessionStorage`); a new session starts from `edit_blocks` again.
 - A tab that follows the active buffer (`reuse`) renders by the document on screen,
   not by the first one: switching from Markdown to a code file and back changes the
-  renderer with the ping that names the document.
+  renderer with the ping that names the document. The relay keeps the latest such
+  ping per room and replays it to a tab that joins later, so a reloaded tab knows its
+  document too.
 - Inside the field Tab indents (nested lists, code); Shift+Tab, Ctrl/Cmd+Enter or a click
   elsewhere leave it and commit. The field grows with its content.
 - A checkbox or text field the relay refuses to save is put back (checkbox) and the

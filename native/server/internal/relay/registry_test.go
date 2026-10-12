@@ -344,6 +344,55 @@ func TestRegistry_JoinAndSeedDeliversContentSpansThenSpotlight(t *testing.T) {
 	}
 }
 
+// A tab that follows the active buffer renders by the document's name, and the
+// name is sent once per buffer switch: a tab that reloads must be told it again,
+// right after the content it belongs to and before the highlights.
+func TestRegistry_JoinAndSeedReplaysTheLatestDocBetweenContentAndSpans(t *testing.T) {
+	r := NewRegistry()
+	r.Broadcast("/doc/a.md", []byte("content"))
+	r.BroadcastDoc("/doc/a.md", []byte("doc:/x/old.py"))
+	r.BroadcastDoc("/doc/a.md", []byte("doc:/x/b.py"))
+	r.BroadcastSpans("/doc/a.md", []byte("spans"))
+
+	c := &fakeConn{}
+	if err := r.JoinAndSeed("/doc/a.md", c); err != nil {
+		t.Fatalf("JoinAndSeed: %v", err)
+	}
+	want := []string{"content", "doc:/x/b.py", "spans"}
+	if len(c.received) != len(want) {
+		t.Fatalf("expected %q, got %q", want, c.received)
+	}
+	for i, w := range want {
+		if string(c.received[i]) != w {
+			t.Fatalf("seed %d: expected %q, got %q", i, w, c.received[i])
+		}
+	}
+}
+
+func TestRegistry_BroadcastDocReachesTheRoomAndNoOtherOne(t *testing.T) {
+	r := NewRegistry()
+	a := &fakeConn{}
+	b := &fakeConn{}
+	r.Join("/doc/a.md", a)
+	r.Join("/doc/b.md", b)
+
+	r.BroadcastDoc("/doc/a.md", []byte("doc:/x/a.md"))
+
+	if len(a.received) != 1 || string(a.received[0]) != "doc:/x/a.md" {
+		t.Fatalf("expected the room to receive the doc ping, got %q", a.received)
+	}
+	if len(b.received) != 0 {
+		t.Fatalf("expected the other room to receive nothing, got %q", b.received)
+	}
+	// It is not the room's content: LastPayload stays empty.
+	if _, ok := r.LastPayload("/doc/a.md"); ok {
+		t.Fatalf("a doc ping must not become the room's content")
+	}
+	if _, ok := r.LastPayload("/doc/b.md"); ok {
+		t.Fatalf("no content was broadcast to the other room")
+	}
+}
+
 func TestRegistry_JoinAndSeedSendsNothingWhenThereIsNoState(t *testing.T) {
 	r := NewRegistry()
 	c := &fakeConn{}
