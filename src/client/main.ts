@@ -10,7 +10,7 @@
 
 import { createTransport } from './transport/transportFactory';
 import { DiffDoc, isEnvelope } from './render/diffDoc';
-import { isMarkdownPath } from './render/fileKind';
+import { isMarkdownPath, needsRerenderAfterDocChange, shownPath } from './render/fileKind';
 import { renderPlainText } from './render/plainText';
 import { installClickNav } from './render/clickNav';
 import { pickScrollTarget, fractionInBlock, hasSourcepos } from './render/scrollSync';
@@ -42,6 +42,7 @@ import {
   dispatchOverlayControl,
 } from './render/overlays';
 import { currentDocument, installHistory, onDocChange } from './render/history';
+import { readEditState, writeEditState } from './render/editState';
 import { createRenderGate } from './render/renderGate';
 import { createScrollFollower, parseCursorFields } from './render/scrollFollow';
 import { parseControl } from './render/controlMessage';
@@ -358,7 +359,7 @@ async function boot() {
   // source (standalone) or has Neovim edit its buffer (start mode). `expected`
   // makes a stale edit fail instead of overwriting newer text. Renders are held
   // back while an editor is open (see renderDocument) and flushed on close.
-  let editEnabled = params.get('edit') === '1';
+  let editEnabled = readEditState(token ?? '', key ?? '') ?? params.get('edit') === '1';
   // The newest text there is: the one held back behind an open editor, else the
   // one on screen. A re-render that is not caused by a push (a control update)
   // must start from this, or it would put the older text back.
@@ -489,7 +490,9 @@ async function boot() {
   // Whether the previewed document is Markdown (WASM comrak+ammonia render)
   // or any other text file (syntax-highlighted read-only code view, only
   // ever reachable when the Lua side's any_file pushed one).
-  const docIsMarkdown = isMarkdownPath(key);
+  // Decided per render from the document on screen (see shownPath), not from the
+  // room's key: under browser.behavior = "reuse" the key stays the first document.
+  let renderedAsMarkdown: boolean | null = null;
 
   // Render the current document into the preview container: through the WASM
   // module for Markdown (output already sanitized inside WASM — safe to
@@ -497,7 +500,10 @@ async function boot() {
   // else (built via DOM APIs, not innerHTML — see render/plainText.ts).
   const renderNow = (text: string): void => {
     if (!container) return;
+    const docPath = shownPath(currentDocument(), key);
+    const docIsMarkdown = isMarkdownPath(docPath);
     try {
+      renderedAsMarkdown = docIsMarkdown;
       if (docIsMarkdown) {
         // Rendered first: if the renderer throws, the DOM is untouched and
         // `lastText` still names the text that DOM was rendered from.
@@ -519,7 +525,7 @@ async function boot() {
         if (taskSyncEnabled) enableTaskCheckboxes(container);
       } else {
         lastText = text;
-        renderPlainText(container, text, key);
+        renderPlainText(container, text, docPath);
       }
       // Highlight fenced/plain code after the DOM is in place. Fire and
       // forget (the highlighter is async for Shiki) — it only adds/replaces
@@ -648,6 +654,7 @@ async function boot() {
       // `:MDView edit` switching block editing on/off for this session. Off
       // closes an open editor without sending its content.
       editEnabled = msg.editBlocks;
+      writeEditState(token ?? '', key ?? '', editEnabled);
       container.classList.toggle('mdview-edit', editEnabled);
       if (!editEnabled) blockEditor?.cancel();
     }
@@ -703,7 +710,13 @@ async function boot() {
     }
 
     if (rawMessage.startsWith(DOC_MESSAGE_PREFIX)) {
-      onDocChange(rawMessage.slice(DOC_MESSAGE_PREFIX.length));
+      const announced = rawMessage.slice(DOC_MESSAGE_PREFIX.length);
+      onDocChange(announced);
+      // The content of a buffer switch came before this ping, so it was rendered
+      // as the previous document: do it again when the kind of document differs.
+      if (container && needsRerenderAfterDocChange(renderedAsMarkdown, announced)) {
+        renderDocument(currentText());
+      }
       // A selection addresses lines of the document it was made in; carrying
       // it into the next one would highlight unrelated text.
       lastSelection = null;
