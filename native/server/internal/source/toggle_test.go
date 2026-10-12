@@ -106,3 +106,34 @@ func TestToggleCheckbox_RejectsInvalidLine(t *testing.T) {
 		t.Fatal("expected an error for line 0")
 	}
 }
+
+func TestToggleCheckboxIf_DoubleClickTickThenUntick(t *testing.T) {
+	// Both requests carry the text the browser rendered, "[ ]".
+	path := writeTemp(t, "- [ ] one\n")
+	if err := ToggleCheckboxIf(path, 1, true, "- [ ] one"); err != nil {
+		t.Fatal(err)
+	}
+	if err := ToggleCheckboxIf(path, 1, false, "- [ ] one"); err != nil {
+		t.Fatalf("the untick must not be stale: %v", err)
+	}
+	if got, want := read(t, path), "- [ ] one\n"; got != want {
+		t.Fatalf("got %q, want %q", got, want)
+	}
+}
+
+func TestToggleCheckboxIf_MarkerCaseIsNotAStaleLine(t *testing.T) {
+	path := writeTemp(t, "- [X] one\n")
+	if err := ToggleCheckboxIf(path, 1, false, "- [x] one"); err != nil {
+		t.Fatal(err)
+	}
+	if got, want := read(t, path), "- [ ] one\n"; got != want {
+		t.Fatalf("got %q, want %q", got, want)
+	}
+}
+
+func TestToggleCheckboxIf_DifferentTextIsStillStale(t *testing.T) {
+	path := writeTemp(t, "- [ ] two\n")
+	if err := ToggleCheckboxIf(path, 1, true, "- [ ] one"); err != ErrStale {
+		t.Fatalf("got %v, want ErrStale", err)
+	}
+}

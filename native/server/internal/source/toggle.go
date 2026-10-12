@@ -15,6 +15,21 @@ import (
 // trailing "\r".
 var taskMarker = regexp.MustCompile(`^(\s*[-*+] \[)([ xX])(\].*)$`)
 
+// sameTaskLine reports whether two lines are the same line apart from the state
+// of their task marker. The browser's `expected` was rendered before an earlier
+// tick of the same box (a double click sends tick, then untick, both against the
+// original text), so "[ ]", "[x]" and "[X]" must compare equal.
+func sameTaskLine(a, b string) bool {
+	return neutralMarker(a) == neutralMarker(b)
+}
+
+func neutralMarker(s string) string {
+	if m := taskMarker.FindStringSubmatch(s); m != nil {
+		return m[1] + " " + m[3]
+	}
+	return s
+}
+
 // ToggleCheckbox flips the task-list checkbox on 1-based line `line` of the file
 // at `path` to `checked`, writing the file back in place. It is a no-op (nil
 // error) when the line doesn't hold a task marker — a re-render can briefly race
@@ -53,7 +68,7 @@ func ToggleCheckboxIf(path string, line int, checked bool, expected string) erro
 	}
 
 	text := strings.TrimSuffix(lines[line-1], "\r")
-	if expected != "" && text != strings.TrimSuffix(expected, "\r") {
+	if expected != "" && !sameTaskLine(text, strings.TrimSuffix(expected, "\r")) {
 		return ErrStale
 	}
 
