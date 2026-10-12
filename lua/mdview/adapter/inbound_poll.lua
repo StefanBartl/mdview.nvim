@@ -146,6 +146,29 @@ local function buf_for_key(key)
   return nil
 end
 
+-- The buffer a browser write-back (checkbox, text field, block edit) belongs
+-- to: the one of the document the tab is showing (`doc`), `key` when the tab did
+-- not say. `key` is the room of the tab; with `browser.behavior = "reuse"` that
+-- is the path of the FIRST document for the whole session while the tab follows
+-- the active buffer, so it only names the right buffer by accident.
+--
+-- Only buffers mdview itself previews qualify: the token that reaches this
+-- module belongs to the relay, it is not a licence to rewrite any loaded buffer.
+---@internal
+---@param key string
+---@param doc string|nil
+---@return integer|nil
+local function target_buffer(key, doc)
+  local buf = buf_for_key((type(doc) == "string" and doc ~= "") and doc or key)
+  if not buf or not vim.api.nvim_buf_is_loaded(buf) then
+    return nil
+  end
+  if not require("mdview.helper.previewable").is(buf) then
+    return nil
+  end
+  return buf
+end
+
 ---@internal
 ---@param key string
 ---@param ratio number
@@ -220,17 +243,25 @@ end
 -- :MDView start path, where the buffer — possibly with unsaved edits — is the
 -- source of truth the relay must not touch. A line that no longer holds a task
 -- marker is left alone (a re-render can race a rapid edit).
+--
+-- `doc` is the document the tab is showing; the buffer is looked up by it (see
+-- `target_buffer`), `key` being only the room of the tab.
 ---@internal
 ---@param key string
 ---@param line integer
 ---@param checked boolean
+---@param doc string|nil
 ---@return nil
-local function handle_toggle(key, line, checked)
-  if type(key) ~= "string" or type(line) ~= "number" or line < 1 then
+local function handle_toggle(key, line, checked, doc)
+  if type(key) ~= "string" or type(line) ~= "number" or line < 1 or line ~= math.floor(line) then
     return
   end
-  local buf = buf_for_key(key)
-  if not buf or not vim.api.nvim_buf_is_loaded(buf) then
+  local buf = target_buffer(key, doc)
+  if not buf then
+    return
+  end
+  if vim.bo[buf].modifiable ~= true then
+    notify("[mdview] preview checkbox dropped: the buffer is not modifiable", vim.log.levels.WARN)
     return
   end
   if line > vim.api.nvim_buf_line_count(buf) then
@@ -277,7 +308,7 @@ local function poll_toggle()
       vim.schedule(function()
         for _, r in ipairs(arr) do
           if type(r) == "table" then
-            handle_toggle(r.key, r.line, r.checked)
+            handle_toggle(r.key, r.line, r.checked, r.doc)
           end
         end
       end)
@@ -313,16 +344,40 @@ do
   end
 end
 
--- Replace the whole buffer's text and push the result. Used for field edits,
+-- Make the buffer hold `new_text` and push the result. Used for field edits,
 -- which can change content across lines (a multi-line textarea body); a
 -- single-line set like handle_toggle's isn't enough.
+--
+-- Only the lines that differ are replaced: the lines before and after the change
+-- are left alone, so their marks, folds and extmarks survive (replacing the whole
+-- buffer moves every one of them to the top).
 ---@internal
 ---@param buf integer
 ---@param new_text string
 ---@return nil
 local function apply_buffer_text(buf, new_text)
-  local lines = vim.split(new_text, "\n", { plain = true })
-  vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
+  local old = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
+  local new = vim.split(new_text, "\n", { plain = true })
+
+  local first = 1
+  while first <= #old and first <= #new and old[first] == new[first] do
+    first = first + 1
+  end
+  local old_last, new_last = #old, #new
+  while old_last >= first and new_last >= first and old[old_last] == new[new_last] do
+    old_last = old_last - 1
+    new_last = new_last - 1
+  end
+  if first > old_last and first > new_last then
+    return -- nothing differs
+  end
+
+  local ok, err =
+    pcall(vim.api.nvim_buf_set_lines, buf, first - 1, old_last, false, vim.list_slice(new, first, new_last))
+  if not ok then
+    notify("[mdview] preview edit dropped: " .. tostring(err), vim.log.levels.WARN)
+    return
+  end
   pcall(require("mdview.bindings.autocmds.live_push").push_buffer_changes, buf, { full = true })
 end
 
@@ -333,8 +388,9 @@ end
 ---@param key string
 ---@param name string
 ---@param value string
+---@param doc string|nil # the document the tab is showing (see `target_buffer`)
 ---@return nil
-local function handle_field(key, name, value)
+local function handle_field(key, name, value, doc)
   if type(key) ~= "string" or type(name) ~= "string" or name == "" or type(value) ~= "string" then
     return
   end
@@ -346,8 +402,12 @@ local function handle_field(key, name, value)
     require("mdview.core.display").note_field_ignored()
     return
   end
-  local buf = buf_for_key(key)
-  if not buf or not vim.api.nvim_buf_is_loaded(buf) then
+  local buf = target_buffer(key, doc)
+  if not buf then
+    return
+  end
+  if vim.bo[buf].modifiable ~= true then
+    notify("[mdview] preview edit dropped: the buffer is not modifiable", vim.log.levels.WARN)
     return
   end
   local text = table.concat(vim.api.nvim_buf_get_lines(buf, 0, -1, false), "\n")
@@ -409,7 +469,7 @@ local function poll_field()
       vim.schedule(function()
         for _, r in ipairs(arr) do
           if type(r) == "table" then
-            handle_field(r.key, r.name, r.value)
+            handle_field(r.key, r.name, r.value, r.doc)
           end
         end
       end)
@@ -472,11 +532,8 @@ local function handle_edit(key, start, end_, expected, text, doc)
     require("mdview.core.display").note_field_ignored()
     return
   end
-  local buf = buf_for_key((type(doc) == "string" and doc ~= "") and doc or key)
-  if not buf or not vim.api.nvim_buf_is_loaded(buf) then
-    return
-  end
-  if not require("mdview.helper.previewable").is(buf) then
+  local buf = target_buffer(key, doc)
+  if not buf then
     return
   end
 

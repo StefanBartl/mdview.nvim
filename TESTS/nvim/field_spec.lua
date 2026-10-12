@@ -12,6 +12,7 @@ local normalize = require("mdview.helper.normalize")
 
 local buf = vim.api.nvim_create_buf(true, false)
 vim.api.nvim_buf_set_name(buf, "mdview_spec_field.md")
+vim.bo[buf].filetype = "markdown" -- only buffers mdview previews are written to
 vim.api.nvim_buf_set_lines(buf, 0, -1, false, {
   "# Form",
   "",
