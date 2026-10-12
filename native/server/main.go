@@ -10,6 +10,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -87,6 +88,7 @@ func main() {
 	watch := flag.String("watch", "", "standalone mode: watch this Markdown file for changes instead of waiting for Neovim to POST /update")
 	open := flag.Bool("open", true, "standalone mode only: open the preview in the default browser on start")
 	theme := flag.String("theme", "github", "standalone mode only: preview theme passed to the client")
+	editBlocks := flag.Bool("edit", false, "standalone mode only: let the preview edit blocks of the file in place (click a block, edit its source lines)")
 	highlighter := flag.String("hl", "hljs", "standalone mode only: code-fence highlighter passed to the client (hljs|shiki|none)")
 	flag.Parse()
 
@@ -126,6 +128,7 @@ func main() {
 	navQueue := relay.NewNavQueue()
 	toggleQueue := relay.NewToggleQueue()
 	fieldQueue := relay.NewFieldQueue()
+	editQueue := relay.NewEditQueue()
 	scrollBox := relay.NewScrollBox()
 
 	// In standalone mode the relay owns the file, so a checkbox toggle is
@@ -154,6 +157,7 @@ func main() {
 	mux.HandleFunc("/nav", handleNav(navQueue, *token))
 	mux.HandleFunc("/toggle", handleToggle(toggleQueue, watchKey, watchPath, *token))
 	mux.HandleFunc("/field", handleField(fieldQueue, watchKey, watchPath, *token))
+	mux.HandleFunc("/edit", handleEdit(editQueue, watchKey, watchPath, *token))
 	mux.HandleFunc("/scrollback", handleScrollback(scrollBox, *token))
 	mux.HandleFunc("/clientlog", handleClientLog(*token))
 	mux.HandleFunc("/ws", handleWS(registry, *token, port))
@@ -178,6 +182,9 @@ func main() {
 			url.QueryEscape(*theme),
 			url.QueryEscape(*highlighter),
 		)
+		if *editBlocks {
+			previewURL += "&edit=1"
+		}
 		fmt.Printf("watching: %s\n", watchPath)
 		fmt.Printf("preview: %s\n", previewURL)
 
@@ -872,6 +879,71 @@ func handleField(queue *relay.FieldQueue, watchKey, watchPath, token string) htt
 				}
 			} else {
 				queue.Push(relay.FieldRequest{Key: key, Name: req.Name, Value: req.Value})
+			}
+			w.WriteHeader(http.StatusNoContent)
+		default:
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	}
+}
+
+const maxEditBodyBytes = 256 << 10 // a block's lines, before and after; generous for a long code block
+
+// handleEdit is the browser->source bridge for block editing. On POST the
+// browser sends JSON {start, end, expected, text}: replace the 1-based source
+// lines start..end, which it rendered as `expected`, with `text`. Standalone
+// applies it to the watched file in place (refused with 409 when the lines are
+// no longer `expected`); Neovim-driven mode queues it for Neovim, which edits
+// its buffer under the same rule. Token-gated.
+func handleEdit(queue *relay.EditQueue, watchKey, watchPath, token string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if !relay.ValidToken(token, r.URL.Query().Get("token")) {
+			http.Error(w, "forbidden", http.StatusForbidden)
+			return
+		}
+		switch r.Method {
+		case http.MethodGet:
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(queue.Drain())
+		case http.MethodPost:
+			key := r.URL.Query().Get("key")
+			if key == "" {
+				http.Error(w, "missing key", http.StatusBadRequest)
+				return
+			}
+			body, err := io.ReadAll(io.LimitReader(r.Body, maxEditBodyBytes+1))
+			if err != nil {
+				http.Error(w, "failed to read body", http.StatusBadRequest)
+				return
+			}
+			if len(body) > maxEditBodyBytes {
+				http.Error(w, "edit too large", http.StatusRequestEntityTooLarge)
+				return
+			}
+			var req struct {
+				Start    int    `json:"start"`
+				End      int    `json:"end"`
+				Expected string `json:"expected"`
+				Text     string `json:"text"`
+			}
+			if err := json.Unmarshal(body, &req); err != nil || req.Start < 1 || req.End < req.Start {
+				http.Error(w, "invalid edit payload", http.StatusBadRequest)
+				return
+			}
+
+			if watchKey != "" && key == watchKey {
+				err := source.ReplaceLines(watchPath, req.Start, req.End, req.Expected, req.Text)
+				if errors.Is(err, source.ErrStale) {
+					http.Error(w, "lines changed", http.StatusConflict)
+					return
+				}
+				if err != nil {
+					fmt.Printf("[edit] %s lines %d-%d: %v\n", watchPath, req.Start, req.End, err)
+					http.Error(w, "edit failed", http.StatusInternalServerError)
+					return
+				}
+			} else {
+				queue.Push(relay.EditRequest{Key: key, Start: req.Start, End: req.End, Expected: req.Expected, Text: req.Text})
 			}
 			w.WriteHeader(http.StatusNoContent)
 		default:

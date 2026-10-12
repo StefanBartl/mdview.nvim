@@ -24,6 +24,7 @@ import { applyLangStatus, parseLangStatus } from './render/langStatus';
 import { createSpotlightMirror } from './render/spotlightMirror';
 import { enableTaskCheckboxes, installTaskToggle } from './render/taskToggle';
 import { installFieldSync } from './render/fieldSync';
+import { installBlockEdit, type BlockEdit, type BlockEditor } from './render/blockEdit';
 import {
   initOverlays,
   setOverlay,
@@ -326,6 +327,52 @@ async function boot() {
     });
   }
 
+  // Block editing (opt-in, ?edit=1 / :MDView edit): clicking a block swaps it
+  // for a field holding its source lines; a committed edit POSTs
+  // {start, end, expected, text} to /edit, which rewrites those lines in the
+  // source (standalone) or has Neovim edit its buffer (start mode). `expected`
+  // makes a stale edit fail instead of overwriting newer text. Renders are held
+  // back while an editor is open (see renderDocument) and flushed on close.
+  let editEnabled = params.get('edit') === '1';
+  let deferredText: string | null = null;
+  const toast = (message: string): void => {
+    if (!container) return;
+    const el = document.createElement('div');
+    el.className = 'mdview-toast';
+    el.textContent = message;
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), 4000);
+  };
+  const sendBlockEdit = (edit: BlockEdit): void => {
+    clientLog(`edit: lines ${edit.start}-${edit.end} (${edit.text.length} chars)`);
+    void fetch(`/edit?token=${encodeURIComponent(token)}&key=${encodeURIComponent(key)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(edit),
+    })
+      .then(res => {
+        if (res.status === 409) toast('Not saved: those lines changed in the source meanwhile.');
+        else if (!res.ok) toast('Not saved: the edit was refused.');
+      })
+      .catch(() => toast('Not saved: the preview server did not answer.'));
+  };
+  let blockEditor: BlockEditor | null = null;
+  if (container) {
+    container.classList.toggle('mdview-edit', editEnabled);
+    blockEditor = installBlockEdit(container, {
+      getText: () => lastText,
+      isEnabled: () => editEnabled,
+      send: sendBlockEdit,
+      onClose: () => {
+        if (deferredText !== null) {
+          const text = deferredText;
+          deferredText = null;
+          renderDocument(text);
+        }
+      },
+    });
+  }
+
   // Link hover previews — the browser counterpart to markdown.nvim's
   // in-editor hover. Installed once rather than per render: the listeners are
   // delegated on `container`, which survives the content swap inside
@@ -414,6 +461,13 @@ async function boot() {
   // else (built via DOM APIs, not innerHTML — see render/plainText.ts).
   const renderDocument = (text: string): void => {
     if (!container) return;
+    // An open block editor sits in the DOM this render would replace: hold the
+    // text back and render it when the editor closes. `lastText` stays the text
+    // the DOM was rendered from, which is what an edit's `expected` is cut from.
+    if (blockEditor?.isEditing()) {
+      deferredText = text;
+      return;
+    }
     lastText = text;
     try {
       if (docIsMarkdown) {
@@ -509,6 +563,7 @@ async function boot() {
       selection?: unknown;
       selectionSync?: unknown;
       displayLang?: unknown;
+      editBlocks?: unknown;
     };
     try {
       msg = JSON.parse(json) as typeof msg;
@@ -562,6 +617,13 @@ async function boot() {
       blankLinesEnabled = msg.blankLines;
       // Blocks are already in the DOM — just add/remove spacers, no re-render.
       applyBlankLineSpacing(container, blankLinesEnabled);
+    }
+    if (typeof msg.editBlocks === 'boolean' && container) {
+      // `:MDView edit` switching block editing on/off for this session. Off
+      // closes an open editor without sending its content.
+      editEnabled = msg.editBlocks;
+      container.classList.toggle('mdview-edit', editEnabled);
+      if (!editEnabled) blockEditor?.cancel();
     }
     if (typeof msg.selectionSync === 'boolean' && container) {
       // `:MDView selection` switching the mirror on/off for this session. The

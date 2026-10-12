@@ -689,3 +689,38 @@ body {
   max-height: 18rem;
   object-fit: contain;
 }
+
+/* Block editing (?edit=1 / :MDView edit): a hint that blocks are clickable to
+   edit, and the field that replaces a block while it is edited. */
+#mdview-root.mdview-edit :is(h1, h2, h3, h4, h5, h6, p, li, pre, table, blockquote):hover {
+  outline: 1px dashed color-mix(in srgb, currentColor 35%, transparent);
+  outline-offset: 2px;
+  cursor: text;
+}
+
+.mdview-block-editor {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0.4em 0;
+  padding: 0.4em 0.6em;
+  font: 0.95em/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  color: inherit;
+  background: color-mix(in srgb, currentColor 6%, transparent);
+  border: 1px solid color-mix(in srgb, currentColor 40%, transparent);
+  border-radius: 4px;
+  resize: vertical;
+}
+
+.mdview-toast {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  max-width: 24em;
+  padding: 0.6em 0.9em;
+  font: 0.9em/1.4 system-ui, sans-serif;
+  color: #fff;
+  background: #7a2e2e;
+  border-radius: 6px;
+  z-index: 10000;
+}
