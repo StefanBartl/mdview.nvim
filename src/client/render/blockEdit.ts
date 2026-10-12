@@ -96,6 +96,20 @@ export function sliceLines(text: string, range: LineRange): string | null {
   return lines.slice(range.start - 1, range.end).join('\n');
 }
 
+/**
+ * Drop trailing blank lines from `range`. A block's source position can run
+ * through the blank line that ends it (the last item of a list does); those
+ * lines are separators, not part of what is edited, and replacing them would
+ * make a missing trailing blank line eat the gap before the next block.
+ */
+export function trimBlankTail(text: string, range: LineRange): LineRange {
+  const lines = text.replace(/\r\n/g, '\n').split('\n');
+  let end = range.end;
+  // Lines past the end of the text are left for `sliceLines` to refuse.
+  while (end > range.start && end <= lines.length && lines[end - 1].trim() === '') end--;
+  return { start: range.start, end };
+}
+
 export interface BlockEditOptions {
   /** The document text the DOM was rendered from. */
   getText: () => string;
@@ -139,9 +153,11 @@ export function installBlockEdit(container: HTMLElement, opts: BlockEditOptions)
   };
 
   const open = (block: HTMLElement): void => {
-    const range = rangeOf(block);
-    if (!range) return;
-    const expected = sliceLines(opts.getText(), range);
+    const text = opts.getText();
+    const full = rangeOf(block);
+    if (!full) return;
+    const range = trimBlankTail(text, full);
+    const expected = sliceLines(text, range);
     if (expected === null) return;
 
     const oneLine = !expected.includes('\n');

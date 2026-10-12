@@ -11,6 +11,7 @@ import {
   parseSourcePos,
   rangeOf,
   sliceLines,
+  trimBlankTail,
 } from '../../src/client/render/blockEdit';
 
 const DOC = ['# Title', '', 'first line', 'second line', '', '- item one', '  - nested', '- item two'].join('\n');
@@ -62,6 +63,18 @@ describe('parseSourcePos / rangeOf / sliceLines', () => {
   it('slices lines inclusively and refuses a range past the end', () => {
     expect(sliceLines(DOC, { start: 3, end: 4 })).toBe('first line\nsecond line');
     expect(sliceLines(DOC, { start: 9, end: 9 })).toBeNull();
+  });
+});
+
+describe('trimBlankTail', () => {
+  it('drops the blank lines a block position runs through', () => {
+    expect(trimBlankTail('- a\n- b\n\nTail', { start: 2, end: 3 })).toEqual({ start: 2, end: 2 });
+    expect(trimBlankTail('a\n\n\nb', { start: 1, end: 3 })).toEqual({ start: 1, end: 1 });
+  });
+
+  it('keeps a range that ends on text and never goes below the start', () => {
+    expect(trimBlankTail('a\nb', { start: 1, end: 2 })).toEqual({ start: 1, end: 2 });
+    expect(trimBlankTail('\n\n', { start: 2, end: 3 })).toEqual({ start: 2, end: 2 });
   });
 });
 
