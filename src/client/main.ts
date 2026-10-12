@@ -24,7 +24,8 @@ import { applyLangStatus, parseLangStatus } from './render/langStatus';
 import { createSpotlightMirror } from './render/spotlightMirror';
 import { enableTaskCheckboxes, installTaskToggle } from './render/taskToggle';
 import { installFieldSync } from './render/fieldSync';
-import { installBlockEdit, type BlockEdit, type BlockEditor } from './render/blockEdit';
+import { installBlockEdit, splitLines, type BlockEdit, type BlockEditor } from './render/blockEdit';
+import { showToast } from './render/toast';
 import {
   initOverlays,
   setOverlay,
@@ -34,7 +35,7 @@ import {
   dispatchOverlayControl,
 } from './render/overlays';
 import { currentDocument, installHistory, onDocChange } from './render/history';
-import { writeBackUrl } from './render/writeBack';
+import { WRITE_BACK_MESSAGES, postJson, writeBackUrl } from './render/writeBack';
 import { highlight, parseHighlighter } from './highlight';
 import init, { render_markdown } from './wasm-render/mdview_wasm_render.js';
 
@@ -295,15 +296,17 @@ async function boot() {
   if (container && taskSyncEnabled) {
     installTaskToggle(container, (line: number, checked: boolean) => {
       clientLog(`toggle: line ${line} -> ${checked ? 'checked' : 'unchecked'}`);
-      try {
-        void fetch(writeBackUrl('/toggle', { token, key, doc: currentDocument() }), {
-          method: 'POST',
-          body: `${line}:${checked ? 1 : 0}`,
-          keepalive: true,
-        });
-      } catch {
+      // The line as rendered: an edit applied before this toggle may have moved
+      // the lines, and the receiving side then drops it instead of ticking the
+      // neighbour.
+      const expected = splitLines(lastText)[line - 1] ?? null;
+      fetch(writeBackUrl('/toggle', { token, key, doc: currentDocument(), expected }), {
+        method: 'POST',
+        body: `${line}:${checked ? 1 : 0}`,
+        keepalive: true,
+      }).catch(() => {
         /* toggle is best-effort */
-      }
+      });
     });
   }
 
@@ -315,16 +318,14 @@ async function boot() {
   if (container && fieldSyncEnabled) {
     installFieldSync(container, (name: string, value: string) => {
       clientLog(`field: ${name} (${value.length} chars)`);
-      try {
-        void fetch(writeBackUrl('/field', { token, key, doc: currentDocument() }), {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name, value }),
-          keepalive: true,
-        });
-      } catch {
+      fetch(writeBackUrl('/field', { token, key, doc: currentDocument() }), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, value }),
+        keepalive: true,
+      }).catch(() => {
         /* field sync is best-effort */
-      }
+      });
     });
   }
 
@@ -340,42 +341,38 @@ async function boot() {
   // one on screen. A re-render that is not caused by a push (a control update)
   // must start from this, or it would put the older text back.
   const currentText = (): string => deferredText ?? lastText;
-  const toast = (message: string): void => {
-    if (!container) return;
-    const el = document.createElement('div');
-    el.className = 'mdview-toast';
-    el.setAttribute('role', 'status');
-    el.textContent = message;
-    document.body.appendChild(el);
-    setTimeout(() => el.remove(), 4000);
-  };
+  const toast = (message: string): void => showToast(message);
   const sendBlockEdit = (edit: BlockEdit): void => {
     clientLog(`edit: lines ${edit.start}-${edit.end} (${edit.text.length} chars)`);
     // `doc`: in "reuse" behavior the tab's key is a room, not the document on
-    // screen; Neovim edits the buffer of the document the tab was showing.
-    void fetch(writeBackUrl('/edit', { token, key, doc: currentDocument() }), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(edit),
-    })
-      .then(res => {
-        if (res.status === 409) toast('Not saved: those lines changed in the source meanwhile.');
-        else if (!res.ok) toast('Not saved: the edit was refused.');
-      })
-      .catch(() => toast('Not saved: the preview server did not answer.'));
+    // screen; Neovim edits the buffer of the document the editor was opened on
+    // (captured at open: a buffer switch while it was open must not retarget it).
+    const { doc, ...payload } = edit;
+    void postJson(fetch, writeBackUrl('/edit', { token, key, doc }), payload).then(result => {
+      if (result !== 'ok') toast(WRITE_BACK_MESSAGES[result]);
+    });
   };
   let blockEditor: BlockEditor | null = null;
   if (container) {
     container.classList.toggle('mdview-edit', editEnabled);
     blockEditor = installBlockEdit(container, {
       getText: () => lastText,
+      getDocument: currentDocument,
       isEnabled: () => editEnabled,
       send: sendBlockEdit,
       onClose: () => {
         if (deferredText !== null) {
           const text = deferredText;
           deferredText = null;
-          renderDocument(text);
+          renderDocument(text); // re-places the cursor marker itself
+        } else if (container && lastCursorLine >= 0) {
+          // Pings that arrived while the block was hidden could not place it.
+          updateCursorMarker(
+            container,
+            lastCursorLine,
+            lastCursorCol >= 0 ? lastCursorCol : null,
+            cursorMarkerMode,
+          );
         }
       },
     });
@@ -476,10 +473,13 @@ async function boot() {
       deferredText = text;
       return;
     }
-    lastText = text;
     try {
       if (docIsMarkdown) {
-        container.innerHTML = render_markdown(text, wantSourceMap);
+        // Rendered first: if the renderer throws, the DOM is untouched and
+        // `lastText` still names the text that DOM was rendered from.
+        const html = render_markdown(text, wantSourceMap);
+        lastText = text;
+        container.innerHTML = html;
         // Make external links open in a new tab so a click doesn't navigate
         // the preview away (default; see browser.external_links).
         markExternalLinks(container, externalLinkMode);
@@ -494,6 +494,7 @@ async function boot() {
         // stay read-only.
         if (taskSyncEnabled) enableTaskCheckboxes(container);
       } else {
+        lastText = text;
         renderPlainText(container, text, key);
       }
       // Highlight fenced/plain code after the DOM is in place. Fire and
@@ -723,7 +724,11 @@ async function boot() {
     if (!container) return;
 
     if (rawMessage.startsWith(SCROLL_MESSAGE_PREFIX)) {
-      applyScrollPing(container, rawMessage);
+      // The block being edited is display:none, so it has no position to scroll
+      // to or to put the cursor bar on: the ping still updates the remembered
+      // cursor line, the placement happens again after the editor closed.
+      const editing = blockEditor?.isEditing() === true;
+      if (!editing) applyScrollPing(container, rawMessage);
       // The same ping carries the cursor line (and column) — update the marker.
       const fields = rawMessage.slice(SCROLL_MESSAGE_PREFIX.length).split('/');
       const cursorLine = Number(fields[0]);
@@ -731,12 +736,14 @@ async function boot() {
       if (Number.isFinite(cursorLine)) {
         lastCursorLine = cursorLine;
         lastCursorCol = Number.isFinite(cursorCol) ? cursorCol : -1;
-        updateCursorMarker(
-          container,
-          cursorLine,
-          lastCursorCol >= 0 ? lastCursorCol : null,
-          cursorMarkerMode,
-        );
+        if (!editing) {
+          updateCursorMarker(
+            container,
+            cursorLine,
+            lastCursorCol >= 0 ? lastCursorCol : null,
+            cursorMarkerMode,
+          );
+        }
         notifyOverlayCursor(cursorLine, lastCursorCol >= 0 ? lastCursorCol : 0);
       }
       // The scrollTop we just set fires a 'scroll' event; suppress reverse-scroll

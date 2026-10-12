@@ -75,7 +75,16 @@ export async function highlightAll(root: HTMLElement): Promise<void> {
         await hl.loadLanguage(lang as never);
       }
       const html = hl.codeToHtml(code.textContent || '', { lang, theme });
-      if (pre.isConnected) pre.outerHTML = html; // Shiki returns a full <pre class="shiki">
+      if (pre.isConnected) {
+        // Shiki returns a full <pre class="shiki">; the replacement must keep
+        // the block's source position, which scroll sync, the cursor/selection
+        // mirrors and block editing all find the block by.
+        const sourcePos = pre.getAttribute('data-sourcepos');
+        pre.insertAdjacentHTML('afterend', html);
+        const highlighted = pre.nextElementSibling;
+        pre.remove();
+        if (sourcePos && highlighted) highlighted.setAttribute('data-sourcepos', sourcePos);
+      }
     } catch {
       /* leave the original block as-is on any failure */
     }

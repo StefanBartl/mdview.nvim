@@ -4,19 +4,20 @@
 // field holding its source lines; a changed commit sends {start, end, expected,
 // text}; an unchanged one, Escape and clicks on links/controls send nothing.
 
-import { describe, it, expect, vi } from 'vitest';
+import { afterEach, describe, it, expect, vi } from 'vitest';
 import {
   blockAt,
   installBlockEdit,
   parseSourcePos,
   rangeOf,
   sliceLines,
+  splitLines,
   trimBlankTail,
 } from '../../src/client/render/blockEdit';
 
 const DOC = ['# Title', '', 'first line', 'second line', '', '- item one', '  - nested', '- item two'].join('\n');
 
-function setup(enabled = true, text = DOC) {
+function setup(enabled = true, text = DOC, doc: string | null = '/notes/a.md') {
   const root = document.createElement('div');
   root.innerHTML =
     '<h1 data-sourcepos="1:1-1:7">Title</h1>' +
@@ -28,9 +29,10 @@ function setup(enabled = true, text = DOC) {
   document.body.appendChild(root);
   const send = vi.fn();
   const onClose = vi.fn();
-  const state = { enabled };
+  const state = { enabled, doc };
   const editor = installBlockEdit(root, {
     getText: () => text,
+    getDocument: () => state.doc,
     isEnabled: () => state.enabled,
     send,
     onClose,
@@ -38,12 +40,20 @@ function setup(enabled = true, text = DOC) {
   return { root, send, onClose, editor, state };
 }
 
+afterEach(() => {
+  document.body.innerHTML = '';
+});
+
 function click(el: Element) {
   el.dispatchEvent(new window.MouseEvent('click', { bubbles: true, button: 0 }));
 }
 
 function key(el: Element, init: KeyboardEventInit) {
   el.dispatchEvent(new window.KeyboardEvent('keydown', { bubbles: true, ...init }));
+}
+
+function field(root: Element): HTMLTextAreaElement {
+  return root.querySelector('.mdview-block-editor') as HTMLTextAreaElement;
 }
 
 describe('parseSourcePos / rangeOf / sliceLines', () => {
@@ -68,6 +78,7 @@ describe('parseSourcePos / rangeOf / sliceLines', () => {
   it('reads CRLF as one line break and takes already split lines', () => {
     expect(sliceLines('a\r\nb\r\nc', { start: 2, end: 3 })).toBe('b\nc');
     expect(sliceLines(['a', 'b', 'c'], { start: 1, end: 2 })).toBe('a\nb');
+    expect(splitLines('a\r\nb')).toEqual(['a', 'b']);
   });
 });
 
@@ -94,103 +105,145 @@ describe('blockAt', () => {
 });
 
 describe('installBlockEdit (real DOM)', () => {
-  it('opens a one-line input for a heading and sends a changed commit', () => {
+  it('opens a one-line textarea for a heading and sends a changed commit on Enter', () => {
     const { root, send, onClose } = setup();
     click(root.querySelector('h1')!);
 
-    const field = root.querySelector('.mdview-block-editor') as HTMLInputElement;
-    expect(field.tagName).toBe('INPUT');
-    expect(field.value).toBe('# Title');
+    const f = field(root);
+    expect(f.tagName).toBe('TEXTAREA');
+    expect(f.rows).toBe(1);
+    expect(f.value).toBe('# Title');
     expect((root.querySelector('h1') as HTMLElement).style.display).toBe('none');
 
-    field.value = '# New title';
-    key(field, { key: 'Enter' });
+    f.value = '# New title';
+    key(f, { key: 'Enter' });
 
-    expect(send).toHaveBeenCalledWith({ start: 1, end: 1, expected: '# Title', text: '# New title' });
+    expect(send).toHaveBeenCalledWith({
+      start: 1,
+      end: 1,
+      doc: '/notes/a.md',
+      expected: '# Title',
+      text: '# New title',
+    });
     expect(root.querySelector('.mdview-block-editor')).toBeNull();
     expect((root.querySelector('h1') as HTMLElement).style.display).toBe('');
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('Shift+Enter in a one-line block adds a line instead of committing, and the field grows', () => {
+    const { root, send } = setup();
+    click(root.querySelector('h1')!);
+    const f = field(root);
+    f.value = '# Title\nsecond line';
+    f.dispatchEvent(new window.Event('input'));
+    expect(f.rows).toBe(2);
+
+    key(f, { key: 'Enter', shiftKey: true });
+    expect(send).not.toHaveBeenCalled();
+    // the block was one line when it opened, so plain Enter still commits
+    key(f, { key: 'Enter' });
+    expect(send).toHaveBeenCalledWith({
+      start: 1,
+      end: 1,
+      doc: '/notes/a.md',
+      expected: '# Title',
+      text: '# Title\nsecond line',
+    });
   });
 
   it('opens a textarea for a multi-line block and commits on Ctrl+Enter', () => {
     const { root, send } = setup();
     click(root.querySelector('p')!);
 
-    const field = root.querySelector('.mdview-block-editor') as HTMLTextAreaElement;
-    expect(field.tagName).toBe('TEXTAREA');
-    expect(field.value).toBe('first line\nsecond line');
+    const f = field(root);
+    expect(f.tagName).toBe('TEXTAREA');
+    expect(f.value).toBe('first line\nsecond line');
 
-    field.value = 'only one';
-    // plain Enter is a newline in a textarea: no commit
-    key(field, { key: 'Enter' });
+    f.value = 'only one';
+    // a block of two lines: plain Enter is a newline, no commit
+    key(f, { key: 'Enter' });
     expect(send).not.toHaveBeenCalled();
-    key(field, { key: 'Enter', ctrlKey: true });
+    key(f, { key: 'Enter', ctrlKey: true });
     expect(send).toHaveBeenCalledWith({
       start: 3,
       end: 4,
+      doc: '/notes/a.md',
       expected: 'first line\nsecond line',
       text: 'only one',
     });
   });
 
-  it('commits on blur (focus moving elsewhere), once', () => {
+  it('captures the document when the editor opens, not when it is committed', () => {
+    const { root, send, state } = setup();
+    click(root.querySelector('h1')!);
+    state.doc = '/notes/b.md'; // the Neovim buffer switched while the editor was open
+    const f = field(root);
+    f.value = '# Changed';
+    key(f, { key: 'Enter' });
+    expect(send.mock.calls[0][0].doc).toBe('/notes/a.md');
+  });
+
+  it('commits on blur (focus moving elsewhere), once, even if removal fires blur again', () => {
     const { root, send } = setup();
     click(root.querySelector('h1')!);
-    const field = root.querySelector('.mdview-block-editor') as HTMLInputElement;
-    expect(document.activeElement).toBe(field);
-    field.value = '# B';
-    field.blur(); // real blur: focus leaves the field
+    const f = field(root);
+    expect(document.activeElement).toBe(f);
+    f.value = '# B';
+    f.blur(); // real blur: focus leaves the field
     expect(send).toHaveBeenCalledTimes(1);
-    expect(send).toHaveBeenCalledWith({ start: 1, end: 1, expected: '# Title', text: '# B' });
+    expect(send.mock.calls[0][0]).toMatchObject({ start: 1, end: 1, expected: '# Title', text: '# B' });
+    // Chromium fires blur when the focused field is removed: no second commit
+    f.dispatchEvent(new window.FocusEvent('blur'));
+    expect(send).toHaveBeenCalledTimes(1);
   });
 
   it('does not commit half-typed text when only the window lost focus', () => {
     const { root, send, editor } = setup();
     click(root.querySelector('h1')!);
-    const field = root.querySelector('.mdview-block-editor') as HTMLInputElement;
-    field.value = '# half typed';
+    const f = field(root);
+    f.value = '# half typed';
     // alt-tab: the blur event fires but the field stays the active element
-    field.dispatchEvent(new window.FocusEvent('blur'));
+    f.dispatchEvent(new window.FocusEvent('blur'));
     expect(send).not.toHaveBeenCalled();
     expect(editor.isEditing()).toBe(true);
   });
 
-  it('ignores Enter that confirms an IME composition', () => {
+  it('closes an UNCHANGED editor when the window loses focus, so held renders can run', () => {
+    const { root, send, editor, onClose } = setup();
+    click(root.querySelector('h1')!);
+    field(root).dispatchEvent(new window.FocusEvent('blur'));
+    expect(send).not.toHaveBeenCalled();
+    expect(editor.isEditing()).toBe(false);
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('ignores Enter that confirms an IME composition (incl. Safari keyCode 229)', () => {
     const { root, send } = setup();
     click(root.querySelector('h1')!);
-    const field = root.querySelector('.mdview-block-editor') as HTMLInputElement;
-    field.value = '# composed';
-    key(field, { key: 'Enter', isComposing: true });
+    const f = field(root);
+    f.value = '# composed';
+    key(f, { key: 'Enter', isComposing: true });
+    key(f, { key: 'Enter', keyCode: 229 });
     expect(send).not.toHaveBeenCalled();
-    key(field, { key: 'Enter' });
+    key(f, { key: 'Enter' });
     expect(send).toHaveBeenCalledTimes(1);
   });
 
   it('labels the field for assistive technology', () => {
     const { root } = setup();
     click(root.querySelector('h1')!);
-    expect(root.querySelector('.mdview-block-editor')!.getAttribute('aria-label')).toBeTruthy();
-  });
-
-  it('never opens inside a private block (the click is its reveal gesture)', () => {
-    const { root } = setup();
-    const priv = document.createElement('div');
-    priv.setAttribute('data-private', '');
-    priv.innerHTML = '<p data-sourcepos="3:1-4:11">hidden words</p>';
-    root.appendChild(priv);
-    click(priv.querySelector('p')!);
-    expect(root.querySelector('.mdview-block-editor')).toBeNull();
+    expect(field(root).getAttribute('aria-label')).toBeTruthy();
   });
 
   it('sends nothing for an unchanged commit and for Escape', () => {
     const { root, send, onClose } = setup();
     click(root.querySelector('h1')!);
-    key(root.querySelector('.mdview-block-editor')!, { key: 'Enter' });
+    key(field(root), { key: 'Enter' });
 
     click(root.querySelector('h1')!);
-    const field = root.querySelector('.mdview-block-editor') as HTMLInputElement;
-    field.value = 'changed but cancelled';
-    key(field, { key: 'Escape' });
+    const f = field(root);
+    f.value = 'changed but cancelled';
+    key(f, { key: 'Escape' });
 
     expect(send).not.toHaveBeenCalled();
     expect(onClose).toHaveBeenCalledTimes(2);
@@ -210,6 +263,18 @@ describe('installBlockEdit (real DOM)', () => {
     expect(on.root.querySelector('.mdview-block-editor')).toBeNull();
   });
 
+  it('does not open while text is selected (a drag is a selection, not an edit)', () => {
+    const { root } = setup();
+    const range = document.createRange();
+    range.selectNodeContents(root.querySelector('p')!);
+    const sel = window.getSelection()!;
+    sel.removeAllRanges();
+    sel.addRange(range);
+    click(root.querySelector('h1')!);
+    expect(root.querySelector('.mdview-block-editor')).toBeNull();
+    sel.removeAllRanges();
+  });
+
   it('reports editing state and cancels without sending', () => {
     const { root, send, editor } = setup();
     expect(editor.isEditing()).toBe(false);
@@ -223,6 +288,37 @@ describe('installBlockEdit (real DOM)', () => {
   it('refuses to open when the rendered lines are not in the text', () => {
     const { root } = setup(true, '# Title');
     click(root.querySelector('p')!); // lines 3-4 do not exist in the one-line text
+    expect(root.querySelector('.mdview-block-editor')).toBeNull();
+  });
+});
+
+describe('private text', () => {
+  it('never opens inside a private block (the click is its reveal gesture)', () => {
+    const { root } = setup();
+    const priv = document.createElement('div');
+    priv.setAttribute('data-private', '');
+    priv.innerHTML = '<p data-sourcepos="3:1-4:11">hidden words</p>';
+    root.appendChild(priv);
+    click(priv.querySelector('p')!);
+    expect(root.querySelector('.mdview-block-editor')).toBeNull();
+  });
+
+  it('never opens on a block that CONTAINS a private block (its source lines include the hidden text)', () => {
+    const { root } = setup();
+    const li = document.createElement('li');
+    li.setAttribute('data-sourcepos', '6:1-7:11');
+    li.innerHTML = 'Customer: Alice<div data-private><p>phone 555-0100</p></div>';
+    const ul = document.createElement('ul');
+    ul.appendChild(li);
+    root.appendChild(ul);
+    click(li);
+    expect(root.querySelector('.mdview-block-editor')).toBeNull();
+
+    const quote = document.createElement('blockquote');
+    quote.setAttribute('data-sourcepos', '3:1-4:11');
+    quote.innerHTML = 'a quote<div data-private>secret</div>';
+    root.appendChild(quote);
+    click(quote);
     expect(root.querySelector('.mdview-block-editor')).toBeNull();
   });
 });

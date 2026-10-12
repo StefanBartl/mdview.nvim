@@ -723,4 +723,12 @@ body {
   background: #7a2e2e;
   border-radius: 6px;
   z-index: 10000;
+  /* One persistent live region: hidden when empty, but never display:none
+     (that would drop it from the accessibility tree and silence it). */
+  opacity: 0;
+  pointer-events: none;
+}
+
+.mdview-toast.mdview-toast-on {
+  opacity: 1;
 }

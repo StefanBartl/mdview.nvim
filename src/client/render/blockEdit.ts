@@ -40,6 +40,12 @@ export interface LineRange {
 }
 
 export interface BlockEdit extends LineRange {
+  /**
+   * The document the tab was showing when the editor OPENED. A buffer switch
+   * while the editor is open must not turn this edit into one for the new
+   * document, so it is captured at open, not at send time.
+   */
+  doc?: string | null;
   /** The block's source lines as rendered, joined with "\n". */
   expected: string;
   /** The text that replaces them. */
@@ -130,6 +136,8 @@ export interface BlockEditOptions {
   getText: () => string;
   /** Editing switched on (`?edit=1`, `:MDView edit`). */
   isEnabled: () => boolean;
+  /** The document on screen, read when an editor opens (see `BlockEdit.doc`). */
+  getDocument?: () => string | null;
   /** Called once per committed, changed edit. */
   send: (edit: BlockEdit) => void;
   /** Called after an editor closed (commit or cancel), so a held-back render can run. */
@@ -159,15 +167,19 @@ export function installBlockEdit(container: HTMLElement, opts: BlockEditOptions)
     opts.onClose?.();
   };
 
-  const commit = (range: LineRange, expected: string): void => {
+  const commit = (range: LineRange, expected: string, doc: string | null): void => {
     if (!active) return;
     const text = active.field.value.replace(/\r\n/g, '\n');
     const changed = text !== expected;
     close();
-    if (changed) opts.send({ ...range, expected, text });
+    if (changed) opts.send({ ...range, doc, expected, text });
   };
 
   const open = (block: HTMLElement): void => {
+    // A tight list item or a quote that CONTAINS a private block is itself not
+    // inside one, but its source lines include the hidden text: no editor.
+    if (block.querySelector(PRIVATE)) return;
+    const doc = opts.getDocument?.() ?? null;
     const lines = splitLines(opts.getText());
     const full = rangeOf(block);
     if (!full) return;
@@ -175,17 +187,21 @@ export function installBlockEdit(container: HTMLElement, opts: BlockEditOptions)
     const expected = sliceLines(lines, range);
     if (expected === null) return;
 
+    // Always a textarea: a one-line <input> would flatten pasted lines into one
+    // and could not split a paragraph or add a sibling list item. A block of one
+    // line commits on plain Enter (Shift+Enter adds a line break), a longer one
+    // on Ctrl/Cmd+Enter.
     const oneLine = !expected.includes('\n');
-    const field = oneLine ? document.createElement('input') : document.createElement('textarea');
+    const field = document.createElement('textarea');
     field.className = 'mdview-block-editor';
     field.value = expected;
     field.spellcheck = false;
     field.setAttribute('aria-label', 'Edit the Markdown source of this block');
-    if (field instanceof HTMLInputElement) {
-      field.type = 'text';
-    } else {
-      field.rows = Math.min(expected.split('\n').length + 1, 30);
-    }
+    const fit = (): void => {
+      field.rows = Math.min(Math.max(field.value.split('\n').length, 1), 30);
+    };
+    fit();
+    field.addEventListener('input', fit);
 
     block.style.display = 'none';
     block.parentNode?.insertBefore(field, block);
@@ -194,24 +210,35 @@ export function installBlockEdit(container: HTMLElement, opts: BlockEditOptions)
 
     field.addEventListener('keydown', (ev: Event) => {
       const k = ev as KeyboardEvent;
-      // Enter that confirms an IME composition is not a commit.
-      if (k.isComposing) return;
+      // Enter that confirms an IME composition is not a commit (Safari reports
+      // the composition as already ended on that keydown, with keyCode 229).
+      if (k.isComposing || k.keyCode === 229) return;
       if (k.key === 'Escape') {
         k.preventDefault();
         close();
-      } else if (k.key === 'Enter' && (oneLine || k.ctrlKey || k.metaKey)) {
-        k.preventDefault();
-        commit(range, expected);
+      } else if (k.key === 'Enter') {
+        // `oneLine` is what the block was when it opened, not what the field
+        // holds now: a paragraph being cut down to one line must not commit on
+        // the Enter that was meant as a line break.
+        if ((oneLine && !k.shiftKey) || k.ctrlKey || k.metaKey) {
+          k.preventDefault();
+          commit(range, expected, doc);
+        }
       }
     });
     // Blur commits. `close` removes the field, which itself fires blur: the
     // `active` check keeps that from committing twice. A blur that leaves the
     // field still the active element is the *window* losing focus (alt-tab, a
     // click into the browser chrome): half-typed text is not committed then.
+    // An UNCHANGED editor is closed all the same: while it stays open every
+    // incoming render is held back, and the preview next to Neovim would freeze.
     field.addEventListener('blur', () => {
       if (!active || active.field !== field) return;
-      if (document.activeElement === field) return;
-      commit(range, expected);
+      if (document.activeElement === field) {
+        if (field.value === expected) close();
+        return;
+      }
+      commit(range, expected, doc);
     });
   };
 
