@@ -41,6 +41,9 @@ func escapeText(v string) string {
 // (nil error) when no such field exists — a re-render can race an edit, and
 // declining is safer than guessing.
 func SetFieldValue(path, name, value string) error {
+	writeMu.Lock()
+	defer writeMu.Unlock()
+
 	content, err := os.ReadFile(path)
 	if err != nil {
 		return err

@@ -29,6 +29,9 @@ func ToggleCheckbox(path string, line int, checked bool) error {
 		return fmt.Errorf("invalid line %d", line)
 	}
 
+	writeMu.Lock()
+	defer writeMu.Unlock()
+
 	content, err := os.ReadFile(path)
 	if err != nil {
 		return err

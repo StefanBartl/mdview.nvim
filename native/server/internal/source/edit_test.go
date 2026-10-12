@@ -2,8 +2,11 @@ package source
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
+	"sync"
 	"testing"
 )
 
@@ -84,5 +87,86 @@ func TestReplaceLines_LeavesNoTempFileBehind(t *testing.T) {
 	}
 	if len(entries) != 1 {
 		t.Fatalf("folder holds %d entries, want only the file", len(entries))
+	}
+}
+
+func TestReplaceLines_MixedLineEndingsAreKeptByteForByte(t *testing.T) {
+	path := writeTemp(t, "lf one\nlf two\r\ncrlf three\r\nlf four\n")
+	if err := ReplaceLines(path, 3, 3, "crlf three", "3a\n3b"); err != nil {
+		t.Fatal(err)
+	}
+	if got, want := read(t, path), "lf one\nlf two\r\n3a\r\n3b\r\nlf four\n"; got != want {
+		t.Fatalf("got %q want %q", got, want)
+	}
+	// an LF block inside a CRLF file stays LF
+	path = writeTemp(t, "crlf one\r\nlf two\nlf three\ncrlf four\r\n")
+	if err := ReplaceLines(path, 2, 3, "lf two\nlf three", "x\ny\nz"); err != nil {
+		t.Fatal(err)
+	}
+	if got, want := read(t, path), "crlf one\r\nx\ny\nz\ncrlf four\r\n"; got != want {
+		t.Fatalf("got %q want %q", got, want)
+	}
+}
+
+func TestReplaceLines_LastLineWithoutNewlineKeepsItsAbsence(t *testing.T) {
+	path := writeTemp(t, "a\nb")
+	if err := ReplaceLines(path, 2, 2, "b", "c\nd"); err != nil {
+		t.Fatal(err)
+	}
+	if got, want := read(t, path), "a\nc\nd"; got != want {
+		t.Fatalf("got %q want %q", got, want)
+	}
+}
+
+func TestReplaceLines_WritesThroughASymlink(t *testing.T) {
+	dir := t.TempDir()
+	real := filepath.Join(dir, "real.md")
+	if err := os.WriteFile(real, []byte("a\nold\nb\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	link := filepath.Join(dir, "link.md")
+	if err := os.Symlink(real, link); err != nil {
+		t.Skipf("symlinks not available here: %v", err)
+	}
+
+	if err := ReplaceLines(link, 2, 2, "old", "new"); err != nil {
+		t.Fatal(err)
+	}
+	info, err := os.Lstat(link)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Mode()&os.ModeSymlink == 0 {
+		t.Fatal("the link was replaced by a regular file")
+	}
+	if got, want := read(t, real), "a\nnew\nb\n"; got != want {
+		t.Fatalf("target = %q, want %q", got, want)
+	}
+}
+
+func TestReplaceLines_ConcurrentEditsOfDifferentLinesAreAllKept(t *testing.T) {
+	var sb strings.Builder
+	for i := 0; i < 20; i++ {
+		fmt.Fprintf(&sb, "line %d\n", i)
+	}
+	path := writeTemp(t, sb.String())
+
+	var wg sync.WaitGroup
+	for i := 0; i < 20; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			old := fmt.Sprintf("line %d", i)
+			if err := ReplaceLines(path, i+1, i+1, old, old+" edited"); err != nil {
+				t.Errorf("line %d: %v", i, err)
+			}
+		}(i)
+	}
+	wg.Wait()
+
+	for i, l := range strings.Split(strings.TrimSuffix(read(t, path), "\n"), "\n") {
+		if want := fmt.Sprintf("line %d edited", i); l != want {
+			t.Fatalf("line %d = %q, want %q (a concurrent edit was lost)", i+1, l, want)
+		}
 	}
 }

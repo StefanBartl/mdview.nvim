@@ -157,7 +157,7 @@ func main() {
 	mux.HandleFunc("/nav", handleNav(navQueue, *token))
 	mux.HandleFunc("/toggle", handleToggle(toggleQueue, watchKey, watchPath, *token))
 	mux.HandleFunc("/field", handleField(fieldQueue, watchKey, watchPath, *token))
-	mux.HandleFunc("/edit", handleEdit(editQueue, watchKey, watchPath, *token))
+	mux.HandleFunc("/edit", handleEdit(editQueue, watchKey, watchPath, *token, *editBlocks))
 	mux.HandleFunc("/scrollback", handleScrollback(scrollBox, *token))
 	mux.HandleFunc("/clientlog", handleClientLog(*token))
 	mux.HandleFunc("/ws", handleWS(registry, *token, port))
@@ -893,9 +893,11 @@ const maxEditBodyBytes = 256 << 10 // a block's lines, before and after; generou
 // browser sends JSON {start, end, expected, text}: replace the 1-based source
 // lines start..end, which it rendered as `expected`, with `text`. Standalone
 // applies it to the watched file in place (refused with 409 when the lines are
-// no longer `expected`); Neovim-driven mode queues it for Neovim, which edits
-// its buffer under the same rule. Token-gated.
-func handleEdit(queue *relay.EditQueue, watchKey, watchPath, token string) http.HandlerFunc {
+// no longer `expected`, and with 403 unless the relay was started with --edit:
+// the page only offers editing when asked, and the route must not be a way
+// around that); Neovim-driven mode queues it for Neovim, which edits its buffer
+// under the same rule and only while block editing is on there. Token-gated.
+func handleEdit(queue *relay.EditQueue, watchKey, watchPath, token string, standaloneEdit bool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if !relay.ValidToken(token, r.URL.Query().Get("token")) {
 			http.Error(w, "forbidden", http.StatusForbidden)
@@ -921,6 +923,7 @@ func handleEdit(queue *relay.EditQueue, watchKey, watchPath, token string) http.
 				return
 			}
 			var req struct {
+				Doc      string `json:"doc"`
 				Start    int    `json:"start"`
 				End      int    `json:"end"`
 				Expected string `json:"expected"`
@@ -932,6 +935,10 @@ func handleEdit(queue *relay.EditQueue, watchKey, watchPath, token string) http.
 			}
 
 			if watchKey != "" && key == watchKey {
+				if !standaloneEdit {
+					http.Error(w, "block editing is off (start the relay with --edit)", http.StatusForbidden)
+					return
+				}
 				err := source.ReplaceLines(watchPath, req.Start, req.End, req.Expected, req.Text)
 				if errors.Is(err, source.ErrStale) {
 					http.Error(w, "lines changed", http.StatusConflict)
@@ -943,7 +950,7 @@ func handleEdit(queue *relay.EditQueue, watchKey, watchPath, token string) http.
 					return
 				}
 			} else {
-				queue.Push(relay.EditRequest{Key: key, Start: req.Start, End: req.End, Expected: req.Expected, Text: req.Text})
+				queue.Push(relay.EditRequest{Key: key, Doc: req.Doc, Start: req.Start, End: req.End, Expected: req.Expected, Text: req.Text})
 			}
 			w.WriteHeader(http.StatusNoContent)
 		default:
