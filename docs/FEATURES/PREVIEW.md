@@ -367,19 +367,29 @@ input with its `#`s, so changing the level is just editing them.
 **Stale edits are refused.** The edit carries the lines as they were rendered
 (`expected`); the receiving side applies it only while the document still holds
 exactly those lines there. Edited in Neovim in between, the preview shows a short
-note and Neovim warns, instead of one side overwriting the other.
+note ("Not saved: …") and Neovim warns, instead of one side overwriting the other.
 
 - **`:MDView start`**: Neovim replaces only that line range of the buffer (marks,
   folds and the rest of the undo history stay), as **one undo step** — `u` takes
-  the edit back. The buffer is then modified; save as usual.
+  the edit back. The buffer is then modified; save as usual. The buffer is the
+  one of the document the tab is showing (also under `browser.behavior =
+  "reuse"`, where the tab follows the active buffer), and only a buffer mdview
+  itself previews is ever edited, never just any loaded one.
 - **Standalone** (`:MDView standalone`, `mdview-server --watch … --edit`): the relay
-  replaces the lines in the file, line endings (LF/CRLF) and the trailing newline
-  preserved, written atomically (temp file + rename).
+  replaces the lines in the file. Everything outside the range stays byte for byte
+  (also a file whose lines end differently), the trailing newline is kept, and it
+  is written atomically (temp file + rename). A symbolic link stays a link: the
+  file it points at is rewritten. The relay refuses an edit (403) unless it was
+  started with `--edit`, and one that finds the file changed on disk (409).
 - While an editor is open, incoming renders are held back and run when it closes,
   so a push never pulls the field out from under you.
-- Not editable: the frontmatter table (it has no source position), a display
-  language / `browser.transform` preview (the lines it shows are not the
-  buffer's), and links, checkboxes and form fields, which keep their own job.
+- Not editable: the frontmatter table (it has no source position), private
+  blocks (the click is their reveal), a display language / `browser.transform`
+  preview (the lines it shows are not the buffer's), and links, checkboxes and
+  form fields, which keep their own job.
+- Leaving the window (alt-tab) does not commit half-typed text; moving focus
+  elsewhere in the page does. Enter that confirms an IME composition is not a
+  commit.
 
 **Off by default**, because a click on text would otherwise open an editor.
 `:MDView edit [on|off|toggle]` switches it for the running session (an open

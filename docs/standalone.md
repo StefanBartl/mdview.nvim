@@ -52,7 +52,8 @@ how you open it yourself, or from another device on the same machine.
 With `edit_blocks = true` in the setup, `:MDView standalone` passes `--edit` to
 the relay (`mdview-server --watch README.md --edit`), and clicking a block in the
 preview edits its source lines in the file itself — written atomically, line
-endings preserved, refused when the lines changed on disk in the meantime. See
+endings preserved, refused when the lines changed on disk in the meantime. Without
+`--edit` the relay refuses the route altogether. See
 [Block editing](FEATURES/PREVIEW.md#block-editing). A relay that does not list
 `--edit` is run without it, and a warning says so.
 
