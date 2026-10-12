@@ -26,9 +26,7 @@ import { enableTaskCheckboxes, installTaskToggle } from './render/taskToggle';
 import { installFieldSync } from './render/fieldSync';
 import {
   BARE_CR_MESSAGE,
-  hasBareCr,
   installBlockEdit,
-  splitLines,
   type BlockEdit,
   type BlockEditor,
 } from './render/blockEdit';
@@ -46,7 +44,8 @@ import { readEditState, writeEditState } from './render/editState';
 import { createRenderGate } from './render/renderGate';
 import { createScrollFollower, parseCursorFields } from './render/scrollFollow';
 import { parseControl } from './render/controlMessage';
-import { WRITE_BACK_MESSAGES, postJson, postToggle, writeBackUrl } from './render/writeBack';
+import { WRITE_BACK_MESSAGES, postJson, writeBackUrl } from './render/writeBack';
+import { sendToggle } from './render/toggleSend';
 import { highlight, parseHighlighter } from './highlight';
 import init, { render_markdown } from './wasm-render/mdview_wasm_render.js';
 
@@ -309,27 +308,18 @@ async function boot() {
   if (container && taskSyncEnabled) {
     installTaskToggle(container, (line: number, checked: boolean) => {
       clientLog(`toggle: line ${line} -> ${checked ? 'checked' : 'unchecked'}`);
-      // The line as rendered: an edit applied before this toggle may have moved
-      // the lines, and the receiving side then drops it instead of ticking the
-      // neighbour.
-      // A document with lone CRs has other line numbers in the preview than in
-      // the source: the box goes back instead of ticking another line.
-      if (hasBareCr(lastText)) {
-        showToast(BARE_CR_MESSAGE);
-        return Promise.resolve(false);
-      }
-      const expected = splitLines(lastText)[line - 1] ?? null;
-      // Resolves false when the relay refused it: the box goes back to what the
+      // Resolves false when nothing was saved: the box goes back to what the
       // source still says, and the person is told, instead of a tick that was
       // never saved.
-      return postToggle(
+      return sendToggle(
         fetch,
-        { token, key, doc: currentDocument(), expected },
+        { token, key, doc: currentDocument() },
+        lastText,
         line,
         checked,
       ).then(result => {
         if (result === 'ok') return true;
-        showToast(WRITE_BACK_MESSAGES[result]);
+        showToast(result === 'bare-cr' ? BARE_CR_MESSAGE : WRITE_BACK_MESSAGES[result]);
         return false;
       });
     });
