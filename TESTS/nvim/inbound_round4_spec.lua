@@ -161,6 +161,20 @@ describe("inbound write-backs, round 4", function()
     assert.are.equal(3, vim.api.nvim_win_get_cursor(0)[1])
   end)
 
+  it("24: a change that waited while the tab switched documents is refused, not written to the old buffer", function()
+    typing(true)
+    inbound._handle_field(ROOM, "title", "late", SHOWN)
+    live._last_doc[ROOM] = "some/other.md" -- the tab follows another buffer now
+    typing(false)
+    vim.wait(1500, function()
+      return #notices > 0
+    end, 20)
+    assert.are.equal('<input type="text" name="title">', lines()[3])
+    assert.is_truthy(
+      notices[1].msg.notice:find("not loaded", 1, true) or notices[1].msg.notice:find("document", 1, true)
+    )
+  end)
+
   it("24: a stop drops changes that were still waiting", function()
     typing(true)
     inbound._handle_field(ROOM, "title", "late", SHOWN)

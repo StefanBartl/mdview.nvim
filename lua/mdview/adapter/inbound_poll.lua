@@ -269,27 +269,39 @@ local function when_not_inserting(buf, fn, tries)
   fn()
 end
 
+-- The same for a request that found no buffer to apply to.
+---@internal
+---@param key string
+---@param what string
+---@param why string|nil
+---@return nil
+local function refuse_no_buffer(key, what, why)
+  notify(("[mdview] %s dropped: %s"):format(what, tostring(why)), vim.log.levels.WARN)
+  tell_tab(key, tostring(why))
+end
+
 -- Per-buffer FIFO of the changes the browser asked for. Each one waits for the
 -- user to stop typing (`when_not_inserting`), and a later one must not overtake
 -- an earlier one that is still waiting: field "first" in Insert mode, Esc, field
 -- "second" has to end with "second". `queues[buf]` is the live queue of a
 -- buffer; `M.stop` drops them all, and a closure of a dropped queue does nothing.
----@type table<integer, { items: fun()[], active: boolean }>
+---@type table<integer, { items: { req: table, fn: fun() }[], active: boolean }>
 local queues = {}
 
 -- Run `fn` for `buf` after the changes queued before it, once the user is not
 -- typing there. An error in `fn` is reported and does not stop the queue.
 ---@internal
 ---@param buf integer
+---@param req { key: string, doc: string|nil, what: string } # whose request it is
 ---@param fn fun()
 ---@return nil
-local function enqueue(buf, fn)
+local function enqueue(buf, req, fn)
   local q = queues[buf]
   if not q then
     q = { items = {}, active = false }
     queues[buf] = q
   end
-  q.items[#q.items + 1] = fn
+  q.items[#q.items + 1] = { req = req, fn = fn }
   if q.active then
     return
   end
@@ -299,17 +311,33 @@ local function enqueue(buf, fn)
       return -- stopped meanwhile
     end
     local nxt = table.remove(q.items, 1)
-    if not nxt or not vim.api.nvim_buf_is_valid(buf) then
+    if not nxt then
       queues[buf] = nil
       return
     end
-    when_not_inserting(buf, function()
+    if not vim.api.nvim_buf_is_valid(buf) then
+      queues[buf] = nil
+      refuse_no_buffer(nxt.req.key, nxt.req.what, "the buffer is gone")
+      return
+    end
+    local ok, err = pcall(when_not_inserting, buf, function()
       if queues[buf] ~= q then
         return
       end
-      safe("change", nxt)
+      -- It may have waited for seconds, behind others: is this still the buffer
+      -- the tab's document maps to (a buffer switch under "reuse")?
+      local now, why = target_buffer(nxt.req.key, nxt.req.doc)
+      if now ~= buf then
+        refuse_no_buffer(nxt.req.key, nxt.req.what, why or "the document on screen changed; try again")
+      else
+        safe("change", nxt.fn)
+      end
       step()
     end)
+    if not ok then
+      queues[buf] = nil
+      notify(("[mdview] preview change failed: %s"):format(tostring(err)), vim.log.levels.ERROR)
+    end
   end
   step()
 end
@@ -342,17 +370,6 @@ local function refuse(key, buf, what, message)
   notify(("[mdview] %s dropped: %s"):format(what, message), vim.log.levels.WARN)
   tell_tab(key, message)
   push_result(buf, key)
-end
-
--- The same for a request that found no buffer to apply to.
----@internal
----@param key string
----@param what string
----@param why string|nil
----@return nil
-local function refuse_no_buffer(key, what, why)
-  notify(("[mdview] %s dropped: %s"):format(what, tostring(why)), vim.log.levels.WARN)
-  tell_tab(key, tostring(why))
 end
 
 ---@internal
@@ -464,7 +481,7 @@ local function handle_toggle(key, line, checked, doc, expected)
     return
   end
   local what = "preview checkbox"
-  enqueue(buf, function()
+  enqueue(buf, { key = key, doc = doc, what = what }, function()
     if vim.bo[buf].modifiable ~= true then
       refuse(key, buf, what, "the buffer is not modifiable")
       return
@@ -641,7 +658,7 @@ local function handle_field(key, name, value, doc)
     refuse_no_buffer(key, "preview edit", why)
     return
   end
-  enqueue(buf, function()
+  enqueue(buf, { key = key, doc = doc, what = "preview edit" }, function()
     if vim.bo[buf].modifiable ~= true then
       refuse(key, buf, "preview edit", "the buffer is not modifiable")
       return
@@ -781,7 +798,7 @@ local function handle_edit(key, start, end_, expected, text, doc)
   end
 
   local what = "preview edit"
-  enqueue(buf, function()
+  enqueue(buf, { key = key, doc = doc, what = what }, function()
     if vim.bo[buf].modifiable ~= true then
       refuse(key, buf, what, "the buffer is not modifiable")
       return
