@@ -25,7 +25,7 @@ import { createSpotlightMirror } from './render/spotlightMirror';
 import { enableTaskCheckboxes, installTaskToggle } from './render/taskToggle';
 import { installFieldSync } from './render/fieldSync';
 import { installBlockEdit, splitLines, type BlockEdit, type BlockEditor } from './render/blockEdit';
-import { showToast } from './render/toast';
+import { initToast, showToast } from './render/toast';
 import {
   initOverlays,
   setOverlay,
@@ -35,7 +35,7 @@ import {
   dispatchOverlayControl,
 } from './render/overlays';
 import { currentDocument, installHistory, onDocChange } from './render/history';
-import { WRITE_BACK_MESSAGES, postJson, writeBackUrl } from './render/writeBack';
+import { WRITE_BACK_MESSAGES, postJson, postText, writeBackUrl } from './render/writeBack';
 import { highlight, parseHighlighter } from './highlight';
 import init, { render_markdown } from './wasm-render/mdview_wasm_render.js';
 
@@ -205,6 +205,8 @@ async function boot() {
 
   const container = document.getElementById('mdview-root');
   let firstRender = true;
+  // The live region exists before the first message, so a screen reader announces it.
+  initToast();
 
   // Code-fence highlighter chosen per session (?hl= from browser.highlighter).
   // The implementation is lazy-imported inside highlight(), so an unselected
@@ -300,12 +302,18 @@ async function boot() {
       // the lines, and the receiving side then drops it instead of ticking the
       // neighbour.
       const expected = splitLines(lastText)[line - 1] ?? null;
-      fetch(writeBackUrl('/toggle', { token, key, doc: currentDocument(), expected }), {
-        method: 'POST',
-        body: `${line}:${checked ? 1 : 0}`,
-        keepalive: true,
-      }).catch(() => {
-        /* toggle is best-effort */
+      // Resolves false when the relay refused it: the box goes back to what the
+      // source still says, and the person is told, instead of a tick that was
+      // never saved.
+      return postText(
+        fetch,
+        writeBackUrl('/toggle', { token, key, doc: currentDocument(), expected }),
+        `${line}:${checked ? 1 : 0}`,
+        true,
+      ).then(result => {
+        if (result === 'ok') return true;
+        showToast(WRITE_BACK_MESSAGES[result]);
+        return false;
       });
     });
   }
@@ -318,13 +326,12 @@ async function boot() {
   if (container && fieldSyncEnabled) {
     installFieldSync(container, (name: string, value: string) => {
       clientLog(`field: ${name} (${value.length} chars)`);
-      fetch(writeBackUrl('/field', { token, key, doc: currentDocument() }), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, value }),
-        keepalive: true,
-      }).catch(() => {
-        /* field sync is best-effort */
+      // No keepalive: a field value can exceed its 64 KiB limit.
+      void postJson(fetch, writeBackUrl('/field', { token, key, doc: currentDocument() }), {
+        name,
+        value,
+      }).then(result => {
+        if (result !== 'ok') showToast(WRITE_BACK_MESSAGES[result]);
       });
     });
   }
@@ -353,6 +360,10 @@ async function boot() {
     });
   };
   let blockEditor: BlockEditor | null = null;
+  // The newest scroll ping that arrived while an editor was open (see onClose).
+  let skippedScroll: string | null = null;
+  let scrollSuppressUntil = 0;
+  const SCROLL_SUPPRESS_MS = 250;
   if (container) {
     container.classList.toggle('mdview-edit', editEnabled);
     blockEditor = installBlockEdit(container, {
@@ -364,15 +375,26 @@ async function boot() {
         if (deferredText !== null) {
           const text = deferredText;
           deferredText = null;
-          renderDocument(text); // re-places the cursor marker itself
-        } else if (container && lastCursorLine >= 0) {
-          // Pings that arrived while the block was hidden could not place it.
-          updateCursorMarker(
-            container,
-            lastCursorLine,
-            lastCursorCol >= 0 ? lastCursorCol : null,
-            cursorMarkerMode,
-          );
+          renderDocument(text); // re-places the cursor marker and the selection itself
+        } else if (container) {
+          // Pings that arrived while the block was hidden could not place these.
+          if (lastCursorLine >= 0) {
+            updateCursorMarker(
+              container,
+              lastCursorLine,
+              lastCursorCol >= 0 ? lastCursorCol : null,
+              cursorMarkerMode,
+            );
+          }
+          if (selectionEnabled && lastSelection) updateSelection(container, lastSelection);
+        }
+        // The scroll ping that was skipped (its block had no position) is
+        // applied now, so the preview follows Neovim again.
+        if (container && skippedScroll !== null) {
+          const ping = skippedScroll;
+          skippedScroll = null;
+          applyScrollPing(container, ping);
+          scrollSuppressUntil = Date.now() + SCROLL_SUPPRESS_MS;
         }
       },
     });
@@ -412,8 +434,6 @@ async function boot() {
   // Opt-in reverse scroll (browser -> Neovim). While applying an incoming
   // nvim->browser scroll ping we set scrollSuppressUntil so the resulting
   // 'scroll' event doesn't bounce back to Neovim and create a feedback loop.
-  let scrollSuppressUntil = 0;
-  const SCROLL_SUPPRESS_MS = 250;
   if (container && params.get('rscroll') === '1') {
     // Visible hint that reverse scroll is on, so a viewer knows they may scroll
     // the preview themselves (otherwise it's an invisible capability).
@@ -606,7 +626,8 @@ async function boot() {
         // spans, so re-render the current document with the new setting.
         wantSourceMap = needSourceMap;
         if (container) renderDocument(currentText());
-      } else if (container) {
+      } else if (container && blockEditor?.isEditing() !== true) {
+        // (With an editor open the block is hidden: onClose places it.)
         updateCursorMarker(
           container,
           lastCursorLine,
@@ -672,7 +693,7 @@ async function boot() {
         renderDocument(currentText());
       } else {
         selectionEnabled = true;
-        updateSelection(container, lastSelection);
+        if (blockEditor?.isEditing() !== true) updateSelection(container, lastSelection);
       }
     }
   };
@@ -729,6 +750,7 @@ async function boot() {
       // cursor line, the placement happens again after the editor closed.
       const editing = blockEditor?.isEditing() === true;
       if (!editing) applyScrollPing(container, rawMessage);
+      else skippedScroll = rawMessage;
       // The same ping carries the cursor line (and column) — update the marker.
       const fields = rawMessage.slice(SCROLL_MESSAGE_PREFIX.length).split('/');
       const cursorLine = Number(fields[0]);

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
-import { showToast } from '../../src/client/render/toast';
+import { initToast, showToast } from '../../src/client/render/toast';
 
 describe('showToast', () => {
   beforeEach(() => {
@@ -35,5 +35,19 @@ describe('showToast', () => {
     const el = document.querySelector('.mdview-toast')!;
     expect(el.textContent).toBe('');
     expect(el.classList.contains('mdview-toast-on')).toBe(false);
+  });
+});
+
+describe('initToast', () => {
+  it('creates the empty live region once, before any message', () => {
+    initToast();
+    initToast();
+    const all = document.querySelectorAll('.mdview-toast');
+    expect(all).toHaveLength(1);
+    expect(all[0].textContent).toBe('');
+    expect(all[0].getAttribute('aria-live')).toBe('polite');
+    showToast('hello');
+    expect(document.querySelectorAll('.mdview-toast')).toHaveLength(1);
+    expect(all[0].textContent).toBe('hello');
   });
 });

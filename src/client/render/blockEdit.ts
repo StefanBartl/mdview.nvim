@@ -171,8 +171,13 @@ export function installBlockEdit(container: HTMLElement, opts: BlockEditOptions)
     if (!active) return;
     const text = active.field.value.replace(/\r\n/g, '\n');
     const changed = text !== expected;
-    close();
-    if (changed) opts.send({ ...range, doc, expected, text });
+    try {
+      close();
+    } finally {
+      // `onClose` runs the caller's held-back render; if that throws, the edit
+      // must still go out — it is the only copy of what was typed.
+      if (changed) opts.send({ ...range, doc, expected, text });
+    }
   };
 
   const open = (block: HTMLElement): void => {
@@ -198,7 +203,11 @@ export function installBlockEdit(container: HTMLElement, opts: BlockEditOptions)
     field.spellcheck = false;
     field.setAttribute('aria-label', 'Edit the Markdown source of this block');
     const fit = (): void => {
+      // Rows for the line breaks, then the real content height: one long paragraph
+      // wraps over several visual lines. (No layout, e.g. in tests: scrollHeight 0.)
       field.rows = Math.min(Math.max(field.value.split('\n').length, 1), 30);
+      field.style.height = 'auto';
+      if (field.scrollHeight > 0) field.style.height = `${field.scrollHeight}px`;
     };
     fit();
     field.addEventListener('input', fit);
@@ -216,6 +225,13 @@ export function installBlockEdit(container: HTMLElement, opts: BlockEditOptions)
       if (k.key === 'Escape') {
         k.preventDefault();
         close();
+      } else if (k.key === 'Tab' && !k.shiftKey && !k.ctrlKey && !k.metaKey && !k.altKey) {
+        // Indentation (nested lists, code, YAML), not a way out of the field:
+        // leaving it commits. Shift+Tab, Ctrl/Cmd+Enter or a click elsewhere
+        // still leave, so the field is no keyboard trap.
+        k.preventDefault();
+        field.setRangeText('\t', field.selectionStart, field.selectionEnd, 'end');
+        fit();
       } else if (k.key === 'Enter') {
         // `oneLine` is what the block was when it opened, not what the field
         // holds now: a paragraph being cut down to one line must not commit on

@@ -1,7 +1,9 @@
 import { describe, it, expect, vi } from 'vitest';
 import {
   WRITE_BACK_MESSAGES,
+  MAX_EXPECTED_BYTES,
   postJson,
+  postText,
   resultOfStatus,
   writeBackUrl,
 } from '../../src/client/render/writeBack';
@@ -42,7 +44,8 @@ describe('resultOfStatus', () => {
   it('maps the relay answers to a result', () => {
     expect(resultOfStatus(204)).toBe('ok');
     expect(resultOfStatus(409)).toBe('stale');
-    expect(resultOfStatus(403)).toBe('readonly');
+    expect(resultOfStatus(403)).toBe('refused'); // no --edit, a wrong token ...
+    expect(resultOfStatus(403, 'the file is read-only\n')).toBe('readonly');
     expect(resultOfStatus(413)).toBe('too-large');
     expect(resultOfStatus(500)).toBe('refused');
     expect(resultOfStatus(404)).toBe('refused');
@@ -71,5 +74,37 @@ describe('postJson', () => {
       throw new TypeError('network down');
     });
     await expect(postJson(fetchFn as unknown as typeof fetch, '/edit', {})).resolves.toBe('offline');
+  });
+});
+
+describe('writeBackUrl, the longest expected line', () => {
+  it('leaves `expected` out above the relay bound (counted in bytes), keeps it at the bound', () => {
+    const atBound = 'x'.repeat(MAX_EXPECTED_BYTES);
+    expect(writeBackUrl('/toggle', { token: 't', key: 'k', expected: atBound })).toContain('&expected=');
+    expect(writeBackUrl('/toggle', { token: 't', key: 'k', expected: atBound + 'x' })).toBe(
+      '/toggle?token=t&key=k',
+    );
+    // 1025 two-byte characters are 2050 bytes, though only 1025 characters
+    expect(writeBackUrl('/toggle', { token: 't', key: 'k', expected: 'ä'.repeat(1025) })).toBe(
+      '/toggle?token=t&key=k',
+    );
+  });
+});
+
+describe('postText / 403 answers', () => {
+  it('posts plain text and reports a refusal that says read-only as readonly', async () => {
+    const fetchFn = vi.fn(async () => new Response('the file is read-only\n', { status: 403 }));
+    expect(await postText(fetchFn as unknown as typeof fetch, '/toggle', '3:1', true)).toBe('readonly');
+    const [, init] = fetchFn.mock.calls[0] as unknown as [string, RequestInit];
+    expect(init.body).toBe('3:1');
+    expect(init.keepalive).toBe(true);
+    expect((init.headers as Record<string, string>)['Content-Type']).toBe('text/plain');
+  });
+
+  it('any other 403 (no --edit, a wrong token) is a plain refusal, and 5xx too', async () => {
+    const f403 = vi.fn(async () => new Response('block editing is off\n', { status: 403 }));
+    expect(await postText(f403 as unknown as typeof fetch, '/toggle', '3:1')).toBe('refused');
+    const f500 = vi.fn(async () => new Response('toggle failed\n', { status: 500 }));
+    expect(await postJson(f500 as unknown as typeof fetch, '/field', {})).toBe('refused');
   });
 });

@@ -106,3 +106,36 @@ describe('installTaskToggle (real DOM)', () => {
     expect(send).not.toHaveBeenCalled();
   });
 });
+
+describe('installTaskToggle, a refused toggle', () => {
+  const flush = () => new Promise(resolve => setTimeout(resolve, 0));
+  function toggle(root: HTMLElement, send: () => Promise<boolean>) {
+    enableTaskCheckboxes(root);
+    installTaskToggle(root, send);
+    const box = root.querySelector<HTMLInputElement>('input[type="checkbox"]')!;
+    box.checked = true;
+    box.dispatchEvent(new window.Event('change', { bubbles: true }));
+    return box;
+  }
+
+  it('puts the box back when send resolves false', async () => {
+    const box = toggle(setup(TASK_HTML), () => Promise.resolve(false));
+    expect(box.checked).toBe(true);
+    await flush();
+    expect(box.checked).toBe(false);
+  });
+
+  it('leaves the box alone when send resolves true', async () => {
+    const box = toggle(setup(TASK_HTML), () => Promise.resolve(true));
+    await flush();
+    expect(box.checked).toBe(true);
+  });
+
+  it('does not touch a box that a re-render removed meanwhile', async () => {
+    const root = setup(TASK_HTML);
+    const box = toggle(root, () => Promise.resolve(false));
+    root.innerHTML = '';
+    await flush();
+    expect(box.checked).toBe(true);
+  });
+});

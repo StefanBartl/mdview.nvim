@@ -411,6 +411,11 @@ note ("Not saved: …") and Neovim warns, instead of one side overwriting the ot
   blocks (the click is their reveal), a display language / `browser.transform`
   preview (the lines it shows are not the buffer's), and links, checkboxes and
   form fields, which keep their own job.
+- Inside the field Tab indents (nested lists, code); Shift+Tab, Ctrl/Cmd+Enter or a click
+  elsewhere leave it and commit. The field grows with its content.
+- A checkbox or text field the relay refuses to save is put back (checkbox) and the
+  preview says "Not saved: …"; a 403 reads "read-only" only when the file is, otherwise
+  "refused". A checkbox line longer than 2048 bytes is ticked without the stale-line check.
 - Leaving the window (alt-tab) does not commit half-typed text (an unchanged
   editor is closed, so the preview does not stand still); moving focus elsewhere
   in the page commits. Enter that confirms an IME composition is not a commit.

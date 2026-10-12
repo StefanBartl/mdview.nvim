@@ -59,6 +59,15 @@ async function getHighlighter(theme: string): Promise<Highlighter> {
 }
 
 /**
+ * A block hidden by the block editor (display: none, its textarea sits next to
+ * it). Replacing it would show the highlighted copy beside the open editor, and
+ * the editor would close onto a detached node.
+ */
+function isHidden(pre: HTMLElement): boolean {
+  return pre.style.display === 'none';
+}
+
+/**
  * Replace each fenced code block under `root` with Shiki's themed output.
  * Per-block try/catch so one unsupported language can't blank the preview.
  */
@@ -68,14 +77,14 @@ export async function highlightAll(root: HTMLElement): Promise<void> {
   const blocks = Array.from(root.querySelectorAll<HTMLElement>('pre > code'));
   for (const code of blocks) {
     const pre = code.parentElement;
-    if (!pre || !pre.isConnected) continue;
+    if (!pre || !pre.isConnected || isHidden(pre)) continue;
     const lang = langOf(code);
     try {
       if (lang !== 'text' && !hl.getLoadedLanguages().includes(lang)) {
         await hl.loadLanguage(lang as never);
       }
       const html = hl.codeToHtml(code.textContent || '', { lang, theme });
-      if (pre.isConnected) {
+      if (pre.isConnected && !isHidden(pre)) {
         // Shiki returns a full <pre class="shiki">; the replacement must keep
         // the block's source position, which scroll sync, the cursor/selection
         // mirrors and block editing all find the block by.

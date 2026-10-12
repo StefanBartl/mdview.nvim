@@ -322,3 +322,61 @@ describe('private text', () => {
     expect(root.querySelector('.mdview-block-editor')).toBeNull();
   });
 });
+
+describe('installBlockEdit, review round 3', () => {
+  it('Tab indents inside the field and does not leave it; Shift+Tab is left alone', () => {
+    const { root, send } = setup();
+    click(root.querySelector('p')!);
+    const f = field(root);
+    f.setSelectionRange(0, 0);
+    const tab = new window.KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true });
+    f.dispatchEvent(tab);
+    expect(tab.defaultPrevented).toBe(true);
+    expect(f.value.startsWith('\tfirst line')).toBe(true);
+    expect(root.querySelector('.mdview-block-editor')).not.toBeNull();
+    expect(send).not.toHaveBeenCalled();
+
+    const shiftTab = new window.KeyboardEvent('keydown', {
+      key: 'Tab',
+      shiftKey: true,
+      bubbles: true,
+      cancelable: true,
+    });
+    f.dispatchEvent(shiftTab);
+    expect(shiftTab.defaultPrevented).toBe(false);
+  });
+
+  it('sends the edit even when onClose throws', () => {
+    const root = document.createElement('div');
+    root.innerHTML = '<h1 data-sourcepos="1:1-1:7">Title</h1>';
+    document.body.appendChild(root);
+    const send = vi.fn();
+    installBlockEdit(root, {
+      getText: () => '# Title',
+      isEnabled: () => true,
+      send,
+      onClose: () => {
+        throw new Error('render failed');
+      },
+    });
+    click(root.querySelector('h1')!);
+    const f = field(root);
+    f.value = '# Changed';
+    // jsdom reports the throw of a listener as a window error: expected here
+    const swallow = (e: Event) => e.preventDefault();
+    window.addEventListener('error', swallow);
+    key(f, { key: 'Enter' });
+    window.removeEventListener('error', swallow);
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(send.mock.calls[0][0]).toMatchObject({ text: '# Changed' });
+  });
+
+  it('sizes the field to its content when the layout reports one', () => {
+    const { root } = setup();
+    click(root.querySelector('p')!);
+    const f = field(root);
+    Object.defineProperty(f, 'scrollHeight', { configurable: true, value: 140 });
+    f.dispatchEvent(new window.Event('input'));
+    expect(f.style.height).toBe('140px');
+  });
+});

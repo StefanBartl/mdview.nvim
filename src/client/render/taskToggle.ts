@@ -41,11 +41,11 @@ export function enableTaskCheckboxes(root: HTMLElement): void {
  * toggled, resolves its source line and calls `send(line, checked)`. Delegated
  * on `root` (which survives the innerHTML swap), so it's installed once. A
  * checkbox with no resolvable source line is reverted rather than silently
- * desynced from the document.
+ * desynced from the document, and so is one whose `send` resolves to false.
  */
 export function installTaskToggle(
   root: HTMLElement,
-  send: (line: number, checked: boolean) => void,
+  send: (line: number, checked: boolean) => void | Promise<boolean>,
 ): void {
   root.addEventListener('change', (ev: Event) => {
     const box = ev.target as HTMLInputElement | null;
@@ -58,6 +58,15 @@ export function installTaskToggle(
       box.checked = !box.checked;
       return;
     }
-    send(line, box.checked);
+    const checked = box.checked;
+    const sent = send(line, checked);
+    if (sent instanceof Promise) {
+      // The relay refused it: the source still has the old state, so the box
+      // goes back instead of showing a tick that was never saved. (A box that a
+      // re-render replaced meanwhile already shows the source's state.)
+      void sent.then(ok => {
+        if (!ok && box.isConnected && box.checked === checked) box.checked = !checked;
+      });
+    }
   });
 }

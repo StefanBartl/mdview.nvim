@@ -12,8 +12,12 @@ const SHOW_MS = 4000;
 
 let timer: ReturnType<typeof setTimeout> | null = null;
 
-/** Show `message` for a few seconds. */
-export function showToast(message: string, doc: Document = document): void {
+/**
+ * Create the (empty) live region. Call it at boot: a region that is inserted
+ * and filled in the same task is often not announced, one that was already in
+ * the page when its text changes is.
+ */
+export function initToast(doc: Document = document): HTMLElement {
   let el = doc.getElementById(ID);
   if (!el) {
     el = doc.createElement('div');
@@ -23,6 +27,12 @@ export function showToast(message: string, doc: Document = document): void {
     el.setAttribute('aria-live', 'polite');
     doc.body.appendChild(el);
   }
+  return el;
+}
+
+/** Show `message` for a few seconds. */
+export function showToast(message: string, doc: Document = document): void {
+  const el = initToast(doc);
   el.textContent = message.slice(0, MAX_LENGTH);
   el.classList.add('mdview-toast-on');
 
