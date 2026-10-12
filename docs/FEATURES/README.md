@@ -51,6 +51,10 @@ In detail in [`PREVIEW.md`](PREVIEW.md).
   **breadcrumbs** (the session outline).
 - **Click to navigate** — clicking a relative link opens the file in Neovim
   instead of navigating the tab away.
+- **Block editing** — click a heading, paragraph, list item, code block or table
+  in the preview to edit its source lines; written back to the buffer as one
+  undo step (or to the file, standalone). A stale edit is refused. Off by
+  default; `:MDView edit` / `edit_blocks`.
 - **Link hover preview** — an image, the start of a text file, a parsed URL, an
   anchor's section, or "not found". The counterpart to markdown.nvim's
   in-editor hover.

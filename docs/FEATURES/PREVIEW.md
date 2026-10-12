@@ -350,6 +350,46 @@ inject markup (`</textarea><script>` becomes inert escaped text).
 - **Module:** `src/client/render/fieldSync.ts`, `native/server/internal/source/field.go`, `native/server/internal/relay/field.go`, `/field` route in `native/server/main.go`; `:MDView start` buffer edit in `lua/mdview/adapter/inbound_poll.lua`; sanitizer allowlist in `native/wasm-render/src/lib.rs`
 - **Config:** `sync_fields` (default `true`; `false` renders these fields read-only)
 
+## Block editing
+
+Click a block in the preview — a heading, paragraph, list item, code block,
+table or quote — and it is replaced by a text field holding that block's
+**source lines**. Commit with blur or Ctrl+Enter (Enter in a one-line field);
+Esc discards. The edit is written back to the source and flows through the normal
+push path, so the block comes back rendered from what you wrote.
+
+**Raw source, not WYSIWYG.** The rendered HTML has lost the Markdown (link
+targets, emphasis markers, table alignment), and turning edited HTML back into
+Markdown is lossy. The renderer's `data-sourcepos` already says which lines a
+block came from, so those lines are what you edit. A heading is a one-line
+input with its `#`s, so changing the level is just editing them.
+
+**Stale edits are refused.** The edit carries the lines as they were rendered
+(`expected`); the receiving side applies it only while the document still holds
+exactly those lines there. Edited in Neovim in between, the preview shows a short
+note and Neovim warns, instead of one side overwriting the other.
+
+- **`:MDView start`**: Neovim replaces only that line range of the buffer (marks,
+  folds and the rest of the undo history stay), as **one undo step** — `u` takes
+  the edit back. The buffer is then modified; save as usual.
+- **Standalone** (`:MDView standalone`, `mdview-server --watch … --edit`): the relay
+  replaces the lines in the file, line endings (LF/CRLF) and the trailing newline
+  preserved, written atomically (temp file + rename).
+- While an editor is open, incoming renders are held back and run when it closes,
+  so a push never pulls the field out from under you.
+- Not editable: the frontmatter table (it has no source position), a display
+  language / `browser.transform` preview (the lines it shows are not the
+  buffer's), and links, checkboxes and form fields, which keep their own job.
+
+**Off by default**, because a click on text would otherwise open an editor.
+`:MDView edit [on|off|toggle]` switches it for the running session (an open
+editor is closed without sending when switched off); `edit_blocks = true` makes
+it the default.
+
+- **Module:** `src/client/render/blockEdit.ts`, `native/server/internal/source/edit.go`, `native/server/internal/relay/edit.go`, `/edit` route in `native/server/main.go`; `:MDView start` buffer edit in `lua/mdview/adapter/inbound_poll.lua` (`handle_edit`); `lua/mdview/bindings/usrcmds/edit.lua`
+- **Usercmds:** `:MDView edit [on|off|toggle]`
+- **Config:** `edit_blocks` (default `false`), passed to the client as `?edit=1`; standalone: `--edit` on the relay
+
 ## Display language (translated preview)
 
 The buffer stays as it is (say, German); the preview shows another language

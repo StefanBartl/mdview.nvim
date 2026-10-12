@@ -47,6 +47,15 @@ relay port and the Vite dev port, so it can sit alongside a normal session.
 With `--no-browser`, mdview prints the preview URL in the notification — that's
 how you open it yourself, or from another device on the same machine.
 
+### Editing in the preview
+
+With `edit_blocks = true` in the setup, `:MDView standalone` passes `--edit` to
+the relay (`mdview-server --watch README.md --edit`), and clicking a block in the
+preview edits its source lines in the file itself — written atomically, line
+endings preserved, refused when the lines changed on disk in the meantime. See
+[Block editing](FEATURES/PREVIEW.md#block-editing). A relay that does not list
+`--edit` is run without it, and a warning says so.
+
 ### Requires a relay with `--watch` (v0.3.0+)
 
 Standalone mode needs a relay binary built with watch support. If the one

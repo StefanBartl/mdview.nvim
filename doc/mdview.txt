@@ -128,6 +128,8 @@ Defaults: >lua
                                     -- preview writes back to the source
     sync_fields             = true, -- editing an <input name>/<textarea name>
                                     -- in the preview writes its value back
+    edit_blocks             = false, -- click a block in the preview to edit
+                                    -- its source lines (:MDView edit)
 
     open_preview_tab = false, -- :MDView start opens an nvim tab, not a browser
 
@@ -245,6 +247,16 @@ sync_fields ~
   is HTML-escaped, so it can't break out of the tag. |:MDView-standalone|
   rewrites the file; |:MDView-start| edits the buffer. Set `false` to render
   such fields read-only.
+
+edit_blocks ~
+  When `true`, clicking a block in the preview (heading, paragraph, list item,
+  code block, table, quote) replaces it with a text field holding the block's
+  source lines; committing (blur / Ctrl+Enter, Enter in a one-line field)
+  writes them back, Esc discards. |:MDView-start| replaces only that line
+  range of the buffer, as one undo step; |:MDView-standalone| rewrites the file
+  (the relay's `--edit`). An edit made against lines that changed since the
+  preview was rendered is refused. Default `false`; |:MDView-edit| switches it
+  for the running session.
 
 open_preview_tab ~
   When `true`, |:MDView-start| opens an nvim-tab preview (see
@@ -666,6 +678,12 @@ pushes a control update over the socket.
   `line` (blinking bar at the cursor line), `caret` (caret at the exact cursor
   column), `section` (spotlight the current heading section, dim the rest), or
   `off`. No argument reports the current mode. Tab-completed.
+
+:MDView edit [action]                                          *:MDView-edit*
+  Switches block editing in the preview on/off (`on`|`off`|`toggle`; no
+  argument toggles) — see `edit_blocks` above. Click a block to edit its
+  source lines. Switching it off closes an editor that is open, without
+  sending its content.
 
 :MDView selection [action]                                *:MDView-selection*
   Switches the visual-selection mirror on/off (`on`|`off`|`toggle`; no
