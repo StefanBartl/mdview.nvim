@@ -24,7 +24,14 @@ import { applyLangStatus, parseLangStatus } from './render/langStatus';
 import { createSpotlightMirror } from './render/spotlightMirror';
 import { enableTaskCheckboxes, installTaskToggle } from './render/taskToggle';
 import { installFieldSync } from './render/fieldSync';
-import { installBlockEdit, splitLines, type BlockEdit, type BlockEditor } from './render/blockEdit';
+import {
+  BARE_CR_MESSAGE,
+  hasBareCr,
+  installBlockEdit,
+  splitLines,
+  type BlockEdit,
+  type BlockEditor,
+} from './render/blockEdit';
 import { initToast, showToast } from './render/toast';
 import {
   initOverlays,
@@ -304,17 +311,26 @@ async function boot() {
       // The line as rendered: an edit applied before this toggle may have moved
       // the lines, and the receiving side then drops it instead of ticking the
       // neighbour.
+      // A document with lone CRs has other line numbers in the preview than in
+      // the source: the box goes back instead of ticking another line.
+      if (hasBareCr(lastText)) {
+        showToast(BARE_CR_MESSAGE);
+        return Promise.resolve(false);
+      }
       const expected = splitLines(lastText)[line - 1] ?? null;
       // Resolves false when the relay refused it: the box goes back to what the
       // source still says, and the person is told, instead of a tick that was
       // never saved.
-      return postToggle(fetch, { token, key, doc: currentDocument(), expected }, line, checked).then(
-        result => {
-          if (result === 'ok') return true;
-          showToast(WRITE_BACK_MESSAGES[result]);
-          return false;
-        },
-      );
+      return postToggle(
+        fetch,
+        { token, key, doc: currentDocument(), expected },
+        line,
+        checked,
+      ).then(result => {
+        if (result === 'ok') return true;
+        showToast(WRITE_BACK_MESSAGES[result]);
+        return false;
+      });
     });
   }
 
@@ -373,6 +389,7 @@ async function boot() {
       getDocument: currentDocument,
       isEnabled: () => editEnabled,
       send: sendBlockEdit,
+      notify: toast,
       onClose: () => {
         // A held-back render re-places the cursor marker and the selection itself.
         if (!gate.release() && container) {
