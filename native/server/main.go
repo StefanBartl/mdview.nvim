@@ -753,9 +753,55 @@ func handleNav(queue *relay.NavQueue, token string) http.HandlerFunc {
 
 const maxToggleBodyBytes = 32 // "<line>:<0|1>"
 
-// maxDocLen bounds the `doc` a write-back names (the path of the document the
-// tab is showing): it ends up in a queue Neovim drains, and no real path is longer.
-const maxDocLen = 4096
+// maxDocLen bounds the strings a write-back names in its URL (`key`, the room,
+// and `doc`, the document the tab is showing): they end up in a queue Neovim
+// drains, and no realistic path is longer.
+const maxDocLen = 8192
+
+// maxExpectedLen bounds the `expected` line a checkbox toggle carries.
+const maxExpectedLen = 2048
+
+// writeBackParams reads what every browser -> source write-back names in its
+// URL. It answers the request itself (and reports false) when the URL is
+// malformed, a value is over its bound, or, in standalone mode, the room is not
+// the watched file: nobody drains a queue there, and a 204 for a request that
+// is then dropped would be a lie.
+func writeBackParams(w http.ResponseWriter, r *http.Request, watchKey string) (q url.Values, key, doc string, ok bool) {
+	q, err := url.ParseQuery(r.URL.RawQuery)
+	if err != nil {
+		http.Error(w, "malformed query", http.StatusBadRequest)
+		return nil, "", "", false
+	}
+	key = q.Get("key")
+	if key == "" {
+		http.Error(w, "missing key", http.StatusBadRequest)
+		return nil, "", "", false
+	}
+	doc = q.Get("doc")
+	if len(key) > maxDocLen || len(doc) > maxDocLen {
+		http.Error(w, "key or doc too long", http.StatusBadRequest)
+		return nil, "", "", false
+	}
+	if watchKey != "" && key != watchKey {
+		http.Error(w, "no such document", http.StatusNotFound)
+		return nil, "", "", false
+	}
+	return q, key, doc, true
+}
+
+// writeBackFailed answers a failed write to the watched file: a stale edit is a
+// conflict, a read-only file is forbidden, anything else is a server error.
+func writeBackFailed(w http.ResponseWriter, what string, err error) {
+	switch {
+	case errors.Is(err, source.ErrStale):
+		http.Error(w, "lines changed", http.StatusConflict)
+	case errors.Is(err, source.ErrReadOnly):
+		http.Error(w, "the file is read-only", http.StatusForbidden)
+	default:
+		fmt.Printf("[%s] %v\n", what, err)
+		http.Error(w, what+" failed", http.StatusInternalServerError)
+	}
+}
 
 // handleToggle is the browser->source bridge for GFM task-list checkboxes. On
 // POST the browser sends "<line>:<0|1>" for a room — the 1-based source line of
@@ -782,9 +828,13 @@ func handleToggle(queue *relay.ToggleQueue, watchKey, watchPath, token string) h
 			w.Header().Set("Content-Type", "application/json")
 			_ = json.NewEncoder(w).Encode(queue.Drain())
 		case http.MethodPost:
-			key := r.URL.Query().Get("key")
-			if key == "" {
-				http.Error(w, "missing key", http.StatusBadRequest)
+			q, key, doc, ok := writeBackParams(w, r, watchKey)
+			if !ok {
+				return
+			}
+			expected := q.Get("expected")
+			if len(expected) > maxExpectedLen {
+				http.Error(w, "expected too long", http.StatusBadRequest)
 				return
 			}
 			body, err := io.ReadAll(io.LimitReader(r.Body, maxToggleBodyBytes))
@@ -797,22 +847,17 @@ func handleToggle(queue *relay.ToggleQueue, watchKey, watchPath, token string) h
 				http.Error(w, "invalid toggle payload", http.StatusBadRequest)
 				return
 			}
-			doc := r.URL.Query().Get("doc")
-			if len(doc) > maxDocLen {
-				http.Error(w, "doc too long", http.StatusBadRequest)
-				return
-			}
 
-			if watchKey != "" && key == watchKey {
-				// Standalone: apply straight to the watched file.
-				if err := source.ToggleCheckbox(watchPath, line, checked); err != nil {
-					fmt.Printf("[toggle] %s line %d: %v\n", watchPath, line, err)
-					http.Error(w, "toggle failed", http.StatusInternalServerError)
+			if watchKey != "" {
+				// Standalone: apply straight to the watched file (writeBackParams
+				// has made sure the room is that file).
+				if err := source.ToggleCheckboxIf(watchPath, line, checked, expected); err != nil {
+					writeBackFailed(w, "toggle", err)
 					return
 				}
 			} else {
 				// Neovim-driven: hand it off for Neovim to apply to its buffer.
-				queue.Push(relay.ToggleRequest{Key: key, Doc: doc, Line: line, Checked: checked})
+				queue.Push(relay.ToggleRequest{Key: key, Doc: doc, Line: line, Expected: expected, Checked: checked})
 			}
 			w.WriteHeader(http.StatusNoContent)
 		default:
@@ -861,9 +906,8 @@ func handleField(queue *relay.FieldQueue, watchKey, watchPath, token string) htt
 			w.Header().Set("Content-Type", "application/json")
 			_ = json.NewEncoder(w).Encode(queue.Drain())
 		case http.MethodPost:
-			key := r.URL.Query().Get("key")
-			if key == "" {
-				http.Error(w, "missing key", http.StatusBadRequest)
+			_, key, doc, ok := writeBackParams(w, r, watchKey)
+			if !ok {
 				return
 			}
 			body, err := io.ReadAll(io.LimitReader(r.Body, maxFieldBodyBytes))
@@ -879,16 +923,10 @@ func handleField(queue *relay.FieldQueue, watchKey, watchPath, token string) htt
 				http.Error(w, "invalid field payload", http.StatusBadRequest)
 				return
 			}
-			doc := r.URL.Query().Get("doc")
-			if len(doc) > maxDocLen {
-				http.Error(w, "doc too long", http.StatusBadRequest)
-				return
-			}
 
-			if watchKey != "" && key == watchKey {
+			if watchKey != "" {
 				if err := source.SetFieldValue(watchPath, req.Name, req.Value); err != nil {
-					fmt.Printf("[field] %s name=%q: %v\n", watchPath, req.Name, err)
-					http.Error(w, "field write failed", http.StatusInternalServerError)
+					writeBackFailed(w, "field", err)
 					return
 				}
 			} else {
@@ -923,9 +961,8 @@ func handleEdit(queue *relay.EditQueue, watchKey, watchPath, token string, stand
 			w.Header().Set("Content-Type", "application/json")
 			_ = json.NewEncoder(w).Encode(queue.Drain())
 		case http.MethodPost:
-			key := r.URL.Query().Get("key")
-			if key == "" {
-				http.Error(w, "missing key", http.StatusBadRequest)
+			_, key, doc, ok := writeBackParams(w, r, watchKey)
+			if !ok {
 				return
 			}
 			body, err := io.ReadAll(io.LimitReader(r.Body, maxEditBodyBytes+1))
@@ -947,25 +984,14 @@ func handleEdit(queue *relay.EditQueue, watchKey, watchPath, token string, stand
 				http.Error(w, "invalid edit payload", http.StatusBadRequest)
 				return
 			}
-			doc := r.URL.Query().Get("doc")
-			if len(doc) > maxDocLen {
-				http.Error(w, "doc too long", http.StatusBadRequest)
-				return
-			}
 
-			if watchKey != "" && key == watchKey {
+			if watchKey != "" {
 				if !standaloneEdit {
 					http.Error(w, "block editing is off (start the relay with --edit)", http.StatusForbidden)
 					return
 				}
-				err := source.ReplaceLines(watchPath, req.Start, req.End, req.Expected, req.Text)
-				if errors.Is(err, source.ErrStale) {
-					http.Error(w, "lines changed", http.StatusConflict)
-					return
-				}
-				if err != nil {
-					fmt.Printf("[edit] %s lines %d-%d: %v\n", watchPath, req.Start, req.End, err)
-					http.Error(w, "edit failed", http.StatusInternalServerError)
+				if err := source.ReplaceLines(watchPath, req.Start, req.End, req.Expected, req.Text); err != nil {
+					writeBackFailed(w, "edit", err)
 					return
 				}
 			} else {

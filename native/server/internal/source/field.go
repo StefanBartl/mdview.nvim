@@ -1,7 +1,6 @@
 package source
 
 import (
-	"os"
 	"regexp"
 	"strings"
 )
@@ -44,7 +43,7 @@ func SetFieldValue(path, name, value string) error {
 	writeMu.Lock()
 	defer writeMu.Unlock()
 
-	content, err := os.ReadFile(path)
+	target, content, perm, err := loadWatched(path)
 	if err != nil {
 		return err
 	}
@@ -52,21 +51,23 @@ func SetFieldValue(path, name, value string) error {
 	q := regexp.QuoteMeta(name)
 
 	// textarea first — it has an explicit close, so its body is unambiguous.
-	taRe := regexp.MustCompile(`(?s)<textarea\b[^>]*\bname="` + q + `"[^>]*>.*?</textarea>`)
+	// `\s` before name=: a boundary, so `data-name="x"` or `username="x"` is not
+	// the field called `x`.
+	taRe := regexp.MustCompile(`(?s)<textarea\b[^>]*\sname="` + q + `"[^>]*>.*?</textarea>`)
 	if loc := taRe.FindStringIndex(s); loc != nil {
 		whole := s[loc[0]:loc[1]]
 		openEnd := strings.IndexByte(whole, '>') + 1
 		closeStart := strings.LastIndex(whole, "</textarea>")
 		rebuilt := whole[:openEnd] + escapeText(value) + whole[closeStart:]
-		return os.WriteFile(path, []byte(s[:loc[0]]+rebuilt+s[loc[1]:]), 0o644)
+		return writeThrough(target, []byte(s[:loc[0]]+rebuilt+s[loc[1]:]), content, perm)
 	}
 
 	// input: locate the tag by name, then set its value attribute.
-	inRe := regexp.MustCompile(`<input\b[^>]*\bname="` + q + `"[^>]*>`)
+	inRe := regexp.MustCompile(`<input\b[^>]*\sname="` + q + `"[^>]*>`)
 	if loc := inRe.FindStringIndex(s); loc != nil {
 		tag := s[loc[0]:loc[1]]
 		newTag := setInputValue(tag, value)
-		return os.WriteFile(path, []byte(s[:loc[0]]+newTag+s[loc[1]:]), 0o644)
+		return writeThrough(target, []byte(s[:loc[0]]+newTag+s[loc[1]:]), content, perm)
 	}
 
 	return nil // no field with that name; decline

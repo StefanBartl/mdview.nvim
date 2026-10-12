@@ -156,3 +156,33 @@ func TestHandleEdit_RejectsOtherMethods(t *testing.T) {
 		t.Fatalf("status = %d, want 405", rec.Code)
 	}
 }
+
+func TestHandleEdit_StandaloneKeyMismatchIs404AndTooLongDocIs400(t *testing.T) {
+	p := mustWriteFile(t, t.TempDir(), "doc.md", "a\nold\nb\n")
+	key := filepath.ToSlash(p)
+	h := handleEdit(relay.NewEditQueue(), key, p, testToken, true)
+
+	if rec := editPost(t, h, "some/other.md", testToken, editBody); rec.Code != http.StatusNotFound {
+		t.Fatalf("key mismatch: status = %d, want 404", rec.Code)
+	}
+	if rec := editPostDoc(t, h, key, strings.Repeat("d", maxDocLen+1), testToken, editBody); rec.Code != http.StatusBadRequest {
+		t.Fatalf("long doc: status = %d, want 400", rec.Code)
+	}
+	if got, want := readFile(t, p), "a\nold\nb\n"; got != want {
+		t.Fatalf("file changed: %q", got)
+	}
+}
+
+func TestHandleEdit_ReadOnlyFileIs403(t *testing.T) {
+	p := mustWriteFile(t, t.TempDir(), "doc.md", "a\nold\nb\n")
+	if err := os.Chmod(p, 0o444); err != nil {
+		t.Skipf("cannot make the file read-only here: %v", err)
+	}
+	defer func() { _ = os.Chmod(p, 0o644) }()
+	key := filepath.ToSlash(p)
+	h := handleEdit(relay.NewEditQueue(), key, p, testToken, true)
+
+	if rec := editPost(t, h, key, testToken, editBody); rec.Code != http.StatusForbidden {
+		t.Fatalf("status = %d, want 403", rec.Code)
+	}
+}

@@ -127,6 +127,11 @@ func (w *watcher) poll() {
 // readCapped reads path, refusing anything past maxFileBytes rather than
 // loading an arbitrarily large file into memory.
 func readCapped(path string) ([]byte, error) {
+	// Under the read lock: a rewrite of the file by this process (block edit,
+	// toggle, field edit) renames over it, which fails while a reader has it open.
+	writeMu.RLock()
+	defer writeMu.RUnlock()
+
 	info, err := os.Stat(path)
 	if err != nil {
 		return nil, err

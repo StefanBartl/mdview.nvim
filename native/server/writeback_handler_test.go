@@ -107,3 +107,78 @@ func TestHandleField_RejectsATooLongDoc(t *testing.T) {
 		t.Fatalf("a refused edit was queued: %+v", got)
 	}
 }
+
+func TestHandleToggle_StandaloneStaleLineIs409AndKeyMismatchIs404(t *testing.T) {
+	p := mustWriteFile(t, t.TempDir(), "doc.md", "- [ ] one\n- [ ] two\n")
+	key := filepath.ToSlash(p)
+	queue := relay.NewToggleQueue()
+	h := handleToggle(queue, key, p, testToken)
+
+	// the tab meant "- [ ] two" at line 1, but the line is another one now
+	target := "/toggle?token=" + testToken + "&key=" + url.QueryEscape(key) + "&expected=" + url.QueryEscape("- [ ] two")
+	rec := httptest.NewRecorder()
+	h(rec, httptest.NewRequest(http.MethodPost, target, strings.NewReader("1:1")))
+	if rec.Code != http.StatusConflict {
+		t.Fatalf("stale: status = %d, want 409", rec.Code)
+	}
+	if got, want := readFile(t, p), "- [ ] one\n- [ ] two\n"; got != want {
+		t.Fatalf("file changed: %q", got)
+	}
+
+	// a room that is not the watched file: nobody would drain a queue
+	if rec := togglePost(t, h, "some/other.md", "", "1:1"); rec.Code != http.StatusNotFound {
+		t.Fatalf("key mismatch: status = %d, want 404", rec.Code)
+	}
+	if got := queue.Drain(); got != nil {
+		t.Fatalf("a request for another room was queued in standalone mode: %+v", got)
+	}
+}
+
+func TestHandleToggle_NeovimModeQueuesTheExpectedLine(t *testing.T) {
+	queue := relay.NewToggleQueue()
+	h := handleToggle(queue, "", "", testToken)
+
+	target := "/toggle?token=" + testToken + "&key=room.md&expected=" + url.QueryEscape("- [ ] one")
+	rec := httptest.NewRecorder()
+	h(rec, httptest.NewRequest(http.MethodPost, target, strings.NewReader("3:1")))
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("status = %d, want 204", rec.Code)
+	}
+	got := queue.Drain()
+	if len(got) != 1 || got[0].Expected != "- [ ] one" {
+		t.Fatalf("queued = %+v", got)
+	}
+
+	long := "/toggle?token=" + testToken + "&key=room.md&expected=" + strings.Repeat("x", maxExpectedLen+1)
+	rec = httptest.NewRecorder()
+	h(rec, httptest.NewRequest(http.MethodPost, long, strings.NewReader("3:1")))
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("long expected: status = %d, want 400", rec.Code)
+	}
+}
+
+func TestWriteBackRoutes_RejectAMalformedQueryAndATooLongKey(t *testing.T) {
+	routes := map[string]http.HandlerFunc{
+		"/toggle": handleToggle(relay.NewToggleQueue(), "", "", testToken),
+		"/field":  handleField(relay.NewFieldQueue(), "", "", testToken),
+		"/edit":   handleEdit(relay.NewEditQueue(), "", "", testToken, false),
+	}
+	bodies := map[string]string{
+		"/toggle": "1:1",
+		"/field":  `{"name":"n","value":"v"}`,
+		"/edit":   `{"start":1,"end":1,"expected":"a","text":"b"}`,
+	}
+	for route, h := range routes {
+		// "%zz" is not a percent escape: the pair is not silently dropped
+		rec := httptest.NewRecorder()
+		h(rec, httptest.NewRequest(http.MethodPost, route+"?token="+testToken+"&key=room.md&doc=%zz", strings.NewReader(bodies[route])))
+		if rec.Code != http.StatusBadRequest {
+			t.Errorf("%s malformed query: status = %d, want 400", route, rec.Code)
+		}
+		rec = httptest.NewRecorder()
+		h(rec, httptest.NewRequest(http.MethodPost, route+"?token="+testToken+"&key="+strings.Repeat("k", maxDocLen+1), strings.NewReader(bodies[route])))
+		if rec.Code != http.StatusBadRequest {
+			t.Errorf("%s long key: status = %d, want 400", route, rec.Code)
+		}
+	}
+}

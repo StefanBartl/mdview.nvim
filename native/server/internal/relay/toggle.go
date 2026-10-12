@@ -9,10 +9,14 @@ import "sync"
 // it only carries the event to Neovim, which edits the buffer (which may hold
 // unsaved changes the relay must not clobber).
 type ToggleRequest struct {
-	Key     string `json:"key"`
-	Doc     string `json:"doc,omitempty"`
-	Line    int    `json:"line"`
-	Checked bool   `json:"checked"`
+	Key  string `json:"key"`
+	Doc  string `json:"doc,omitempty"`
+	Line int    `json:"line"`
+	// Expected is the text of that line as the browser rendered it (without its
+	// line ending), so a toggle that arrives after an edit moved the lines is
+	// dropped instead of ticking the neighbour. Empty: not checked.
+	Expected string `json:"expected,omitempty"`
+	Checked  bool   `json:"checked"`
 }
 
 // ToggleQueue is a tiny thread-safe FIFO of pending checkbox toggles, drained by

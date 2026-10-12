@@ -2,7 +2,6 @@ package source
 
 import (
 	"fmt"
-	"os"
 	"regexp"
 	"strings"
 )
@@ -12,7 +11,8 @@ import (
 // "[X]". The three capture groups are (everything up to and including the
 // opening bracket), (the state char), (everything from the closing bracket on),
 // so flipping is a single-character rewrite that preserves indentation, bullet
-// style and the item text exactly.
+// style and the item text exactly. It is matched against a line without its
+// trailing "\r".
 var taskMarker = regexp.MustCompile(`^(\s*[-*+] \[)([ xX])(\].*)$`)
 
 // ToggleCheckbox flips the task-list checkbox on 1-based line `line` of the file
@@ -22,9 +22,18 @@ var taskMarker = regexp.MustCompile(`^(\s*[-*+] \[)([ xX])(\].*)$`)
 // line number.
 //
 // Only the one marker character changes; the rest of the line, the line ending,
-// and every other line are preserved exactly, so a checkbox toggle never
-// reformats the user's document.
+// and every other line are preserved exactly (also in a file whose lines end
+// differently), so a checkbox toggle never reformats the user's document.
 func ToggleCheckbox(path string, line int, checked bool) error {
+	return ToggleCheckboxIf(path, line, checked, "")
+}
+
+// ToggleCheckboxIf is ToggleCheckbox that, when `expected` is not empty, also
+// requires line `line` to hold exactly that text (without its line ending):
+// the browser computed the line number from the render it was looking at, and
+// an edit applied in between (a text field that gained lines, a block edit) may
+// have moved it. A different line is ErrStale instead of toggling a neighbour.
+func ToggleCheckboxIf(path string, line int, checked bool, expected string) error {
 	if line < 1 {
 		return fmt.Errorf("invalid line %d", line)
 	}
@@ -32,25 +41,23 @@ func ToggleCheckbox(path string, line int, checked bool) error {
 	writeMu.Lock()
 	defer writeMu.Unlock()
 
-	content, err := os.ReadFile(path)
+	target, content, perm, err := loadWatched(path)
 	if err != nil {
 		return err
 	}
 
-	// Detect and preserve the file's line ending; split on "\n" after
-	// normalizing so a lone marker rewrite doesn't flip CRLF to LF elsewhere.
-	newline := "\n"
-	if strings.Contains(string(content), "\r\n") {
-		newline = "\r\n"
-	}
-	lines := strings.Split(strings.ReplaceAll(string(content), "\r\n", "\n"), "\n")
-
+	lines := strings.Split(string(content), "\n") // a CRLF line keeps its "\r"
 	if line > len(lines) {
 		// Stale line number (file shrank since render) — decline silently.
 		return nil
 	}
 
-	m := taskMarker.FindStringSubmatch(lines[line-1])
+	text := strings.TrimSuffix(lines[line-1], "\r")
+	if expected != "" && text != strings.TrimSuffix(expected, "\r") {
+		return ErrStale
+	}
+
+	m := taskMarker.FindStringSubmatch(text)
 	if m == nil {
 		// Not a checkbox line — decline rather than corrupt it.
 		return nil
@@ -63,7 +70,7 @@ func ToggleCheckbox(path string, line int, checked bool) error {
 	if m[2] == want {
 		return nil // already in the requested state; no write
 	}
-	lines[line-1] = m[1] + want + m[3]
+	lines[line-1] = m[1] + want + m[3] + strings.TrimPrefix(lines[line-1], text)
 
-	return os.WriteFile(path, []byte(strings.Join(lines, newline)), 0o644)
+	return writeThrough(target, []byte(strings.Join(lines, "\n")), content, perm)
 }
