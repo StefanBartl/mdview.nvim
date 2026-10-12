@@ -207,7 +207,9 @@ export function installBlockEdit(container: HTMLElement, opts: BlockEditOptions)
       // wraps over several visual lines. (No layout, e.g. in tests: scrollHeight 0.)
       field.rows = Math.min(Math.max(field.value.split('\n').length, 1), 30);
       field.style.height = 'auto';
-      if (field.scrollHeight > 0) field.style.height = `${field.scrollHeight}px`;
+      // scrollHeight leaves out the border (border-box sizing): add it back.
+      const border = field.offsetHeight - field.clientHeight;
+      if (field.scrollHeight > 0) field.style.height = `${field.scrollHeight + border}px`;
     };
     fit();
     field.addEventListener('input', fit);
@@ -216,6 +218,7 @@ export function installBlockEdit(container: HTMLElement, opts: BlockEditOptions)
     block.parentNode?.insertBefore(field, block);
     active = { field, block };
     field.focus();
+    fit(); // now that it has a layout: a long wrapping paragraph needs its height at once
 
     field.addEventListener('keydown', (ev: Event) => {
       const k = ev as KeyboardEvent;

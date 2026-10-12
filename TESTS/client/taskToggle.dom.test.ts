@@ -131,6 +131,19 @@ describe('installTaskToggle, a refused toggle', () => {
     expect(box.checked).toBe(true);
   });
 
+  it('a refused double click ends on the state the source has, not on a never saved tick', async () => {
+    const root = setup(TASK_HTML);
+    enableTaskCheckboxes(root);
+    installTaskToggle(root, () => Promise.resolve(false));
+    const box = root.querySelector<HTMLInputElement>('input[type="checkbox"]')!;
+    for (const v of [true, false]) {
+      box.checked = v;
+      box.dispatchEvent(new window.Event('change', { bubbles: true }));
+    }
+    await flush();
+    expect(box.checked).toBe(false); // the source was unticked all along
+  });
+
   it('does not touch a box that a re-render removed meanwhile', async () => {
     const root = setup(TASK_HTML);
     const box = toggle(root, () => Promise.resolve(false));

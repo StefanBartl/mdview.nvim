@@ -36,6 +36,12 @@ export function enableTaskCheckboxes(root: HTMLElement): void {
   });
 }
 
+/** Toggles of one box that the relay has not answered yet. */
+const inFlight = new WeakMap<
+  HTMLInputElement,
+  { pending: number; saved: boolean; failed: boolean }
+>();
+
 /**
  * Install one delegated change handler that, when a task-list checkbox is
  * toggled, resolves its source line and calls `send(line, checked)`. Delegated
@@ -62,10 +68,22 @@ export function installTaskToggle(
     const sent = send(line, checked);
     if (sent instanceof Promise) {
       // The relay refused it: the source still has the old state, so the box
-      // goes back instead of showing a tick that was never saved. (A box that a
-      // re-render replaced meanwhile already shows the source's state.)
+      // goes back instead of showing a tick that was never saved. With several
+      // clicks in flight (a double click) the box returns once all are answered,
+      // to the state the source was last known to have.
+      let st = inFlight.get(box);
+      if (!st) {
+        st = { pending: 0, saved: !checked, failed: false };
+        inFlight.set(box, st);
+      }
+      st.pending++;
       void sent.then(ok => {
-        if (!ok && box.isConnected && box.checked === checked) box.checked = !checked;
+        if (ok) st.saved = checked;
+        else st.failed = true;
+        if (--st.pending > 0) return;
+        inFlight.delete(box);
+        // (A box that a re-render replaced meanwhile already shows the source.)
+        if (st.failed && box.isConnected) box.checked = st.saved;
       });
     }
   });
