@@ -33,6 +33,14 @@ export function installHistory(deps: HistoryDeps): void {
   window.addEventListener('popstate', handler);
 }
 
+/**
+ * The document the tab is showing, as Neovim last announced it (null before the
+ * first announcement). In "reuse" behavior this is not the tab's room key.
+ */
+export function currentDocument(): string | null {
+  return currentDoc;
+}
+
 /** Record that the previewed document changed to `path` (from a doc ping). */
 export function onDocChange(path: string): void {
   if (!path || path === currentDoc) return;

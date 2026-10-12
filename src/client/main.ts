@@ -33,7 +33,7 @@ import {
   notifyRender as notifyOverlayRender,
   dispatchOverlayControl,
 } from './render/overlays';
-import { installHistory, onDocChange } from './render/history';
+import { currentDocument, installHistory, onDocChange } from './render/history';
 import { highlight, parseHighlighter } from './highlight';
 import init, { render_markdown } from './wasm-render/mdview_wasm_render.js';
 
@@ -335,10 +335,15 @@ async function boot() {
   // back while an editor is open (see renderDocument) and flushed on close.
   let editEnabled = params.get('edit') === '1';
   let deferredText: string | null = null;
+  // The newest text there is: the one held back behind an open editor, else the
+  // one on screen. A re-render that is not caused by a push (a control update)
+  // must start from this, or it would put the older text back.
+  const currentText = (): string => deferredText ?? lastText;
   const toast = (message: string): void => {
     if (!container) return;
     const el = document.createElement('div');
     el.className = 'mdview-toast';
+    el.setAttribute('role', 'status');
     el.textContent = message;
     document.body.appendChild(el);
     setTimeout(() => el.remove(), 4000);
@@ -348,7 +353,9 @@ async function boot() {
     void fetch(`/edit?token=${encodeURIComponent(token)}&key=${encodeURIComponent(key)}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(edit),
+      // `doc`: in "reuse" behavior the tab's key is a room, not the document on
+      // screen; Neovim edits the buffer of the document the tab was showing.
+      body: JSON.stringify({ ...edit, doc: currentDocument() ?? undefined }),
     })
       .then(res => {
         if (res.status === 409) toast('Not saved: those lines changed in the source meanwhile.');
@@ -564,6 +571,7 @@ async function boot() {
       selectionSync?: unknown;
       displayLang?: unknown;
       editBlocks?: unknown;
+      notice?: unknown;
     };
     try {
       msg = JSON.parse(json) as typeof msg;
@@ -595,7 +603,7 @@ async function boot() {
         // Toggling caret changes whether the renderer must emit source-position
         // spans, so re-render the current document with the new setting.
         wantSourceMap = needSourceMap;
-        if (container) renderDocument(lastText);
+        if (container) renderDocument(currentText());
       } else if (container) {
         updateCursorMarker(
           container,
@@ -618,6 +626,11 @@ async function boot() {
       // Blocks are already in the DOM — just add/remove spacers, no re-render.
       applyBlankLineSpacing(container, blankLinesEnabled);
     }
+    if (typeof msg.notice === 'string' && msg.notice !== '') {
+      // A short message from Neovim for the person at the preview, e.g. that a
+      // block edit was not applied. Shown as text, never as markup.
+      toast(msg.notice.slice(0, 200));
+    }
     if (typeof msg.editBlocks === 'boolean' && container) {
       // `:MDView edit` switching block editing on/off for this session. Off
       // closes an open editor without sending its content.
@@ -639,7 +652,7 @@ async function boot() {
       const needSourceMap = selectionEnabled || cursorMarkerMode === 'caret';
       if (needSourceMap !== wantSourceMap) {
         wantSourceMap = needSourceMap;
-        renderDocument(lastText);
+        renderDocument(currentText());
       }
     }
     if ('selection' in msg && container) {
@@ -654,7 +667,7 @@ async function boot() {
         // them — but only now that there is actually something to draw.
         selectionEnabled = true;
         wantSourceMap = true;
-        renderDocument(lastText);
+        renderDocument(currentText());
       } else {
         selectionEnabled = true;
         updateSelection(container, lastSelection);

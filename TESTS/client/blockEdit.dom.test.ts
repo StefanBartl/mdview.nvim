@@ -64,6 +64,11 @@ describe('parseSourcePos / rangeOf / sliceLines', () => {
     expect(sliceLines(DOC, { start: 3, end: 4 })).toBe('first line\nsecond line');
     expect(sliceLines(DOC, { start: 9, end: 9 })).toBeNull();
   });
+
+  it('reads CRLF as one line break and takes already split lines', () => {
+    expect(sliceLines('a\r\nb\r\nc', { start: 2, end: 3 })).toBe('b\nc');
+    expect(sliceLines(['a', 'b', 'c'], { start: 1, end: 2 })).toBe('a\nb');
+  });
 });
 
 describe('trimBlankTail', () => {
@@ -128,13 +133,53 @@ describe('installBlockEdit (real DOM)', () => {
     });
   });
 
-  it('commits on blur, once', () => {
+  it('commits on blur (focus moving elsewhere), once', () => {
     const { root, send } = setup();
     click(root.querySelector('h1')!);
     const field = root.querySelector('.mdview-block-editor') as HTMLInputElement;
+    expect(document.activeElement).toBe(field);
     field.value = '# B';
-    field.dispatchEvent(new window.FocusEvent('blur'));
+    field.blur(); // real blur: focus leaves the field
     expect(send).toHaveBeenCalledTimes(1);
+    expect(send).toHaveBeenCalledWith({ start: 1, end: 1, expected: '# Title', text: '# B' });
+  });
+
+  it('does not commit half-typed text when only the window lost focus', () => {
+    const { root, send, editor } = setup();
+    click(root.querySelector('h1')!);
+    const field = root.querySelector('.mdview-block-editor') as HTMLInputElement;
+    field.value = '# half typed';
+    // alt-tab: the blur event fires but the field stays the active element
+    field.dispatchEvent(new window.FocusEvent('blur'));
+    expect(send).not.toHaveBeenCalled();
+    expect(editor.isEditing()).toBe(true);
+  });
+
+  it('ignores Enter that confirms an IME composition', () => {
+    const { root, send } = setup();
+    click(root.querySelector('h1')!);
+    const field = root.querySelector('.mdview-block-editor') as HTMLInputElement;
+    field.value = '# composed';
+    key(field, { key: 'Enter', isComposing: true });
+    expect(send).not.toHaveBeenCalled();
+    key(field, { key: 'Enter' });
+    expect(send).toHaveBeenCalledTimes(1);
+  });
+
+  it('labels the field for assistive technology', () => {
+    const { root } = setup();
+    click(root.querySelector('h1')!);
+    expect(root.querySelector('.mdview-block-editor')!.getAttribute('aria-label')).toBeTruthy();
+  });
+
+  it('never opens inside a private block (the click is its reveal gesture)', () => {
+    const { root } = setup();
+    const priv = document.createElement('div');
+    priv.setAttribute('data-private', '');
+    priv.innerHTML = '<p data-sourcepos="3:1-4:11">hidden words</p>';
+    root.appendChild(priv);
+    click(priv.querySelector('p')!);
+    expect(root.querySelector('.mdview-block-editor')).toBeNull();
   });
 
   it('sends nothing for an unchanged commit and for Escape', () => {

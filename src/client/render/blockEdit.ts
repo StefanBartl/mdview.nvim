@@ -26,6 +26,12 @@ const EDITABLE_TAGS = new Set([
 /** Clicks inside these never open an editor (they have a job of their own). */
 const INTERACTIVE = 'a, input, textarea, button, select, label, summary, .mdview-block-editor';
 
+/**
+ * Private blocks are blurred until revealed, and a click is the reveal gesture:
+ * an editor opening on that click would show the raw text of what is hidden.
+ */
+const PRIVATE = '[data-private]';
+
 export interface LineRange {
   /** 1-based first source line. */
   start: number;
@@ -34,10 +40,17 @@ export interface LineRange {
 }
 
 export interface BlockEdit extends LineRange {
+  /** The document the edit belongs to, when the tab knows it (see `currentDocument`). */
+  doc?: string;
   /** The block's source lines as rendered, joined with "\n". */
   expected: string;
   /** The text that replaces them. */
   text: string;
+}
+
+/** The lines of a document, with CRLF read as one line break. */
+export function splitLines(text: string): string[] {
+  return text.replace(/\r\n/g, '\n').split('\n');
 }
 
 /** Parse comrak's "startLine:startCol-endLine:endCol". Null when malformed. */
@@ -74,11 +87,11 @@ export function rangeOf(el: Element): LineRange | null {
 /**
  * The editable block a click landed in: the nearest ancestor (or the target
  * itself) that is one editable unit and carries a source position. Null for
- * clicks on links, controls, existing editors or between blocks.
+ * clicks on links, controls, existing editors, private blocks or between blocks.
  */
 export function blockAt(target: EventTarget | null, container: HTMLElement): HTMLElement | null {
   if (!(target instanceof Element)) return null;
-  if (target.closest(INTERACTIVE)) return null;
+  if (target.closest(INTERACTIVE) || target.closest(PRIVATE)) return null;
   let el: Element | null = target;
   while (el && el !== container) {
     if (EDITABLE_TAGS.has(el.tagName) && el.hasAttribute('data-sourcepos')) {
@@ -89,9 +102,13 @@ export function blockAt(target: EventTarget | null, container: HTMLElement): HTM
   return null;
 }
 
-/** Lines `start..end` (1-based, inclusive) of `text`, joined with "\n". Null when out of range. */
-export function sliceLines(text: string, range: LineRange): string | null {
-  const lines = text.replace(/\r\n/g, '\n').split('\n');
+/**
+ * Lines `start..end` (1-based, inclusive) joined with "\n". Null when the range
+ * is not inside the text. `text` is the document, or its lines when the caller
+ * has split it already (a large document is split once per click, not per call).
+ */
+export function sliceLines(text: string | string[], range: LineRange): string | null {
+  const lines = typeof text === 'string' ? splitLines(text) : text;
   if (range.start < 1 || range.end > lines.length) return null;
   return lines.slice(range.start - 1, range.end).join('\n');
 }
@@ -102,8 +119,8 @@ export function sliceLines(text: string, range: LineRange): string | null {
  * lines are separators, not part of what is edited, and replacing them would
  * make a missing trailing blank line eat the gap before the next block.
  */
-export function trimBlankTail(text: string, range: LineRange): LineRange {
-  const lines = text.replace(/\r\n/g, '\n').split('\n');
+export function trimBlankTail(text: string | string[], range: LineRange): LineRange {
+  const lines = typeof text === 'string' ? splitLines(text) : text;
   let end = range.end;
   // Lines past the end of the text are left for `sliceLines` to refuse.
   while (end > range.start && end <= lines.length && lines[end - 1].trim() === '') end--;
@@ -153,11 +170,11 @@ export function installBlockEdit(container: HTMLElement, opts: BlockEditOptions)
   };
 
   const open = (block: HTMLElement): void => {
-    const text = opts.getText();
+    const lines = splitLines(opts.getText());
     const full = rangeOf(block);
     if (!full) return;
-    const range = trimBlankTail(text, full);
-    const expected = sliceLines(text, range);
+    const range = trimBlankTail(lines, full);
+    const expected = sliceLines(lines, range);
     if (expected === null) return;
 
     const oneLine = !expected.includes('\n');
@@ -165,6 +182,7 @@ export function installBlockEdit(container: HTMLElement, opts: BlockEditOptions)
     field.className = 'mdview-block-editor';
     field.value = expected;
     field.spellcheck = false;
+    field.setAttribute('aria-label', 'Edit the Markdown source of this block');
     if (field instanceof HTMLInputElement) {
       field.type = 'text';
     } else {
@@ -178,6 +196,8 @@ export function installBlockEdit(container: HTMLElement, opts: BlockEditOptions)
 
     field.addEventListener('keydown', (ev: Event) => {
       const k = ev as KeyboardEvent;
+      // Enter that confirms an IME composition is not a commit.
+      if (k.isComposing) return;
       if (k.key === 'Escape') {
         k.preventDefault();
         close();
@@ -187,9 +207,13 @@ export function installBlockEdit(container: HTMLElement, opts: BlockEditOptions)
       }
     });
     // Blur commits. `close` removes the field, which itself fires blur: the
-    // `active` check keeps that from committing twice.
+    // `active` check keeps that from committing twice. A blur that leaves the
+    // field still the active element is the *window* losing focus (alt-tab, a
+    // click into the browser chrome): half-typed text is not committed then.
     field.addEventListener('blur', () => {
-      if (active && active.field === field) commit(range, expected);
+      if (!active || active.field !== field) return;
+      if (document.activeElement === field) return;
+      commit(range, expected);
     });
   };
 
