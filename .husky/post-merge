@@ -1,0 +1,4 @@
+#!/usr/bin/env sh
+# After `git pull` / `git merge`: rebuild what the incoming changes touched.
+sh "$(git rev-parse --show-toplevel)/scripts/rebuild-changed.sh" ORIG_HEAD HEAD
+exit 0

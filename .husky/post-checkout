@@ -1,0 +1,6 @@
+#!/usr/bin/env sh
+# After a branch switch ($3 = 1): rebuild what differs between the two branches.
+[ "$3" = "1" ] || exit 0
+[ "$1" = "$2" ] && exit 0
+sh "$(git rev-parse --show-toplevel)/scripts/rebuild-changed.sh" "$1" "$2"
+exit 0

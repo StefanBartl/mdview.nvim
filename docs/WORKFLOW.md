@@ -181,3 +181,9 @@ feature. It also needs a relay built with `--watch` support (v0.3.0+) and
 probes the binary before starting, so an old cached binary fails fast with
 a clear message rather than spawning a process that silently can't do the
 job.
+
+## Dev builds follow git — `dist/` and the relay are rebuilt for you
+
+With `dev.web_root` / `dev.binary_path` pointing into a checkout, the bundle in `dist/client` and the relay `native/server/mdview-server` are build artifacts of *that* checkout. The hooks in `.husky/` rebuild the piece whose sources changed after a commit, a `git pull` / merge, a rebase and a branch switch (`scripts/rebuild-changed.sh`). They are active once `npm install` (or `npm run prepare`) ran in the checkout; a worktree needs its own.
+
+The relay cannot be overwritten while a session runs (Windows): the build moves the running file aside and puts the new one in place, but the running session keeps the old relay until `:MDView stop` and `:MDView start`. After a pull, reload the browser tab as well.

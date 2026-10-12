@@ -11,7 +11,7 @@
 // through cmd.exe on Windows, where `$(...)` is not a thing.
 
 import { execFileSync } from 'node:child_process';
-import { existsSync, rmSync } from 'node:fs';
+import { existsSync, renameSync, rmSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -43,8 +43,29 @@ function go(args, capture = false) {
 const goexe = go(['env', 'GOEXE'], true).trim();
 const output = `mdview-server${goexe}`;
 
-go(['build', '-o', output, '.']);
-console.log(`[build:go] ${join(serverDir, output)}`);
+// Built next to the target and swapped in, not written over it: on Windows a
+// running relay (an open :MDView session) keeps its .exe from being replaced,
+// but the file can still be renamed out of the way. The session keeps running
+// the old build until it is restarted; every start after that gets the new one.
+const fresh = `mdview-server.new${goexe}`;
+const target = join(serverDir, output);
+const aside = join(serverDir, `mdview-server.old${goexe}`);
+
+go(['build', '-o', fresh, '.']);
+rmSync(aside, { force: true }); // (fails quietly while that old build still runs)
+if (existsSync(target)) {
+  try {
+    renameSync(target, aside);
+  } catch (err) {
+    rmSync(join(serverDir, fresh), { force: true });
+    console.error(`[build:go] ${target} is in use and cannot be moved: ${err.message}`);
+    console.error('[build:go] stop the session (:MDView stop) and build again.');
+    process.exit(1);
+  }
+}
+renameSync(join(serverDir, fresh), target);
+rmSync(aside, { force: true });
+console.log(`[build:go] ${target}`);
 
 // A build from before this script wrote the extension-less name next door. On
 // Windows that file is the one the resolver used to pick and fail on, so a

@@ -1,0 +1,5 @@
+#!/usr/bin/env sh
+# After `git pull --rebase` / `git rebase` / `git commit --amend`.
+[ "$1" = "rebase" ] || exit 0
+sh "$(git rev-parse --show-toplevel)/scripts/rebuild-changed.sh" ORIG_HEAD HEAD
+exit 0
