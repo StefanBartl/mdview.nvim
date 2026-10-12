@@ -41,7 +41,7 @@ func escapeText(v string) string {
 var (
 	inputTagRe     = regexp.MustCompile(`<input\b(?:[^>"']|"[^"]*"|'[^']*')*>`)
 	textareaOpenRe = regexp.MustCompile(`<textarea\b(?:[^>"']|"[^"]*"|'[^']*')*>`)
-	attributeRe    = regexp.MustCompile("\\s([^\\s\"'<>/=]+)(?:\\s*=\\s*(\"[^\"]*\"|'[^']*'|[^\\s\"'<>=`]+))?")
+	attributeRe    = regexp.MustCompile("\\s([^\\s\"'<>/=]+)(?:\\s*=\\s*(\"[^\"]*\"|'[^']*'|[^\\s\"'<>=`]+)?)?")
 )
 
 // attribute is one attribute of a tag: where it sits (from its name to the end
@@ -57,13 +57,31 @@ type attribute struct {
 func attributesOf(tag string, from int) []attribute {
 	var out []attribute
 	for _, m := range attributeRe.FindAllStringSubmatchIndex(tag[from:], -1) {
-		a := attribute{name: tag[from+m[2] : from+m[3]], start: from + m[2], end: from + m[1]}
+		a := attribute{name: strings.ToLower(tag[from+m[2] : from+m[3]]), start: from + m[2], end: from + m[1]}
 		if m[4] >= 0 {
-			a.value = strings.Trim(tag[from+m[4]:from+m[5]], `"'`)
+			raw := tag[from+m[4] : from+m[5]]
+			// Only the quotes around the value, not quotes inside it.
+			if len(raw) >= 2 && (raw[0] == '"' || raw[0] == '\'') && raw[len(raw)-1] == raw[0] {
+				raw = raw[1 : len(raw)-1]
+			}
+			a.value = raw
 		}
 		out = append(out, a)
 	}
 	return out
+}
+
+// isTagStart reports whether the tag at `loc` really is `<name` followed by
+// white space, `/` or `>` (and not a custom element such as <input-x>).
+func isTagStart(s string, loc []int, open string) bool {
+	if loc[0]+len(open) >= loc[1] {
+		return true
+	}
+	switch s[loc[0]+len(open)] {
+	case ' ', '\t', '\r', '\n', '/', '>':
+		return true
+	}
+	return false
 }
 
 // tagHasName reports whether the attribute called `name` of `tag` says `want`.
@@ -93,7 +111,7 @@ func SetFieldValue(path, name, value string) error {
 
 	// textarea first — it has an explicit close, so its body is unambiguous.
 	for _, loc := range textareaOpenRe.FindAllStringIndex(s, -1) {
-		if !tagHasName(s[loc[0]:loc[1]], len("<textarea"), name) {
+		if !isTagStart(s, loc, "<textarea") || !tagHasName(s[loc[0]:loc[1]], len("<textarea"), name) {
 			continue
 		}
 		closeAt := strings.Index(s[loc[1]:], "</textarea>")
@@ -107,7 +125,7 @@ func SetFieldValue(path, name, value string) error {
 	// input: locate the tag by name, then set its value attribute.
 	for _, loc := range inputTagRe.FindAllStringIndex(s, -1) {
 		tag := s[loc[0]:loc[1]]
-		if !tagHasName(tag, len("<input"), name) {
+		if !isTagStart(s, loc, "<input") || !tagHasName(tag, len("<input"), name) {
 			continue
 		}
 		newTag := setInputValue(tag, value)

@@ -306,6 +306,14 @@ local function enqueue(buf, req, fn)
     return
   end
   q.active = true
+  -- Give up on the queue: every change still in it is reported, none vanishes.
+  local function abandon(reason)
+    queues[buf] = nil
+    for _, item in ipairs(q.items) do
+      refuse_no_buffer(item.req.key, item.req.what, reason)
+    end
+    q.items = {}
+  end
   local function step()
     if queues[buf] ~= q then
       return -- stopped meanwhile
@@ -316,8 +324,8 @@ local function enqueue(buf, req, fn)
       return
     end
     if not vim.api.nvim_buf_is_valid(buf) then
-      queues[buf] = nil
       refuse_no_buffer(nxt.req.key, nxt.req.what, "the buffer is gone")
+      abandon("the buffer is gone")
       return
     end
     local ok, err = pcall(when_not_inserting, buf, function()
@@ -325,18 +333,25 @@ local function enqueue(buf, req, fn)
         return
       end
       -- It may have waited for seconds, behind others: is this still the buffer
-      -- the tab's document maps to (a buffer switch under "reuse")?
-      local now, why = target_buffer(nxt.req.key, nxt.req.doc)
-      if now ~= buf then
-        refuse_no_buffer(nxt.req.key, nxt.req.what, why or "the document on screen changed; try again")
-      else
-        safe("change", nxt.fn)
+      -- the tab's document maps to (a buffer switch under "reuse")? Whatever
+      -- happens here, the next change gets its turn.
+      local ran, why = pcall(function()
+        local now, reason = target_buffer(nxt.req.key, nxt.req.doc)
+        if now ~= buf then
+          refuse_no_buffer(nxt.req.key, nxt.req.what, reason or "the document on screen changed; try again")
+        else
+          safe("change", nxt.fn)
+        end
+      end)
+      if not ran then
+        notify(("[mdview] preview change failed: %s"):format(tostring(why)), vim.log.levels.ERROR)
       end
       step()
     end)
     if not ok then
-      queues[buf] = nil
       notify(("[mdview] preview change failed: %s"):format(tostring(err)), vim.log.levels.ERROR)
+      refuse_no_buffer(nxt.req.key, nxt.req.what, "it could not be applied")
+      abandon("an earlier change could not be applied")
     end
   end
   step()
@@ -665,11 +680,12 @@ local function opening_tags(text, tagname)
         end
         i = i + 1
       end
-      if not e then
-        break
+      if e then
+        found[#found + 1] = { s, e }
+        init = e + 1
+      else
+        init = s + #open -- an unclosed quote: look at the next tag
       end
-      found[#found + 1] = { s, e }
-      init = e + 1
     else
       init = s + #open
     end
@@ -702,8 +718,14 @@ local function tag_attributes(tag, from)
       end
       if ve then
         e, value = ve, v
+      else
+        -- `value=` with nothing after it: the `=` still belongs to the attribute
+        local _, eq = tag:find("^%s*=%s*", ne + 1)
+        if eq then
+          e = eq
+        end
       end
-      list[#list + 1] = { name = name, value = value, s = ns, e = e }
+      list[#list + 1] = { name = name:lower(), value = value, s = ns, e = e }
       pos = e + 1
     end
   end
