@@ -28,6 +28,13 @@ WebSocket/WebTransport fan-out, and knows about neither files nor buffers), a
 
 In detail in [`PREVIEW.md`](PREVIEW.md).
 
+- **Two-way sync** — the headline feature: the preview is a working surface, not
+  a mirror. Neovim drives the browser (text, scroll, cursor, selection,
+  highlights), and the browser writes back into the buffer — **block editing**
+  of the Markdown source, **checkbox ticks**, **text fields** — as one undo
+  step, in order, waiting while you type, and refused (never overwriting)
+  when the text changed under the edit. See
+  [`PREVIEW.md`](PREVIEW.md#two-way-sync).
 - **Live preview in the browser** — buffer text flows through the relay into a
   browser tab and is rendered client-side.
 - **Live push on change and on save** — `TextChanged`/`TextChangedI` plus

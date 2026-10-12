@@ -3,6 +3,41 @@
 Getting a Markdown document on screen, and keeping it there in sync with
 whatever you're doing to it.
 
+## Two-way sync
+
+The preview is not a mirror: **changes travel in both directions.** The editor
+drives the browser, and the browser writes back into the buffer.
+
+- **Neovim → browser:** the text on every change and on save, scroll position,
+  the cursor marker, the visual selection, spotlight highlights, fence colors,
+  a translated view, and the document you switch to.
+- **Browser → Neovim:** [block editing](#block-editing) (click a block, edit its
+  source lines), [task-list checkboxes](#task-list-checkbox-sync),
+  [text fields](#text-field-sync), and — opt-in — [reverse scroll](#reverse-scroll-browser--neovim)
+  and [click-to-navigate](#click-to-navigate).
+
+What makes the write-back safe to leave on:
+
+- **One undo step.** In `:MDView start` the edit replaces only the lines it
+  names, so marks, folds and the rest of the undo history stay; `u` takes it
+  back. Standalone, the relay rewrites the file instead (atomically where the
+  folder allows).
+- **Never over newer text.** Every write-back carries the lines as the browser
+  rendered them. If the buffer (or the file) holds something else there now, the
+  edit is refused, the tab says "Not saved: …", and the buffer's real text is
+  pushed back — nothing is silently overwritten.
+- **Out of your way while you type.** In Insert mode a change from the browser
+  waits until you stop (a key in the last second) and says so; if you merely
+  stand in Insert mode it applies at once as its own undo step.
+- **In order.** Changes from the browser reach a buffer in the order they were
+  made, one queue per buffer.
+- **The right document.** With `browser.behavior = "reuse"` one tab follows the
+  active buffer; a write-back goes to the document Neovim last put on screen,
+  and a tab that is behind is told and asked to try again.
+
+- **Module:** `lua/mdview/adapter/inbound_poll.lua`, `native/server/internal/source/`, `src/client/render/`
+- **Config:** `sync_checkboxes` (default on), `sync_fields` (default on), `edit_blocks` (default off; `:MDView edit`), `experimental.reverse_scroll`, `experimental.click_navigate` — see [../configuration.md](../configuration.md)
+
 ## Live browser preview
 
 `:MDView start [file] [cwd=…]` spawns the relay binary (downloading it on

@@ -28,6 +28,26 @@ A browser-based Markdown preview for Neovim that renders nothing on the server.
 Buffer text is streamed to a browser tab and rendered client-side by a
 Rust/WASM module with sanitization built in — no toolchain needed to run it.
 
+## It syncs both ways
+
+Most previews are a mirror. This one is a working surface: **what you do in the
+editor shows up in the browser, and what you do in the browser lands in the
+buffer.**
+
+| Neovim → browser | Browser → Neovim |
+| --- | --- |
+| text, live on every change and on save | **click a block and edit its Markdown source** (`:MDView edit`) |
+| scroll position, cursor and visual selection | **tick a task-list checkbox** |
+| spotlight highlights, fence colors, a translated view | **type into a text field** (`<input>` / `<textarea>`) |
+| the document you switch to | scroll, and follow a link, to move Neovim there (opt-in) |
+
+Edits from the browser are written into the buffer as **one undo step** (`u`
+takes one back), or into the file in standalone mode. They wait while you type
+in Insert mode instead of cutting into your undo block, arrive in the order they
+were made, and are **refused with a message — never overwritten — when the text
+changed under them**. It works with several documents and a tab that follows the
+active buffer. Details: [Preview](docs/FEATURES/PREVIEW.md#two-way-sync).
+
 ---
 
 ## Around it

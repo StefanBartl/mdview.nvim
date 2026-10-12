@@ -20,6 +20,13 @@ CONTENTS                                                     *mdview-contents*
 
 mdview.nvim renders the current Markdown buffer live in a browser tab.
 
+It syncs both ways: the editor drives the browser (text, scroll, cursor,
+selection), and the browser writes back into the buffer -- click a block to edit
+its Markdown source (`:MDView edit`), tick a task-list checkbox, type into a text
+field. Edits from the browser are one undo step, wait while you type in Insert
+mode, arrive in order, and are refused (never overwriting) when the text changed
+under them.
+
 A small Go relay process streams raw buffer text to the browser over
 WebSocket. Rendering and HTML sanitization happen entirely client-side, in a
 Rust module compiled to WebAssembly (comrak for Markdown -> HTML, ammonia for
