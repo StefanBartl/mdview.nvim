@@ -20,7 +20,17 @@
 
 /** Tags that are one editable unit (the block as a whole, not its children). */
 const EDITABLE_TAGS = new Set([
-  'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'P', 'LI', 'PRE', 'TABLE', 'BLOCKQUOTE',
+  'H1',
+  'H2',
+  'H3',
+  'H4',
+  'H5',
+  'H6',
+  'P',
+  'LI',
+  'PRE',
+  'TABLE',
+  'BLOCKQUOTE',
 ]);
 
 /** Clicks inside these never open an editor (they have a job of their own). */
@@ -56,6 +66,21 @@ export interface BlockEdit extends LineRange {
 export function splitLines(text: string): string[] {
   return text.replace(/\r\n/g, '\n').split('\n');
 }
+
+/**
+ * The text has a carriage return that is not part of a CRLF. The renderer counts
+ * such a CR as a line ending, the relay and Neovim split lines on LF only: the
+ * line numbers of the rendered blocks then no longer point at the same lines of
+ * the source, and an edit would rewrite the wrong ones. Such a document is not
+ * edited from the preview.
+ */
+export function hasBareCr(text: string): boolean {
+  return /\r(?!\n)/.test(text);
+}
+
+/** Said when a document with bare CRs is clicked or ticked (see `hasBareCr`). */
+export const BARE_CR_MESSAGE =
+  'Not editable here: the document has lone CR line endings. Edit it in Neovim.';
 
 /** Parse comrak's "startLine:startCol-endLine:endCol". Null when malformed. */
 export function parseSourcePos(sp: string | null | undefined): LineRange | null {
@@ -140,6 +165,8 @@ export interface BlockEditOptions {
   getDocument?: () => string | null;
   /** Called once per committed, changed edit. */
   send: (edit: BlockEdit) => void;
+  /** Told why a click did not open an editor (see `hasBareCr`). */
+  notify?: (message: string) => void;
   /** Called after an editor closed (commit or cancel), so a held-back render can run. */
   onClose?: () => void;
 }
@@ -185,7 +212,12 @@ export function installBlockEdit(container: HTMLElement, opts: BlockEditOptions)
     // inside one, but its source lines include the hidden text: no editor.
     if (block.querySelector(PRIVATE)) return;
     const doc = opts.getDocument?.() ?? null;
-    const lines = splitLines(opts.getText());
+    const text = opts.getText();
+    if (hasBareCr(text)) {
+      opts.notify?.(BARE_CR_MESSAGE);
+      return;
+    }
+    const lines = splitLines(text);
     const full = rangeOf(block);
     if (!full) return;
     const range = trimBlankTail(lines, full);

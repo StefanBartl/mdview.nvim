@@ -321,6 +321,16 @@ mod tests {
         assert!(html.contains("Hello world."));
     }
 
+    // comrak counts a lone "\r" as a line ending, while the relay and Neovim
+    // split lines on "\n" only: the client must not offer to edit such a document
+    // (see hasBareCr in src/client/render/blockEdit.ts). This pins the premise.
+    #[test]
+    fn a_lone_cr_counts_as_a_line_ending_in_sourcepos() {
+        let html = render_markdown("a\rb\r\rc", false);
+        assert!(html.contains("data-sourcepos=\"1:1-2:1\""), "{html}");
+        assert!(html.contains("data-sourcepos=\"4:1-4:1\""), "{html}");
+    }
+
     #[test]
     fn frontmatter_becomes_a_table_not_hr_and_heading() {
         let src = "---\ntitle: A task\nstatus: open\ntags: [a, b]\n---\n\n# Body\n";
