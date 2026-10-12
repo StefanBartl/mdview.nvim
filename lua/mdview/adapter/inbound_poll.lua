@@ -194,11 +194,20 @@ local function tell_tab(key, message)
   pcall(require("mdview.adapter.control").send, { notice = "Not saved: " .. message }, key)
 end
 
+-- Time of the user's last keystroke (`vim.uv.now()` ms), for `when_not_inserting`.
+local TYPING_WINDOW_MS = 1000
+local last_key_ms = 0
+vim.on_key(function()
+  last_key_ms = vim.uv.now()
+end, vim.api.nvim_create_namespace("mdview_inbound_keys"))
+
 -- Run `fn` when the user is not typing in `buf`. A change made to the buffer
 -- while its owner is in Insert (or Replace) mode there is joined into the undo
 -- block of what they type, so one `u` would take back their words and the
--- browser's edit together. Waits briefly (up to ~5 s), then applies anyway: a
--- user who stays in insert mode must not hold the browser's edit forever.
+-- browser's edit together. "Typing" means a key in the last second, not merely
+-- standing in insert mode: the edit waits only for real typing (up to ~5 s, and
+-- says so once), then applies anyway. When it applies in insert mode, the undo
+-- block is cut before and after it, so `u` takes back the browser's edit alone.
 -- `fn` re-checks everything it relies on, as the buffer may have changed.
 ---@internal
 ---@param buf integer
@@ -208,8 +217,12 @@ end
 local function when_not_inserting(buf, fn, tries)
   tries = tries or 0
   local mode = vim.api.nvim_get_mode().mode:sub(1, 1)
-  local typing = (mode == "i" or mode == "R") and vim.api.nvim_get_current_buf() == buf
+  local inserting = (mode == "i" or mode == "R") and vim.api.nvim_get_current_buf() == buf
+  local typing = inserting and (vim.uv.now() - last_key_ms) < TYPING_WINDOW_MS
   if typing and tries < 20 then
+    if tries == 0 then
+      notify("[mdview] a change from the preview waits until you stop typing", vim.log.levels.INFO)
+    end
     vim.defer_fn(function()
       if vim.api.nvim_buf_is_valid(buf) then
         when_not_inserting(buf, fn, tries + 1)
@@ -217,9 +230,17 @@ local function when_not_inserting(buf, fn, tries)
     end, 250)
     return
   end
-  if vim.api.nvim_buf_is_valid(buf) then
-    fn()
+  if not vim.api.nvim_buf_is_valid(buf) then
+    return
   end
+  if inserting then
+    -- `:let &undolevels = &undolevels` starts a new undo block (:help undo-blocks)
+    vim.cmd("let &undolevels = &undolevels")
+    pcall(fn)
+    vim.cmd("let &undolevels = &undolevels")
+    return
+  end
+  fn()
 end
 
 ---@internal
@@ -300,6 +321,19 @@ end
 -- write-back that arrived first (a text field that gained lines, a block edit)
 -- may have moved the lines, and the tick must not land on the neighbour. A
 -- line that no longer holds a task marker is left alone as well.
+-- The line with its task marker state neutralised ("[ ]", "[x]", "[X]" alike):
+-- a double click sends tick and untick against the same rendered text.
+---@internal
+---@param s string
+---@return string
+local function neutral_marker(s)
+  local pre, post = s:match("^(%s*[-*+] %[)[ xX](%].*)$")
+  if pre then
+    return pre .. " " .. post
+  end
+  return s
+end
+
 ---@internal
 ---@param key string # the room of the tab
 ---@param line integer
@@ -329,8 +363,13 @@ local function handle_toggle(key, line, checked, doc, expected)
     end
     -- A buffer loaded with 'fileformat' unix from a CRLF file keeps a "\r".
     local cur, cr = raw:gsub("\r$", "")
-    if type(expected) == "string" and expected ~= "" and cur ~= (expected:gsub("\r$", "")) then
-      return -- the lines moved since the render: not the checkbox that was ticked
+    -- Under a display language the browser rendered a translated text, so its
+    -- `expected` can never equal the buffer line; the marker check below stays.
+    if type(expected) == "string" and expected ~= "" and not require("mdview.core.display").active() then
+      local want_line = expected:gsub("\r$", "")
+      if neutral_marker(cur) ~= neutral_marker(want_line) then
+        return -- the lines moved since the render: not the checkbox that was ticked
+      end
     end
     local pre, state, post = cur:match("^(%s*[-*+] %[)([ xX])(%].*)$")
     if not pre then
@@ -767,5 +806,12 @@ M._handle_scroll = handle_scroll
 M._handle_toggle = handle_toggle
 M._handle_field = handle_field
 M._handle_edit = handle_edit
+M._when_not_inserting = when_not_inserting
+-- test seam: pretend the last keystroke happened at `ms` (vim.uv.now() clock)
+---@param ms integer
+---@return nil
+function M._set_last_key(ms)
+  last_key_ms = ms
+end
 
 return M
