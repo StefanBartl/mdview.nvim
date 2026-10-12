@@ -34,6 +34,7 @@ import {
   dispatchOverlayControl,
 } from './render/overlays';
 import { currentDocument, installHistory, onDocChange } from './render/history';
+import { writeBackUrl } from './render/writeBack';
 import { highlight, parseHighlighter } from './highlight';
 import init, { render_markdown } from './wasm-render/mdview_wasm_render.js';
 
@@ -295,7 +296,7 @@ async function boot() {
     installTaskToggle(container, (line: number, checked: boolean) => {
       clientLog(`toggle: line ${line} -> ${checked ? 'checked' : 'unchecked'}`);
       try {
-        void fetch(`/toggle?token=${encodeURIComponent(token)}&key=${encodeURIComponent(key)}`, {
+        void fetch(writeBackUrl('/toggle', { token, key, doc: currentDocument() }), {
           method: 'POST',
           body: `${line}:${checked ? 1 : 0}`,
           keepalive: true,
@@ -315,7 +316,7 @@ async function boot() {
     installFieldSync(container, (name: string, value: string) => {
       clientLog(`field: ${name} (${value.length} chars)`);
       try {
-        void fetch(`/field?token=${encodeURIComponent(token)}&key=${encodeURIComponent(key)}`, {
+        void fetch(writeBackUrl('/field', { token, key, doc: currentDocument() }), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ name, value }),
@@ -350,12 +351,12 @@ async function boot() {
   };
   const sendBlockEdit = (edit: BlockEdit): void => {
     clientLog(`edit: lines ${edit.start}-${edit.end} (${edit.text.length} chars)`);
-    void fetch(`/edit?token=${encodeURIComponent(token)}&key=${encodeURIComponent(key)}`, {
+    // `doc`: in "reuse" behavior the tab's key is a room, not the document on
+    // screen; Neovim edits the buffer of the document the tab was showing.
+    void fetch(writeBackUrl('/edit', { token, key, doc: currentDocument() }), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      // `doc`: in "reuse" behavior the tab's key is a room, not the document on
-      // screen; Neovim edits the buffer of the document the tab was showing.
-      body: JSON.stringify({ ...edit, doc: currentDocument() ?? undefined }),
+      body: JSON.stringify(edit),
     })
       .then(res => {
         if (res.status === 409) toast('Not saved: those lines changed in the source meanwhile.');

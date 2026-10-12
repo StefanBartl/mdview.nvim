@@ -40,8 +40,6 @@ export interface LineRange {
 }
 
 export interface BlockEdit extends LineRange {
-  /** The document the edit belongs to, when the tab knows it (see `currentDocument`). */
-  doc?: string;
   /** The block's source lines as rendered, joined with "\n". */
   expected: string;
   /** The text that replaces them. */
