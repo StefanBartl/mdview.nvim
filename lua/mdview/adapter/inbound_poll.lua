@@ -424,25 +424,46 @@ end
 
 -- ---- block edit (browser -> nvim buffer) -----------------------------------
 
+-- Is `n` a whole number a buffer line can be?
+---@internal
+---@param n any
+---@return boolean
+local function is_line_number(n)
+  return type(n) == "number" and n == math.floor(n) and n >= 1 and n < 2 ^ 31
+end
+
 -- Replace the 1-based, inclusive buffer lines start..end_ of the buffer showing
--- `key` with `text`, but only while those lines are still `expected`: the edit
--- was made against the text the preview was rendered from, and a buffer that
--- moved on since must not be overwritten by it. Standalone never reaches here
--- (the relay edits the file). Only the one range is replaced, so marks, folds
--- and the rest of the undo history stay put, and `u` takes the edit back as one
--- step.
+-- `doc` (the document the tab is showing; `key` when the tab did not say) with
+-- `text`, but only while those lines are still `expected`: the edit was made
+-- against the text the preview was rendered from, and a buffer that moved on
+-- since must not be overwritten by it. Standalone never reaches here (the relay
+-- edits the file). Only the one range is replaced, so marks, folds and the rest
+-- of the undo history stay put, and `u` takes the edit back as one step.
+--
+-- `key` is the room of the tab. With `browser.behavior = "reuse"` that is the
+-- first document's path for the whole session, while the tab follows the active
+-- buffer: the buffer to edit is the one for `doc`, and `key` is only where the
+-- answer goes.
+--
+-- The token that reaches this function belongs to the relay, not to a licence
+-- to rewrite any loaded buffer: only buffers mdview itself previews are edited.
 ---@internal
 ---@param key string
 ---@param start integer
 ---@param end_ integer
 ---@param expected string
 ---@param text string
+---@param doc string|nil
 ---@return nil
-local function handle_edit(key, start, end_, expected, text)
+local function handle_edit(key, start, end_, expected, text, doc)
   if type(key) ~= "string" or type(expected) ~= "string" or type(text) ~= "string" then
     return
   end
-  if type(start) ~= "number" or type(end_) ~= "number" or start < 1 or end_ < start then
+  if not is_line_number(start) or not is_line_number(end_) or end_ < start then
+    return
+  end
+  -- Switched off since the edit was queued (`:MDView edit off`).
+  if require("mdview.config").defaults.edit_blocks ~= true then
     return
   end
   -- The preview shows a transformed text (browser.transform / a display
@@ -451,31 +472,46 @@ local function handle_edit(key, start, end_, expected, text)
     require("mdview.core.display").note_field_ignored()
     return
   end
-  local buf = buf_for_key(key)
+  local buf = buf_for_key((type(doc) == "string" and doc ~= "") and doc or key)
   if not buf or not vim.api.nvim_buf_is_loaded(buf) then
+    return
+  end
+  if not require("mdview.helper.previewable").is(buf) then
+    return
+  end
+
+  -- Tell the person at the preview that the edit was not applied (the browser
+  -- would otherwise just show their text vanish), say so in Neovim too, and put
+  -- the buffer's real text back into the tab.
+  local function refuse(message)
+    notify("[mdview] preview edit dropped: " .. message, vim.log.levels.WARN)
+    pcall(require("mdview.adapter.control").send, { notice = "Not saved: " .. message }, key)
+    pcall(require("mdview.bindings.autocmds.live_push").push_buffer_changes, buf, { full = true })
+  end
+
+  if vim.bo[buf].modifiable ~= true then
+    refuse("the buffer is not modifiable")
+    return
+  end
+  if end_ > vim.api.nvim_buf_line_count(buf) then
+    refuse("the lines changed in the buffer")
     return
   end
   local function norm(s)
     return (s:gsub("\r\n", "\n"))
   end
-  local function resync()
-    -- Show the buffer's real text again, so the tab does not keep a block that
-    -- was refused.
-    pcall(require("mdview.bindings.autocmds.live_push").push_buffer_changes, buf, { full = true })
-  end
-  if end_ > vim.api.nvim_buf_line_count(buf) then
-    notify("[mdview] preview edit dropped: the lines changed in the buffer", vim.log.levels.WARN)
-    resync()
-    return
-  end
   local current = table.concat(vim.api.nvim_buf_get_lines(buf, start - 1, end_, false), "\n")
   if current ~= norm(expected) then
-    notify("[mdview] preview edit dropped: the lines changed in the buffer", vim.log.levels.WARN)
-    resync()
+    refuse("the lines changed in the buffer")
     return
   end
+
   local lines = vim.split(norm(text), "\n", { plain = true })
-  vim.api.nvim_buf_set_lines(buf, start - 1, end_, false, lines)
+  local ok, err = pcall(vim.api.nvim_buf_set_lines, buf, start - 1, end_, false, lines)
+  if not ok then
+    refuse(tostring(err))
+    return
+  end
   -- nvim_buf_set_lines doesn't fire TextChanged, so push explicitly.
   pcall(require("mdview.bindings.autocmds.live_push").push_buffer_changes, buf, { full = true })
 end
@@ -504,7 +540,7 @@ local function poll_edit()
       vim.schedule(function()
         for _, r in ipairs(arr) do
           if type(r) == "table" then
-            handle_edit(r.key, r.start, r["end"], r.expected, r.text)
+            handle_edit(r.key, r.start, r["end"], r.expected, r.text, r.doc)
           end
         end
       end)
