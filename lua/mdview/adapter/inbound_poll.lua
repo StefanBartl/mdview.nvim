@@ -197,6 +197,7 @@ end
 -- Time of the user's last keystroke (`vim.uv.now()` ms), for `when_not_inserting`.
 local TYPING_WINDOW_MS = 1000
 local last_key_ms = 0
+local wait_said = false -- the "waits until you stop typing" notice is shown once per wait
 vim.on_key(function()
   last_key_ms = vim.uv.now()
 end, vim.api.nvim_create_namespace("mdview_inbound_keys"))
@@ -220,7 +221,8 @@ local function when_not_inserting(buf, fn, tries)
   local inserting = (mode == "i" or mode == "R") and vim.api.nvim_get_current_buf() == buf
   local typing = inserting and (vim.uv.now() - last_key_ms) < TYPING_WINDOW_MS
   if typing and tries < 20 then
-    if tries == 0 then
+    if not wait_said then
+      wait_said = true
       notify("[mdview] a change from the preview waits until you stop typing", vim.log.levels.INFO)
     end
     vim.defer_fn(function()
@@ -230,14 +232,18 @@ local function when_not_inserting(buf, fn, tries)
     end, 250)
     return
   end
+  wait_said = false
   if not vim.api.nvim_buf_is_valid(buf) then
     return
   end
   if inserting then
     -- `:let &undolevels = &undolevels` starts a new undo block (:help undo-blocks)
     vim.cmd("let &undolevels = &undolevels")
-    pcall(fn)
+    local ok, err = pcall(fn)
     vim.cmd("let &undolevels = &undolevels")
+    if not ok then
+      error(err, 0)
+    end
     return
   end
   fn()
@@ -311,16 +317,6 @@ end
 
 -- ---- task-list checkbox toggle (browser -> nvim buffer) --------------------
 
--- Flip the GFM task-list checkbox on 1-based `line` of the buffer showing the
--- document of the tab to `checked`, then push the change so the preview
--- reflects it. Standalone mode never reaches here (the relay edits the file
--- itself); this is the :MDView start path, where the buffer — possibly with
--- unsaved edits — is the source of truth the relay must not touch.
---
--- `expected` is the text of that line as the browser rendered it: another
--- write-back that arrived first (a text field that gained lines, a block edit)
--- may have moved the lines, and the tick must not land on the neighbour. A
--- line that no longer holds a task marker is left alone as well.
 -- The line with its task marker state neutralised ("[ ]", "[x]", "[X]" alike):
 -- a double click sends tick and untick against the same rendered text.
 ---@internal
@@ -334,6 +330,16 @@ local function neutral_marker(s)
   return s
 end
 
+-- Flip the GFM task-list checkbox on 1-based `line` of the buffer showing the
+-- document of the tab to `checked`, then push the change so the preview
+-- reflects it. Standalone mode never reaches here (the relay edits the file
+-- itself); this is the :MDView start path, where the buffer — possibly with
+-- unsaved edits — is the source of truth the relay must not touch.
+--
+-- `expected` is the text of that line as the browser rendered it: another
+-- write-back that arrived first (a text field that gained lines, a block edit)
+-- may have moved the lines, and the tick must not land on the neighbour. A
+-- line that no longer holds a task marker is left alone as well.
 ---@internal
 ---@param key string # the room of the tab
 ---@param line integer
@@ -363,12 +369,20 @@ local function handle_toggle(key, line, checked, doc, expected)
     end
     -- A buffer loaded with 'fileformat' unix from a CRLF file keeps a "\r".
     local cur, cr = raw:gsub("\r$", "")
-    -- Under a display language the browser rendered a translated text, so its
-    -- `expected` can never equal the buffer line; the marker check below stays.
-    if type(expected) == "string" and expected ~= "" and not require("mdview.core.display").active() then
+    if type(expected) == "string" and expected ~= "" then
       local want_line = expected:gsub("\r$", "")
-      if neutral_marker(cur) ~= neutral_marker(want_line) then
-        return -- the lines moved since the render: not the checkbox that was ticked
+      if not require("mdview.core.display").active() then
+        if neutral_marker(cur) ~= neutral_marker(want_line) then
+          return -- the lines moved since the render: not the checkbox that was ticked
+        end
+      else
+        -- Under a display language the browser rendered a translated text, so
+        -- only the part a translation leaves alone can be compared: the indent
+        -- and the bullet in front of the marker.
+        local want_pre = want_line:match("^(%s*[-*+] %[)[ xX]%]")
+        if want_pre and want_pre ~= cur:match("^(%s*[-*+] %[)") then
+          return
+        end
       end
     end
     local pre, state, post = cur:match("^(%s*[-*+] %[)([ xX])(%].*)$")

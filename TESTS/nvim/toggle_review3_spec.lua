@@ -46,6 +46,15 @@ describe("toggle, review round 3", function()
     assert.are.same({ "# Aufgaben", "- [x] erste" }, lines())
   end)
 
+  it("under a display language a moved line (other indent) is still not ticked", function()
+    display.active = function()
+      return true
+    end
+    vim.api.nvim_buf_set_lines(buf, 1, 2, false, { "  * [ ] verschoben" })
+    inbound._handle_toggle(KEY, 2, true, KEY, "- [ ] first")
+    assert.are.same({ "# Aufgaben", "  * [ ] verschoben" }, lines())
+  end)
+
   it("without a display language a different `expected` still drops the tick", function()
     display.active = function()
       return false
