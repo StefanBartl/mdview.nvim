@@ -63,5 +63,16 @@ return {
     },
   },
   -- gated: a failed conformance check makes `scripts/test.sh conformance` exit 1 (docs/CONFORMANCE.md of testing.nvim)
-  conformance = { gate = true },
+  conformance = {
+    gate = true,
+    waivers = {
+      {
+        check = "K15",
+        rule = "NEW-08",
+        level = "warn",
+        reason = "mdview.nvim defines no keymaps by design (only :MDView and autocmds); docs/BINDINGS.md says so, a bindings/keymaps file would be empty",
+        expires = "2027-04-14",
+      },
+    },
+  },
 }
