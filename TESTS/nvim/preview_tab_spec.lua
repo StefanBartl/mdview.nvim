@@ -99,9 +99,9 @@ describe("preview_tab.open/close/toggle", function()
   end)
 
   it("toggle() closes an open preview: window and buffer both go away", function()
+    -- Own state, not the previous case's: open() opens the preview, or just focuses an open one.
+    assert.is_true(preview_tab.open(source))
     assert.is_true(preview_tab.is_open(source))
-    -- Focus it (open() on an already-open preview just focuses).
-    preview_tab.open(source)
     local preview_buf = vim.api.nvim_get_current_buf()
 
     local tabs_before = vim.fn.tabpagenr("$")
