@@ -33,6 +33,7 @@ local overlay = require("mdview.bindings.usrcmds.overlay")
 local blanklines = require("mdview.bindings.usrcmds.blanklines")
 local selection = require("mdview.bindings.usrcmds.selection")
 local edit = require("mdview.bindings.usrcmds.edit")
+local write = require("mdview.bindings.usrcmds.write")
 local spotlight = require("mdview.bindings.usrcmds.spotlight")
 local pin = require("mdview.bindings.usrcmds.pin")
 local lang = require("mdview.bindings.usrcmds.lang")
@@ -293,6 +294,30 @@ function M.attach()
       desc = "Click a block in the preview to edit its source lines, or stop; no argument toggles",
       run = function(ctx)
         edit.run(ctx.args.action)
+      end,
+    },
+
+    -- Caret + block editing as one switch; starts the preview when none
+    -- runs, and never stops it (off/toggle only switch the two back off).
+    {
+      path = { "write" },
+      args = {
+        {
+          name = "action",
+          type = "STRING",
+          optional = true,
+          values = write.actions,
+          desc = "Cursor caret and block editing together (no argument toggles)",
+          enum_desc = {
+            on = "Caret + block editing on; starts the preview if none runs",
+            off = "Both off; the preview keeps running",
+            toggle = "Off when both are on, otherwise on",
+          },
+        },
+      },
+      desc = "Switch cursor caret and block editing together, starting the preview if needed; no argument toggles",
+      run = function(ctx)
+        write.run(ctx.args.action)
       end,
     },
 

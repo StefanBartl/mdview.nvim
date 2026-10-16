@@ -39,6 +39,8 @@ function M.setup(opts)
   -- Resolve browser at setup time and notify user if resolution failed
   require("mdview.config.browser").resolve_with_notify()
   require("mdview.bindings.usrcmds").attach()
+  -- Opt-in only: maps nothing unless setup() set a lhs under `keymaps`.
+  require("mdview.bindings.keymaps").attach(cfg.defaults.keymaps)
 
   -- One-time (persisted across restarts) popup on the first setup() after
   -- installing this plugin: which CLI tools it needs and why

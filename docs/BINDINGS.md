@@ -35,6 +35,7 @@ pushes a `\x05` control update over the socket.
 | Command | Args | Description |
 | --- | --- | --- |
 | `:MDView cursor [mode]` | optional `line`\|`caret`\|`section`\|`off`\|`toggle`, completed | Sets the Neovim-cursor marker in the preview (`browser.cursor_marker`): `line` (bar at the cursor line), `caret` (exact cursor column, via inline source-position spans), `section` (spotlight the current heading section, dim the rest), `off`. `toggle` flips `section` on and off. No argument reports the current mode. |
+| `:MDView write [action]` | optional `on`\|`off`\|`toggle`, completed | Switches the cursor caret (`browser.cursor_marker = "caret"`) and block editing (`edit_blocks`) together, in one control update. Without a session, `on`/`toggle` starts the preview (like `:MDView start`) with both on. `off` switches both off (marker back to its earlier mode) and never stops the preview. `toggle` (no argument) is `off` when both are on, else `on`. |
 | `:MDView sync [action]` | optional `pause`\|`resume`\|`toggle`, completed | Pauses/resumes the outgoing nvim→browser scroll sync. While paused, `CursorMoved` sends no pings, so you can jump to a reference spot without dragging a viewer along. Neovim-side only. No argument reports the state. |
 | `:MDView pin [action]` | optional `on`\|`off`\|`toggle`\|`status`, completed | Holds the preview on the document it is showing instead of letting it follow the active buffer (`browser.behavior = "reuse"`). While pinned, everything another buffer would send into the pinned tab's room — content push, scroll ping, selection mirror, an auto-opened tab under `"new_tab"` — is dropped at the source; the pinned document's own edits and scrolling still go through. Neovim-side only, and session state rather than config: cleared by `:MDView stop` and by a fresh `:MDView start`. `off` also catches the tab up with the buffer you are in. No argument toggles. |
 | `:MDView zoom [step]` | optional `+`\|`-`\|`reset`\|`<factor>`, completed | Adjusts the preview font-size zoom (`browser.zoom`). `+`/`-` step 10% (clamped 50–300%), `reset` = 100%, a bare number is a factor (`1.5`) or percent (`150`). No argument reports the current zoom. A number outside 50–300% is clamped **and said so** — `zoom 500` applies 300% and reports that it did, rather than silently applying something other than what was asked. A non-number is refused. |
@@ -76,7 +77,17 @@ Two additional autocmd modules exist but are intentionally **not** wired up (`bi
 
 ## Keymaps
 
-mdview.nvim does not define any keymaps itself — only the `:MDView` command above. If you want a keymap, map it to a subcommand directly, e.g.:
+mdview.nvim defines no keymaps by default — only the `:MDView` command above. One action has an opt-in keymap in the config ([`bindings/keymaps.lua`](../lua/mdview/bindings/keymaps.lua)):
+
+| Config key | Mode | Maps to |
+| --- | --- | --- |
+| `keymaps.write = "<lhs>"` | normal | `:MDView write toggle` (cursor caret + block editing together) |
+
+```lua
+require("mdview").setup({ keymaps = { write = "<leader>mw" } })
+```
+
+For anything else, map a subcommand directly, e.g.:
 
 ```lua
 vim.keymap.set("n", "<leader>mp", "<cmd>MDView start<cr>", { desc = "mdview: start preview" })

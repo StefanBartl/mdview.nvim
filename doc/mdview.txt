@@ -137,6 +137,8 @@ Defaults: >lua
                                     -- in the preview writes its value back
     edit_blocks             = false, -- click a block in the preview to edit
                                     -- its source lines (:MDView edit)
+    keymaps                 = {},    -- opt-in, e.g. { write = "<leader>mw" }
+                                    -- (:MDView write toggle); none by default
 
     open_preview_tab = false, -- :MDView start opens an nvim tab, not a browser
 
@@ -692,6 +694,16 @@ pushes a control update over the socket.
   source lines. Switching it off closes an editor that is open, without
   sending its content.
 
+:MDView write [action]                                        *:MDView-write*
+  Switches the cursor caret (|:MDView-cursor| `caret`) and block editing
+  (|:MDView-edit|) together (`on`|`off`|`toggle`; no argument toggles).
+  Without a running session, `on`/`toggle` starts one like |:MDView-start|,
+  with both already on, so no second command is needed. `off` switches both
+  off (the cursor marker goes back to what it was before `on`) and never
+  stops the preview, so the same command switches writing on again. `toggle`
+  is `off` when both are on, otherwise `on`: a mixed state (only one of the
+  two on) turns both on. Optional keymap: `keymaps.write` (|mdview-keymaps|).
+
 :MDView selection [action]                                *:MDView-selection*
   Switches the visual-selection mirror on/off (`on`|`off`|`toggle`; no
   argument toggles) — see `browser.selection_sync` above. Off by default;
@@ -836,8 +848,16 @@ reference; `live_push.lua` supersedes both.
 ==============================================================================
 7. KEYMAPS                                                      *mdview-keymaps*
 
-mdview.nvim does not define any keymaps of its own — only the user commands
-in |mdview-commands|. Map them yourself if you want keymaps: >lua
+mdview.nvim defines no keymaps by default — only the user commands in
+|mdview-commands|. One action has an opt-in keymap in the config:
+
+  `keymaps.write = "<lhs>"`   normal mode, |:MDView-write| `toggle` (cursor
+                             caret + block editing together) >lua
+
+  require("mdview").setup({ keymaps = { write = "<leader>mw" } })
+<
+
+For anything else, map the commands yourself: >lua
 
   vim.keymap.set("n", "<leader>mp", "<cmd>MDView start<cr>",
     { desc = "mdview: start preview" })
@@ -915,8 +935,8 @@ are downloaded automatically the first time |:MDView-start| runs.
                                    |mdview-autocmds|); preview_tab_sync.lua
                                    is separate, self-managing, and
                                    independent of :MDView start/stop
-      keymaps/                     Reserved; mdview.nvim ships no keymaps (see
-                                   |mdview-keymaps|)
+      keymaps.lua                  Opt-in keymaps from `keymaps` in setup();
+                                   none by default (see |mdview-keymaps|)
     helper/                        Small cross-platform utilities; several
                                    delegate to lib.nvim
 

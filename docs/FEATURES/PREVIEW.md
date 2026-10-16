@@ -410,6 +410,11 @@ table or quote — and it is replaced by a text field holding that block's
 Esc discards. The edit is written back to the source and flows through the normal
 push path, so the block comes back rendered from what you wrote.
 
+**One switch for writing:** `:MDView write` turns block editing and the cursor
+caret on together (and starts the preview if none runs); `:MDView write` again
+turns both off while the preview keeps running. Map it with
+`keymaps = { write = "<leader>mw" }` in `setup()` if you like (no default keymap).
+
 **Raw source, not WYSIWYG.** The rendered HTML has lost the Markdown (link
 targets, emphasis markers, table alignment), and turning edited HTML back into
 Markdown is lossy. The renderer's `data-sourcepos` already says which lines a
