@@ -79,6 +79,9 @@
 ---@field reverse_scroll boolean opt in to reverse scroll: scrolling the preview moves Neovim's cursor to match (polled, so slightly lagged)
 ---@field any_file boolean? **deprecated** -- the flag moved to the top level on 2026-08-30. Still read by `config.merge` so an older config keeps working; DEFAULTS does not carry it, so it is only ever set when a caller passed it.
 
+---@class mdview.config.KeymapsDefaults
+---@field write string|false|nil normal-mode lhs for `:MDView write toggle` (caret + block editing together); nil/false (default) maps nothing
+
 ---@class mdview.config.Defaults
 ---@field ft_pattern string[] filetype/glob patterns mdview's autocmds attach to
 ---@field any_file boolean preview any normal text buffer, not just Markdown: widens `ft_pattern` to `{"*"}` (see mdview.config.merge) and renders non-Markdown files as a syntax-highlighted read-only code view instead of through the Markdown renderer. Scroll-sync falls back to proportional (no per-line sourcepos yet, so no cursor line bar). Takes precedence over a hand-set `ft_pattern`. Default false.
@@ -108,6 +111,7 @@
 ---@field dev mdview.config.DevDefaults
 ---@field standalone mdview.config.StandaloneDefaults
 ---@field experimental mdview.config.ExperimentalDefaults
+---@field keymaps mdview.config.KeymapsDefaults opt-in keymaps; none by default
 ---@field deps_popup boolean show the lib.nvim.deps "declared tools" popup once, ever, on first setup() after install (default true; needs lib.nvim.deps — a no-op without it)
 ---@field transport mdview.config.TransportDefaults
 
@@ -227,6 +231,10 @@ return {
   -- for this plugin specifically, right here in the spec passed to
   -- setup() — no vim.g needed. See docs/configuration.md.
   deps_popup = true,
+
+  -- Opt-in keymaps: mdview maps nothing unless a lhs is set here (see
+  -- docs/BINDINGS.md#keymaps). `write` = `:MDView write toggle`.
+  keymaps = {},
 
   browser = {
     open_mode = "default",

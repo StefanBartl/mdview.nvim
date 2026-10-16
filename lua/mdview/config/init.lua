@@ -47,6 +47,7 @@ local KNOWN_NIL_KEYS = {
   start = { try_push_opts = true, wait_timeout_ms = true },
   dev = { binary_path = true, web_root = true },
   standalone = { binary_path = true },
+  keymaps = { write = true },
 }
 
 -- Collect every valid leaf key name across all levels (for "did you mean").
