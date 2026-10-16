@@ -8,8 +8,9 @@
 --             a plain :MDView start), with both already set, so the first
 --             browser URL carries ?cursor=caret&edit=1 and the inbound poll
 --             comes up with the session.
---   * off     both off: block editing off, the cursor marker back to what it
---             was before `on` (or the configured default). NEVER stops the
+--   * off     both off: block editing off, a "caret" marker back to what it
+--             was before `on` (or the configured default); any other marker
+--             is left alone (the caret is already off). NEVER stops the
 --             session — the preview keeps running, so the same command can
 --             switch writing on again.
 --   * toggle  (default) off when both are on, otherwise on — a mixed state
@@ -101,7 +102,11 @@ function M.run(action)
     end
     browser.cursor_marker = "caret"
   else
-    browser.cursor_marker = marker_after_off()
+    -- Only undo the caret: a marker the user picked meanwhile (or one that
+    -- was never "caret", e.g. `section` with :MDView edit on) stays as it is.
+    if browser.cursor_marker == "caret" then
+      browser.cursor_marker = marker_after_off()
+    end
     prev_marker = nil
   end
   cfg.edit_blocks = on

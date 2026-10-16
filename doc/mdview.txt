@@ -699,7 +699,8 @@ pushes a control update over the socket.
   (|:MDView-edit|) together (`on`|`off`|`toggle`; no argument toggles).
   Without a running session, `on`/`toggle` starts one like |:MDView-start|,
   with both already on, so no second command is needed. `off` switches both
-  off (the cursor marker goes back to what it was before `on`) and never
+  off (a `caret` marker goes back to what it was before `on`; any other
+  marker stays) and never
   stops the preview, so the same command switches writing on again. `toggle`
   is `off` when both are on, otherwise `on`: a mixed state (only one of the
   two on) turns both on. Optional keymap: `keymaps.write` (|mdview-keymaps|).

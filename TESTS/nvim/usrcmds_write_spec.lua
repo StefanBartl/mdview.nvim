@@ -118,6 +118,23 @@ describe("usrcmds.write", function()
     assert.are_not.equal("caret", cfg.defaults.browser.cursor_marker)
   end)
 
+  it("off keeps a non-caret marker (only block editing was on)", function()
+    reset("section", true, { stub = true })
+    write.run("off")
+    assert.are.equal("section", cfg.defaults.browser.cursor_marker)
+    assert.is_false(cfg.defaults.edit_blocks)
+    assert.are.same({ cursor = "section", editBlocks = false }, sent)
+  end)
+
+  it("off keeps a marker the user picked after on", function()
+    reset("line", false, { stub = true })
+    write.run("on")
+    cfg.defaults.browser.cursor_marker = "section" -- e.g. :MDView cursor section
+    write.run("off")
+    assert.are.equal("section", cfg.defaults.browser.cursor_marker)
+    assert.is_false(cfg.defaults.edit_blocks)
+  end)
+
   it("toggle from a mixed state (only edit on) switches both on", function()
     reset("line", true, { stub = true })
     write.run("toggle")
