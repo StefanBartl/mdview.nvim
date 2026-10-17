@@ -35,6 +35,38 @@ function M.color()
   return ("#%06x"):format(hl.bg)
 end
 
+--- Last color the group was seen with, kept across a `:colorscheme`.
+---@type string|nil
+local last_color = nil
+
+--- The color to use, remembering it. `after_colorscheme`: the read follows a
+--- `:colorscheme` (or a 'background' switch, which reloads it). That command
+--- runs `:highlight clear`, which empties a group the user defined once in the
+--- config too; an empty group then means "cleared by the colorscheme", not "the
+--- user wants the theme's tint", so the last color seen is kept. Any other read
+--- (start, `:MDView paragraph`) takes the group as it is and forgets a color
+--- the group no longer has. A colorscheme that defines the group itself wins.
+---@param after_colorscheme boolean|nil
+---@return string|nil
+function M.resolve_color(after_colorscheme)
+  local color = M.color()
+  if color then
+    last_color = color
+    return color
+  end
+  if after_colorscheme then
+    return last_color
+  end
+  last_color = nil
+  return nil
+end
+
+--- Forget the remembered color (specs).
+---@return nil
+function M.forget()
+  last_color = nil
+end
+
 --- Whether the highlight is switched on in the given browser config.
 ---@param browser table|nil # config.defaults.browser
 ---@return boolean
@@ -52,7 +84,7 @@ function M.url_params(browser)
     return ""
   end
   local query = "&para=1"
-  local color = M.color()
+  local color = M.resolve_color(false)
   if color then
     query = query .. "&parabg=" .. color:sub(2)
   end
@@ -62,11 +94,13 @@ end
 --- Control update switching the highlight in an open tab. Carries the current
 --- color too (`false` = the theme's tint), so a changed highlight group reaches
 --- the preview with the next `:MDView paragraph`, and after a `:colorscheme`
---- through bindings/autocmds/cursor_paragraph_sync.lua.
+--- through bindings/autocmds/cursor_paragraph_sync.lua (`after_colorscheme`,
+--- see resolve_color).
 ---@param on boolean
+---@param after_colorscheme boolean|nil
 ---@return { cursorParagraph: boolean, cursorParagraphBg: string|false }
-function M.payload(on)
-  return { cursorParagraph = on, cursorParagraphBg = M.color() or false }
+function M.payload(on, after_colorscheme)
+  return { cursorParagraph = on, cursorParagraphBg = M.resolve_color(after_colorscheme) or false }
 end
 
 return M

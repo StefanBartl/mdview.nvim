@@ -136,7 +136,27 @@ own faint tint, which suits light and dark preview themes alike; a color from
 the group is used as is, so pick one that suits the preview theme. The color is
 read at `:MDView start`, with every `:MDView paragraph` and, while the
 highlight is on, again after every `:colorscheme` or `'background'` change, so
-the open tab follows the new color without a toggle.
+the open tabs follow the new color without a toggle -- every tab, also with
+`browser.behavior = "new_tab"` / `"manual"` and whichever buffer is current.
+
+`:colorscheme` runs `:highlight clear`, which also empties a group you defined
+once in your config. mdview then keeps the color the group had last, so the tab
+does not fall back to the theme's tint; a colorscheme that defines the group
+itself replaces it. To pick the color per colorscheme (or to make the group
+survive for Neovim itself), define it in a `ColorScheme` autocmd -- mdview reads
+the group one tick after the event, so your autocmd always runs first:
+
+```lua
+local function paragraph_hl()
+  vim.api.nvim_set_hl(0, "MdviewCursorParagraph", { bg = "#2a3350" })
+end
+paragraph_hl()
+vim.api.nvim_create_autocmd("ColorScheme", { callback = paragraph_hl })
+```
+
+To go back to the theme's tint, clear the group (`nvim_set_hl(0,
+"MdviewCursorParagraph", {})`) and run `:MDView paragraph on`, which reads the
+group as it is and forgets the kept color.
 
 - **Module:** `lua/mdview/core/cursor_paragraph.lua`, `lua/mdview/bindings/usrcmds/paragraph.lua`, `lua/mdview/bindings/autocmds/cursor_paragraph_sync.lua`, `src/client/render/cursorParagraph.ts`
 - **Usercmds:** `:MDView paragraph [on|off|toggle]` (no argument toggles)

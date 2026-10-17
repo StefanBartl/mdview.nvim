@@ -34,4 +34,30 @@ function M.send(fields, room)
   return true
 end
 
+--- Send a control update that concerns the editor rather than one document
+--- (e.g. the cursor paragraph color after `:colorscheme`) to every open tab.
+--- With `browser.behavior = "reuse"` that is the one tab, reached through
+--- send()'s own routing. Otherwise every document has a tab of its own: the
+--- update goes to every room Neovim pushed a document into this session (and
+--- to the current buffer's room, should it not be among them yet), so it
+--- arrives no matter which buffer is current -- also an unnamed one.
+---@param fields table
+---@return boolean sent # at least one room got it
+function M.broadcast(fields)
+  local behavior = require("mdview.config.browser").defaults.behavior or "reuse"
+  if behavior == "reuse" then
+    return M.send(fields)
+  end
+  local rooms = require("mdview.bindings.autocmds.live_push").rooms()
+  local current = target_key.resolve(0)
+  if current and not vim.tbl_contains(rooms, current) then
+    rooms[#rooms + 1] = current
+  end
+  local any = false
+  for _, room in ipairs(rooms) do
+    any = M.send(fields, room) or any
+  end
+  return any
+end
+
 return M

@@ -34,6 +34,16 @@ function M.shown_document(room)
   return M._last_doc[room]
 end
 
+--- Every room Neovim pushed a document into this session, sorted: the rooms
+--- open preview tabs watch (one per document with `browser.behavior =
+--- "new_tab"`/`"manual"`).
+---@return string[]
+function M.rooms()
+  local list = vim.tbl_keys(M._last_doc)
+  table.sort(list)
+  return list
+end
+
 --- Record (and announce to the tab) that `path` is the document now shown in
 --- `room`. Called for every push of a document into a room: the content push of
 --- an edit or a save, and the content push of a buffer switch. A no-op when it
