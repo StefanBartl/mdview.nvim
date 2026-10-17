@@ -4,8 +4,9 @@
 -- highlight group, which the tab otherwise only learns at start (URL parameter
 -- `parabg`) and with the next `:MDView paragraph`. After a `:colorscheme` (or a
 -- 'background' switch, which reloads the colorscheme) the tab would keep the
--- old tint, so this re-sends the control update with the current color --
--- `false` when the group has no background any more, i.e. the theme's tint.
+-- old tint, so this re-sends the control update with the current color to
+-- every open tab. A group the colorscheme's `:highlight clear` emptied keeps
+-- the last color it had; `false` (the theme's tint) only when it never had one.
 --
 -- Lives in the session augroup (MdviewAutocmds), so it exists only while a
 -- preview is running, and is gated per event on browser.cursor_paragraph, so
@@ -22,8 +23,11 @@ local autocmd = require("lib.nvim.bindings.autocmd")
 
 local M = {}
 
---- Send the current color to the open tab, when the highlight is on and a
---- session is running.
+--- Send the current color to every open tab, when the highlight is on and a
+--- session is running. A colorscheme concerns the editor, not one document, so
+--- with a tab per document (behavior "new_tab"/"manual") every tab gets it,
+--- whichever buffer is current. A group the colorscheme cleared keeps the last
+--- color it had (cursor_paragraph.resolve_color).
 ---@return boolean sent
 function M.sync_now()
   if not cursor_paragraph.enabled(require("mdview.config.browser").defaults) then
@@ -32,7 +36,7 @@ function M.sync_now()
   if not state.get_server() then
     return false
   end
-  return control.send(cursor_paragraph.payload(true))
+  return control.broadcast(cursor_paragraph.payload(true, true))
 end
 
 --- Register the ColorScheme / OptionSet background autocmds in `group`.

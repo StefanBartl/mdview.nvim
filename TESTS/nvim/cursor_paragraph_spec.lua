@@ -15,6 +15,7 @@ local bcfg = require("mdview.config.browser")
 local scroll_sync = require("mdview.bindings.autocmds.scroll_sync")
 local cursor_paragraph = require("mdview.core.cursor_paragraph")
 local paragraph = require("mdview.bindings.usrcmds.paragraph")
+local live_push = require("mdview.bindings.autocmds.live_push")
 
 local GROUP = cursor_paragraph.HL_GROUP
 -- A namespace of the spec's own, so no group lands in the global one.
@@ -26,23 +27,30 @@ local orig = {
   ping = scroll_sync.send_current_position,
   value = bcfg.defaults.cursor_paragraph,
   ns = cursor_paragraph.ns,
+  behavior = bcfg.defaults.behavior,
+  last_doc = live_push._last_doc,
 }
 
-local sent, pinged
+-- `sent`: the fields of the last control.send; `rooms`: the room of every
+-- control.send in order ("<current>" for one without a room).
+local sent, pinged, rooms
 
 local function reset(value, server)
   bcfg.defaults.cursor_paragraph = value
   state.set_server(server)
-  sent, pinged = nil, false
+  sent, pinged, rooms = nil, false, {}
   vim.api.nvim_set_hl(NS, GROUP, {})
+  cursor_paragraph.forget()
 end
 
 describe("cursor paragraph highlight", function()
   before_each(function()
     cursor_paragraph.ns = NS
     vim.notify = function() end
-    control.send = function(fields)
+    rooms = {}
+    control.send = function(fields, room)
       sent = fields
+      rooms[#rooms + 1] = room or "<current>"
       return true
     end
     scroll_sync.send_current_position = function()
@@ -56,8 +64,11 @@ describe("cursor paragraph highlight", function()
     control.send = orig.send
     scroll_sync.send_current_position = orig.ping
     bcfg.defaults.cursor_paragraph = orig.value
+    bcfg.defaults.behavior = orig.behavior
+    live_push._last_doc = orig.last_doc
     state.set_server(nil)
     vim.api.nvim_set_hl(NS, GROUP, {})
+    cursor_paragraph.forget()
   end)
 
   it("is off by default", function()
@@ -149,6 +160,78 @@ describe("cursor paragraph highlight", function()
       reset(true, {})
       fire("ColorScheme")
       assert.are.same({ cursorParagraph = true, cursorParagraphBg = false }, sent)
+    end)
+
+    it("keeps the last color when the colorscheme's :highlight clear emptied the group", function()
+      reset(true, {})
+      -- Defined once in the config, then `:colorscheme` clears it.
+      vim.api.nvim_set_hl(NS, GROUP, { bg = "#2a3350" })
+      fire("ColorScheme")
+      assert.are.same({ cursorParagraph = true, cursorParagraphBg = "#2a3350" }, sent)
+      sent = nil
+      vim.api.nvim_set_hl(NS, GROUP, {})
+      fire("ColorScheme")
+      assert.are.same({ cursorParagraph = true, cursorParagraphBg = "#2a3350" }, sent)
+    end)
+
+    it("a colorscheme that defines the group itself replaces the kept color", function()
+      reset(true, {})
+      vim.api.nvim_set_hl(NS, GROUP, { bg = "#2a3350" })
+      fire("ColorScheme")
+      sent = nil
+      vim.api.nvim_set_hl(NS, GROUP, { bg = "#0f0e0d" })
+      fire("ColorScheme")
+      assert.are.same({ cursorParagraph = true, cursorParagraphBg = "#0f0e0d" }, sent)
+    end)
+
+    it("forgets the kept color once :MDView paragraph finds the group empty", function()
+      reset(true, {})
+      vim.api.nvim_set_hl(NS, GROUP, { bg = "#2a3350" })
+      fire("ColorScheme")
+      vim.api.nvim_set_hl(NS, GROUP, {})
+      paragraph.run("on")
+      assert.are.same({ cursorParagraph = true, cursorParagraphBg = false }, sent)
+      sent = nil
+      fire("ColorScheme")
+      assert.are.same({ cursorParagraph = true, cursorParagraphBg = false }, sent)
+    end)
+
+    it("reads the group after a ColorScheme autocmd registered later redefined it", function()
+      reset(true, {})
+      -- The user's own ColorScheme autocmd, defined after mdview's: it runs
+      -- second, so only a read deferred past the event sees its color.
+      vim.api.nvim_create_autocmd("ColorScheme", {
+        group = group,
+        callback = function()
+          vim.api.nvim_set_hl(NS, GROUP, { bg = "#778899" })
+        end,
+      })
+      fire("ColorScheme")
+      assert.are.same({ cursorParagraph = true, cursorParagraphBg = "#778899" }, sent)
+    end)
+
+    it("reaches every open tab with a tab per document, from an unnamed buffer too", function()
+      reset(true, {})
+      bcfg.defaults.behavior = "new_tab"
+      live_push._last_doc = { ["/notes/b.md"] = "/notes/b.md", ["/notes/a.md"] = "/notes/a.md" }
+      local scratch = vim.api.nvim_create_buf(false, true)
+      local prev = vim.api.nvim_get_current_buf()
+      vim.api.nvim_set_current_buf(scratch)
+      vim.api.nvim_set_hl(NS, GROUP, { bg = "#445566" })
+      fire("ColorScheme")
+      vim.api.nvim_set_current_buf(prev)
+      vim.api.nvim_buf_delete(scratch, { force = true })
+      assert.are.same({ "/notes/a.md", "/notes/b.md" }, rooms)
+      assert.are.same({ cursorParagraph = true, cursorParagraphBg = "#445566" }, sent)
+    end)
+
+    it("keeps the one-tab routing with behavior = reuse", function()
+      reset(true, {})
+      bcfg.defaults.behavior = "reuse"
+      live_push._last_doc = { ["/notes/a.md"] = "/notes/a.md", ["/notes/b.md"] = "/notes/b.md" }
+      vim.api.nvim_set_hl(NS, GROUP, { bg = "#445566" })
+      fire("ColorScheme")
+      assert.are.same({ "<current>" }, rooms)
     end)
 
     it("re-sends after a 'background' switch too", function()
