@@ -60,6 +60,19 @@ describe('parseControl', () => {
     expect(off.selection).toBe(false);
   });
 
+  it('reads the cursor paragraph switch and tells a missing color from a cleared one', () => {
+    const on = parseControl('{"cursorParagraph":true,"cursorParagraphBg":"#203040"}')!;
+    expect(on.cursorParagraph).toBe(true);
+    expect(on.hasCursorParagraphBg).toBe(true);
+    expect(on.cursorParagraphBg).toBe('#203040');
+    const cleared = parseControl('{"cursorParagraph":false,"cursorParagraphBg":false}')!;
+    expect(cleared.cursorParagraph).toBe(false);
+    expect(cleared.hasCursorParagraphBg).toBe(true);
+    const none = parseControl('{"cursorParagraph":"yes"}')!;
+    expect(none.cursorParagraph).toBeUndefined();
+    expect(none.hasCursorParagraphBg).toBe(false);
+  });
+
   it('checks the shape of the overlay fields', () => {
     expect(parseControl('{"overlay":{"name":"keycast","on":true}}')!.overlay).toEqual({
       name: 'keycast',

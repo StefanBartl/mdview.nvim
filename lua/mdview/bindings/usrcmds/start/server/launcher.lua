@@ -113,6 +113,10 @@ local function resolve_browser_url(opts)
     url = url .. "&cursor=" .. vim.uri_encode(cursor_marker)
   end
 
+  -- cursor paragraph highlight (client reads ?para=1 and ?parabg=); only
+  -- passed when on, so a reopened tab starts at what :MDView paragraph set.
+  url = url .. require("mdview.core.cursor_paragraph").url_params(browser_defaults)
+
   -- preview zoom factor (client reads ?zoom=); only pass a non-default so a
   -- freshly reopened tab starts at the zoom :MDView zoom last set.
   local zoom = browser_defaults.zoom
