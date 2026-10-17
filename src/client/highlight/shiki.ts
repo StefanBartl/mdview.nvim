@@ -13,9 +13,10 @@
 
 import { createHighlighter, bundledLanguages, bundledThemes } from 'shiki';
 import { createJavaScriptRegexEngine } from 'shiki/engine/javascript';
-import { PARAGRAPH_CLASS } from '../render/cursorParagraph';
-
 type Highlighter = Awaited<ReturnType<typeof createHighlighter>>;
+
+/** Class prefix of everything the preview decorates a block with. */
+const DECORATION_PREFIX = 'mdview-';
 
 // Map an mdview theme name (?theme=) to a bundled Shiki theme.
 function shikiTheme(): string {
@@ -89,15 +90,17 @@ export async function highlightAll(root: HTMLElement): Promise<void> {
         // Shiki returns a full <pre class="shiki">; the replacement must keep
         // the block's source position, which scroll sync, the cursor/selection
         // mirrors and block editing all find the block by. It also keeps the
-        // cursor paragraph tint: the render placed it on the old <pre>
-        // synchronously, and no cursor ping follows this async swap.
+        // preview's own decoration classes (mdview-*: the cursor paragraph
+        // tint, the section spotlight's dim/active, …): the render placed them
+        // on the old <pre> synchronously, and no cursor ping follows this async
+        // swap.
         const sourcePos = pre.getAttribute('data-sourcepos');
-        const tinted = pre.classList.contains(PARAGRAPH_CLASS);
+        const decorations = Array.from(pre.classList).filter(c => c.startsWith(DECORATION_PREFIX));
         pre.insertAdjacentHTML('afterend', html);
         const highlighted = pre.nextElementSibling;
         pre.remove();
         if (sourcePos && highlighted) highlighted.setAttribute('data-sourcepos', sourcePos);
-        if (tinted && highlighted) highlighted.classList.add(PARAGRAPH_CLASS);
+        if (highlighted) highlighted.classList.add(...decorations);
       }
     } catch {
       /* leave the original block as-is on any failure */

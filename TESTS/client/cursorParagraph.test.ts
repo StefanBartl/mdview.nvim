@@ -33,7 +33,7 @@
 //  26  > quote                block quote 26..27
 //  27  > more
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import {
   paragraphBlockAt,
   updateCursorParagraph,
@@ -165,6 +165,62 @@ describe('paragraphBlockAt with several blank lines after a block', () => {
     for (const line of [3, 4]) expect(at(html, src, line)).toBeNull();
   });
 
+  // comrak ends the list past the spaces of a whitespace-only last line, not at
+  // column 0 (WASM renderer: 1:1-5:2 and 1:1-3:2).
+  it('maps a run ending in a whitespace-only line to nothing', () => {
+    const src = '- a\n- b\n\n\n  \nPara';
+    const html =
+      '<ul data-sourcepos="1:1-5:2"><li data-sourcepos="1:1-1:3">a</li>' +
+      '<li data-sourcepos="2:1-5:2">b</li></ul><p data-sourcepos="6:1-6:4">Para</p>';
+    expect(at(html, src, 2)).toBe('UL');
+    for (const line of [3, 4, 5]) expect(at(html, src, line)).toBeNull();
+
+    const one = '- a\n- b\n  \nPara';
+    const oneHtml =
+      '<ul data-sourcepos="1:1-3:2"><li data-sourcepos="1:1-1:3">a</li>' +
+      '<li data-sourcepos="2:1-3:2">b</li></ul><p data-sourcepos="4:1-4:4">Para</p>';
+    expect(at(oneHtml, one, 2)).toBe('UL');
+    expect(at(oneHtml, one, 3)).toBeNull();
+  });
+
+  // A fence left open runs to the end of the file; its blank lines are code
+  // the <pre> shows (WASM renderer: code "x\n\n\n").
+  it('keeps the blank lines of a fence left open in the code block', () => {
+    const src = '```\nx\n\n\n';
+    const html = '<pre data-sourcepos="1:1-4:0"><code>x\n\n\n</code></pre>';
+    for (const line of [1, 2, 3, 4]) expect(at(html, src, line)).toBe('PRE');
+  });
+
+  it('keeps the blank lines of a fence left open inside a list in the list', () => {
+    const src = '- a\n  ```\n  x\n\n\n';
+    const html =
+      '<ul data-sourcepos="1:1-5:0"><li data-sourcepos="1:1-5:0">a' +
+      '<pre data-sourcepos="2:3-5:0"><code>x\n\n\n</code></pre></li></ul>';
+    for (const line of [1, 2, 3, 4, 5]) expect(at(html, src, line)).toBe('UL');
+
+    const onMarker = '- ```\n  x\n\n\n';
+    const onMarkerHtml =
+      '<ul data-sourcepos="1:1-4:0"><li data-sourcepos="1:1-4:0">' +
+      '<pre data-sourcepos="1:3-4:0"><code>x\n\n\n</code></pre></li></ul>';
+    for (const line of [1, 2, 3, 4]) expect(at(onMarkerHtml, onMarker, line)).toBe('UL');
+  });
+
+  it('still drops the blank lines after a closed fence and an indented block', () => {
+    const src = '- a\n  ```\n  x\n  ```\n\n\nP';
+    const html =
+      '<ul data-sourcepos="1:1-6:0"><li data-sourcepos="1:1-6:0">a' +
+      '<pre data-sourcepos="2:3-4:5"><code>x\n</code></pre></li></ul>' +
+      '<p data-sourcepos="7:1-7:1">P</p>';
+    for (const line of [1, 2, 3, 4]) expect(at(html, src, line)).toBe('UL');
+    for (const line of [5, 6]) expect(at(html, src, line)).toBeNull();
+
+    const indented = '    code\n    \n\nPara';
+    const indentedHtml =
+      '<pre data-sourcepos="1:5-3:0"><code>code\n</code></pre><p data-sourcepos="4:1-4:4">Para</p>';
+    expect(at(indentedHtml, indented, 1)).toBe('PRE');
+    for (const line of [2, 3]) expect(at(indentedHtml, indented, line)).toBeNull();
+  });
+
   it('updateCursorParagraph leaves the list untinted on such a blank line (CRLF source)', () => {
     const el = document.createElement('div');
     el.innerHTML =
@@ -200,6 +256,24 @@ describe('updateCursorParagraph', () => {
 
     updateCursorParagraph(el, -1, true);
     expect(el.querySelector(`.${PARAGRAPH_CLASS}`)).toBeNull();
+  });
+
+  it('does not split the source while the highlight is off', () => {
+    // Off is the default: a render must not keep a line array of the document.
+    const el = doc();
+    const source = `${'x\n'.repeat(5)}off-only`;
+    const split = vi.spyOn(String.prototype, 'split');
+    const splitSource = (): boolean =>
+      split.mock.contexts.some(ctx => String(ctx as string) === source);
+    try {
+      updateCursorParagraph(el, 3, false, source);
+      updateCursorParagraph(el, 0, true, source);
+      expect(splitSource()).toBe(false);
+      updateCursorParagraph(el, 3, true, source);
+      expect(splitSource()).toBe(true);
+    } finally {
+      split.mockRestore();
+    }
   });
 
   it('marks only the top-level block, never a nested one', () => {

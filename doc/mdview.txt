@@ -380,10 +380,12 @@ browser.cursor_paragraph ~
   Tint the block the Neovim cursor is in, independent of the cursor marker: a
   paragraph (the text up to the next blank line), or a whole list, table, code
   block, block quote, heading or the frontmatter table -- each one block, also
-  with blank lines inside. A cursor on a blank line between blocks highlights
-  nothing. Default: `false` (the line marker already shows the cursor; a
-  block-sized tint moving with every keystroke is noise while editing) --
-  |:MDView-paragraph| toggles it.
+  with blank lines inside. A cursor on a blank (or whitespace-only) line
+  between blocks highlights nothing; the blank lines of a fenced code block
+  left open at the end of the file are code and belong to it. Default:
+  `false` (the line marker already shows the cursor; a block-sized tint
+  moving with every keystroke is noise while editing) -- |:MDView-paragraph|
+  toggles it.
                                                 *hl-MdviewCursorParagraph*
   Color: the background of the highlight group `MdviewCursorParagraph` (links
   followed), read at start, with every |:MDView-paragraph| and, while the
