@@ -36,15 +36,26 @@ function M.sync_now()
   if not state.get_server() then
     return false
   end
-  return control.broadcast(cursor_paragraph.payload(true, true))
+  return control.broadcast(cursor_paragraph.payload(true))
 end
 
 --- Register the ColorScheme / OptionSet background autocmds in `group`.
+--- `:set background=…` fires both events (the option, then the colorscheme it
+--- reloads) in the same tick: the requests of one tick share one deferred
+--- sync, so the tabs get one update, not two.
 ---@param group integer # session augroup id
 ---@return nil
 function M.attach(group)
+  local pending = false
   local function request()
-    vim.schedule(M.sync_now)
+    if pending then
+      return
+    end
+    pending = true
+    vim.schedule(function()
+      pending = false
+      M.sync_now()
+    end)
   end
 
   autocmd.create({ "ColorScheme" }, request, {

@@ -39,26 +39,28 @@ end
 ---@type string|nil
 local last_color = nil
 
---- The color to use, remembering it. `after_colorscheme`: the read follows a
---- `:colorscheme` (or a 'background' switch, which reloads it). That command
---- runs `:highlight clear`, which empties a group the user defined once in the
---- config too; an empty group then means "cleared by the colorscheme", not "the
---- user wants the theme's tint", so the last color seen is kept. Any other read
---- (start, `:MDView paragraph`) takes the group as it is and forgets a color
---- the group no longer has. A colorscheme that defines the group itself wins.
----@param after_colorscheme boolean|nil
+--- The color to use, remembering it. `:colorscheme` (and a 'background'
+--- switch, which reloads it) runs `:highlight clear`, which empties a group the
+--- user defined once in the config too; an empty group therefore does not mean
+--- "the user wants the theme's tint", and every read keeps the last color the
+--- group had: the sync after a colorscheme, the browser URL of a tab opened
+--- later (`:MDView start`, `:MDView open`, the tab per document a buffer switch
+--- opens) and the URL `:MDView diagnose` shows. A colorscheme that defines the
+--- group itself replaces it. Only `reset` -- `:MDView paragraph` switching the
+--- highlight on, the user's explicit request -- takes the group as it is and
+--- forgets a color the group no longer has.
+---@param reset boolean|nil
 ---@return string|nil
-function M.resolve_color(after_colorscheme)
+function M.resolve_color(reset)
   local color = M.color()
   if color then
     last_color = color
     return color
   end
-  if after_colorscheme then
-    return last_color
+  if reset then
+    last_color = nil
   end
-  last_color = nil
-  return nil
+  return last_color
 end
 
 --- Forget the remembered color (specs).
@@ -75,8 +77,10 @@ function M.enabled(browser)
 end
 
 --- Query string to append to the browser URL: `&para=1` (plus `&parabg=rrggbb`
---- when the highlight group has a background) when the highlight is on, else "".
---- The color goes without its `#`, which would start the URL fragment.
+--- when the highlight group has a background, or had one before a colorscheme
+--- cleared it) when the highlight is on, else "". The color goes without its
+--- `#`, which would start the URL fragment. Never forgets the kept color: it is
+--- built for every tab opened, also automatically, and by `:MDView diagnose`.
 ---@param browser table|nil # config.defaults.browser
 ---@return string
 function M.url_params(browser)
@@ -84,7 +88,7 @@ function M.url_params(browser)
     return ""
   end
   local query = "&para=1"
-  local color = M.resolve_color(false)
+  local color = M.resolve_color()
   if color then
     query = query .. "&parabg=" .. color:sub(2)
   end
@@ -94,13 +98,13 @@ end
 --- Control update switching the highlight in an open tab. Carries the current
 --- color too (`false` = the theme's tint), so a changed highlight group reaches
 --- the preview with the next `:MDView paragraph`, and after a `:colorscheme`
---- through bindings/autocmds/cursor_paragraph_sync.lua (`after_colorscheme`,
---- see resolve_color).
+--- through bindings/autocmds/cursor_paragraph_sync.lua. `reset`: see
+--- resolve_color.
 ---@param on boolean
----@param after_colorscheme boolean|nil
+---@param reset boolean|nil
 ---@return { cursorParagraph: boolean, cursorParagraphBg: string|false }
-function M.payload(on, after_colorscheme)
-  return { cursorParagraph = on, cursorParagraphBg = M.resolve_color(after_colorscheme) or false }
+function M.payload(on, reset)
+  return { cursorParagraph = on, cursorParagraphBg = M.resolve_color(reset) or false }
 end
 
 return M

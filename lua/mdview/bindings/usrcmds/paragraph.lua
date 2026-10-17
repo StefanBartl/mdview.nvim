@@ -7,7 +7,13 @@
 -- carries ?para=) and, with a session running, pushes a live control update
 -- with the current color of the MdviewCursorParagraph group, followed by a
 -- position ping so the highlight appears right away instead of on the next
--- cursor move.
+-- cursor move. The switch concerns the editor, not one document: like the
+-- color sync after a colorscheme it reaches every open tab (control.broadcast),
+-- also with a tab per document and from an unnamed buffer.
+--
+-- Switching on is the explicit way back to the theme's tint: it reads the group
+-- as it is, so an empty group forgets the color kept across a colorscheme
+-- (cursor_paragraph.resolve_color). Switching off leaves the kept color alone.
 
 local control = require("mdview.adapter.control")
 local state = require("mdview.core.state")
@@ -41,7 +47,15 @@ function M.run(action)
   browser.cursor_paragraph = on
   local label = on and "highlighted in the preview" or "not highlighted"
 
-  if state.get_server() and control.send(cursor_paragraph.payload(on)) then
+  -- Read (and with `on`, reset) the color with or without a session: the next
+  -- browser URL carries what this read decided.
+  local payload = cursor_paragraph.payload(on, on)
+  if not state.get_server() then
+    notify("[mdview] cursor paragraph: " .. label .. " (applies on next :MDView start)", vim.log.levels.INFO)
+    return
+  end
+
+  if control.broadcast(payload) then
     if on then
       local scroll_sync = require("mdview.bindings.autocmds.scroll_sync")
       if not scroll_sync.is_paused() then
@@ -51,7 +65,8 @@ function M.run(action)
     end
     notify("[mdview] cursor paragraph: " .. label, vim.log.levels.INFO)
   else
-    notify("[mdview] cursor paragraph: " .. label .. " (applies on next :MDView start)", vim.log.levels.INFO)
+    -- A session without a tab to reach yet: the next one opened carries it.
+    notify("[mdview] cursor paragraph: " .. label .. " (applies to the next preview tab)", vim.log.levels.INFO)
   end
 end
 
