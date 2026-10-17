@@ -35,6 +35,7 @@
 ---@field focus "browser"|"nvim" whether the opened tab may take keyboard focus ("browser", default) or focus stays in Neovim ("nvim" — clean on macOS, best-effort on Windows, no-op on Linux); default open_mode only
 ---@field external_links "new_tab"|"same_tab" open external links (http/mailto/absolute) in a new tab ("new_tab", default — keeps the preview tab) or in place ("same_tab")
 ---@field cursor_marker "line"|"caret"|"section"|"off" show the Neovim cursor in the preview: full-width band over the cursor's source line ("line", default), an exact caret at the cursor column ("caret", uses inline source-position spans), a spotlight on the current heading section with the rest dimmed ("section"), or hidden ("off"); rides the scroll-sync ping, so needs scroll_sync on
+---@field cursor_paragraph boolean tint the top-level block the Neovim cursor is in (a paragraph up to the next blank line, or a whole list, table, code block, quote, heading or the frontmatter) in the preview, independent of cursor_marker; off by default, toggle with `:MDView paragraph`; color from the highlight group MdviewCursorParagraph (its background), else the preview theme's own tint; passed to the client as ?para=1 and pushed live; rides the scroll-sync ping, so needs scroll_sync on
 ---@field zoom number preview font-size zoom factor (1.0 = 100%, default); adjust at runtime with :MDView zoom, passed to the client as ?zoom= and pushed live
 ---@field overlays table<string, boolean> which preview overlays start enabled, e.g. { toc = false }; toggle at runtime with :MDView overlay, passed to the client as ?overlays= and pushed live
 ---@field selection_sync boolean mirror the Neovim visual selection (v / V / CTRL-V) into the preview as a highlight, live -- for showing a document to other people; off by default, switch it on for as long as you are presenting with `:MDView selection` (toggles), passed to the client as ?sel=1 and pushed live
@@ -114,6 +115,14 @@
 ---@field keymaps mdview.config.KeymapsDefaults opt-in keymaps; none by default
 ---@field deps_popup boolean show the lib.nvim.deps "declared tools" popup once, ever, on first setup() after install (default true; needs lib.nvim.deps — a no-op without it)
 ---@field transport mdview.config.TransportDefaults
+---@field shared_relay mdview.config.SharedRelayDefaults
+
+--- One relay and one preview tab for every Neovim instance (opt-in). See
+--- docs/FEATURES/SHARED_RELAY.md.
+---@class mdview.config.SharedRelayDefaults
+---@field enabled boolean the first `:MDView start` spawns a shared relay detached from its instance and advertises it in `stdpath("state")/mdview/relay.json`; a later `:MDView start` in another instance attaches to it (no second relay, no second tab). The tab follows the instance that has the focus, write-backs go to the instance that owns the document on screen. Default false: one relay per instance. Needs a relay with `--shared` (newer than v0.4.3; `dev.binary_path` until the next release)
+---@field heartbeat_ms integer how often an attached instance tells the relay it is still there and learns who owns the tab (default 2000)
+---@field idle_timeout_s integer seconds without a heartbeat after which the relay counts an instance as gone; the relay ends once none is left (default 30)
 
 --- Timing against the relay process. One block, because these are one
 --- decision -- how patient to be with a relay that is slow to answer -- and
@@ -188,6 +197,15 @@ return {
     inbound_poll_ms = 250,
   },
 
+  -- One relay + one preview tab for all Neovim instances. Off by default: each
+  -- instance runs its own relay and tab, as before. See
+  -- docs/FEATURES/SHARED_RELAY.md.
+  shared_relay = {
+    enabled = false,
+    heartbeat_ms = 2000,
+    idle_timeout_s = 30,
+  },
+
   scroll_sync = true,
   scroll_sync_throttle_ms = 150,
   -- Where the cursor line lands in the browser viewport:
@@ -254,6 +272,13 @@ return {
     focus = "browser",
     external_links = "new_tab",
     cursor_marker = "line",
+    -- Off by default: the cursor marker (a band over the cursor line) already
+    -- shows where the cursor is, and a second, block-sized tint on top of it
+    -- while you type is more noise than help. Switch it on (`:MDView
+    -- paragraph`) when the block matters more than the line -- presenting, or
+    -- reading along on a second screen. Color: highlight group
+    -- MdviewCursorParagraph (background), else the preview theme's own tint.
+    cursor_paragraph = false,
     zoom = 1.0,
     -- Preview overlays (see :MDView overlay). Off by default — they're for
     -- presenting/screen-sharing, not for everyday editing.

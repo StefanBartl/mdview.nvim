@@ -341,6 +341,25 @@ body {
   background-color: var(--section-spotlight, rgba(84, 174, 255, 0.14));
 }
 
+/* Cursor paragraph highlight (browser.cursor_paragraph, :MDView paragraph): the
+   top-level block the Neovim cursor is in (a paragraph, a whole list, table,
+   code block, quote or heading) gets a tint, set by JS as a class. The tint is
+   a background *image* so it lies over a code block's own background instead of
+   replacing it; the box-shadow carries it a little past the text on both sides.
+   --cursor-paragraph-bg comes from Neovim's MdviewCursorParagraph group, else
+   the theme's link color, faint. */
+#mdview-root .mdview-cursor-paragraph {
+  --mdview-paragraph-tint: var(
+    --cursor-paragraph-bg,
+    color-mix(in srgb, var(--md-link) 9%, transparent)
+  );
+  border-radius: 6px;
+  background-image: linear-gradient(var(--mdview-paragraph-tint), var(--mdview-paragraph-tint));
+  box-shadow:
+    -0.6rem 0 0 var(--mdview-paragraph-tint),
+    0.6rem 0 0 var(--mdview-paragraph-tint);
+}
+
 /* Private blocks (```private): blurred by default so third-party names/numbers
    aren't visible during a screen share. Click to reveal one, or :MDViewReveal to
    reveal all (adds .mdview-reveal-all on the root). */

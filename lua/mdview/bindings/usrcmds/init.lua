@@ -32,6 +32,7 @@ local breadcrumbs = require("mdview.bindings.usrcmds.breadcrumbs")
 local overlay = require("mdview.bindings.usrcmds.overlay")
 local blanklines = require("mdview.bindings.usrcmds.blanklines")
 local selection = require("mdview.bindings.usrcmds.selection")
+local paragraph = require("mdview.bindings.usrcmds.paragraph")
 local edit = require("mdview.bindings.usrcmds.edit")
 local write = require("mdview.bindings.usrcmds.write")
 local spotlight = require("mdview.bindings.usrcmds.spotlight")
@@ -260,6 +261,23 @@ function M.attach()
       desc = "Set the Neovim-cursor marker in the preview (line|caret|section|off|toggle — toggle flips section on/off)",
       run = function(ctx)
         cursor.run(ctx.args.mode)
+      end,
+    },
+
+    {
+      path = { "paragraph" },
+      args = {
+        {
+          name = "action",
+          type = "STRING",
+          optional = true,
+          values = paragraph.actions,
+          desc = "Highlight the block under the cursor in the preview (no argument toggles)",
+        },
+      },
+      desc = "Tint the paragraph/list/table/code block the cursor is in, in the preview, or stop; no argument toggles",
+      run = function(ctx)
+        paragraph.run(ctx.args.action)
       end,
     },
 

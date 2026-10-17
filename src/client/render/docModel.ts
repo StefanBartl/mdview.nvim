@@ -10,6 +10,8 @@ export interface BlockPos {
   el: HTMLElement;
   startLine: number;
   endLine: number;
+  /** End column from data-sourcepos; 0 means the block ends before `endLine`'s text. */
+  endCol?: number;
   headingLevel: number | null; // 1..6 for H1..H6, else null
 }
 
@@ -31,10 +33,18 @@ export function topLevelBlocks(container: HTMLElement): BlockPos[] {
     // comrak sourcepos: "startLine:startCol-endLine:endCol".
     const [startPart, endPart] = sp.split('-');
     const startLine = Number(startPart?.split(':')[0]);
-    const endLine = Number(endPart?.split(':')[0]);
+    const [endLineText, endColText] = endPart?.split(':') ?? [];
+    const endLine = Number(endLineText);
     if (!Number.isFinite(startLine) || !Number.isFinite(endLine)) continue;
+    const endCol = Number(endColText);
     const m = /^H([1-6])$/.exec(child.tagName);
-    out.push({ el: child, startLine, endLine, headingLevel: m ? Number(m[1]) : null });
+    out.push({
+      el: child,
+      startLine,
+      endLine,
+      ...(endColText !== undefined && Number.isFinite(endCol) ? { endCol } : {}),
+      headingLevel: m ? Number(m[1]) : null,
+    });
   }
   return out;
 }

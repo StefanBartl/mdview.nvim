@@ -112,6 +112,34 @@ a live control update — no reload needed either way.
 - **Usercmds:** `:MDView cursor [line|caret|section|off|toggle]` (no argument reports the current mode)
 - **Config:** `browser.cursor_marker` (default unset — see the command's own report for the effective value)
 
+## Cursor paragraph highlight
+
+On top of the cursor marker, the preview can tint the whole block the Neovim
+cursor is in, so whoever reads along sees which part of the document is being
+worked on. A block is a paragraph (the text up to the next blank line), or a
+whole list, table, code block, block quote, heading or the frontmatter table —
+each counts as one block, also when it has blank lines inside (a fenced code
+block, a loose list). A cursor on a blank line between two blocks highlights
+nothing. The mapping uses the rendered document's `data-sourcepos`, so it
+matches what the preview shows; raw HTML blocks carry no source position and
+are never highlighted.
+
+Off by default: the line band of the cursor marker already shows where the
+cursor is, and a second tint the size of a block, moving with every keystroke,
+is more noise than help while editing. Switch it on with `:MDView paragraph`
+while presenting or reading along on a second screen.
+
+The color is the background of the highlight group `MdviewCursorParagraph`
+(links followed), e.g. `vim.api.nvim_set_hl(0, "MdviewCursorParagraph", { bg =
+"#2a3350" })`. Without a background on that group the preview uses its theme's
+own faint tint, which suits light and dark preview themes alike; a color from
+the group is used as is, so pick one that suits the preview theme. The color is
+read at `:MDView start` and with every `:MDView paragraph`.
+
+- **Module:** `lua/mdview/core/cursor_paragraph.lua`, `lua/mdview/bindings/usrcmds/paragraph.lua`, `src/client/render/cursorParagraph.ts`
+- **Usercmds:** `:MDView paragraph [on|off|toggle]` (no argument toggles)
+- **Config:** `browser.cursor_paragraph` (default `false`); rides the scroll-sync ping, so it needs `scroll_sync` on
+
 ## Visual selection mirror
 
 What you select in Neovim with `v` / `V` / `CTRL-V` is highlighted in the

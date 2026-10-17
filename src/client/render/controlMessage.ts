@@ -10,6 +10,10 @@ export interface ControlMessage {
   overlayData?: { name: string; data: unknown };
   reveal?: boolean;
   cursor?: string;
+  cursorParagraph?: boolean;
+  /** True when the key is present at all: `false` drops back to the theme's tint. */
+  hasCursorParagraphBg: boolean;
+  cursorParagraphBg?: unknown;
   zoom?: number;
   /** True when the key is present at all: `false` removes the badge. */
   hasDisplayLang: boolean;
@@ -43,6 +47,7 @@ export function parseControl(json: string): ControlMessage | null {
   const msg: ControlMessage = {
     hasDisplayLang: 'displayLang' in raw,
     hasSelection: 'selection' in raw,
+    hasCursorParagraphBg: 'cursorParagraphBg' in raw,
   };
   if (isObject(raw.overlay)) {
     const { name, on } = raw.overlay;
@@ -55,6 +60,8 @@ export function parseControl(json: string): ControlMessage | null {
   }
   if (typeof raw.reveal === 'boolean') msg.reveal = raw.reveal;
   if (typeof raw.cursor === 'string') msg.cursor = raw.cursor;
+  if (typeof raw.cursorParagraph === 'boolean') msg.cursorParagraph = raw.cursorParagraph;
+  if (msg.hasCursorParagraphBg) msg.cursorParagraphBg = raw.cursorParagraphBg;
   if (typeof raw.zoom === 'number') msg.zoom = raw.zoom;
   if (msg.hasDisplayLang) msg.displayLang = raw.displayLang;
   if (typeof raw.blankLines === 'boolean') msg.blankLines = raw.blankLines;

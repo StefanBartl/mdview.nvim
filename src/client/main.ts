@@ -18,6 +18,12 @@ import { markExternalLinks, parseExternalLinkMode } from './render/externalLinks
 import { resolveLocalImages } from './render/localImages';
 import { installLinkHover } from './render/linkHover';
 import { updateCursorMarker, parseCursorMarkerMode } from './render/cursorMarker';
+import {
+  updateCursorParagraph,
+  parseCursorParagraph,
+  parseParagraphColor,
+  applyParagraphColor,
+} from './render/cursorParagraph';
 import { updateSelection, parseSelection, type SourceSelection } from './render/selectionMarker';
 import { applyBlankLineSpacing, parseBlankLines } from './render/blankLines';
 import { applyLangStatus, parseLangStatus } from './render/langStatus';
@@ -235,6 +241,13 @@ async function boot() {
   let lastCursorLine = -1;
   let lastCursorCol = -1;
 
+  // Cursor paragraph highlight (?para=1 from browser.cursor_paragraph; :MDView
+  // paragraph toggles it live): tints the top-level block the cursor is in.
+  // Its color comes from Neovim's MdviewCursorParagraph group (?parabg=), else
+  // the theme's own tint.
+  let cursorParagraphEnabled = parseCursorParagraph(params.get('para'));
+  if (container) applyParagraphColor(container, parseParagraphColor(params.get('parabg')));
+
   // Mirror of the Neovim visual selection (?sel= from browser.selection_sync;
   // :MDView selection toggles it live). Off unless asked for: while editing,
   // every v/V drag reaching the browser is noise. Kept across renders so the
@@ -392,6 +405,7 @@ async function boot() {
               lastCursorCol >= 0 ? lastCursorCol : null,
               cursorMarkerMode,
             );
+            updateCursorParagraph(container, lastCursorLine, cursorParagraphEnabled);
           }
           if (selectionEnabled && lastSelection) updateSelection(container, lastSelection);
         }
@@ -537,6 +551,7 @@ async function boot() {
           lastCursorCol >= 0 ? lastCursorCol : null,
           cursorMarkerMode,
         );
+        updateCursorParagraph(container, lastCursorLine, cursorParagraphEnabled);
       }
       // Same for the visual-selection mirror: the render wiped its layer, and
       // the selection it draws is still the current one.
@@ -622,6 +637,18 @@ async function boot() {
           lastCursorCol >= 0 ? lastCursorCol : null,
           cursorMarkerMode,
         );
+      }
+    }
+    if (msg.cursorParagraph !== undefined && container) {
+      // `:MDView paragraph` switching the block highlight on/off. Sent with the
+      // current color of the highlight group, so a changed color comes along.
+      cursorParagraphEnabled = msg.cursorParagraph;
+      if (msg.hasCursorParagraphBg) {
+        applyParagraphColor(container, parseParagraphColor(msg.cursorParagraphBg));
+      }
+      // (With an editor open the block is hidden: onClose places it.)
+      if (blockEditor?.isEditing() !== true) {
+        updateCursorParagraph(container, lastCursorLine, cursorParagraphEnabled);
       }
     }
     if (msg.zoom !== undefined) {
@@ -764,6 +791,7 @@ async function boot() {
             lastCursorCol >= 0 ? lastCursorCol : null,
             cursorMarkerMode,
           );
+          updateCursorParagraph(container, cursor.line, cursorParagraphEnabled);
         }
         notifyOverlayCursor(cursor.line, lastCursorCol >= 0 ? lastCursorCol : 0);
       }

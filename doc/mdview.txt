@@ -152,6 +152,7 @@ Defaults: >lua
       highlighter         = "hljs",    -- code highlighter: hljs|shiki|nvim|none
       external_links      = "new_tab", -- external links: "new_tab" | "same_tab"
       cursor_marker       = "line",    -- "line"|"caret"|"section"|"off"
+      cursor_paragraph    = false,     -- tint the block under the cursor
       selection_sync      = false,     -- mirror the visual selection (v/V/C-v)
       spotlight_sync      = true,      -- mirror spotlight.nvim's highlights
       spotlight_max_matches = 500,     -- matches painted per spotlight
@@ -352,6 +353,20 @@ browser.cursor_marker ~
     "off"   — no marker.
   All ride the scroll-sync ping, so they need |mdview-scroll_sync| on. Switch
   at runtime with |:MDView-cursor|.
+
+browser.cursor_paragraph ~
+  Tint the block the Neovim cursor is in, independent of the cursor marker: a
+  paragraph (the text up to the next blank line), or a whole list, table, code
+  block, block quote, heading or the frontmatter table -- each one block, also
+  with blank lines inside. A cursor on a blank line between blocks highlights
+  nothing. Default: `false` (the line marker already shows the cursor; a
+  block-sized tint moving with every keystroke is noise while editing) --
+  |:MDView-paragraph| toggles it.
+                                                *hl-MdviewCursorParagraph*
+  Color: the background of the highlight group `MdviewCursorParagraph` (links
+  followed), read at start and with every |:MDView-paragraph|. Without one the
+  preview theme's own faint tint is used. Rides the scroll-sync ping, so it
+  needs |mdview-scroll_sync| on.
 
 browser.selection_sync ~
   Mirror the Neovim visual selection into the preview: what you select with
@@ -705,6 +720,13 @@ pushes a control update over the socket.
   stops the preview, so the same command switches writing on again. `toggle`
   is `off` when both are on, otherwise `on`: a mixed state (only one of the
   two on) turns both on. Optional keymap: `keymaps.write` (|mdview-keymaps|).
+
+:MDView paragraph [action]                                *:MDView-paragraph*
+  Switches the cursor paragraph highlight on/off (`on`|`off`|`toggle`; no
+  argument toggles) -- see `browser.cursor_paragraph` above. Switching it on
+  in a running session also sends the current color of
+  |hl-MdviewCursorParagraph| and the cursor position, so the highlight appears
+  at once.
 
 :MDView selection [action]                                *:MDView-selection*
   Switches the visual-selection mirror on/off (`on`|`off`|`toggle`; no

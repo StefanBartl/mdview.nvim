@@ -179,6 +179,27 @@ describe("launcher.resolve_browser_url", function()
     end)
   end)
 
+  it("cursor_paragraph adds para=1 (and the group's color) only when on", function()
+    with_clean_state(function()
+      bcfg.defaults.open_url = nil
+      state.set_token("t")
+      local cursor_paragraph = require("mdview.core.cursor_paragraph")
+      local ns0 = cursor_paragraph.ns
+      cursor_paragraph.ns = vim.api.nvim_create_namespace("mdview_spec_launcher_url")
+      vim.api.nvim_set_hl(cursor_paragraph.ns, cursor_paragraph.HL_GROUP, { bg = "#203040" })
+      bcfg.defaults.cursor_paragraph = false
+      local q = query_of(launcher.resolve_browser_url({ key = "k" }))
+      assert.is_nil(q.para)
+      assert.is_nil(q.parabg)
+
+      bcfg.defaults.cursor_paragraph = true
+      q = query_of(launcher.resolve_browser_url({ key = "k" }))
+      assert.are.equal("1", q.para)
+      assert.are.equal("203040", q.parabg)
+      cursor_paragraph.ns = ns0
+    end)
+  end)
+
   it("preserve_blank_lines adds blanklines=1 only when on", function()
     with_clean_state(function()
       bcfg.defaults.open_url = nil

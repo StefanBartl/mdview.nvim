@@ -1,0 +1,117 @@
+---@module 'tests.nvim.cursor_paragraph_spec'
+-- The Neovim side of the cursor paragraph highlight: its default, the color read
+-- from the MdviewCursorParagraph highlight group, the URL parameters and the
+-- :MDView paragraph switch with its live control update. Which block a line
+-- maps to is decided in the browser (TESTS/client/cursorParagraph.test.ts).
+--
+-- control.send and the position ping are stubbed at their one real definition,
+-- the same convention as usrcmds_write_spec.lua.
+
+---@diagnostic disable: undefined-global, duplicate-set-field
+
+local control = require("mdview.adapter.control")
+local state = require("mdview.core.state")
+local bcfg = require("mdview.config.browser")
+local scroll_sync = require("mdview.bindings.autocmds.scroll_sync")
+local cursor_paragraph = require("mdview.core.cursor_paragraph")
+local paragraph = require("mdview.bindings.usrcmds.paragraph")
+
+local GROUP = cursor_paragraph.HL_GROUP
+-- A namespace of the spec's own, so no group lands in the global one.
+local NS = vim.api.nvim_create_namespace("mdview_spec_cursor_paragraph")
+
+local orig = {
+  notify = vim.notify,
+  send = control.send,
+  ping = scroll_sync.send_current_position,
+  value = bcfg.defaults.cursor_paragraph,
+  ns = cursor_paragraph.ns,
+}
+
+local sent, pinged
+
+local function reset(value, server)
+  bcfg.defaults.cursor_paragraph = value
+  state.set_server(server)
+  sent, pinged = nil, false
+  vim.api.nvim_set_hl(NS, GROUP, {})
+end
+
+describe("cursor paragraph highlight", function()
+  before_each(function()
+    cursor_paragraph.ns = NS
+    vim.notify = function() end
+    control.send = function(fields)
+      sent = fields
+      return true
+    end
+    scroll_sync.send_current_position = function()
+      pinged = true
+    end
+  end)
+
+  after_each(function()
+    vim.notify = orig.notify
+    cursor_paragraph.ns = orig.ns
+    control.send = orig.send
+    scroll_sync.send_current_position = orig.ping
+    bcfg.defaults.cursor_paragraph = orig.value
+    state.set_server(nil)
+    vim.api.nvim_set_hl(NS, GROUP, {})
+  end)
+
+  it("is off by default", function()
+    assert.is_false(require("mdview.config.DEFAULTS").browser.cursor_paragraph)
+  end)
+
+  it("reads the color from the highlight group's background, nil without one", function()
+    reset(false, nil)
+    assert.is_nil(cursor_paragraph.color())
+    vim.api.nvim_set_hl(NS, GROUP, { bg = "#0a0b0c" })
+    assert.are.equal("#0a0b0c", cursor_paragraph.color())
+    vim.api.nvim_set_hl(NS, GROUP, { fg = "#ffffff" })
+    assert.is_nil(cursor_paragraph.color())
+  end)
+
+  it("builds the URL parameters only when switched on, the color without its #", function()
+    assert.are.equal("", cursor_paragraph.url_params({ cursor_paragraph = false }))
+    assert.are.equal("", cursor_paragraph.url_params(nil))
+    vim.api.nvim_set_hl(NS, GROUP, {})
+    assert.are.equal("&para=1", cursor_paragraph.url_params({ cursor_paragraph = true }))
+    vim.api.nvim_set_hl(NS, GROUP, { bg = "#a1b2c3" })
+    assert.are.equal("&para=1&parabg=a1b2c3", cursor_paragraph.url_params({ cursor_paragraph = true }))
+  end)
+
+  it("toggles without a session: records the choice, sends nothing", function()
+    reset(false, nil)
+    paragraph.run()
+    assert.is_true(bcfg.defaults.cursor_paragraph)
+    assert.is_nil(sent)
+    paragraph.run("toggle")
+    assert.is_false(bcfg.defaults.cursor_paragraph)
+  end)
+
+  it("on with a session pushes the switch with the current color and pings the position", function()
+    reset(false, {})
+    vim.api.nvim_set_hl(NS, GROUP, { bg = "#102030" })
+    paragraph.run("on")
+    assert.is_true(bcfg.defaults.cursor_paragraph)
+    assert.are.same({ cursorParagraph = true, cursorParagraphBg = "#102030" }, sent)
+    assert.is_true(pinged)
+  end)
+
+  it("off with a session pushes the switch, a missing color as false, no ping", function()
+    reset(true, {})
+    paragraph.run("off")
+    assert.is_false(bcfg.defaults.cursor_paragraph)
+    assert.are.same({ cursorParagraph = false, cursorParagraphBg = false }, sent)
+    assert.is_false(pinged)
+  end)
+
+  it("rejects an unknown action and changes nothing", function()
+    reset(true, {})
+    paragraph.run("sideways")
+    assert.is_true(bcfg.defaults.cursor_paragraph)
+    assert.is_nil(sent)
+  end)
+end)

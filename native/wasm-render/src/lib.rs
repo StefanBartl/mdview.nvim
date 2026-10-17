@@ -138,7 +138,12 @@ fn is_key_line(line: &str) -> bool {
 /// table. Each `key: value` line becomes one row; an indented line or a line
 /// without `key:` shape continues the previous row's value, so a block list or
 /// a folded value stays readable instead of being dropped.
-fn front_matter_table(inner: &[&str]) -> String {
+///
+/// The table carries the `data-sourcepos` of the whole block (line 1 through
+/// the closing delimiter, `block_lines`): comrak emits a raw HTML block without
+/// one, and without it the client could not map a cursor on a frontmatter line
+/// to this table (scroll sync, cursor paragraph highlight, block editing).
+fn front_matter_table(inner: &[&str], block_lines: usize) -> String {
     let mut rows: Vec<(String, String)> = Vec::new();
     for line in inner {
         let trimmed = line.trim();
@@ -159,7 +164,9 @@ fn front_matter_table(inner: &[&str]) -> String {
             (false, None) => rows.push((String::new(), trimmed.to_string())),
         }
     }
-    let mut html = String::from("<table><caption>Frontmatter</caption><tbody>");
+    let mut html = format!(
+        "<table data-sourcepos=\"1:1-{block_lines}:3\"><caption>Frontmatter</caption><tbody>"
+    );
     for (k, v) in rows {
         html.push_str(&format!(
             "<tr><th>{}</th><td>{}</td></tr>",
@@ -204,7 +211,7 @@ fn replace_front_matter(input: &str) -> Cow<'_, str> {
     if !closed || !first_entry.is_some_and(|l| is_key_line(l)) {
         return Cow::Borrowed(input);
     }
-    let mut out = front_matter_table(&inner);
+    let mut out = front_matter_table(&inner, block_lines);
     out.push('\n');
     out.push_str(&"\n".repeat(block_lines - 1));
     out.push_str(&input[consumed..]);
@@ -341,6 +348,24 @@ mod tests {
         assert!(html.contains("<td>[a, b]</td>"), "{html}");
         // Later blocks keep their real source line (the block is padded, not removed).
         assert!(html.contains("<h1 data-sourcepos=\"7:1-7:6\">"), "{html}");
+    }
+
+    #[test]
+    fn frontmatter_table_spans_its_source_lines() {
+        // The table stands for lines 1..5 (both delimiters included), so a cursor on
+        // any frontmatter line maps to it.
+        let src = "---\ntitle: A task\nstatus: open\ntags: [a, b]\n---\n\n# Body\n";
+        let html = render_markdown(src, false);
+        assert!(
+            html.contains("<table data-sourcepos=\"1:1-5:3\">"),
+            "{html}"
+        );
+        // The same with CRLF line endings and a `...` closing delimiter.
+        let html = render_markdown("---\r\nkey: v\r\n...\r\n\r\ntext\r\n", false);
+        assert!(
+            html.contains("<table data-sourcepos=\"1:1-3:3\">"),
+            "{html}"
+        );
     }
 
     #[test]
