@@ -120,6 +120,63 @@ describe('paragraphBlockAt (source line -> top-level block)', () => {
   });
 });
 
+// comrak ends a list or an indented code block on the LAST of the blank lines
+// after it (column 0). The HTML is the WASM renderer's output for each source.
+describe('paragraphBlockAt with several blank lines after a block', () => {
+  const at = (html: string, source: string, line: number): string | null => {
+    const el = document.createElement('div');
+    el.innerHTML = html;
+    return paragraphBlockAt(topLevelBlocks(el), line, source.split('\n'))?.el.tagName ?? null;
+  };
+
+  it('maps none of the blank lines after a list to the list', () => {
+    const src = '- a\n- b\n\n\n\nPara';
+    const html =
+      '<ul data-sourcepos="1:1-5:0"><li data-sourcepos="1:1-1:3">a</li>' +
+      '<li data-sourcepos="2:1-5:0">b</li></ul><p data-sourcepos="6:1-6:4">Para</p>';
+    expect(at(html, src, 2)).toBe('UL');
+    for (const line of [3, 4, 5]) expect(at(html, src, line)).toBeNull();
+    expect(at(html, src, 6)).toBe('P');
+  });
+
+  it('maps none of the blank lines after an indented code block to it', () => {
+    const src = '    code\n\n\nPara';
+    const html =
+      '<pre data-sourcepos="1:5-3:0"><code>code\n</code></pre><p data-sourcepos="4:1-4:4">Para</p>';
+    expect(at(html, src, 1)).toBe('PRE');
+    for (const line of [2, 3]) expect(at(html, src, line)).toBeNull();
+  });
+
+  it('keeps a list with a nested fence together, but not the blank lines after it', () => {
+    const src = '- a\n\n  ```\n  x\n  ```\n\n\nP';
+    const html =
+      '<ul data-sourcepos="1:1-7:0"><li data-sourcepos="1:1-7:0"><p data-sourcepos="1:3-1:3">a</p>' +
+      '<pre data-sourcepos="3:3-5:5"><code>x\n</code></pre></li></ul><p data-sourcepos="8:1-8:1">P</p>';
+    for (const line of [1, 2, 3, 4, 5]) expect(at(html, src, line)).toBe('UL');
+    for (const line of [6, 7]) expect(at(html, src, line)).toBeNull();
+  });
+
+  it('maps the blank lines after a list at the end of the file to nothing', () => {
+    const src = '- a\n- b\n\n\n';
+    const html =
+      '<ul data-sourcepos="1:1-4:0"><li data-sourcepos="1:1-1:3">a</li>' +
+      '<li data-sourcepos="2:1-4:0">b</li></ul>';
+    expect(at(html, src, 2)).toBe('UL');
+    for (const line of [3, 4]) expect(at(html, src, line)).toBeNull();
+  });
+
+  it('updateCursorParagraph leaves the list untinted on such a blank line (CRLF source)', () => {
+    const el = document.createElement('div');
+    el.innerHTML =
+      '<ul data-sourcepos="1:1-5:0"><li data-sourcepos="1:1-1:3">a</li>' +
+      '<li data-sourcepos="2:1-5:0">b</li></ul><p data-sourcepos="6:1-6:4">Para</p>';
+    updateCursorParagraph(el, 3, true, '- a\r\n- b\r\n\r\n\r\n\r\nPara');
+    expect(el.querySelector(`.${PARAGRAPH_CLASS}`)).toBeNull();
+    updateCursorParagraph(el, 2, true, '- a\r\n- b\r\n\r\n\r\n\r\nPara');
+    expect(el.querySelector('ul')?.classList.contains(PARAGRAPH_CLASS)).toBe(true);
+  });
+});
+
 describe('updateCursorParagraph', () => {
   it('marks the block under the cursor and moves with it', () => {
     const el = doc();
