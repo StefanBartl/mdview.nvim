@@ -120,9 +120,9 @@ worked on. A block is a paragraph (the text up to the next blank line), or a
 whole list, table, code block, block quote, heading or the frontmatter table —
 each counts as one block, also when it has blank lines inside (a fenced code
 block, a loose list). A cursor on a blank line between two blocks highlights
-nothing. The mapping uses the rendered document's `data-sourcepos`, so it
-matches what the preview shows; raw HTML blocks carry no source position and
-are never highlighted.
+nothing, however many blank lines there are. The mapping uses the rendered
+document's `data-sourcepos`, so it matches what the preview shows; raw HTML
+blocks carry no source position and are never highlighted.
 
 Off by default: the line band of the cursor marker already shows where the
 cursor is, and a second tint the size of a block, moving with every keystroke,

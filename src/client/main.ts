@@ -405,7 +405,7 @@ async function boot() {
               lastCursorCol >= 0 ? lastCursorCol : null,
               cursorMarkerMode,
             );
-            updateCursorParagraph(container, lastCursorLine, cursorParagraphEnabled);
+            updateCursorParagraph(container, lastCursorLine, cursorParagraphEnabled, lastText);
           }
           if (selectionEnabled && lastSelection) updateSelection(container, lastSelection);
         }
@@ -551,7 +551,7 @@ async function boot() {
           lastCursorCol >= 0 ? lastCursorCol : null,
           cursorMarkerMode,
         );
-        updateCursorParagraph(container, lastCursorLine, cursorParagraphEnabled);
+        updateCursorParagraph(container, lastCursorLine, cursorParagraphEnabled, lastText);
       }
       // Same for the visual-selection mirror: the render wiped its layer, and
       // the selection it draws is still the current one.
@@ -648,7 +648,7 @@ async function boot() {
       }
       // (With an editor open the block is hidden: onClose places it.)
       if (blockEditor?.isEditing() !== true) {
-        updateCursorParagraph(container, lastCursorLine, cursorParagraphEnabled);
+        updateCursorParagraph(container, lastCursorLine, cursorParagraphEnabled, lastText);
       }
     }
     if (msg.zoom !== undefined) {
@@ -791,7 +791,7 @@ async function boot() {
             lastCursorCol >= 0 ? lastCursorCol : null,
             cursorMarkerMode,
           );
-          updateCursorParagraph(container, cursor.line, cursorParagraphEnabled);
+          updateCursorParagraph(container, cursor.line, cursorParagraphEnabled, lastText);
         }
         notifyOverlayCursor(cursor.line, lastCursorCol >= 0 ? lastCursorCol : 0);
       }

@@ -37,24 +37,49 @@ export function parseParagraphColor(value: unknown): string | null {
   return /^[0-9a-fA-F]{6}$/.test(hex) ? `#${hex.toLowerCase()}` : null;
 }
 
+// Source lines of the last document handed in, split once per document rather
+// than once per cursor ping.
+let splitSource: string | null = null;
+let splitLines: readonly string[] = [];
+
+function sourceLines(source: string): readonly string[] {
+  if (source !== splitSource) {
+    splitSource = source;
+    splitLines = source.split(/\r?\n/);
+  }
+  return splitLines;
+}
+
+const isBlank = (text: string | undefined): boolean => text === undefined || /^\s*$/.test(text);
+
 /**
  * Last source line holding text of `block`. comrak ends a block that swallows the
- * blank line after it (a list followed by a blank line) at column 0 of that blank
- * line; that line belongs to no block.
+ * blank lines after it (a list, an indented code block) at column 0 of the LAST
+ * of those blank lines; none of them belongs to the block. With the document's
+ * `lines` the whole blank run is dropped; without them only the line comrak
+ * ends on is.
  */
-function lastTextLine(block: BlockPos): number {
-  if (block.endCol === 0 && block.endLine > block.startLine) return block.endLine - 1;
-  return block.endLine;
+function lastTextLine(block: BlockPos, lines?: readonly string[]): number {
+  if (block.endCol !== 0 || block.endLine <= block.startLine) return block.endLine;
+  let end = block.endLine - 1;
+  if (lines) while (end > block.startLine && isBlank(lines[end - 1])) end--;
+  return end;
 }
 
 /**
  * The top-level block that contains source `line` (1-based), or null when the
  * line is blank between blocks, before the first or after the last block.
+ * `lines` (the rendered document's source lines) lets a run of blank lines after
+ * a list or an indented code block map to nothing, as any other blank line does.
  */
-export function paragraphBlockAt(blocks: BlockPos[], line: number): BlockPos | null {
+export function paragraphBlockAt(
+  blocks: BlockPos[],
+  line: number,
+  lines?: readonly string[],
+): BlockPos | null {
   for (const b of blocks) {
     if (b.startLine > line) return null; // blocks are in increasing line order
-    if (line <= lastTextLine(b)) return b;
+    if (line <= lastTextLine(b, lines)) return b;
   }
   return null;
 }
@@ -62,14 +87,18 @@ export function paragraphBlockAt(blocks: BlockPos[], line: number): BlockPos | n
 /**
  * Highlight the block under the cursor `line`, or clear the highlight when
  * `enabled` is false or the line is in no block. Call after each render (the
- * class goes with the replaced DOM) and on each cursor ping.
+ * class goes with the replaced DOM) and on each cursor ping. `source` is the
+ * Markdown the DOM was rendered from (see paragraphBlockAt).
  */
 export function updateCursorParagraph(
   container: HTMLElement,
   line: number,
   enabled: boolean,
+  source?: string,
 ): void {
-  const target = enabled && line >= 1 ? paragraphBlockAt(topLevelBlocks(container), line) : null;
+  const lines = source === undefined ? undefined : sourceLines(source);
+  const target =
+    enabled && line >= 1 ? paragraphBlockAt(topLevelBlocks(container), line, lines) : null;
   // Leave an unchanged highlight alone: a cursor ping per keystroke must not
   // restart the CSS transition.
   container.querySelectorAll(`.${PARAGRAPH_CLASS}`).forEach(el => {
