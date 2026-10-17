@@ -82,19 +82,23 @@ body {
   padding: 2rem clamp(1rem, 4vw, 3rem) 6rem;
 }
 
-/* Neovim cursor marker (browser.cursor_marker = "line"): a caret in the left
-   gutter at the cursor's line. Positioned in content coordinates by JS. */
+/* Neovim cursor line (browser.cursor_marker = "line"): a band across the full
+   width of the preview over the cursor's whole source line, with an accent
+   edge in the left gutter. Top/height set in content coordinates by JS; the
+   min-height keeps a blank line (zero-height slice) visible. Not blinking: it
+   marks the line, it does not pretend to be a caret. Drawn over the document
+   (code blocks have their own background) but translucent, so the text stays
+   readable; under the selection layer (4). */
 .mdview-cursor-bar {
   position: absolute;
-  left: 0.25rem;
-  width: 3px;
-  height: 1.4em;
-  margin-top: -0.7em; /* center on the target line */
-  border-radius: 2px;
-  background: var(--cursor-color, var(--md-link));
+  left: 0;
+  right: 0;
+  min-height: 4px;
+  box-sizing: border-box;
+  border-left: 3px solid var(--cursor-color, var(--md-link));
+  background: var(--cursorline-bg, color-mix(in srgb, var(--md-link) 12%, transparent));
   pointer-events: none;
-  z-index: 5;
-  animation: mdview-cursor-blink 1.1s steps(2, start) infinite;
+  z-index: 3;
 }
 /* Neovim cursor caret (browser.cursor_marker = "caret"): a thin vertical bar at
    the exact cursor character. Left/top/height set in content coordinates by JS
@@ -704,7 +708,12 @@ body {
   box-sizing: border-box;
   margin: 0.4em 0;
   padding: 0.4em 0.6em;
-  font: 0.95em/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font:
+    0.95em/1.5 ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    Consolas,
+    monospace;
   color: inherit;
   background: color-mix(in srgb, currentColor 6%, transparent);
   border: 1px solid color-mix(in srgb, currentColor 40%, transparent);
@@ -718,7 +727,9 @@ body {
   bottom: 16px;
   max-width: 24em;
   padding: 0.6em 0.9em;
-  font: 0.9em/1.4 system-ui, sans-serif;
+  font:
+    0.9em/1.4 system-ui,
+    sans-serif;
   color: #fff;
   background: #7a2e2e;
   border-radius: 6px;

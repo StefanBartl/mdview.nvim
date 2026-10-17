@@ -330,10 +330,11 @@ browser.external_links ~
 
 browser.cursor_marker ~
   Show where the Neovim cursor is inside the preview:
-    "line"  — a blinking bar in the left gutter at the cursor's line (default),
-              placed with the same sourcepos block + in-block interpolation as
-              the scroll sync, so it is line-accurate even inside multi-line
-              blocks. It marks the line, not the column.
+    "line"  — a full-width band over the cursor's whole source line (default),
+              covering every visual line when it wraps. Exact where the line's
+              text is locatable (inline source spans, code blocks), otherwise
+              the line's share of its sourcepos block. It marks the line, not
+              the column. Color: CSS variable `--cursorline-bg`.
     "caret" — a caret at the exact cursor column. The WASM renderer wraps inline
               text/code runs in `<span data-sp="…">` carrying their source
               position (byte columns, matching Neovim's byte-based cursor

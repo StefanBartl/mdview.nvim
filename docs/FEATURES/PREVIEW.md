@@ -98,7 +98,8 @@ the cursor's relative height inside the Neovim window.
 ## Neovim cursor marker
 
 The preview highlights whatever the Neovim cursor is currently on, in one of
-three modes: `line` (highlight the whole source line), `caret` (an exact
+three modes: `line` (a full-width band over the whole source line, every
+visual line of it when it wraps; the column does not move it), `caret` (an exact
 inline caret, byte-accurate via the renderer's `data-sp` spans — see
 [RENDERING.md](RENDERING.md#source-position-mapping)), or `section`
 (spotlight the enclosing heading section — the mode `:MDView cursor toggle`
