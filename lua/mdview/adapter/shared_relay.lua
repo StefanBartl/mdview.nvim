@@ -149,16 +149,8 @@ end
 --- Read the discovery file.
 ---@return { port: integer, token: string }|nil
 function M.read_discovery()
-  local path = M.discovery_path()
-  if vim.fn.filereadable(path) ~= 1 then
-    return nil
-  end
-  local ok, lines = pcall(vim.fn.readfile, path)
-  if not ok then
-    return nil
-  end
-  local dok, d = pcall(vim.json.decode, table.concat(lines, "\n"))
-  if not dok or type(d) ~= "table" or type(d.port) ~= "number" or type(d.token) ~= "string" or d.token == "" then
+  local d = require("lib.nvim.fs.json").read(M.discovery_path())
+  if type(d) ~= "table" or type(d.port) ~= "number" or type(d.token) ~= "string" or d.token == "" then
     return nil
   end
   return { port = d.port, token = d.token }
@@ -290,6 +282,8 @@ function M.takeover(bufnr)
   buffer_switch._last = nil
   require("mdview.adapter.ws_client").reset_diff_state(room)
   M.claim()
+  -- The spotlight mirror is per tab too: replace the other instance's.
+  pcall(require("mdview.bindings.autocmds.spotlight_sync").resend)
   return buffer_switch.resync(bufnr)
 end
 
@@ -308,7 +302,10 @@ function M.apply_status(st, sent_at)
   if room and state.get_preview_key() ~= room then
     state.set_preview_key(room)
   end
-  if sent_at and sent_at < M._claimed_at then
+  -- `<=`: uv.now() is the loop's cached clock, so a heartbeat sent in the same
+  -- loop iteration as the takeover carries the same stamp and may still have
+  -- left before it.
+  if sent_at and sent_at <= M._claimed_at then
     return
   end
   local owner = type(st.owners) == "table" and room and st.owners[room] or nil
