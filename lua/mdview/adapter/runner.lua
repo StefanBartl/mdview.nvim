@@ -94,6 +94,10 @@ function M.start_server(cmd, args, cwd)
     stdio = { nil, stdout, stderr },
     cwd = spawn_cwd,
     env = nil,
+    -- A shared relay serves every Neovim instance and must outlive the one
+    -- that spawned it: detached, it is not killed with this instance (on
+    -- Windows libuv otherwise ties the child to a kill-on-close job object).
+    detached = require("mdview.adapter.shared_relay").enabled(),
   }, function(code)
     if stdout then
       pcall(stdout.close, stdout)

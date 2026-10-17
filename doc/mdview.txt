@@ -142,6 +142,12 @@ Defaults: >lua
 
     open_preview_tab = false, -- :MDView start opens an nvim tab, not a browser
 
+    shared_relay = {          -- one relay + one tab for all nvim instances
+      enabled        = false, -- opt-in; needs a relay newer than v0.4.3
+      heartbeat_ms   = 2000,  -- how often an instance reports to the relay
+      idle_timeout_s = 30,    -- silent this long = gone; none left = relay ends
+    },
+
     browser = {
       open_mode           = "default", -- "default" (tab in your browser)
                                        -- | "isolated" (own window, auto-close)
@@ -267,6 +273,22 @@ edit_blocks ~
   (the relay's `--edit`). An edit made against lines that changed since the
   preview was rendered is refused. Default `false`; |:MDView-edit| switches it
   for the running session.
+
+shared_relay ~
+  Opt-in (`enabled = true`): one relay process and one preview tab for every
+  Neovim instance. The first |:MDView-start| spawns the relay detached and
+  advertises it in `stdpath("state")/mdview/relay.json`; a |:MDView-start| in
+  another instance attaches to it instead of spawning a second relay and tab.
+  The tab follows the instance that gains the focus (`FocusGained`, needs a
+  terminal with focus reporting; otherwise the first cursor move, buffer
+  switch or insert in an instance), and only that instance pushes. Checkbox,
+  field, block-edit, click-to-navigate and reverse-scroll write-backs go to
+  the instance whose document the tab shows; with the same file open in two
+  instances that is the focused one. |:MDView-stop| and quitting only detach;
+  the relay ends, closing the tab, once no instance is attached any more
+  (`idle_timeout_s` without a heartbeat counts as gone). Needs a relay with
+  `--shared` (newer than `v0.4.3`; `dev.binary_path`). Details in
+  docs/FEATURES/SHARED_RELAY.md.
 
 open_preview_tab ~
   When `true`, |:MDView-start| opens an nvim-tab preview (see

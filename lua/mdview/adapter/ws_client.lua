@@ -14,6 +14,7 @@ local fn = vim.fn
 local uv = vim.uv or vim.loop
 local normalize = require("mdview.helper.normalize")
 local log = require("mdview.helper.log")
+local shared_relay = require("mdview.adapter.shared_relay")
 
 -- Unlike config/init.lua's and init.lua's plain `create("")` (no popup,
 -- follows the future global default), these specific messages are health-
@@ -199,7 +200,18 @@ local function endpoint_url_for(endpoint, path)
   local port = vim.g.mdview_server_port or DEFAULT_PORT
   local normalized = normalize.path_for_url(path)
   local token = require("mdview.core.state").get_token() or ""
+  -- On a shared relay every request names this instance: a heartbeat, and for
+  -- /update and /doc the claim on the room (see mdview.adapter.shared_relay).
   return string.format("http://localhost:%d/%s?key=%s&token=%s", port, endpoint, normalized, vim.uri_encode(token))
+    .. shared_relay.client_param()
+end
+
+-- On a shared relay only the instance that owns the tab's room pushes into it
+-- (the focused one); the others stay quiet until they take it over.
+---@internal
+---@return boolean
+local function may_push()
+  return shared_relay.may_push()
 end
 
 ---@internal
@@ -386,7 +398,7 @@ end
 ---@return nil
 function M.send_markdown(path, markdown, opts)
   opts = opts or {}
-  if type(path) ~= "string" or type(markdown) ~= "string" then
+  if type(path) ~= "string" or type(markdown) ~= "string" or not may_push() then
     return
   end
 
@@ -434,7 +446,7 @@ end
 ---@param viewfrac number|nil # desired 0..1 vertical position of the line in the browser viewport
 ---@param col integer|nil # 0-based byte column of the cursor (for the cursor caret)
 function M.send_scroll(path, line, total, viewfrac, col)
-  if type(path) ~= "string" or path == "" then
+  if type(path) ~= "string" or path == "" or not may_push() then
     return
   end
   local body = tostring(line) .. "/" .. tostring(total)
@@ -504,7 +516,7 @@ end
 ---@return nil
 function M.send_content(key, lines, opts)
   opts = opts or {}
-  if type(key) ~= "string" or key == "" then
+  if type(key) ~= "string" or key == "" or not may_push() then
     return
   end
   lines = lines or {}
@@ -549,7 +561,7 @@ end
 ---@param doc_path string # absolute path of the now-previewed document
 ---@return nil
 function M.send_doc(key, doc_path)
-  if type(key) ~= "string" or key == "" or type(doc_path) ~= "string" or doc_path == "" then
+  if type(key) ~= "string" or key == "" or type(doc_path) ~= "string" or doc_path == "" or not may_push() then
     return
   end
   http_post_nonblocking(doc_url_for(key), doc_path, function() end)
@@ -583,7 +595,7 @@ end
 ---@param json string|nil # the fence-highlight payload, or nil for "nothing to paint"
 ---@return nil
 function M.send_spans(key, json)
-  if type(key) ~= "string" or key == "" then
+  if type(key) ~= "string" or key == "" or not may_push() then
     return
   end
   http_post_nonblocking(spans_url_for(key), json or "null", function() end)

@@ -39,6 +39,16 @@ function M.stop(close_browser_override)
   -- signal travels over the relay, so it must still be alive. This is the
   -- only way to close a tab in the "default" browser open_mode (no process
   -- handle); in "isolated" mode the handle-based close below still applies.
+  -- A shared relay serves other instances too: this one only detaches. The
+  -- relay closes the tab itself once no instance is attached any more, and the
+  -- tab is not this instance's to close while others still feed it.
+  local shared = require("mdview.adapter.shared_relay")
+  local was_shared = shared.is_attached()
+  if was_shared then
+    shared.detach()
+    state.set_server(nil)
+  end
+
   if state.get_server() then
     pcall(require("mdview.adapter.ws_client").send_close)
   end
@@ -74,7 +84,7 @@ function M.stop(close_browser_override)
     should_close = browser_cfg.defaults.browser_autoclose == true
   end
 
-  if should_close and state.get_browser() then
+  if should_close and state.get_browser() and not was_shared then
     local ok, err = browser_adapter.close(state.get_browser())
     if not ok then
       notify(("[mdview] failed to close browser: %s"):format(tostring(err)), vim.log.levels.WARN)

@@ -37,6 +37,9 @@ function M.teardown()
   -- be deduplicated against what this one was last sent.
   pcall(require("mdview.bindings.autocmds.spotlight_sync").reset)
   pcall(require("mdview.adapter.inbound_poll").stop)
+  -- The shared-relay heartbeat belongs to the session too (detaching from the
+  -- relay is :MDView stop's and VimLeavePre's job, not a teardown's).
+  pcall(require("mdview.adapter.shared_relay").stop_heartbeat)
   -- live_push's trailing debounce timer (armed by a push inside the throttle
   -- window) otherwise survives teardown and fires after the session it was
   -- meant to flush is already gone (PERF-62).
@@ -82,6 +85,12 @@ function M.attach()
   -- unless one is enabled). Not an autocmd, but shares the session lifecycle —
   -- started here, stopped in teardown.
   pcall(require("mdview.adapter.inbound_poll").start)
+
+  -- Shared relay (no-op without one): take the tab over on focus/activity, and
+  -- keep telling the relay this instance is there.
+  local shared = require("mdview.adapter.shared_relay")
+  shared.attach_autocmds(M.augroup_id)
+  pcall(shared.start_heartbeat)
 
   -- optional debug/legacy modules
   -- on_text_change.attach(M.augroup_id)

@@ -115,6 +115,14 @@ function M.collect()
   kv(lines, "server running", running)
   kv(lines, "state.get_server()", state.get_server() ~= nil)
   kv(lines, "attached", state.is_attached())
+  local shared = require("mdview.adapter.shared_relay")
+  if shared.enabled() then
+    local how = "not attached"
+    if shared.is_attached() then
+      how = shared.may_push() and "attached, owns the tab" or "attached, another instance owns the tab"
+    end
+    kv(lines, "shared relay", how)
+  end
   kv(lines, "session token set", state.get_token() ~= nil)
   local port = vim.g.mdview_server_port or defaults.server_port
   kv(lines, "detected port", port)

@@ -203,6 +203,10 @@ function M.resolve(cwd_override)
     args[#args + 1] = "--webtransport"
   end
 
+  -- Opt-in shared relay: one relay for every Neovim instance, advertised in a
+  -- discovery file (empty when shared_relay.enabled is off).
+  vim.list_extend(args, require("mdview.adapter.shared_relay").spawn_args())
+
   local cwd = cwd_override
   if not cwd or cwd == "" then
     cwd = defaults.server_cwd

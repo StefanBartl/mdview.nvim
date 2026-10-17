@@ -210,7 +210,11 @@ function M.start(opts)
   -- exits 0 on HTTP errors). Only resolve (and thus rotate the token) when
   -- we actually spawn a fresh process.
   local proc = state.get_proc()
-  if not state.proc_is_running() then
+  local shared = require("mdview.adapter.shared_relay")
+  if shared.is_attached() and not state.proc_is_running() then
+    -- Attached to the shared relay another instance runs: nothing to spawn.
+    proc = shared.handle()
+  elseif not state.proc_is_running() then
     ws_client.reset_ready()
 
     local cmd, args, cwd, resolve_err = require("mdview.adapter.server_args").resolve()
@@ -253,6 +257,18 @@ function M.start(opts)
       log.debug("launcher: performing initial full push", nil, "launcher", true)
       local buf = api.nvim_get_current_buf()
       local key = normalize.path(api.nvim_buf_get_name(buf))
+
+      -- Shared relay with a tab already open (another instance's): follow
+      -- that tab instead of opening a second one -- this instance takes it
+      -- over, so it shows this buffer from now on.
+      if shared.is_attached() and shared.tab_room() then
+        shared.takeover(buf)
+        return
+      end
+      -- Attached but no tab open anywhere: this instance opens the tab, so
+      -- it owns what goes into it.
+      shared.claim()
+
       -- live_push autocmds are already registered by autocmds.attach()
       -- at spawn time (in their augroup); do NOT call
       -- live_push.attach() here again — the no-arg call used
