@@ -110,6 +110,12 @@ function M.start_server(cmd, args, cwd)
     end
     state.set_proc(nil)
     vim.schedule(function()
+      -- A shared relay ends on its own, cleanly, once every instance left --
+      -- possibly long after this one ran :MDView stop. That is no warning.
+      if code == 0 and require("mdview.adapter.shared_relay").enabled() then
+        log.append(desc_tag .. "shared relay exited (code=0)", desc_tag)
+        return
+      end
       notify(desc_tag .. "server exited (code=" .. tostring(code) .. ")", vim.log.levels.WARN, {})
     end)
   end)

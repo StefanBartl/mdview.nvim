@@ -205,6 +205,34 @@ describe("spotlight_sync", function()
     assert.are.equal(2, #sent)
   end)
 
+  it("on a shared relay only the instance owning the tab sends; a takeover replaces the other's", function()
+    local shared = require("mdview.adapter.shared_relay")
+    local ok, err = pcall(function()
+      shared.attach({ port = 43219, token = "tok", status = { tabs = {} } })
+      sync.attach(group)
+      fire()
+      settle()
+      assert.are.equal(0, #sent, "a background instance must not replace the tab's spotlights")
+
+      shared.claim()
+      sync.resend()
+      wait_for(1)
+      assert.are.equal("SYSsystosca", sent[1].items[1].text)
+      -- Unchanged since its own last send, yet the tab held the other's: sent again.
+      sync.resend()
+      wait_for(2)
+      -- Nothing marked here: the takeover still clears the other instance's.
+      items = {}
+      sync.resend()
+      wait_for(3)
+      assert.are.same({}, sent[3].items)
+    end)
+    shared._reset()
+    if not ok then
+      error(err, 0)
+    end
+  end)
+
   it("is a quiet no-op without spotlight.nvim", function()
     package.loaded["spotlight"] = nil
     package.preload["spotlight"] = function()

@@ -24,6 +24,9 @@ its own relay and its own tab, as before.
   previews does not take the tab over; it keeps showing the other document.
   The others learn from their heartbeat (every `shared_relay.heartbeat_ms`)
   that they lost the room and stop pushing.
+  The spotlight.nvim mirror (`browser.spotlight_sync`) goes with the tab: a
+  takeover replaces the other instance's spotlights with this one's (or clears
+  them), and a background instance does not send its spotlight changes.
 - **Write-backs go to the owner of the document on screen.** Checkbox ticks,
   text fields, block edits, click-to-navigate and reverse scroll are queued at
   the relay; each instance names itself when it polls, and gets only the

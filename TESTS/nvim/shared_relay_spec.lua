@@ -116,6 +116,10 @@ describe("shared_relay", function()
     -- An answer to a request sent before the claim describes the old owner.
     shared.apply_status({ tabs = { ROOM }, owners = { [ROOM] = "nvim-other" } }, before)
     assert.is_true(shared.may_push())
+    -- uv.now() is the loop's cached clock: a heartbeat stamped with the very
+    -- tick of the claim may have left before it.
+    shared.apply_status({ tabs = { ROOM }, owners = { [ROOM] = "nvim-other" } }, shared._claimed_at)
+    assert.is_true(shared.may_push(), "an answer stamped with the claim's tick is not trusted")
     shared._claimed_at = 0
     shared.apply_status({ tabs = { ROOM }, owners = { [ROOM] = "nvim-other" } }, vim.uv.now())
     assert.is_false(shared.may_push())
@@ -132,17 +136,23 @@ describe("shared_relay", function()
 
   it("takes the tab over with the current markdown buffer, not with any other buffer", function()
     local bs = require("mdview.bindings.autocmds.buffer_switch")
-    local orig_resync = bs.resync
+    local spot = require("mdview.bindings.autocmds.spotlight_sync")
+    local orig_resync, orig_resend = bs.resync, spot.resend
     local resynced
+    local resent = 0
     bs.resync = function(buf)
       resynced = buf
       return true
+    end
+    spot.resend = function()
+      resent = resent + 1
     end
     local ok, err = pcall(function()
       attach_as_non_owner()
       local scratch = vim.api.nvim_create_buf(false, true)
       assert.is_false(shared.takeover(scratch))
       assert.is_false(shared.may_push(), "a buffer mdview does not preview claims nothing")
+      assert.are.equal(0, resent)
 
       local md = make_md_buffer("mdview_shared_spec.md")
       require("mdview.bindings.autocmds.live_push")._last_doc[ROOM] = "C:/notes/stale.md"
@@ -152,8 +162,9 @@ describe("shared_relay", function()
       assert.are.equal(ROOM, state.get_preview_key())
       -- The document is named again, so the relay records the new owner.
       assert.is_nil(require("mdview.bindings.autocmds.live_push").shown_document(ROOM))
+      assert.are.equal(1, resent, "the tab's spotlights become this instance's too")
     end)
-    bs.resync = orig_resync
+    bs.resync, spot.resend = orig_resync, orig_resend
     for _, b in ipairs(vim.api.nvim_list_bufs()) do
       if b ~= vim.api.nvim_get_current_buf() then
         pcall(vim.api.nvim_buf_delete, b, { force = true })
@@ -204,6 +215,8 @@ describe("shared_relay", function()
     end
     local ok, err = pcall(function()
       assert.is_nil((shared.discover()))
+      vim.fn.writefile({ "{ half a file" }, file)
+      assert.is_nil((shared.discover()), "a broken discovery file is no relay")
       vim.fn.writefile({ vim.json.encode({ protocol = 1, port = 43300, token = "tok", pid = 1 }) }, file)
 
       answer = nil

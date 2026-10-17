@@ -153,8 +153,7 @@ local RULES = {
   { route = "getregionpos", hit = word("getregionpos"), allowed = {} },
   { route = "matchbufline", hit = word("matchbufline"), allowed = {} },
   -- The disk side: a file that is not open in a buffer is read by mirror.lines_for_path.
-  -- shared_relay reads the relay's discovery file (port + token), never a document.
-  { route = "readfile", hit = word("readfile"), allowed = { MIRROR, "adapter/shared_relay.lua" } },
+  { route = "readfile", hit = word("readfile"), allowed = { MIRROR } },
   { route = "readblob", hit = word("readblob"), allowed = {} },
   { route = "fs_read", hit = word("fs_read"), allowed = {} },
   { route = "io.lines", hit = word("io.lines"), allowed = {} },

@@ -97,6 +97,12 @@ local function send_now()
   if not state.get_server() then
     return
   end
+  -- On a shared relay the spotlight state is the tab's, not this editor's:
+  -- only the instance that owns the tab may replace it. A background instance
+  -- keeps its change unsent (last_json stays behind) until it takes over.
+  if not require("mdview.adapter.shared_relay").may_push() then
+    return
+  end
   if in_flight then
     dirty = true
     return
@@ -148,6 +154,17 @@ function M.sync_now()
       send_now()
     end
   end)
+end
+
+--- Send this instance's spotlight state even when it did not change since its
+--- last send -- an empty one too, to clear another's. For a shared relay's
+--- takeover: the tab still holds the spotlights of the instance that owned it.
+---@return nil
+function M.resend()
+  -- "" is never a payload, so the next send is not deduplicated and an empty
+  -- state goes out as the clearing message it is.
+  last_json = ""
+  M.sync_now()
 end
 
 --- Ask for a sync, debounced: a burst of changes reads the state once.
