@@ -656,4 +656,58 @@ function M.send_close()
   pcall(fn.system, { "curl", "-sS", "--max-time", "1", "-X", "POST", url })
 end
 
+--- Decode the `tabs` list of a relay status answer (GET /attach); nil when the
+--- body is no such answer.
+---@param body string|nil
+---@return string[]|nil
+function M.parse_tab_rooms(body)
+  if type(body) ~= "string" or body == "" then
+    return nil
+  end
+  local ok, st = pcall(vim.json.decode, body)
+  if not ok or type(st) ~= "table" or type(st.tabs) ~= "table" then
+    return nil
+  end
+  local rooms = {}
+  for _, room in ipairs(st.tabs) do
+    if type(room) == "string" and room ~= "" then
+      rooms[#rooms + 1] = room
+    end
+  end
+  return rooms
+end
+
+-- Public: the rooms that have a connected preview tab, as the relay reports
+-- them. Every relay answers `GET /attach` with its status (the shared relay
+-- uses it as the heartbeat); without a `client` parameter the request is no
+-- heartbeat and changes nothing. Non-blocking: `cb(rooms)` runs on the main
+-- loop, `cb(nil)` when the relay gave no usable answer (curl missing, an older
+-- relay without the endpoint, no session).
+---@param cb fun(rooms: string[]|nil)
+---@return nil
+function M.tab_rooms(cb)
+  local token = require("mdview.core.state").get_token()
+  if fn.executable("curl") ~= 1 or type(token) ~= "string" or token == "" then
+    cb(nil)
+    return
+  end
+  local port = vim.g.mdview_server_port or DEFAULT_PORT
+  local url = string.format("http://localhost:%d/attach?token=%s", port, vim.uri_encode(token))
+  local out = {}
+  local ok, jid = pcall(fn.jobstart, { "curl", "-sS", "--max-time", "2", url }, {
+    stdout_buffered = true,
+    on_stdout = function(_, data)
+      out = data or {}
+    end,
+    on_exit = function(_, code)
+      vim.schedule(function()
+        cb(code == 0 and M.parse_tab_rooms(table.concat(out, "\n")) or nil)
+      end)
+    end,
+  })
+  if not ok or type(jid) ~= "number" or jid <= 0 then
+    cb(nil)
+  end
+end
+
 return M

@@ -388,24 +388,28 @@ browser.cursor_paragraph ~
   toggles it.
                                                 *hl-MdviewCursorParagraph*
   Color: the background of the highlight group `MdviewCursorParagraph` (links
-  followed), read at start, with every |:MDView-paragraph| and, while the
-  highlight is on, after every |:colorscheme| or 'background' change (to
-  every open tab, also with "new_tab"/"manual"). Without one the preview
-  theme's own faint tint is used. Rides the scroll-sync ping, so it needs
-  |mdview-scroll_sync| on.
+  followed), read for every tab opened, with every |:MDView-paragraph| and,
+  while the highlight is on, after every |:colorscheme| or 'background' change.
+  Both updates reach every open tab, also with "new_tab"/"manual" and from an
+  unnamed buffer (the tabs the relay reports connected, among the documents
+  this Neovim pushed). Without one the preview theme's own faint tint is
+  used. Rides the scroll-sync ping, so it needs |mdview-scroll_sync| on.
   |:colorscheme| runs ":highlight clear", which also empties a group defined
-  once in the config; mdview then keeps the color the group had last (a
-  colorscheme defining the group itself replaces it). To set it per
-  colorscheme, define it in a |ColorScheme| autocmd -- mdview reads the group
-  one tick after the event, so that autocmd always runs first: >lua
+  once in the config; mdview then keeps the color the group had last, also
+  for a tab opened later (a colorscheme defining the group itself replaces
+  it). To set it per colorscheme, define it in a |ColorScheme| autocmd --
+  mdview reads the group one tick after the event, so that autocmd always
+  runs first: >lua
     local function paragraph_hl()
       vim.api.nvim_set_hl(0, "MdviewCursorParagraph", { bg = "#2a3350" })
     end
     paragraph_hl()
     vim.api.nvim_create_autocmd("ColorScheme", { callback = paragraph_hl })
 <
-  Back to the theme's tint: clear the group and run |:MDView-paragraph| `on`,
-  which reads the group as it is and forgets the kept color.
+  Back to the theme's tint: clear the group and run |:MDView-paragraph| `on`
+  (or a toggle that switches it on), which reads the group as it is, forgets
+  the kept color and sends the tint to every open tab. Nothing else forgets
+  it; `off` leaves it alone.
 
 browser.selection_sync ~
   Mirror the Neovim visual selection into the preview: what you select with
@@ -762,10 +766,11 @@ pushes a control update over the socket.
 
 :MDView paragraph [action]                                *:MDView-paragraph*
   Switches the cursor paragraph highlight on/off (`on`|`off`|`toggle`; no
-  argument toggles) -- see `browser.cursor_paragraph` above. Switching it on
-  in a running session also sends the current color of
+  argument toggles) -- see `browser.cursor_paragraph` above. In a running
+  session the switch reaches every open tab (also with "new_tab"/"manual" and
+  from an unnamed buffer); switching it on also sends the current color of
   |hl-MdviewCursorParagraph| and the cursor position, so the highlight appears
-  at once.
+  at once. With no tab open yet the next one opened carries the setting.
 
 :MDView selection [action]                                *:MDView-selection*
   Switches the visual-selection mirror on/off (`on`|`off`|`toggle`; no

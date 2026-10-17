@@ -38,26 +38,38 @@ end
 --- (e.g. the cursor paragraph color after `:colorscheme`) to every open tab.
 --- With `browser.behavior = "reuse"` that is the one tab, reached through
 --- send()'s own routing. Otherwise every document has a tab of its own: the
---- update goes to every room Neovim pushed a document into this session (and
---- to the current buffer's room, should it not be among them yet), so it
---- arrives no matter which buffer is current -- also an unnamed one.
+--- update goes to the rooms Neovim pushed a document into this session (and to
+--- the current buffer's room, should it not be among them yet), so it arrives
+--- no matter which buffer is current -- also an unnamed one. Of those, only
+--- the rooms the relay reports a connected tab for get it (one request per
+--- tab, not per document ever edited); should the relay not answer that, all
+--- of them do.
 ---@param fields table
----@return boolean sent # at least one room got it
+---@return boolean sent # sent (or, with a tab per document, queued) to at least one room
 function M.broadcast(fields)
   local behavior = require("mdview.config.browser").defaults.behavior or "reuse"
   if behavior == "reuse" then
     return M.send(fields)
+  end
+  if type(fields) ~= "table" or vim.tbl_isempty(fields) or not require("mdview.core.state").get_server() then
+    return false
   end
   local rooms = require("mdview.bindings.autocmds.live_push").rooms()
   local current = target_key.resolve(0)
   if current and not vim.tbl_contains(rooms, current) then
     rooms[#rooms + 1] = current
   end
-  local any = false
-  for _, room in ipairs(rooms) do
-    any = M.send(fields, room) or any
+  if #rooms == 0 then
+    return false
   end
-  return any
+  ws_client.tab_rooms(function(tabs)
+    for _, room in ipairs(rooms) do
+      if not tabs or vim.tbl_contains(tabs, room) then
+        M.send(fields, room)
+      end
+    end
+  end)
+  return true
 end
 
 return M

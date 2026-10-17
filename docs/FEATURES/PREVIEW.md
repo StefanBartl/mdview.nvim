@@ -136,16 +136,24 @@ The color is the background of the highlight group `MdviewCursorParagraph`
 "#2a3350" })`. Without a background on that group the preview uses its theme's
 own faint tint, which suits light and dark preview themes alike; a color from
 the group is used as is, so pick one that suits the preview theme. The color is
-read at `:MDView start`, with every `:MDView paragraph` and, while the
+read for every tab opened (`:MDView start`, `:MDView open`, the tab per
+document a buffer switch opens), with every `:MDView paragraph` and, while the
 highlight is on, again after every `:colorscheme` or `'background'` change, so
-the open tabs follow the new color without a toggle -- every tab, also with
-`browser.behavior = "new_tab"` / `"manual"` and whichever buffer is current.
+the open tabs follow the new color without a toggle. `:MDView paragraph` and
+the colorscheme update both reach every tab, also with `browser.behavior =
+"new_tab"` / `"manual"` and whichever buffer is current, an unnamed one
+included: they go to the documents this Neovim pushed into a tab, and of those
+only to the ones the relay reports a connected tab for (one request per open
+tab, not per document edited). With no tab open yet, the next one opened
+carries the setting. A `'background'` switch, which fires both the option and
+the colorscheme event, sends one update.
 
 `:colorscheme` runs `:highlight clear`, which also empties a group you defined
 once in your config. mdview then keeps the color the group had last, so the tab
-does not fall back to the theme's tint; a colorscheme that defines the group
-itself replaces it. To pick the color per colorscheme (or to make the group
-survive for Neovim itself), define it in a `ColorScheme` autocmd -- mdview reads
+does not fall back to the theme's tint, and a tab opened later gets that color
+too; a colorscheme that defines the group itself replaces it. To pick the color
+per colorscheme (or to make the group survive for Neovim itself), define it in
+a `ColorScheme` autocmd -- mdview reads
 the group one tick after the event, so your autocmd always runs first:
 
 ```lua
@@ -157,8 +165,10 @@ vim.api.nvim_create_autocmd("ColorScheme", { callback = paragraph_hl })
 ```
 
 To go back to the theme's tint, clear the group (`nvim_set_hl(0,
-"MdviewCursorParagraph", {})`) and run `:MDView paragraph on`, which reads the
-group as it is and forgets the kept color.
+"MdviewCursorParagraph", {})`) and run `:MDView paragraph on` (or a toggle that
+switches it on), which reads the group as it is, forgets the kept color and
+sends the theme's tint to every open tab. Nothing else forgets the kept color;
+`:MDView paragraph off` leaves it alone.
 
 - **Module:** `lua/mdview/core/cursor_paragraph.lua`, `lua/mdview/bindings/usrcmds/paragraph.lua`, `lua/mdview/bindings/autocmds/cursor_paragraph_sync.lua`, `src/client/render/cursorParagraph.ts`
 - **Usercmds:** `:MDView paragraph [on|off|toggle]` (no argument toggles)
