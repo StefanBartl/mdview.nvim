@@ -134,9 +134,11 @@ The color is the background of the highlight group `MdviewCursorParagraph`
 "#2a3350" })`. Without a background on that group the preview uses its theme's
 own faint tint, which suits light and dark preview themes alike; a color from
 the group is used as is, so pick one that suits the preview theme. The color is
-read at `:MDView start` and with every `:MDView paragraph`.
+read at `:MDView start`, with every `:MDView paragraph` and, while the
+highlight is on, again after every `:colorscheme` or `'background'` change, so
+the open tab follows the new color without a toggle.
 
-- **Module:** `lua/mdview/core/cursor_paragraph.lua`, `lua/mdview/bindings/usrcmds/paragraph.lua`, `src/client/render/cursorParagraph.ts`
+- **Module:** `lua/mdview/core/cursor_paragraph.lua`, `lua/mdview/bindings/usrcmds/paragraph.lua`, `lua/mdview/bindings/autocmds/cursor_paragraph_sync.lua`, `src/client/render/cursorParagraph.ts`
 - **Usercmds:** `:MDView paragraph [on|off|toggle]` (no argument toggles)
 - **Config:** `browser.cursor_paragraph` (default `false`); rides the scroll-sync ping, so it needs `scroll_sync` on
 
