@@ -2,10 +2,10 @@
 //
 // Shows where the Neovim cursor is, in the preview.
 //
-//  * "line"  (Stage A): a small blinking bar in the left gutter at the cursor's
-//    line, positioned with the same sourcepos block + in-block interpolation as
-//    the scroll sync — line-accurate even inside multi-line blocks, but it marks
-//    the line, not the column.
+//  * "line"  (Stage A): a full-width band over the cursor's whole source line
+//    (all its visual lines when it wraps), independent of the column. Exact
+//    where the line's text is locatable (inline runs, code blocks), otherwise
+//    the line's slice of its sourcepos block (see lineBand).
 //
 //  * "caret" (Stage C): a caret at the exact cursor character. The WASM renderer
 //    wraps inline text/code runs in `<span data-sp="sl:sc:el:ec">` (byte columns,
@@ -16,9 +16,16 @@
 //
 // See docs/Roadmap/KONZEPT_links_und_cursor.md.
 
-import { pickScrollTarget, fractionInBlock } from './scrollSync';
+import { pickScrollTarget, type ScrollTarget } from './scrollSync';
 import { topLevelBlocks, sectionRange } from './docModel';
-import { runsOnLine, byteOffsetToUtf16, findTextPosition } from './sourcePos';
+import {
+  runsOnLine,
+  byteOffsetToUtf16,
+  findTextPosition,
+  buildPosIndex,
+  lineStartPosition,
+  lineEndPosition,
+} from './sourcePos';
 
 export type CursorMarkerMode = 'off' | 'line' | 'caret' | 'section';
 
@@ -89,20 +96,90 @@ export function updateCursorMarker(
   hide(caretEl);
 }
 
-function placeLineBar(container: HTMLElement, line: number): void {
+/**
+ * The share of a block's rendered height that source `line` occupies, as
+ * fractions (0..1) of the block's height. A block spanning N source lines is
+ * cut into N equal slices; a single-line block (a heading, a one-line paragraph
+ * that wraps over several visual lines) is covered completely. A line outside
+ * the block (a blank line after it) maps to the zero-height slice at its bottom.
+ */
+export function lineSlice(target: ScrollTarget, line: number): { from: number; to: number } {
+  if (line < target.startLine) return { from: 0, to: 0 };
+  if (line > target.endLine) return { from: 1, to: 1 };
+  const lines = target.endLine - target.startLine + 1;
+  const i = line - target.startLine;
+  return { from: i / lines, to: (i + 1) / lines };
+}
+
+/**
+ * Vertical extent of source `line` in the container's content coordinates.
+ *
+ * Exact where the DOM can say where the line's text is: through the inline
+ * source-position runs (source map on) or a code block's own line structure.
+ * The range over the line's text yields one rect per visual line, so a source
+ * line that wraps is covered over all its visual lines. Elsewhere the line gets
+ * its slice of the smallest block containing it (see lineSlice). Null when the
+ * line cannot be located at all (before the first block, no sourcepos).
+ */
+export function lineBand(
+  container: HTMLElement,
+  line: number,
+): { top: number; height: number } | null {
+  const contRect = container.getBoundingClientRect();
+  const toContent = (y: number) => y - contRect.top + container.scrollTop;
+
+  const exact = textLineBox(container, line);
+  if (exact) return { top: toContent(exact.top), height: exact.bottom - exact.top };
+
   const target = pickScrollTarget(container, line);
-  if (!target) {
+  if (!target) return null;
+  const rect = target.el.getBoundingClientRect();
+  const slice = lineSlice(target, line);
+  return {
+    top: toContent(rect.top + slice.from * rect.height),
+    height: (slice.to - slice.from) * rect.height,
+  };
+}
+
+/** Viewport top/bottom of the text on source `line`, or null if not measurable. */
+function textLineBox(container: HTMLElement, line: number): { top: number; bottom: number } | null {
+  const index = buildPosIndex(container);
+  const start = lineStartPosition(container, line, index);
+  const end = lineEndPosition(container, line, index);
+  if (!start || !end) return null;
+  const range = document.createRange();
+  if (typeof range.getClientRects !== 'function') return null;
+  try {
+    range.setStart(start.node, start.offset);
+    range.setEnd(end.node, end.offset);
+  } catch {
+    return null;
+  }
+  let top = Infinity;
+  let bottom = -Infinity;
+  for (const r of Array.from(range.getClientRects())) {
+    if (r.height <= 0) continue;
+    top = Math.min(top, r.top);
+    bottom = Math.max(bottom, r.bottom);
+  }
+  return bottom > top ? { top, bottom } : null;
+}
+
+/**
+ * Highlight the cursor's whole line across the full width of the preview. The
+ * column never matters here: the band marks the line, the caret mode marks the
+ * column.
+ */
+function placeLineBar(container: HTMLElement, line: number): void {
+  const band = lineBand(container, line);
+  if (!band) {
     hide(barEl);
     return;
   }
-  const rect = target.el.getBoundingClientRect();
-  const contRect = container.getBoundingClientRect();
-  const yInContent =
-    rect.top - contRect.top + container.scrollTop + fractionInBlock(target, line) * rect.height;
-
   barEl = ensureEl(barEl, container, 'mdview-cursor-bar');
   barEl.style.display = 'block';
-  barEl.style.top = `${yInContent}px`;
+  barEl.style.top = `${band.top}px`;
+  barEl.style.height = `${band.height}px`;
 }
 
 /**

@@ -1,7 +1,95 @@
 // tests/client/cursorMarker.test.ts
 // @vitest-environment jsdom
 import { describe, it, expect } from 'vitest';
-import { updateCursorMarker, parseCursorMarkerMode } from '../../src/client/render/cursorMarker';
+import {
+  updateCursorMarker,
+  parseCursorMarkerMode,
+  lineSlice,
+  lineBand,
+} from '../../src/client/render/cursorMarker';
+
+// Give `el` a fixed layout box (jsdom has none).
+function stubRect(el: Element, top: number, height: number): void {
+  (el as HTMLElement).getBoundingClientRect = () =>
+    ({ top, bottom: top + height, left: 0, right: 600, width: 600, height }) as DOMRect;
+}
+
+describe('lineSlice (source line -> share of the block height)', () => {
+  const t = { el: document.createElement('p'), startLine: 3, endLine: 6 };
+
+  it('cuts a block of N source lines into N equal slices', () => {
+    expect(lineSlice(t, 3)).toEqual({ from: 0, to: 0.25 });
+    expect(lineSlice(t, 4)).toEqual({ from: 0.25, to: 0.5 });
+    expect(lineSlice(t, 6)).toEqual({ from: 0.75, to: 1 });
+  });
+
+  it('covers a single-line block completely (a wrapped line stays one band)', () => {
+    expect(lineSlice({ ...t, startLine: 5, endLine: 5 }, 5)).toEqual({ from: 0, to: 1 });
+  });
+
+  it('maps a line past the block (blank line after it) to its bottom edge', () => {
+    expect(lineSlice(t, 8)).toEqual({ from: 1, to: 1 });
+    expect(lineSlice(t, 1)).toEqual({ from: 0, to: 0 });
+  });
+});
+
+describe('line mode highlights the whole cursor line', () => {
+  function doc(): HTMLElement {
+    const el = document.createElement('div');
+    // l1: a heading; l3-l4: a two-line paragraph; l6: a long one-line
+    // paragraph that wraps over three visual lines (60px).
+    el.innerHTML =
+      '<h1 data-sourcepos="1:1-1:5">One</h1>' +
+      '<p data-sourcepos="3:1-4:5">two<br>three</p>' +
+      '<p data-sourcepos="6:1-6:300">long</p>';
+    document.body.appendChild(el);
+    stubRect(el, 100, 400);
+    const [h1, p1, p2] = Array.from(el.children);
+    stubRect(h1, 100, 40);
+    stubRect(p1, 160, 40);
+    stubRect(p2, 220, 60);
+    return el;
+  }
+
+  it('covers the full height of a wrapped single-line paragraph', () => {
+    expect(lineBand(doc(), 6)).toEqual({ top: 120, height: 60 });
+  });
+
+  it('gives each source line of a multi-line block its own slice', () => {
+    const el = doc();
+    expect(lineBand(el, 3)).toEqual({ top: 60, height: 20 });
+    expect(lineBand(el, 4)).toEqual({ top: 80, height: 20 });
+  });
+
+  it('sets top and height on the band, and the column does not move it', () => {
+    const el = doc();
+    updateCursorMarker(el, 6, 0, 'line');
+    const bar = el.querySelector('.mdview-cursor-bar') as HTMLElement;
+    const at = { top: bar.style.top, height: bar.style.height };
+    expect(at).toEqual({ top: '120px', height: '60px' });
+    updateCursorMarker(el, 6, 250, 'line');
+    expect({ top: bar.style.top, height: bar.style.height }).toEqual(at);
+  });
+
+  it('measures the line text exactly when inline runs locate it', () => {
+    const proto = Range.prototype as unknown as { getClientRects?: () => DOMRect[] };
+    const orig = proto.getClientRects;
+    // two visual lines of the same source line (it wraps)
+    proto.getClientRects = () =>
+      [
+        { top: 230, bottom: 250, height: 20 },
+        { top: 250, bottom: 270, height: 20 },
+      ] as DOMRect[];
+    try {
+      const el = doc();
+      el.querySelector('p:last-child')!.innerHTML = '<span data-sp="6:1:6:4">long</span>';
+      expect(lineBand(el, 6)).toEqual({ top: 130, height: 40 });
+    } finally {
+      if (orig) proto.getClientRects = orig;
+      else delete proto.getClientRects;
+    }
+  });
+});
 
 // jsdom has no layout (getBoundingClientRect is 0), so this covers the mode
 // parsing and the element lifecycle, not pixel positions.
@@ -31,7 +119,7 @@ describe('updateCursorMarker section spotlight', () => {
     return el;
   }
   const cls = (el: HTMLElement) =>
-    Array.from(el.querySelectorAll('[data-sourcepos]')).map((c) =>
+    Array.from(el.querySelectorAll('[data-sourcepos]')).map(c =>
       c.classList.contains('mdview-section-active')
         ? 'A'
         : c.classList.contains('mdview-section-dim')
