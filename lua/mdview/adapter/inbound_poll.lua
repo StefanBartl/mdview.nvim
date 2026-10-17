@@ -45,7 +45,10 @@ local edit_inflight = false
 local function url_for(endpoint)
   local port = vim.g.mdview_server_port or 43219
   local token = require("mdview.core.state").get_token() or ""
+  -- On a shared relay this instance names itself, and the relay hands it the
+  -- write-backs of the rooms it owns only (mdview.adapter.shared_relay).
   return string.format("http://localhost:%d/%s?token=%s", port, endpoint, vim.uri_encode(token))
+    .. require("mdview.adapter.shared_relay").client_param()
 end
 
 -- Report a failure of a request handler (it is never silent) and carry on.

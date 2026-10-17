@@ -15,6 +15,16 @@ local M = {}
 --- @param group integer|nil
 function M.attach(group)
   local function on_leave()
+    -- A shared relay serves other instances too: leave it running (it ends,
+    -- and closes the tab, once no instance is attached any more).
+    local shared = require("mdview.adapter.shared_relay")
+    if shared.is_attached() then
+      -- No more polls after the detach: one arriving later would count as a
+      -- heartbeat and keep the relay waiting for an instance that is gone.
+      pcall(require("mdview.adapter.inbound_poll").stop)
+      shared.detach()
+      return
+    end
     if state.get_proc() ~= nil then
       -- Once Neovim exits the preview is frozen (no more sync), so close
       -- the browser tab too. The close signal travels over the relay, so

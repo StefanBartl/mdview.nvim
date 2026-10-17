@@ -69,6 +69,9 @@ In detail in [`PREVIEW.md`](PREVIEW.md).
   can be started from a terminal.
 - **In-editor preview tab** — `:MDView preview-tab`, with no relay and no
   browser at all.
+- **Shared relay** — opt-in: one relay and one preview tab for every Neovim
+  instance; the tab follows the focused one. See
+  [`SHARED_RELAY.md`](SHARED_RELAY.md).
 
 ## Rendering
 

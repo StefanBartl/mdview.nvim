@@ -16,12 +16,14 @@ import (
 	"io"
 	"log"
 	"mime"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"nhooyr.io/websocket"
 
@@ -90,6 +92,9 @@ func main() {
 	theme := flag.String("theme", "github", "standalone mode only: preview theme passed to the client")
 	editBlocks := flag.Bool("edit", false, "standalone mode only: let the preview edit blocks of the file in place (click a block, edit its source lines)")
 	highlighter := flag.String("hl", "hljs", "standalone mode only: code-fence highlighter passed to the client (hljs|shiki|none)")
+	shared := flag.Bool("shared", false, "shared relay for several Neovim instances: track attached instances, route write-backs to the owner of a room, exit when none is left")
+	discoveryFile := flag.String("discovery-file", "", "shared mode only: write port and token to this file (user-only permissions) and remove it on exit")
+	idleTimeout := flag.Int("idle-timeout", 30, "shared mode only: seconds without a heartbeat after which an instance counts as gone")
 	flag.Parse()
 
 	// Standalone mode has no Lua side to mint a token, so the process mints its
@@ -130,6 +135,11 @@ func main() {
 	fieldQueue := relay.NewFieldQueue()
 	editQueue := relay.NewEditQueue()
 	scrollBox := relay.NewScrollBox()
+	// nil unless --shared: every room then belongs to whoever polls (one instance).
+	var clients *relay.Clients
+	if *shared && !standalone {
+		clients = relay.NewClients()
+	}
 
 	// In standalone mode the relay owns the file, so a checkbox toggle is
 	// applied here directly; the room key is the watched path in slash form
@@ -161,6 +171,8 @@ func main() {
 	mux.HandleFunc("/scrollback", handleScrollback(scrollBox, *token))
 	mux.HandleFunc("/clientlog", handleClientLog(*token))
 	mux.HandleFunc("/ws", handleWS(registry, *token, port))
+	mux.HandleFunc("/attach", handleAttach(clients, registry, *token))
+	mux.HandleFunc("/detach", handleDetach(clients, *token))
 	mux.Handle("/", fileServer)
 
 	addr := fmt.Sprintf("127.0.0.1:%d", port)
@@ -210,6 +222,34 @@ func main() {
 			fmt.Printf("wt cert-hash: %s\n", hash)
 			startWebTransport(addr, cert, registry, *token)
 		}
+	}
+
+	if clients != nil {
+		ignoreSIGPIPE()
+		fmt.Println("[shared] shared relay: waiting for Neovim instances to attach")
+		listener, err := net.Listen("tcp", addr)
+		if err != nil {
+			log.Fatalf("server error: %v", err)
+		}
+		// Advertised only once the port is really bound, so an instance that
+		// reads the file can reach the relay at once.
+		if *discoveryFile != "" {
+			d := discovery{Protocol: relay.SharedProtocol, Port: port, Token: *token, PID: os.Getpid()}
+			if err := writeDiscovery(*discoveryFile, d); err != nil {
+				fmt.Printf("[shared] could not write the discovery file %s: %v\n", *discoveryFile, err)
+			}
+		}
+		go func() {
+			if err := http.Serve(listener, withClients(clients, *token, mux)); err != nil {
+				log.Fatalf("server error: %v", err)
+			}
+		}()
+		timeout := time.Duration(*idleTimeout) * time.Second
+		if timeout <= 0 {
+			timeout = 30 * time.Second
+		}
+		runSharedLifetime(newLifetime(clients, timeout, time.Now()), registry, *discoveryFile, *token)
+		return
 	}
 
 	if err := http.ListenAndServe(addr, mux); err != nil {
@@ -728,7 +768,7 @@ func handleNav(queue *relay.NavQueue, token string) http.HandlerFunc {
 		switch r.Method {
 		case http.MethodGet:
 			w.Header().Set("Content-Type", "application/json")
-			_ = json.NewEncoder(w).Encode(queue.Drain())
+			_ = json.NewEncoder(w).Encode(queue.DrainFor(ownerFilter(r)))
 		case http.MethodPost:
 			key := r.URL.Query().Get("key")
 			if key == "" {
@@ -828,7 +868,7 @@ func handleToggle(queue *relay.ToggleQueue, watchKey, watchPath, token string) h
 		case http.MethodGet:
 			// Neovim drains queued toggles (Neovim-driven mode only).
 			w.Header().Set("Content-Type", "application/json")
-			_ = json.NewEncoder(w).Encode(queue.Drain())
+			_ = json.NewEncoder(w).Encode(queue.DrainFor(ownerFilter(r)))
 		case http.MethodPost:
 			q, key, doc, ok := writeBackParams(w, r, watchKey)
 			if !ok {
@@ -908,7 +948,7 @@ func handleField(queue *relay.FieldQueue, watchKey, watchPath, token string) htt
 		switch r.Method {
 		case http.MethodGet:
 			w.Header().Set("Content-Type", "application/json")
-			_ = json.NewEncoder(w).Encode(queue.Drain())
+			_ = json.NewEncoder(w).Encode(queue.DrainFor(ownerFilter(r)))
 		case http.MethodPost:
 			_, key, doc, ok := writeBackParams(w, r, watchKey)
 			if !ok {
@@ -963,7 +1003,7 @@ func handleEdit(queue *relay.EditQueue, watchKey, watchPath, token string, stand
 		switch r.Method {
 		case http.MethodGet:
 			w.Header().Set("Content-Type", "application/json")
-			_ = json.NewEncoder(w).Encode(queue.Drain())
+			_ = json.NewEncoder(w).Encode(queue.DrainFor(ownerFilter(r)))
 		case http.MethodPost:
 			_, key, doc, ok := writeBackParams(w, r, watchKey)
 			if !ok {
@@ -1025,7 +1065,7 @@ func handleScrollback(box *relay.ScrollBox, token string) http.HandlerFunc {
 		switch r.Method {
 		case http.MethodGet:
 			w.Header().Set("Content-Type", "application/json")
-			_ = json.NewEncoder(w).Encode(box.Take())
+			_ = json.NewEncoder(w).Encode(box.TakeFor(ownerFilter(r)))
 		case http.MethodPost:
 			key := r.URL.Query().Get("key")
 			if key == "" {

@@ -182,6 +182,13 @@ function M.run(fargs)
       }, arg_path)
     end
 
+    -- On a shared relay with a tab already open, take that tab over instead of
+    -- opening a second one.
+    local shared = require("mdview.adapter.shared_relay")
+    if shared.is_attached() and shared.tab_room() and shared.takeover() then
+      return
+    end
+
     -- re-open the preview surface for the current buffer
     if require("mdview.config").defaults.open_preview_tab then
       require("mdview.adapter.preview_tab").open(vim.api.nvim_get_current_buf())
@@ -211,11 +218,34 @@ function M.run(fargs)
     initial_target = (norm and norm ~= "") and norm or file_arg
   end
 
-  -- Ensure server proc spawned (cwd_arg, if given, overrides mdview.config.defaults.server_cwd for this spawn)
-  local proc, proc_err = state.ensure_proc_started(cwd_arg)
+  -- Shared relay (opt-in): attach to the relay another instance already runs
+  -- instead of spawning a second one (and opening a second tab).
+  local shared = require("mdview.adapter.shared_relay")
+  local proc, proc_err
+  if shared.enabled() then
+    local info, why = shared.discover()
+    if info then
+      shared.attach(info)
+      proc = shared.handle()
+      if cwd_arg then
+        notify("[mdview] cwd=... ignored -- attached to the shared relay", vim.log.levels.WARN)
+      end
+      log.debug("start: attached to the shared relay on port " .. tostring(info.port), nil, "usercmds.start", true)
+    else
+      log.debug("start: no shared relay to attach to (" .. tostring(why) .. ")", nil, "usercmds.start", true)
+    end
+  end
+
   if not proc then
-    notify("[mdview] failed to start server process" .. (proc_err and (": " .. proc_err) or ""), vim.log.levels.ERROR)
-    return
+    -- Ensure server proc spawned (cwd_arg, if given, overrides mdview.config.defaults.server_cwd for this spawn)
+    proc, proc_err = state.ensure_proc_started(cwd_arg)
+    if not proc then
+      notify("[mdview] failed to start server process" .. (proc_err and (": " .. proc_err) or ""), vim.log.levels.ERROR)
+      return
+    end
+    if shared.enabled() then
+      shared.mark_spawned()
+    end
   end
   -- Wire session + autocmds BEFORE marking the server as "running":
   -- if autocmds.attach() errors, we don't want state.get_server() left
