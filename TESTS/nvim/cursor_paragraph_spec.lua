@@ -114,4 +114,69 @@ describe("cursor paragraph highlight", function()
     assert.is_true(bcfg.defaults.cursor_paragraph)
     assert.is_nil(sent)
   end)
+
+  describe("after a colorscheme change", function()
+    local sync = require("mdview.bindings.autocmds.cursor_paragraph_sync")
+    local group
+
+    --- Fire `event` (with `pattern`), then let the deferred read run.
+    ---@param event string
+    ---@param pattern string|nil
+    local function fire(event, pattern)
+      vim.api.nvim_exec_autocmds(event, { pattern = pattern, modeline = false })
+      vim.wait(200, function()
+        return sent ~= nil
+      end, 10)
+    end
+
+    before_each(function()
+      group = vim.api.nvim_create_augroup("MdviewCursorParagraphSyncSpec", { clear = true })
+      sync.attach(group)
+    end)
+
+    after_each(function()
+      pcall(vim.api.nvim_del_augroup_by_id, group)
+    end)
+
+    it("re-sends the new color to the open tab when the highlight is on", function()
+      reset(true, {})
+      vim.api.nvim_set_hl(NS, GROUP, { bg = "#445566" })
+      fire("ColorScheme")
+      assert.are.same({ cursorParagraph = true, cursorParagraphBg = "#445566" }, sent)
+    end)
+
+    it("falls back to the theme's tint (false) when the group lost its background", function()
+      reset(true, {})
+      fire("ColorScheme")
+      assert.are.same({ cursorParagraph = true, cursorParagraphBg = false }, sent)
+    end)
+
+    it("re-sends after a 'background' switch too", function()
+      reset(true, {})
+      vim.api.nvim_set_hl(NS, GROUP, { bg = "#010203" })
+      fire("OptionSet", "background")
+      assert.are.same({ cursorParagraph = true, cursorParagraphBg = "#010203" }, sent)
+    end)
+
+    it("sends nothing while the highlight is off", function()
+      reset(false, {})
+      vim.api.nvim_set_hl(NS, GROUP, { bg = "#445566" })
+      fire("ColorScheme")
+      assert.is_nil(sent)
+    end)
+
+    it("sends nothing without a session", function()
+      reset(true, nil)
+      vim.api.nvim_set_hl(NS, GROUP, { bg = "#445566" })
+      fire("ColorScheme")
+      assert.is_nil(sent)
+    end)
+
+    it("sends nothing once the augroup is gone (session stopped)", function()
+      reset(true, {})
+      vim.api.nvim_del_augroup_by_id(group)
+      fire("ColorScheme")
+      assert.is_nil(sent)
+    end)
+  end)
 end)

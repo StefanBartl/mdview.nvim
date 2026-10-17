@@ -10,6 +10,7 @@ local vim_leave = require("mdview.bindings.autocmds.vim_leave")
 local scroll_sync = require("mdview.bindings.autocmds.scroll_sync")
 local selection_sync = require("mdview.bindings.autocmds.selection_sync")
 local spotlight_sync = require("mdview.bindings.autocmds.spotlight_sync")
+local cursor_paragraph_sync = require("mdview.bindings.autocmds.cursor_paragraph_sync")
 local breadcrumbs = require("mdview.bindings.autocmds.breadcrumbs")
 -- local on_text_change = require("mdview.bindings.autocmds.on_text_change")
 -- local bufwrite = require("mdview.bindings.autocmds.bufwrite")
@@ -78,6 +79,7 @@ function M.attach()
   scroll_sync.attach(M.augroup_id) -- nvim-to-browser scroll sync (config: scroll_sync)
   selection_sync.attach(M.augroup_id) -- visual selection mirrored into the preview (config: browser.selection_sync)
   spotlight_sync.attach(M.augroup_id) -- spotlight.nvim's highlights mirrored into the preview (config: browser.spotlight_sync)
+  cursor_paragraph_sync.attach(M.augroup_id) -- cursor paragraph color follows :colorscheme (config: browser.cursor_paragraph)
   breadcrumbs.attach(M.augroup_id) -- Session breadcrumbs (config: breadcrumbs); its BufEnter half goes through the hub
   vim_leave.attach(M.augroup_id) -- Stop server on VimLeave
 

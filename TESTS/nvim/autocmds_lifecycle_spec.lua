@@ -94,6 +94,23 @@ describe("session autocmds attach/teardown", function()
     end
   end)
 
+  it("attach() follows :colorscheme for the cursor paragraph color, teardown() stops it", function()
+    ---@return boolean
+    local function has_paragraph_colorscheme()
+      local ok, list = pcall(vim.api.nvim_get_autocmds, { group = GROUP, event = "ColorScheme" })
+      for _, au in ipairs(ok and list or {}) do
+        if (au.desc or ""):find("cursor paragraph", 1, true) then
+          return true
+        end
+      end
+      return false
+    end
+    autocmds.attach()
+    assert.is_true(has_paragraph_colorscheme())
+    autocmds.teardown()
+    assert.is_false(has_paragraph_colorscheme())
+  end)
+
   -- restore
   inbound_poll.start, inbound_poll.stop = orig_start, orig_stop
 end)

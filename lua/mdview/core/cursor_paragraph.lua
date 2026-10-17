@@ -61,7 +61,8 @@ end
 
 --- Control update switching the highlight in an open tab. Carries the current
 --- color too (`false` = the theme's tint), so a changed highlight group reaches
---- the preview with the next `:MDView paragraph`.
+--- the preview with the next `:MDView paragraph`, and after a `:colorscheme`
+--- through bindings/autocmds/cursor_paragraph_sync.lua.
 ---@param on boolean
 ---@return { cursorParagraph: boolean, cursorParagraphBg: string|false }
 function M.payload(on)
