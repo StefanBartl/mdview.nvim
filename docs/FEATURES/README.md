@@ -41,6 +41,11 @@ In detail in [`PREVIEW.md`](PREVIEW.md).
   `BufWritePost`.
 - **Scroll sync Neovim → browser**, and **reverse scroll** browser → Neovim.
 - **Cursor marker** — Neovim's position, shown in the rendered document.
+- **Cursor paragraph highlight** — the whole block the cursor is in (paragraph,
+  list, table, code block, quote, heading, frontmatter) is tinted in the
+  preview, for reading along. Off by default; `:MDView paragraph` toggles it,
+  color from `MdviewCursorParagraph`. See
+  [`PREVIEW.md`](PREVIEW.md#cursor-paragraph-highlight).
 - **Visual selection mirror** — what you select with `v`/`V`/`CTRL-V` is
   highlighted in the preview, for showing a document to other people. Off
   while you edit; `:MDView selection` toggles it.
