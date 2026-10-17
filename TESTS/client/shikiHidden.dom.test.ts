@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 //
 // Shiki replaces a fenced block with its themed copy, keeps the block's
-// data-sourcepos and the cursor paragraph tint, and leaves a block alone that
-// the block editor has hidden.
+// data-sourcepos and the preview's decoration classes (cursor paragraph tint,
+// section spotlight), and leaves a block alone that the block editor has hidden.
 
 import { describe, it, expect, vi } from 'vitest';
 
@@ -60,6 +60,24 @@ describe('highlightAll (shiki)', () => {
     expect(pres[0].classList.contains('shiki')).toBe(true);
     expect(pres[0].classList.contains('mdview-cursor-paragraph')).toBe(true);
     expect(pres[1].classList.contains('mdview-cursor-paragraph')).toBe(false);
+  });
+
+  it('keeps the section spotlight classes on the replaced blocks', async () => {
+    // cursor_marker = "section" dims / lights up the old <pre>s synchronously
+    // too; without them a dimmed code block would show at full opacity again.
+    const root = setup(
+      '<pre data-sourcepos="1:1-3:3" class="mdview-section-dim"><code class="language-js">a()</code></pre>' +
+        '<pre data-sourcepos="5:1-7:3" class="mdview-section-active mdview-cursor-paragraph">' +
+        '<code class="language-js">b()</code></pre>',
+    );
+    await highlightAll(root);
+    const pres = root.querySelectorAll('pre');
+    expect(Array.from(pres[0].classList).sort()).toEqual(['mdview-section-dim', 'shiki']);
+    expect(Array.from(pres[1].classList).sort()).toEqual([
+      'mdview-cursor-paragraph',
+      'mdview-section-active',
+      'shiki',
+    ]);
   });
 
   it('skips a block the editor has hidden', async () => {

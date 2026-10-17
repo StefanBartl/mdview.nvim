@@ -52,17 +52,41 @@ function sourceLines(source: string): readonly string[] {
 
 const isBlank = (text: string | undefined): boolean => text === undefined || /^\s*$/.test(text);
 
+const FENCE_OPEN = /^(`{3,}|~{3,})/;
+
 /**
- * Last source line holding text of `block`. comrak ends a block that swallows the
- * blank lines after it (a list, an indented code block) at column 0 of the LAST
- * of those blank lines; none of them belongs to the block. With the document's
- * `lines` the whole blank run is dropped; without them only the line comrak
- * ends on is.
+ * Whether `block` ends inside a fenced code block that is never closed (the one
+ * being typed at the end of the file). Its trailing blank lines are code: the
+ * <pre> shows them, so they belong to the block. Found through the <pre> (the
+ * block itself or one nested in a list / quote) that ends where the block ends
+ * and whose first source line opens a fence at its start column; an indented
+ * code block has no fence there.
+ */
+function endsInOpenFence(block: BlockPos, lines: readonly string[]): boolean {
+  const pres = [block.el, ...Array.from(block.el.querySelectorAll<HTMLElement>('pre'))];
+  return pres.some(pre => {
+    if (pre.tagName !== 'PRE') return false;
+    const m = /^(\d+):(\d+)-(\d+):/.exec(pre.getAttribute('data-sourcepos') ?? '');
+    if (!m || Number(m[3]) !== block.endLine) return false;
+    const opener = lines[Number(m[1]) - 1] ?? '';
+    return FENCE_OPEN.test(opener.slice(Number(m[2]) - 1));
+  });
+}
+
+/**
+ * Last source line holding text of `block`. comrak lets a block that swallows
+ * the blank lines after it (a list, an indented code block) end on the LAST of
+ * those lines: at column 0, or past its spaces when that line holds only
+ * whitespace. None of them belongs to the block. With the document's `lines`
+ * the whole blank run is dropped (except in a fence left open, whose blank lines
+ * are code); without them only a line comrak ends on at column 0 is.
  */
 function lastTextLine(block: BlockPos, lines?: readonly string[]): number {
-  if (block.endCol !== 0 || block.endLine <= block.startLine) return block.endLine;
-  let end = block.endLine - 1;
-  if (lines) while (end > block.startLine && isBlank(lines[end - 1])) end--;
+  if (block.endLine <= block.startLine) return block.endLine;
+  if (!lines) return block.endCol === 0 ? block.endLine - 1 : block.endLine;
+  if (endsInOpenFence(block, lines)) return block.endLine;
+  let end = block.endCol === 0 ? block.endLine - 1 : block.endLine;
+  while (end > block.startLine && isBlank(lines[end - 1])) end--;
   return end;
 }
 
@@ -96,9 +120,16 @@ export function updateCursorParagraph(
   enabled: boolean,
   source?: string,
 ): void {
-  const lines = source === undefined ? undefined : sourceLines(source);
+  // The source is split only while the highlight is on: off (the default), a
+  // render must not pay for a second copy of the document as lines.
   const target =
-    enabled && line >= 1 ? paragraphBlockAt(topLevelBlocks(container), line, lines) : null;
+    enabled && line >= 1
+      ? paragraphBlockAt(
+          topLevelBlocks(container),
+          line,
+          source === undefined ? undefined : sourceLines(source),
+        )
+      : null;
   // Leave an unchanged highlight alone: a cursor ping per keystroke must not
   // restart the CSS transition.
   container.querySelectorAll(`.${PARAGRAPH_CLASS}`).forEach(el => {
