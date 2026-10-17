@@ -783,7 +783,7 @@ answer the same question the same way.
 | Markdown / text (`.md`, `.markdown`, `.mdx`, `.txt`) | Its first lines, via `/preview` |
 | PDF | Name only — see below |
 | URL | Host, path and decoded query, parsed locally |
-| In-page anchor | The target heading and its first paragraphs, read from the rendered DOM |
+| In-page anchor | The target heading and its first paragraphs, read from the rendered DOM. Repeated headings are numbered as on GitHub (`#setup-1` is the second "Setup"), headings in block quotes and list items count too |
 | Missing target | "target not found" |
 
 Disable it per session by appending `?hover=0` to the preview URL.

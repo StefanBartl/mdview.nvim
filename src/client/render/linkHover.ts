@@ -25,7 +25,6 @@
 // contents, which are not trusted markup.
 
 import { isExternalHref } from './externalLinks';
-import { headings } from './docModel';
 
 const IMAGE_EXT = /\.(png|jpe?g|gif|webp|bmp|svg|ico|avif)$/i;
 const TEXT_EXT = /\.(md|markdown|mdx|txt)$/i;
@@ -61,6 +60,49 @@ export function slugify(text: string): string {
     .trim()
     .replace(/\s+/g, '-')
     .replace(/-+/g, '-');
+}
+
+export interface HeadingAnchor {
+  el: HTMLElement;
+  text: string;
+  /** `slugify(text)`, without a de-duplication suffix. */
+  slug: string;
+  /** The anchor GitHub gives the heading: `slug`, `slug-1`, `slug-2`, ... */
+  anchor: string;
+}
+
+/**
+ * Every heading under `root` in document order, nested ones (block quotes,
+ * list items) included, with its GitHub-style anchor: a repeated slug is
+ * numbered `-1`, `-2`, ... by how many earlier headings share it. Same count
+ * as markdown.nvim's `core.slug.heading_anchors` and language.nvim's
+ * `translate_markdown`, so a link either of them writes resolves here.
+ *
+ * Deliberately not docModel.headings: that is the outline (TOC, cursor
+ * sections) and keeps to top-level blocks; an anchor can point at any
+ * heading. Headings with an empty slug get no anchor and are not counted.
+ */
+export function headingAnchors(root: HTMLElement): HeadingAnchor[] {
+  const out: HeadingAnchor[] = [];
+  const seen = new Map<string, number>();
+  for (const el of Array.from(root.querySelectorAll<HTMLElement>('h1, h2, h3, h4, h5, h6'))) {
+    const text = (el.textContent ?? '').trim();
+    const slug = slugify(text);
+    if (slug === '') continue;
+    const count = seen.get(slug) ?? 0;
+    seen.set(slug, count + 1);
+    out.push({ el, text, slug, anchor: count === 0 ? slug : `${slug}-${count}` });
+  }
+  return out;
+}
+
+/**
+ * The heading a `#wanted` link points at (`wanted` already slugified). A
+ * heading whose own slug is `wanted` wins (one really called "Setup-1" beats
+ * the second "Setup"); otherwise the numbered anchor decides.
+ */
+export function resolveAnchor(list: HeadingAnchor[], wanted: string): HeadingAnchor | undefined {
+  return list.find(h => h.slug === wanted) ?? list.find(h => h.anchor === wanted);
 }
 
 /** Split a URL for display. Enough for a hover line, not a spec parser. */
@@ -203,12 +245,11 @@ export function installLinkHover(root: HTMLElement, opts: LinkHoverOptions): () 
 
     if (kind === 'anchor') {
       const wanted = slugify(decodeURIComponent(href.slice(1)));
-      // Resolved against the document's heading outline (docModel.headings,
-      // which keys off H1..H6 tags), NOT off element ids: the WASM renderer
-      // emits no id attributes, so an id lookup would silently find nothing
-      // for every anchor. Slug matching also mirrors how markdown.nvim's
-      // in-editor hover resolves the same link.
-      const target = headings(root).find(h => slugify(h.text) === wanted);
+      // Resolved against the H1..H6 tags by slug, NOT off element ids: the
+      // WASM renderer emits no id attributes, so an id lookup would silently
+      // find nothing for every anchor. Slug matching with GitHub's numbering
+      // also mirrors how markdown.nvim's in-editor hover resolves the link.
+      const target = resolveAnchor(headingAnchors(root), wanted);
       const popup = createPopup('anchor');
       if (target) {
         const parts: string[] = [target.text];

@@ -69,9 +69,16 @@ One shared model instead of three separate parsers: top-level blocks carrying
 `data-sourcepos` (comrak's source map), and from those the heading outline and
 the line-to-block mapping.
 
-Used by the **TOC overlay**, **scroll sync**, the **cursor marker** and
-**link hover** (anchor resolution). It works off `H1`–`H6` tags, **not** off
-`id` attributes — the WASM renderer emits none.
+Used by the **TOC overlay**, **scroll sync** and the **cursor marker**. It
+works off `H1`–`H6` tags, **not** off `id` attributes — the WASM renderer
+emits none.
+
+**Link hover** resolves anchors off the same tags but not off this model: an
+anchor can point at a heading inside a block quote or list item, which the
+top-level outline leaves out. `linkHover.ts` (`headingAnchors`,
+`resolveAnchor`) slugs every heading and numbers repeated slugs the way GitHub,
+markdown.nvim and language.nvim do (`setup`, `setup-1`, `setup-2`); a heading
+whose own slug is the link target wins over a numbered one.
 
 - **Module:** `src/client/render/docModel.ts` (`topLevelBlocks`, `headings`, `governingHeading`)
 

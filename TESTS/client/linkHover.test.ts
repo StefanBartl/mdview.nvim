@@ -1,7 +1,14 @@
 // tests/client/linkHover.test.ts
 // @vitest-environment jsdom
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { classifyHref, describeUrl, slugify, installLinkHover } from '../../src/client/render/linkHover';
+import {
+  classifyHref,
+  describeUrl,
+  slugify,
+  headingAnchors,
+  resolveAnchor,
+  installLinkHover,
+} from '../../src/client/render/linkHover';
 
 describe('classifyHref', () => {
   it('classifies in-page anchors', () => {
@@ -48,6 +55,58 @@ describe('slugify', () => {
 
   it('keeps non-ASCII letters rather than stripping them', () => {
     expect(slugify('Überschrift')).toBe('überschrift');
+  });
+});
+
+describe('headingAnchors / resolveAnchor', () => {
+  function doc(html: string): HTMLElement {
+    const el = document.createElement('div');
+    el.innerHTML = html;
+    return el;
+  }
+
+  it('numbers a repeated slug the way GitHub does', () => {
+    const list = headingAnchors(
+      doc('<h2>Setup</h2><p>a</p><h2>Setup</h2><p>b</p><h3>Setup</h3><h2>Other</h2>'),
+    );
+    expect(list.map(h => h.anchor)).toEqual(['setup', 'setup-1', 'setup-2', 'other']);
+  });
+
+  it('resolves #slug-N to the N-th repeated heading', () => {
+    const el = doc('<h2>Setup</h2><h2>Setup</h2><h2>Setup</h2>');
+    const hs = Array.from(el.querySelectorAll('h2'));
+    const list = headingAnchors(el);
+    expect(resolveAnchor(list, 'setup')?.el).toBe(hs[0]);
+    expect(resolveAnchor(list, 'setup-1')?.el).toBe(hs[1]);
+    expect(resolveAnchor(list, 'setup-2')?.el).toBe(hs[2]);
+    expect(resolveAnchor(list, 'setup-3')).toBeUndefined();
+  });
+
+  it('lets a heading really called "Setup-1" win over the number', () => {
+    const el = doc('<h2>Setup</h2><h2>Setup</h2><h2 id="real">Setup-1</h2>');
+    const target = resolveAnchor(headingAnchors(el), 'setup-1');
+    expect(target?.el.id).toBe('real');
+  });
+
+  it('counts headings inside block quotes and list items', () => {
+    const el = doc(
+      [
+        '<h2 data-sourcepos="1:1-1:8">Setup</h2>',
+        '<blockquote data-sourcepos="3:1-3:10"><h2>Setup</h2></blockquote>',
+        '<ul data-sourcepos="5:1-5:10"><li><h3>Setup</h3></li></ul>',
+        '<h2 data-sourcepos="7:1-7:8" id="top">Setup</h2>',
+      ].join(''),
+    );
+    const list = headingAnchors(el);
+    expect(list.map(h => h.anchor)).toEqual(['setup', 'setup-1', 'setup-2', 'setup-3']);
+    // The fourth top-level heading is #setup-3, not #setup-1.
+    expect(resolveAnchor(list, 'setup-3')?.el.id).toBe('top');
+  });
+
+  it('gives a heading without slug text no anchor and does not count it', () => {
+    const list = headingAnchors(doc('<h2>!!!</h2><h2>???</h2><h2>Setup</h2>'));
+    expect(list.map(h => h.anchor)).toEqual(['setup']);
+    expect(resolveAnchor(list, '-1')).toBeUndefined();
   });
 });
 
@@ -142,6 +201,26 @@ describe('installLinkHover — anchor resolution', () => {
     vi.advanceTimersByTime(5);
 
     expect(popupText()).toContain('no heading matches');
+  });
+
+  it('follows a numbered #slug-N link into a nested heading', () => {
+    vi.useFakeTimers();
+    const el = document.createElement('div');
+    el.innerHTML = [
+      '<h2 data-sourcepos="1:1-1:8">Setup</h2>',
+      '<p data-sourcepos="2:1-2:5">first</p>',
+      '<blockquote data-sourcepos="4:1-5:10"><h2>Setup</h2><p>quoted body</p></blockquote>',
+      '<a href="#setup-1" id="num">jump</a>',
+    ].join('');
+    document.body.appendChild(el);
+    mounted = el;
+    teardown = installLinkHover(el, { key: 'k', token: 't', delayMs: 1 });
+    hover(el, 'num');
+    vi.advanceTimersByTime(5);
+
+    const text = popupText();
+    expect(text).toContain('quoted body');
+    expect(text).not.toContain('first');
   });
 
   it('opens nothing before the delay has elapsed', () => {
