@@ -703,8 +703,10 @@ on the relay (the key of the preview room plus `#<code>`), its own translation, 
 language is never shown in the tab of another; the scroll position, the cursor, the fence highlighting and the live
 controls (zoom, overlays, ...) are repeated into those rooms. The tabs are read only: a checkbox or an edit in them
 is not written back. They need `browser.behavior = "reuse"` (the preview follows one room) and language.nvim, and
-every language is translated once per document, so more languages mean more requests to the engine: the privacy
-notice names the engine as for `display_lang`.
+every language is translated once per document, so more languages mean more requests to the engine: opening a tab
+says which engine gets the text for that language (once per language and session), and `browser.display_lang_max_tabs`
+(default 3) limits how many tabs there can be. A language that fails (the engine says no) shows the original in its
+tab with the state `failed`; the other tabs are not affected. `:checkhealth mdview` lists the tabs with their state.
 
 **Not supported (by design).**
 

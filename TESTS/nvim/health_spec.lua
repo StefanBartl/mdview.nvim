@@ -82,4 +82,36 @@ describe("health.check", function()
         .. tostring(err)
     )
   end)
+
+  it("lists the tabs of other display languages with their state", function()
+    local rooms = require("mdview.core.lang_rooms")
+    local config = require("mdview.config")
+    local prev_key, prev_behavior = state.get_preview_key(), config.defaults.browser.behavior
+    state.set_preview_key("health-spec-room")
+    config.defaults.browser.behavior = "reuse"
+    local said = {}
+    local real_ok, real_warn = vim.health.ok, vim.health.warn
+    vim.health.ok = function(msg)
+      said[#said + 1] = msg
+    end
+    vim.health.warn = function(msg)
+      said[#said + 1] = msg
+    end
+    -- health.lua binds vim.health.ok / warn when it loads: load it again with the stubs in place.
+    package.loaded["mdview.health"] = nil
+    local fresh = require("mdview.health")
+    pcall(fresh.check)
+    local none = table.concat(said, " | ")
+    rooms.add("es")
+    said = {}
+    pcall(fresh.check)
+    local with = table.concat(said, " | ")
+    vim.health.ok, vim.health.warn = real_ok, real_warn
+    package.loaded["mdview.health"] = health
+    rooms.reset()
+    state.set_preview_key(prev_key)
+    config.defaults.browser.behavior = prev_behavior
+    assert.is_truthy(none:find("no tab of another display language", 1, true))
+    assert.is_truthy(with:find('tab "es"', 1, true), "the report names the tab")
+  end)
 end)

@@ -105,7 +105,14 @@ local function restore()
   state.get_server = saved.get_server
   state.set_preview_key(saved.preview_key)
   local b = config.defaults.browser
-  for _, k in ipairs({ "display_lang", "transform", "display_lang_trigger", "display_lang_debounce_ms", "behavior" }) do
+  for _, k in ipairs({
+    "display_lang",
+    "transform",
+    "display_lang_trigger",
+    "display_lang_debounce_ms",
+    "display_lang_max_tabs",
+    "behavior",
+  }) do
     b[k] = saved.browser[k]
   end
 end
@@ -154,6 +161,19 @@ describe("the tabs of other display languages: registering them", function()
     assert.are.equal(MAIN .. "#es", rooms.add("es"), "the same language is the same tab")
     local list = rooms.list()
     assert.are.same({ "es", "it" }, { list[1].code, list[2].code })
+  end)
+
+  it("allows only display_lang_max_tabs tabs, and a closed one frees its place", function()
+    config.defaults.browser.display_lang_max_tabs = 2
+    assert.is_truthy(rooms.add("es"))
+    assert.is_truthy(rooms.add("it"))
+    local key, err = rooms.add("pt")
+    assert.is_nil(key)
+    assert.is_truthy(err:find("at most 2 tabs", 1, true))
+    assert.is_truthy(err:find("display_lang_max_tabs", 1, true), "it names the option")
+    assert.are.equal(MAIN .. "#es", rooms.add("es"), "a tab that is there is not a new one")
+    rooms.remove("es")
+    assert.is_truthy(rooms.add("pt"))
   end)
 
   it("refuses what it cannot serve and says why", function()
@@ -238,6 +258,23 @@ describe("the tabs of other display languages: the text", function()
       assert.are_not.equal("a-uno", s.lines[1])
     end
     assert.are.same({ "a-eins", "a-zwei" }, vim.api.nvim_buf_get_lines(a, 0, -1, false), "the buffer is untouched")
+  end)
+
+  it("a failure in one language leaves the other tab with its translation", function()
+    live.push_buffer_changes(a, { full = true, reason = "save" })
+    assert.is_true(settle(function()
+      return #full_runs("es") == 1 and #full_runs("it") == 1
+    end))
+    full_runs("es")[1].cb(false, "engine said no")
+    full_runs("it")[1].cb(true, { "a-uno-it", "a-due" }, { failed = 0 })
+    assert.is_true(settle(function()
+      local st = display.statuses()
+      return st[MAIN .. "#es"].state == "failed" and st[MAIN .. "#it"].state == "done"
+    end))
+    local es, it = sent_to(MAIN .. "#es"), sent_to(MAIN .. "#it")
+    assert.are.same({ "a-eins", "a-zwei" }, es[#es].lines, "the Spanish tab shows the original")
+    assert.are.same({ "a-uno-it", "a-due" }, it[#it].lines, "the Italian tab keeps its translation")
+    assert.is_truthy(display.statuses()[MAIN .. "#es"].message:find("engine said no", 1, true))
   end)
 
   it("a switch of the buffer is a switch in every tab, and a late answer of the old one is dropped", function()
@@ -395,6 +432,17 @@ describe(":MDView lang open / close / tabs", function()
     state.is_attached, state.get_token = attached, token
     assert.are.equal(2, #opened, "the browser is asked for a tab each time")
     assert.are.equal(1, #rooms.list(), "but the room is one")
+    local engine_notes = 0
+    for _, n in ipairs(notes) do
+      if
+        n.msg:find("translation engine", 1, true)
+        and n.msg:find('"fakeengine"', 1, true)
+        and n.msg:find('"es"', 1, true)
+      then
+        engine_notes = engine_notes + 1
+      end
+    end
+    assert.are.equal(1, engine_notes, "the notice names engine and language, once per language and session")
     assert.is_truthy(opened[1]:find(vim.uri_encode(MAIN .. "#es", "rfc2396"), 1, true))
   end)
 

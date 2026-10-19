@@ -24,6 +24,10 @@ local notify = require("lib.nvim.notify").create("").notify
 ---@type { code: string, key: string }[]
 local rooms = {}
 
+--- The languages whose engine notice was shown this session.
+---@type table<string, true>
+local noted = {}
+
 ---@param code any
 ---@return boolean
 function M.valid_code(code)
@@ -89,6 +93,7 @@ end
 ---@return nil
 function M.reset()
   rooms = {}
+  noted = {}
 end
 
 --- Register `code` and say what the tab needs; does NOT open the browser (see `open`).
@@ -111,6 +116,16 @@ function M.add(code)
     if r.code == code then
       return r.key, nil
     end
+  end
+  local max = require("mdview.config.browser").defaults.display_lang_max_tabs
+  if type(max) ~= "number" then
+    max = 3
+  end
+  if #rooms >= max then
+    return nil,
+      ("at most %d tabs of other languages (browser.display_lang_max_tabs): every language is one more request to the engine per document; `:MDView lang close <code>` frees one"):format(
+        max
+      )
   end
   local key = M.key_for(code, main)
   rooms[#rooms + 1] = { code = code, key = key }
@@ -204,6 +219,17 @@ function M.open(code, opts)
     return false, "failed to open the browser: " .. tostring(handle)
   end
   notify(("[mdview] tab for %q opened: %s"):format(code, url), vim.log.levels.INFO)
+  if not noted[code] then
+    noted[code] = true
+    local info = require("mdview.core.display").engine_info()
+    notify(
+      ("[mdview] the text of the previewed document is also sent to the translation engine %q for %q (one request per document and language; may leave this machine)"):format(
+        info.engine or "?",
+        code
+      ),
+      vim.log.levels.INFO
+    )
+  end
   return true, nil
 end
 

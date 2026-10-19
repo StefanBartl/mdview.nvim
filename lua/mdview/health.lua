@@ -267,6 +267,21 @@ function M.check()
         )
       end
     end
+    local tabs = require("mdview.core.lang_rooms").list()
+    if #tabs == 0 then
+      ok("no tab of another display language (`:MDView lang open <code>` opens one)")
+    else
+      local statuses = display.statuses()
+      for _, t in ipairs(tabs) do
+        local st = statuses[t.key]
+        local line = ("tab %q: %s"):format(t.code, st and st.state or "no text yet")
+        if st and st.state == "failed" then
+          warn(line .. (st.message and (" (" .. st.message .. ")") or ""))
+        else
+          ok(line)
+        end
+      end
+    end
     if display.lang() and require("mdview.core.state").get_server() == nil then
       ok("no session running: the language applies on the next :MDView start")
     end
