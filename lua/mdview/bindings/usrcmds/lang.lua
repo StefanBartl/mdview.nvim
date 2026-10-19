@@ -7,6 +7,11 @@
 --   :MDView lang refresh  translate the current document again now (the
 --                         trigger "manual" waits for exactly this)
 --   :MDView lang          report the state, change nothing
+--   :MDView lang open es  one more browser tab that shows the document in Spanish (the original stays in Neovim and
+--                         in the first tab); open another for Italian, and every buffer the preview follows is
+--                         translated for each of them
+--   :MDView lang close es|all  forget those tabs (the browser tab itself is closed by hand)
+--   :MDView lang tabs     list them
 --
 -- Sets browser.display_lang in the shared config. A running session re-pushes
 -- the current buffer so the change shows immediately; without one the choice
@@ -26,6 +31,9 @@ local M = {}
 M.values = {
   "off",
   "refresh",
+  "open",
+  "close",
+  "tabs",
   "en",
   "de",
   "fr",
@@ -50,6 +58,26 @@ M.values = {
   "zh",
 }
 
+--- The language codes alone (for the second argument of `open` and `close`).
+---@type string[]
+M.codes = vim.list_slice(M.values, 6)
+
+---@internal
+---@return string
+local function tabs_text()
+  local list = require("mdview.core.lang_rooms").list()
+  if #list == 0 then
+    return "no tab of another language (`:MDView lang open <code>` opens one)"
+  end
+  local parts = {}
+  local statuses = display.statuses()
+  for _, r in ipairs(list) do
+    local st = statuses[r.key]
+    parts[#parts + 1] = st and ("%s (%s)"):format(r.code, st.state) or r.code
+  end
+  return "tabs of other languages: " .. table.concat(parts, ", ")
+end
+
 ---@internal
 ---@return string
 local function describe()
@@ -60,7 +88,7 @@ local function describe()
     if type(transform) == "function" then
       base = base .. "; browser.transform is set"
     end
-    return base
+    return base .. "; " .. tabs_text()
   end
   local st = display.status()
   local parts = { ("[mdview] display language: %s, trigger %s"):format(lang, display.trigger()) }
@@ -85,6 +113,7 @@ local function describe()
     label = label .. " (" .. st.message .. ")"
   end
   parts[#parts + 1] = label
+  parts[#parts + 1] = tabs_text()
   return table.concat(parts, "; ")
 end
 
@@ -179,16 +208,65 @@ local function repush(reason)
   return true
 end
 
----@param arg string|nil
+--- `open <code>`, `close <code>|all`, `tabs`: the tabs of other display languages.
+---@internal
+---@param verb "open"|"close"|"tabs"
+---@param code string|nil
 ---@return nil
-function M.run(arg)
+local function run_tabs(verb, code)
+  local rooms = require("mdview.core.lang_rooms")
+  if verb == "tabs" then
+    notify("[mdview] " .. tabs_text(), vim.log.levels.INFO)
+    return
+  end
+  if verb == "open" then
+    if not code or code == "" then
+      notify("[mdview] lang open: name a language, e.g. `:MDView lang open es`", vim.log.levels.WARN)
+      return
+    end
+    if not display.language() then
+      notify(
+        "[mdview] a tab of another language needs language.nvim (" .. display.language_problem() .. ")",
+        vim.log.levels.WARN
+      )
+      return
+    end
+    local ok, err = rooms.open(code, {})
+    if not ok then
+      notify(("[mdview] lang open: %s"):format(err or "?"), vim.log.levels.WARN)
+    end
+    return
+  end
+  -- close
+  local target = (code and code ~= "" and code:lower() ~= "all") and code or nil
+  local removed = rooms.remove(target)
+  notify(
+    removed > 0 and ("[mdview] forgot %d tab(s) of another language (close them in the browser)"):format(removed)
+      or "[mdview] no such tab",
+    vim.log.levels.INFO
+  )
+end
+
+---@param arg string|nil
+---@param second string|nil # the language code of `open` / `close`
+---@return nil
+function M.run(arg, second)
   arg = arg and vim.trim(arg) or ""
+  -- "open es" typed as one argument works as well as two.
+  local verb, rest = arg:match("^(%S+)%s+(%S+)$")
+  if verb and (verb:lower() == "open" or verb:lower() == "close") then
+    arg, second = verb, rest
+  end
   if arg == "" then
     notify(describe(), vim.log.levels.INFO)
     return
   end
 
   local lowered = arg:lower()
+  if lowered == "open" or lowered == "close" or lowered == "tabs" then
+    run_tabs(lowered, second)
+    return
+  end
   if lowered == "off" then
     display.set_lang(nil)
     local pushed = repush("enable")

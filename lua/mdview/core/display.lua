@@ -89,10 +89,16 @@ local privacy_noted = nil
 ---@field done integer|nil
 ---@field total integer|nil
 ---@field message string|nil
+--- The state of every room that has a display transform: the badge goes to the tab that shows that text. The tabs of
+--- other display languages (see `mdview.core.lang_rooms`) are rooms of their own, each with its state.
+---@type table<string, mdview.display.Status>
+local statuses = {}
+---@type table<string, string> # what was last sent to each room
+local sent = {}
+--- The latest state set anywhere, for `M.status()` (`:MDView lang`, `:checkhealth`).
 ---@type mdview.display.Status
 local status = { state = "off" }
-local status_sent = ""
---- Room of the latest stream: the badge goes to the tab that shows that text.
+--- Room of the latest stream of the CONFIGURED language: `:MDView lang off` clears its badge.
 ---@type string|nil
 local status_target = nil
 
@@ -570,46 +576,73 @@ end
 --- Tell the browser what state the preview is in (a small badge; an older
 --- client ignores the message). Only sent when it changes.
 ---@internal
+---@param target string|nil # the room the state belongs to
 ---@param force boolean|nil
 ---@return nil
-local function push_status(force)
+local function push_status_for(target, force)
+  local st = target and statuses[target] or status
   local payload
-  if status.state == "off" then
+  if st.state == "off" then
     payload = false
   else
     payload = {
-      state = status.state,
-      lang = status.lang,
-      engine = status.engine,
-      done = status.done,
-      total = status.total,
-      message = status.message,
+      state = st.state,
+      lang = st.lang,
+      engine = st.engine,
+      done = st.done,
+      total = st.total,
+      message = st.message,
     }
   end
   local ok, encoded = pcall(vim.json.encode, { displayLang = payload })
   if not ok then
     return
   end
-  if not force and encoded == status_sent then
+  local mark = target or ""
+  if not force and encoded == sent[mark] then
     return
   end
-  status_sent = encoded
+  sent[mark] = encoded
   -- To the room the state belongs to (not whatever buffer is current now).
-  pcall(require("mdview.adapter.control").send, { displayLang = payload }, status_target)
+  pcall(require("mdview.adapter.control").send, { displayLang = payload }, target)
 end
 
 ---@internal
+---@param target string|nil
 ---@param s mdview.display.Status
 ---@return nil
-local function set_status(s)
+local function set_status_for(target, s)
   status = s
-  push_status(false)
+  if target then
+    statuses[target] = s
+  end
+  push_status_for(target, false)
 end
 
---- The state of the display transform, for `:MDView lang` and `:checkhealth`.
+--- The latest state of the display transform, for `:MDView lang` and `:checkhealth`.
 ---@return mdview.display.Status
 function M.status()
   return vim.deepcopy(status)
+end
+
+--- The state of every room that shows a transformed text, by room key.
+---@return table<string, mdview.display.Status>
+function M.statuses()
+  return vim.deepcopy(statuses)
+end
+
+--- Cancel what runs for the room `key` and forget its state (the tab of a language was closed).
+---@param key string
+---@return nil
+function M.forget_room(key)
+  local r = rooms[key]
+  if r then
+    r.gen = r.gen + 1
+    cancel_room(r)
+    rooms[key] = nil
+  end
+  statuses[key] = nil
+  sent[key] = nil
 end
 
 --- Cancel everything in flight (switching the option, stopping the session).
@@ -628,7 +661,8 @@ function M.reset(keep_notices)
     privacy_noted = nil
   end
   status = { state = "off" }
-  status_sent = ""
+  statuses = {}
+  sent = {}
   status_target = nil
 end
 
@@ -670,6 +704,7 @@ end
 ---@class mdview.display.Source
 ---@field path string # source document (normalized path)
 ---@field target string # room the result goes to
+---@field lang string|nil # the language of THIS stream (the tab of a language of its own); nil: the configured one
 ---@field bufnr integer|nil
 ---@field reason "edit"|"save"|"switch"|"initial"|"enable"|"refresh"|nil
 
@@ -695,7 +730,7 @@ local function through_hook(room, is_stale, src, out, final, k)
     path = src.path,
     bufnr = src.bufnr,
     target = src.target,
-    display_lang = M.lang(),
+    display_lang = src.lang or M.lang(),
     reason = src.reason or "edit",
     final = final,
   }
@@ -735,15 +770,33 @@ end
 ---@param on_text fun(out: string[], final: boolean)
 ---@return boolean transformed # false: answered synchronously with `lines`
 function M.stream(src, lines, on_text)
-  local lang, f = M.lang(), hook()
+  --- The language of this stream: its own (the tab of a language of its own) or the configured one.
+  local function wanted()
+    return src.lang or M.lang()
+  end
+  local lang, f = wanted(), hook()
+  --- The state of THIS room (the others have theirs).
+  local function set_status(s)
+    set_status_for(src.target, s)
+  end
+  local function push_status(force)
+    push_status_for(src.target, force)
+  end
   if not lang and not f then
-    if status.state ~= "off" then
-      M.reset(true)
-      -- The option went away without `:MDView lang off` (a config change): the
-      -- tab still shows the badge of the old state.
-      status_target = src.target
-      push_status(true)
-      status_target = nil
+    local mine = statuses[src.target]
+    if mine and mine.state ~= "off" then
+      -- The option went away without `:MDView lang off` (a config change): this room stops, and its tab shows the
+      -- badge of the old state until it is told. The other rooms (the tabs of other languages) are not its business.
+      local r = rooms[src.target]
+      if r then
+        r.gen = r.gen + 1
+        cancel_room(r)
+      end
+      if status == mine then
+        status = { state = "off" }
+      end
+      statuses[src.target] = { state = "off" }
+      push_status_for(src.target, true)
     end
     on_text(lines, true)
     return false
@@ -755,7 +808,6 @@ function M.stream(src, lines, on_text)
     if not lib then
       local why = M.language_problem()
       report_once("display_lang needs language.nvim (" .. why .. "): the preview stays original")
-      status_target = src.target
       set_status({ state = "unavailable", lang = lang, message = why })
       lang = nil
       if not f then
@@ -765,7 +817,9 @@ function M.stream(src, lines, on_text)
     end
   end
 
-  status_target = src.target
+  if not src.lang then
+    status_target = src.target
+  end
   local room = room_of(src.target)
   -- Bump first: cancelling a run calls its callback, which must find itself stale.
   room.gen = room.gen + 1
@@ -778,12 +832,14 @@ function M.stream(src, lines, on_text)
   --- What a finished translation of this document was made for.
   local reuse_key =
     table.concat({ lang or "", browser_cfg().display_lang_source or "", browser_cfg().display_lang_engine or "" }, "|")
+  --- What the translation of this document is remembered under: the same document in two languages has two entries.
+  local cache_id = src.path .. string.char(31) .. (lang or "")
   --- The buffer of this document is gone (:bwipeout): nothing of it goes on.
   local function gone()
     return src.bufnr ~= nil and not vim.api.nvim_buf_is_valid(src.bufnr)
   end
   local function is_stale()
-    return room.gen ~= gen or (started_lang ~= nil and M.lang() ~= started_lang) or gone()
+    return room.gen ~= gen or (started_lang ~= nil and wanted() ~= started_lang) or gone()
   end
 
   local reason = src.reason or "edit"
@@ -817,7 +873,7 @@ function M.stream(src, lines, on_text)
     end
     msg = short(msg)
     report_once("display_lang: " .. msg .. "; the preview shows the original")
-    set_status({ state = "failed", lang = lang, engine = status.engine, message = msg })
+    set_status({ state = "failed", lang = lang, engine = (statuses[src.target] or {}).engine, message = msg })
     deliver(lines, true)
   end
 
@@ -884,7 +940,7 @@ function M.stream(src, lines, on_text)
         current = function()
           -- Another generation, or the option changed under the run: the
           -- translator stops asking its engine at the next request.
-          if M.lang() ~= started_lang or gone() then
+          if wanted() ~= started_lang or gone() then
             return -1
           end
           return room.gen
@@ -910,7 +966,10 @@ function M.stream(src, lines, on_text)
         for i = first, lastl do
           current[i] = got[i - first + 1]
         end
-        status.done, status.total = ev.done, ev.total
+        local mine = statuses[src.target]
+        if mine then
+          mine.done, mine.total = ev.done, ev.total
+        end
         if not room.patch_pending then
           room.patch_pending = true
           vim.defer_fn(patch_flush, PATCH_MS)
@@ -953,7 +1012,7 @@ function M.stream(src, lines, on_text)
           )
         )
       end
-      remember(src.path, reuse_key, lines, copy(res))
+      remember(cache_id, reuse_key, lines, copy(res))
       set_status({
         state = "done",
         lang = lang,
@@ -1003,11 +1062,11 @@ function M.stream(src, lines, on_text)
   -- pause. This is a plain comparison of lines; the cache-only step below parses
   -- the WHOLE document (about 0.3 s for 20 000 lines), and an edit makes a push
   -- every 150 ms.
-  local prev = translated[src.path]
+  local prev = translated[cache_id]
   local reused = reason == "edit" and prev and prev.key == reuse_key and reuse_translation(prev.inp, prev.out, lines)
   if reused then
     current = reused
-    remember(src.path, reuse_key, lines, current)
+    remember(cache_id, reuse_key, lines, current)
     deliver(copy(current), false)
     after_first_text()
     return true
@@ -1033,7 +1092,7 @@ function M.stream(src, lines, on_text)
     end
     -- The text of a parse: the next edit is compared with it (a structural
     -- edit makes the parse, a plain one after it needs none).
-    remember(src.path, reuse_key, lines, current)
+    remember(cache_id, reuse_key, lines, current)
     deliver(copy(current), false)
     after_first_text()
   end)
@@ -1089,10 +1148,16 @@ function M.set_lang(code)
   browser_cfg().display_lang = code
   if code == nil then
     status = { state = "off" }
-    push_status(true)
+    if status_target then
+      statuses[status_target] = status
+    end
+    push_status_for(status_target, true)
     privacy_noted = nil
   else
     status = { state = "idle", lang = code }
+    if status_target then
+      statuses[status_target] = status
+    end
   end
   return true, nil
 end

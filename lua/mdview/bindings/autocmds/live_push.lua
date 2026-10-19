@@ -137,6 +137,15 @@ function M.push_buffer_changes(bufnr, opts)
 
   local first = true
   local full = opts and opts.full == true or nil
+  -- The tabs of other display languages follow the room the preview follows (see core/lang_rooms): a push into
+  -- another room (a write-back of an older tab) is no news for them.
+  if not (opts and opts.room) then
+    require("mdview.core.lang_rooms").push(bufnr, {
+      path = path,
+      reason = opts and opts.reason or (full and "save" or "edit"),
+      full = full,
+    })
+  end
   -- Without a display transform this runs once, synchronously, with the buffer
   -- text. With one (a display language, browser.transform) it may run several
   -- times: a first valid text, patches, the finished document -- each of them

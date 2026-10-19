@@ -164,9 +164,10 @@ end
 --- delivered.
 ---@param bufnr integer
 ---@param cb fun(lines: string[], final: boolean, original: string[])
----@param opts { target?: string, path?: string, reason?: string }|nil
+---@param opts { target?: string, path?: string, reason?: string, lang?: string }|nil
 ---   target: room the text goes to (default: the buffer name);
 ---   path: source document (default: the buffer name);
+---   lang: show it in this language (the tab of a language of its own); default: `browser.display_lang`;
 ---   reason: "edit"|"save"|"switch"|"initial"|"enable"|"refresh" (default "edit")
 ---@return boolean transformed # false: `cb` ran synchronously with the plain text
 function M.lines_async(bufnr, cb, opts)
@@ -179,6 +180,7 @@ function M.lines_async(bufnr, cb, opts)
       target = opts.target or name,
       bufnr = bufnr,
       reason = opts.reason,
+      lang = opts.lang,
     },
     original,
     function(out, final)

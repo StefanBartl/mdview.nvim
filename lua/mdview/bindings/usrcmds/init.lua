@@ -382,12 +382,19 @@ function M.attach()
           type = "STRING",
           optional = true,
           values = lang.values,
-          desc = "Language code, off (original again) or refresh (translate again)",
+          desc = "Language code, off, refresh, or open / close / tabs for tabs of other languages",
+        },
+        {
+          name = "tab",
+          type = "STRING",
+          optional = true,
+          values = lang.codes,
+          desc = "With open / close: the language of the tab (close also takes all)",
         },
       },
-      desc = "Show the preview in another language (<code> | off | refresh); no argument reports the state",
+      desc = "Show the preview in another language (<code> | off | refresh | open <code> | close <code>|all | tabs); no argument reports the state",
       run = function(ctx)
-        lang.run(ctx.args.code)
+        lang.run(ctx.args.code, ctx.args.tab)
       end,
     },
 

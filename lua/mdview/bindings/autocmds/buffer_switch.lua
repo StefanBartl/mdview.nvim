@@ -89,6 +89,8 @@ function M.resync(bufnr)
     -- generation of the shared preview room drops anything older).
     local first = true
     local returned = false
+    -- The tabs of other display languages follow the buffer too.
+    require("mdview.core.lang_rooms").push(bufnr, { path = path, reason = "switch", full = true })
     require("mdview.core.mirror").lines_async(bufnr, function(lines)
       -- An answer that comes after lines_async returned (all but the plain
       -- synchronous one; language.nvim never calls back before it returned,

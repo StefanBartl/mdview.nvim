@@ -695,13 +695,22 @@ result show that result, the edited ones are original. With both set, the langua
 the hook sees its output (also the cache-only first text and the patches:
 `ctx.final` tells them apart).
 
+**Several languages at once.** The original stays in Neovim (and in the first tab); `:MDView lang open es` opens
+one more browser tab that shows the same document in Spanish, `:MDView lang open it` another in Italian, and every
+buffer the preview follows is translated for each of them. `:MDView lang tabs` lists them with their state,
+`:MDView lang close es|all` forgets them (the browser tab itself is closed by hand). Each tab has a room of its own
+on the relay (the key of the preview room plus `#<code>`), its own translation, cache and badge, so the text of one
+language is never shown in the tab of another; the scroll position, the cursor, the fence highlighting and the live
+controls (zoom, overlays, ...) are repeated into those rooms. The tabs are read only: a checkbox or an edit in them
+is not written back. They need `browser.behavior = "reuse"` (the preview follows one room) and language.nvim, and
+every language is translated once per document, so more languages mean more requests to the engine: the privacy
+notice names the engine as for `display_lang`.
+
 **Not supported (by design).**
 
 - Standalone mode (`:MDView standalone`): the relay reads the file itself, so
   there is no Lua side that could translate it. The command refuses while
   `display_lang` or `transform` is set and says how to proceed.
-- Several tabs with different languages at once (it would need one room per
-  language).
 - Column-exact mirrors in the translated text (selection mirror, spotlight
   matches): only whole lines keep their meaning.
 - The in-editor preview tab (`:MDView preview-tab`) shows the buffer text; it is
@@ -709,8 +718,8 @@ the hook sees its output (also the cache-only first text and the patches:
 - A pinned preview (`:MDView pin`) holds the document as it is; turn the pin off
   to translate it.
 
-- **Module:** `lua/mdview/core/display.lua`, `lua/mdview/core/mirror.lua` (`lines_async`), `lua/mdview/bindings/usrcmds/lang.lua`; the badge in `src/client/render/langStatus.ts`
-- **Usercmds:** `:MDView lang`
+- **Module:** `lua/mdview/core/display.lua`, `lua/mdview/core/lang_rooms.lua` (the tabs of other languages), `lua/mdview/core/mirror.lua` (`lines_async`), `lua/mdview/bindings/usrcmds/lang.lua`; the badge in `src/client/render/langStatus.ts`
+- **Usercmds:** `:MDView lang` (`open <code>`, `close <code>|all`, `tabs`)
 - **Config:** `browser.display_lang` (default `nil` = off), `browser.display_lang_trigger` (`"idle"`), `browser.display_lang_debounce_ms` (`800`), `browser.display_lang_source`, `browser.display_lang_engine`, `browser.transform`
 
 ## Standalone preview (outlives Neovim)

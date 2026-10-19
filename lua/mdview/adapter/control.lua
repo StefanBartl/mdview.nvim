@@ -31,6 +31,13 @@ function M.send(fields, room)
     return false
   end
   ws_client.send_control(key, json)
+  -- The tabs of other display languages follow the controls of the preview (zoom, cursor, overlays); the badge of the
+  -- display language belongs to one room and is not repeated.
+  if fields.displayLang == nil then
+    for _, follower in ipairs(require("mdview.core.lang_rooms").followers(key)) do
+      ws_client.send_control(follower, json)
+    end
+  end
   return true
 end
 

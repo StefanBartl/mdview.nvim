@@ -65,6 +65,8 @@ function M.stop(close_browser_override)
   -- Forget which room the (now-closed) tab watched, so a fresh :MDView start
   -- doesn't route "reuse" pushes to a stale key from the previous session.
   state.set_preview_key(nil)
+  -- The tabs of other display languages were rooms of that session.
+  require("mdview.core.lang_rooms").reset()
 
   -- Same for a document pin (:MDView pin): it held THAT tab on THAT document
   -- and means nothing without it — leaving it up would silently swallow the

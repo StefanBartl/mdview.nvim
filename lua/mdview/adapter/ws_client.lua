@@ -461,6 +461,10 @@ function M.send_scroll(path, line, total, viewfrac, col)
     body = body .. "/" .. tostring(col)
   end
   http_post_nonblocking(scroll_url_for(path), body, function() end)
+  -- The tabs of other display languages show the same lines: they scroll with it.
+  for _, follower in ipairs(require("mdview.core.lang_rooms").followers(path)) do
+    http_post_nonblocking(scroll_url_for(follower), body, function() end)
+  end
 end
 
 -- ---------------------------------------------------------------------------
@@ -599,6 +603,10 @@ function M.send_spans(key, json)
     return
   end
   http_post_nonblocking(spans_url_for(key), json or "null", function() end)
+  -- The fences are the buffer's and no line moves in a translation: the tabs of other languages paint the same spans.
+  for _, follower in ipairs(require("mdview.core.lang_rooms").followers(key)) do
+    http_post_nonblocking(spans_url_for(follower), json or "null", function() end)
+  end
 end
 
 --- Public: push the spotlight-mirror state (spotlight.nvim's whole-file
