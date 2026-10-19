@@ -288,6 +288,7 @@ describe("the tabs of other display languages: the text", function()
     assert.are.equal("es", st[MAIN .. "#es"].lang)
     assert.are.equal("it", st[MAIN .. "#it"].lang)
     assert.are.equal("translating", st[MAIN .. "#es"].state)
+    assert.are.equal("off", display.status().state, "the state of the display language is not that of a tab")
     full_runs("es")[1].cb(true, { "a-uno", "a-dos" }, { failed = 0 })
     assert.is_true(settle(function()
       return display.statuses()[MAIN .. "#es"].state == "done"

@@ -777,7 +777,14 @@ function M.stream(src, lines, on_text)
   local lang, f = wanted(), hook()
   --- The state of THIS room (the others have theirs).
   local function set_status(s)
-    set_status_for(src.target, s)
+    if src.lang then
+      -- A tab of a language of its own keeps its state to itself: `M.status()` (`:MDView lang`, `:checkhealth`) is the
+      -- state of the configured display language, not the progress of whichever tab wrote last.
+      statuses[src.target] = s
+      push_status_for(src.target, false)
+    else
+      set_status_for(src.target, s)
+    end
   end
   local function push_status(force)
     push_status_for(src.target, force)
