@@ -10,6 +10,8 @@ export interface ControlMessage {
   overlayData?: { name: string; data: unknown };
   reveal?: boolean;
   cursor?: string;
+  /** Block-marker blink: `true`/a number of ms to blink, `false` for steady (see parseCursorBlink). */
+  cursorBlink?: boolean | number;
   cursorParagraph?: boolean;
   /** True when the key is present at all: `false` drops back to the theme's tint. */
   hasCursorParagraphBg: boolean;
@@ -60,6 +62,9 @@ export function parseControl(json: string): ControlMessage | null {
   }
   if (typeof raw.reveal === 'boolean') msg.reveal = raw.reveal;
   if (typeof raw.cursor === 'string') msg.cursor = raw.cursor;
+  if (typeof raw.cursorBlink === 'boolean' || typeof raw.cursorBlink === 'number') {
+    msg.cursorBlink = raw.cursorBlink;
+  }
   if (typeof raw.cursorParagraph === 'boolean') msg.cursorParagraph = raw.cursorParagraph;
   if (msg.hasCursorParagraphBg) msg.cursorParagraphBg = raw.cursorParagraphBg;
   if (typeof raw.zoom === 'number') msg.zoom = raw.zoom;

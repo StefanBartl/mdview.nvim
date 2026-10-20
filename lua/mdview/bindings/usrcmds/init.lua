@@ -252,13 +252,14 @@ function M.attach()
           enum_desc = {
             line = "Line marker in the left gutter (default)",
             caret = "Exact caret at the cursor column",
+            block = "Box over the character under the cursor",
             section = "Spotlight the current heading section, dim the rest",
             off = "No cursor marker",
             toggle = "Flip the section spotlight on and off",
           },
         },
       },
-      desc = "Set the Neovim-cursor marker in the preview (line|caret|section|off|toggle — toggle flips section on/off)",
+      desc = "Set the Neovim-cursor marker in the preview (line|caret|block|section|off|toggle — toggle flips section on/off)",
       run = function(ctx)
         cursor.run(ctx.args.mode)
       end,

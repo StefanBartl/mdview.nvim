@@ -17,7 +17,13 @@ import { pickScrollTarget, fractionInBlock, hasSourcepos } from './render/scroll
 import { markExternalLinks, parseExternalLinkMode } from './render/externalLinks';
 import { resolveLocalImages } from './render/localImages';
 import { installLinkHover } from './render/linkHover';
-import { updateCursorMarker, parseCursorMarkerMode } from './render/cursorMarker';
+import {
+  updateCursorMarker,
+  parseCursorMarkerMode,
+  parseCursorBlink,
+  setCursorBlink,
+  cursorModeNeedsSourceMap,
+} from './render/cursorMarker';
 import {
   updateCursorParagraph,
   parseCursorParagraph,
@@ -238,6 +244,8 @@ async function boot() {
   // so it renders with the source map on; "line"/"off" render without it. Both
   // are mutable so :MDViewCursor can change them live (see the control channel).
   let cursorMarkerMode = parseCursorMarkerMode(params.get('cursor'));
+  // Block marker blink (?blink= from browser.cursor_blink): steady unless asked for.
+  setCursorBlink(parseCursorBlink(params.get('blink')));
   let lastCursorLine = -1;
   let lastCursorCol = -1;
 
@@ -257,7 +265,7 @@ async function boot() {
 
   // Both the caret and the selection mirror are placed from the renderer's
   // inline source-position spans, so either one turns the source map on.
-  let wantSourceMap = cursorMarkerMode === 'caret' || selectionEnabled;
+  let wantSourceMap = cursorModeNeedsSourceMap(cursorMarkerMode) || selectionEnabled;
 
   // Show-all-blank-lines mode (?blanklines=1 from browser.preserve_blank_lines;
   // :MDView blanklines toggles it live). Off (CommonMark default: runs of
@@ -620,10 +628,23 @@ async function boot() {
       // Reveal/hide all private blocks at once (:MDViewReveal).
       container.classList.toggle('mdview-reveal-all', msg.reveal);
     }
+    if (msg.cursorBlink !== undefined) {
+      // Applied before the mode below, so a message carrying both places the
+      // marker once, already with the new blink.
+      setCursorBlink(parseCursorBlink(msg.cursorBlink));
+      if (msg.cursor === undefined && container && blockEditor?.isEditing() !== true) {
+        updateCursorMarker(
+          container,
+          lastCursorLine,
+          lastCursorCol >= 0 ? lastCursorCol : null,
+          cursorMarkerMode,
+        );
+      }
+    }
     if (msg.cursor !== undefined) {
       const mode = parseCursorMarkerMode(msg.cursor);
       cursorMarkerMode = mode;
-      const needSourceMap = mode === 'caret' || selectionEnabled;
+      const needSourceMap = cursorModeNeedsSourceMap(mode) || selectionEnabled;
       if (needSourceMap !== wantSourceMap) {
         // Toggling caret changes whether the renderer must emit source-position
         // spans, so re-render the current document with the new setting.
@@ -688,7 +709,7 @@ async function boot() {
         lastSelection = null;
         updateSelection(container, null);
       }
-      const needSourceMap = selectionEnabled || cursorMarkerMode === 'caret';
+      const needSourceMap = selectionEnabled || cursorModeNeedsSourceMap(cursorMarkerMode);
       if (needSourceMap !== wantSourceMap) {
         wantSourceMap = needSourceMap;
         renderDocument(currentText());

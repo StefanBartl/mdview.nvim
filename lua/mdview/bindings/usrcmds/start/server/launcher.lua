@@ -113,6 +113,9 @@ local function resolve_browser_url(opts)
     url = url .. "&cursor=" .. vim.uri_encode(cursor_marker)
   end
 
+  -- block marker blink (client reads ?blink=<ms>); only when on, steady otherwise
+  url = url .. require("mdview.core.cursor_blink").url_param(browser_defaults)
+
   -- cursor paragraph highlight (client reads ?para=1 and ?parabg=); only
   -- passed when on, so a reopened tab starts at what :MDView paragraph set.
   url = url .. require("mdview.core.cursor_paragraph").url_params(browser_defaults)

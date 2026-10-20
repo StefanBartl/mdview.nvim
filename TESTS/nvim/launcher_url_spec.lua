@@ -126,6 +126,24 @@ describe("launcher.resolve_browser_url", function()
     end)
   end)
 
+  it("cursor_blink adds blink=<ms> only when on, and the block marker rides in cursor=", function()
+    with_clean_state(function()
+      bcfg.defaults.open_url = nil
+      state.set_token("t")
+      bcfg.defaults.cursor_marker = "block"
+      bcfg.defaults.cursor_blink = false
+      local q = query_of(launcher.resolve_browser_url({ key = "k" }))
+      assert.are.equal("block", q.cursor)
+      assert.is_nil(q.blink)
+
+      bcfg.defaults.cursor_blink = true
+      assert.are.equal("530", query_of(launcher.resolve_browser_url({ key = "k" })).blink)
+
+      bcfg.defaults.cursor_blink = { ms = 250 }
+      assert.are.equal("250", query_of(launcher.resolve_browser_url({ key = "k" })).blink)
+    end)
+  end)
+
   it("click_navigate is ON by default and adds nav=1", function()
     with_clean_state(function()
       bcfg.defaults.open_url = nil

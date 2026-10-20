@@ -119,6 +119,36 @@ body {
   }
 }
 
+/* Neovim cursor block (browser.cursor_marker = "block"): a box over the whole
+   character under the cursor, like a terminal block cursor, so it reads from a
+   distance. Left/top/width/height set in content coordinates by JS. Colors are
+   variables: --cursor-block-bg (fill) and --cursor-block-border (frame); both
+   default to the caret's --cursor-color. The fill is translucent so the letter
+   stays readable. Steady unless browser.cursor_blink adds .mdview-cursor-blink
+   (period in --mdview-blink-ms), and never blinking for prefers-reduced-motion. */
+.mdview-cursor-block {
+  position: absolute;
+  min-width: 0.6em;
+  min-height: 1.2em;
+  box-sizing: border-box;
+  border: 1px solid var(--cursor-block-border, var(--cursor-color, var(--md-link)));
+  border-radius: 2px;
+  background: var(
+    --cursor-block-bg,
+    color-mix(in srgb, var(--cursor-color, var(--md-link)) 35%, transparent)
+  );
+  pointer-events: none;
+  z-index: 5;
+}
+.mdview-cursor-block.mdview-cursor-blink {
+  animation: mdview-cursor-blink var(--mdview-blink-ms, 530ms) steps(2, start) infinite alternate;
+}
+@media (prefers-reduced-motion: reduce) {
+  .mdview-cursor-block.mdview-cursor-blink {
+    animation: none;
+  }
+}
+
 /* Visual-selection mirror (browser.selection_sync): the Neovim selection drawn
    over the document as rectangles, one per visual line, positioned in content
    coordinates by JS from a DOM Range. A layer rather than markup around the

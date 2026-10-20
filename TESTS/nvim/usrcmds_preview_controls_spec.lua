@@ -103,6 +103,26 @@ describe("usrcmds.cursor", function()
     state.set_server(nil)
   end)
 
+  it("'block' is a valid mode and pushes the blink setting along with it", function()
+    state.set_server({ stub = true })
+    local blink0 = bcfg.defaults.cursor_blink
+    sent = nil
+    bcfg.defaults.cursor_blink = false
+    cursor.run("block")
+    assert.are.equal("block", bcfg.defaults.cursor_marker)
+    assert.are.same({ cursor = "block", cursorBlink = false }, sent)
+
+    bcfg.defaults.cursor_blink = { ms = 300 }
+    cursor.run("block")
+    assert.are.same({ cursor = "block", cursorBlink = 300 }, sent)
+
+    -- the other modes do not carry blinking
+    cursor.run("caret")
+    assert.are.same({ cursor = "caret" }, sent)
+    bcfg.defaults.cursor_blink = blink0
+    state.set_server(nil)
+  end)
+
   it("pings the current cursor position after a live mode switch (paints without a CursorMoved)", function()
     state.set_server({ stub = true })
     position_pinged = nil

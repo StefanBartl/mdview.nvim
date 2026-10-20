@@ -34,7 +34,8 @@
 ---@field highlighter "hljs"|"shiki"|"nvim"|"none" code-fence syntax highlighter: "hljs" (highlight.js, light, default), "shiki" (exact VSCode/TextMate themes, heavier), "nvim" (Neovim's own colors, read out of color_my_ascii.nvim and pushed over /spans -- the preview then matches the buffer exactly; blocks it does not paint fall through to highlight.js), or "none"
 ---@field focus "browser"|"nvim" whether the opened tab may take keyboard focus ("browser", default) or focus stays in Neovim ("nvim" — clean on macOS, best-effort on Windows, no-op on Linux); default open_mode only
 ---@field external_links "new_tab"|"same_tab" open external links (http/mailto/absolute) in a new tab ("new_tab", default — keeps the preview tab) or in place ("same_tab")
----@field cursor_marker "line"|"caret"|"section"|"off" show the Neovim cursor in the preview: full-width band over the cursor's source line ("line", default), an exact caret at the cursor column ("caret", uses inline source-position spans), a spotlight on the current heading section with the rest dimmed ("section"), or hidden ("off"); rides the scroll-sync ping, so needs scroll_sync on
+---@field cursor_blink boolean|integer|{ ms: integer } blink the "block" cursor marker: false (steady, default), true (530 ms) or { ms = 530 }; never blinks under the browser's prefers-reduced-motion; passed to the client as ?blink= and pushed live
+---@field cursor_marker "line"|"caret"|"block"|"section"|"off" show the Neovim cursor in the preview: full-width band over the cursor's source line ("line", default), an exact caret at the cursor column ("caret", uses inline source-position spans), a box over the character under the cursor ("block", same spans; see cursor_blink), a spotlight on the current heading section with the rest dimmed ("section"), or hidden ("off"); rides the scroll-sync ping, so needs scroll_sync on
 ---@field cursor_paragraph boolean tint the top-level block the Neovim cursor is in (a paragraph up to the next blank line, or a whole list, table, code block, quote, heading or the frontmatter) in the preview, independent of cursor_marker; off by default, toggle with `:MDView paragraph`; color from the highlight group MdviewCursorParagraph (its background), else the preview theme's own tint; passed to the client as ?para=1 and pushed live; rides the scroll-sync ping, so needs scroll_sync on
 ---@field zoom number preview font-size zoom factor (1.0 = 100%, default); adjust at runtime with :MDView zoom, passed to the client as ?zoom= and pushed live
 ---@field overlays table<string, boolean> which preview overlays start enabled, e.g. { toc = false }; toggle at runtime with :MDView overlay, passed to the client as ?overlays= and pushed live
@@ -273,6 +274,9 @@ return {
     focus = "browser",
     external_links = "new_tab",
     cursor_marker = "line",
+    -- Steady block marker by default; true or { ms = 530 } makes it blink (never
+    -- under the browser's prefers-reduced-motion).
+    cursor_blink = false,
     -- Off by default: the cursor marker (a band over the cursor line) already
     -- shows where the cursor is, and a second, block-sized tint on top of it
     -- while you type is more noise than help. Switch it on (`:MDView

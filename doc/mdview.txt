@@ -157,7 +157,8 @@ Defaults: >lua
                                        -- catppuccin (optionally -light/-dark)
       highlighter         = "hljs",    -- code highlighter: hljs|shiki|nvim|none
       external_links      = "new_tab", -- external links: "new_tab" | "same_tab"
-      cursor_marker       = "line",    -- "line"|"caret"|"section"|"off"
+      cursor_marker       = "line",    -- "line"|"caret"|"block"|"section"|"off"
+      cursor_blink        = false,     -- block marker: false | true | { ms = 530 }
       cursor_paragraph    = false,     -- tint the block under the cursor
       selection_sync      = false,     -- mirror the visual selection (v/V/C-v)
       spotlight_sync      = true,      -- mirror spotlight.nvim's highlights
@@ -365,6 +366,13 @@ browser.cursor_marker ~
               back to the line marker on blank lines and inside code blocks
               (whose content is re-tokenized by the highlighter). Documents
               render with the extra spans only in this mode.
+    "block" — like "caret", but a box over the whole character under the
+              cursor (its own width: a wide character or a tab gets a wide
+              box; at the end of the line the box is one character wide), so
+              it reads from a distance. Uses the same `data-sp` spans and the
+              same line-marker fallback as "caret". Colors: CSS variables
+              `--cursor-block-bg` and `--cursor-block-border`. Steady unless
+              `browser.cursor_blink` is set (below).
     "section" — spotlight the whole heading section the cursor is in and dim
               the rest. The section runs from the governing heading (the last
               heading at/before the cursor) to just before the next heading of
@@ -375,6 +383,12 @@ browser.cursor_marker ~
     "off"   — no marker.
   All ride the scroll-sync ping, so they need |mdview-scroll_sync| on. Switch
   at runtime with |:MDView-cursor|.
+
+browser.cursor_blink ~
+  Blink the "block" cursor marker: `false` (steady, default), `true` (530 ms)
+  or `{ ms = 530 }` (period, clamped to 100..5000). Never blinks for a visitor
+  whose system asks for reduced motion (`prefers-reduced-motion`). Passed to
+  the preview as `?blink=<ms>`; |:MDView-cursor| `block` applies it live.
 
 browser.cursor_paragraph ~
   Tint the block the Neovim cursor is in, independent of the cursor marker: a
@@ -744,8 +758,9 @@ pushes a control update over the socket.
 :MDView cursor [mode]                                        *:MDView-cursor*
   Sets the Neovim-cursor marker in the preview (`browser.cursor_marker`):
   `line` (blinking bar at the cursor line), `caret` (caret at the exact cursor
-  column), `section` (spotlight the current heading section, dim the rest), or
-  `off`. No argument reports the current mode. Tab-completed.
+  column), `block` (a box over the character under the cursor; blinking via
+  `browser.cursor_blink`), `section` (spotlight the current heading section,
+  dim the rest), or `off`. No argument reports the current mode. Tab-completed.
 
 :MDView edit [action]                                          *:MDView-edit*
   Switches block editing in the preview on/off (`on`|`off`|`toggle`; no

@@ -98,10 +98,17 @@ the cursor's relative height inside the Neovim window.
 ## Neovim cursor marker
 
 The preview highlights whatever the Neovim cursor is currently on, in one of
-three modes: `line` (a full-width band over the whole source line, every
+four modes: `line` (a full-width band over the whole source line, every
 visual line of it when it wraps; the column does not move it), `caret` (an exact
 inline caret, byte-accurate via the renderer's `data-sp` spans — see
-[RENDERING.md](RENDERING.md#source-position-mapping)), or `section`
+[RENDERING.md](RENDERING.md#source-position-mapping)), `block` (the same
+position, drawn as a box over the whole character under the cursor — a wide
+character or a tab gets a wide box, and at the end of the line the box is one
+character wide — so it reads from a distance; it is steady unless
+`browser.cursor_blink` is set, and never blinks under `prefers-reduced-motion`;
+colors via `--cursor-block-bg` / `--cursor-block-border`; on a blank line or in
+a code block, where no character can be measured, it falls back to the line
+band like `caret` does), or `section`
 (spotlight the enclosing heading section — the mode `:MDView cursor toggle`
 flips on and off, since it's the one most likely to be toggled repeatedly
 while presenting). Changing the mode updates the shared config (so the next
@@ -109,8 +116,9 @@ browser URL carries `?cursor=`) and, if a session is already running, pushes
 a live control update — no reload needed either way.
 
 - **Module:** `lua/mdview/bindings/usrcmds/cursor.lua`, `lua/mdview/adapter/control.lua`
-- **Usercmds:** `:MDView cursor [line|caret|section|off|toggle]` (no argument reports the current mode)
-- **Config:** `browser.cursor_marker` (default unset — see the command's own report for the effective value)
+- **Usercmds:** `:MDView cursor [line|caret|block|section|off|toggle]` (no argument reports the current mode)
+- **Config:** `browser.cursor_marker` (default unset — see the command's own report for the effective value), `browser.cursor_blink` (block marker only)
+- **URL:** `?cursor=block`, `?blink=<ms>`
 
 ## Cursor paragraph highlight
 

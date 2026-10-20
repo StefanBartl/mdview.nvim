@@ -7,6 +7,11 @@
 //    where the line's text is locatable (inline runs, code blocks), otherwise
 //    the line's slice of its sourcepos block (see lineBand).
 //
+//  * "block": like "caret", but a box over the whole character under the cursor
+//    (its own width; at the end of the line's text, one character wide), the way
+//    a terminal's block cursor looks from a distance. Optional blinking comes from
+//    setCursorBlink and is never shown under prefers-reduced-motion.
+//
 //  * "caret" (Stage C): a caret at the exact cursor character. The WASM renderer
 //    wraps inline text/code runs in `<span data-sp="sl:sc:el:ec">` (byte columns,
 //    matching Neovim's byte-based cursor column). We find the run containing the
@@ -27,17 +32,62 @@ import {
   lineEndPosition,
 } from './sourcePos';
 
-export type CursorMarkerMode = 'off' | 'line' | 'caret' | 'section';
+export type CursorMarkerMode = 'off' | 'line' | 'caret' | 'block' | 'section';
 
 export function parseCursorMarkerMode(param: string | null | undefined): CursorMarkerMode {
   if (param === 'off') return 'off';
   if (param === 'caret') return 'caret';
+  if (param === 'block') return 'block';
   if (param === 'section') return 'section';
   return 'line';
 }
 
+/**
+ * Whether `mode` places its marker from the inline source-position spans, so the
+ * renderer has to emit them ("caret" and "block" both measure a character).
+ */
+export function cursorModeNeedsSourceMap(mode: CursorMarkerMode): boolean {
+  return mode === 'caret' || mode === 'block';
+}
+
+/** Default blink period of the block marker, in ms (about a terminal cursor's). */
+export const DEFAULT_BLINK_MS = 530;
+const MIN_BLINK_MS = 100;
+const MAX_BLINK_MS = 5000;
+
+/**
+ * The block marker's blink setting: `false` (steady) or the half-period in ms.
+ * Accepts what the URL (`?blink=1|0|530`) and a control message (`true`, `false`,
+ * a number) carry; anything else is steady.
+ */
+export function parseCursorBlink(value: unknown): false | number {
+  if (value === true || value === '1' || value === 'true') return DEFAULT_BLINK_MS;
+  const n = typeof value === 'number' ? value : typeof value === 'string' ? Number(value) : NaN;
+  if (Number.isFinite(n) && n > 0) {
+    return Math.min(MAX_BLINK_MS, Math.max(MIN_BLINK_MS, Math.round(n)));
+  }
+  return false;
+}
+
+let blinkMs: false | number = false;
+
+/** Set the block marker's blink (see parseCursorBlink); takes effect on the next placement. */
+export function setCursorBlink(value: false | number): void {
+  blinkMs = value;
+}
+
+/** Whether the visitor asked the OS for less motion: blinking is then never shown. */
+function prefersReducedMotion(): boolean {
+  return (
+    typeof window !== 'undefined' &&
+    typeof window.matchMedia === 'function' &&
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  );
+}
+
 let barEl: HTMLElement | null = null;
 let caretEl: HTMLElement | null = null;
+let blockEl: HTMLElement | null = null;
 
 function ensureEl(
   current: HTMLElement | null,
@@ -79,21 +129,31 @@ export function updateCursorMarker(
   if (mode === 'off') {
     hide(barEl);
     hide(caretEl);
+    hide(blockEl);
     return;
   }
   if (mode === 'section') {
     hide(barEl);
     hide(caretEl);
+    hide(blockEl);
     placeSection(container, line);
     return;
   }
-  if (mode === 'caret' && typeof col === 'number' && col >= 0 && placeCaret(container, line, col)) {
+  const hasCol = typeof col === 'number' && col >= 0;
+  if (mode === 'caret' && hasCol && placeCaret(container, line, col)) {
     hide(barEl);
+    hide(blockEl);
     return;
   }
-  // "line" mode, or the caret fallback (blank line / code block / no run).
+  if (mode === 'block' && hasCol && placeBlock(container, line, col)) {
+    hide(barEl);
+    hide(caretEl);
+    return;
+  }
+  // "line" mode, or the caret/block fallback (blank line / code block / no run).
   placeLineBar(container, line);
   hide(caretEl);
+  hide(blockEl);
 }
 
 /**
@@ -193,7 +253,7 @@ export function caretContentPos(
   container: HTMLElement,
   line: number,
   col: number,
-): { x: number; y: number; h: number } | null {
+): { x: number; y: number; h: number; w: number } | null {
   const box = caretViewportBox(container, line, col);
   if (!box) return null;
   const contRect = container.getBoundingClientRect();
@@ -201,15 +261,16 @@ export function caretContentPos(
     x: box.left - contRect.left + container.scrollLeft,
     y: box.top - contRect.top + container.scrollTop,
     h: box.height,
+    w: box.width,
   };
 }
 
-/** Viewport-space caret box for `line`/`col`, or null. */
+/** Viewport-space box of the character at `line`/`col` (width: that character's), or null. */
 function caretViewportBox(
   container: HTMLElement,
   line: number,
   col: number,
-): { left: number; top: number; height: number } | null {
+): { left: number; top: number; height: number; width: number } | null {
   const runs = runsOnLine(container, line);
   if (runs.length === 0) return null;
 
@@ -258,37 +319,79 @@ function placeCaret(container: HTMLElement, line: number, col: number): boolean 
 }
 
 /**
- * Pixel box of the caret at `offset` within text `node`. A *collapsed* Range's
+ * Place the block marker over the character at the 0-based byte column `col` on
+ * `line`: the box of that character (its own width, so a wide character or a tab
+ * gets a wide block), or, past the end of the line's text, a block as wide as the
+ * last character. Returns false when no run covers the position (caller falls
+ * back to the line bar).
+ */
+function placeBlock(container: HTMLElement, line: number, col: number): boolean {
+  const p = caretContentPos(container, line, col);
+  if (!p) return false;
+
+  blockEl = ensureEl(blockEl, container, 'mdview-cursor-block');
+  blockEl.style.display = 'block';
+  blockEl.style.left = `${p.x}px`;
+  blockEl.style.top = `${p.y}px`;
+  blockEl.style.height = `${p.h}px`;
+  blockEl.style.width = `${p.w}px`;
+  // Blinking is opt-in and never shown to someone who asked for less motion.
+  const blink = blinkMs !== false && !prefersReducedMotion();
+  blockEl.classList.toggle('mdview-cursor-blink', blink);
+  if (blink) blockEl.style.setProperty('--mdview-blink-ms', `${blinkMs}ms`);
+  else blockEl.style.removeProperty('--mdview-blink-ms');
+  return true;
+}
+
+/** Start of the UTF-16 unit run that is the character ending at `end` (a surrogate pair is one). */
+function charStartBefore(data: string, end: number): number {
+  const low = data.charCodeAt(end - 1);
+  const high = end >= 2 ? data.charCodeAt(end - 2) : 0;
+  return low >= 0xdc00 && low <= 0xdfff && high >= 0xd800 && high <= 0xdbff ? end - 2 : end - 1;
+}
+
+/** End of the character starting at `start` (a surrogate pair is one). */
+function charEndAfter(data: string, start: number): number {
+  const high = data.charCodeAt(start);
+  const low = start + 1 < data.length ? data.charCodeAt(start + 1) : 0;
+  return high >= 0xd800 && high <= 0xdbff && low >= 0xdc00 && low <= 0xdfff ? start + 2 : start + 1;
+}
+
+/**
+ * Pixel box of the character at `offset` within text `node` (`left` is the
+ * caret position, `width` the character's). A *collapsed* Range's
  * getBoundingClientRect is unreliable (several engines return a degenerate rect
- * at the block's left edge), so measure a one-character box instead: the left
- * edge of the character at `offset`, or the right edge of the character before
- * it at end-of-node. Returns null when there is no layout (jsdom) or the node is
- * empty.
+ * at the block's left edge), so measure a one-character box instead: the
+ * character at `offset`, or at end-of-node the character before it (the box then
+ * starts at its right edge and is as wide as it). Returns null when there is no
+ * layout (jsdom) or the node is empty.
  */
 function caretPixelBox(
   node: Text,
   offset: number,
-): { left: number; top: number; height: number } | null {
+): { left: number; top: number; height: number; width: number } | null {
   const range = document.createRange();
   if (typeof range.getBoundingClientRect !== 'function') return null;
   const len = node.data.length;
   if (offset < len) {
     range.setStart(node, offset);
-    range.setEnd(node, offset + 1);
+    range.setEnd(node, charEndAfter(node.data, offset));
     const r = range.getBoundingClientRect();
-    if (r.width || r.height) return { left: r.left, top: r.top, height: r.height };
+    if (r.width || r.height) return { left: r.left, top: r.top, height: r.height, width: r.width };
   }
   if (offset > 0) {
-    range.setStart(node, offset - 1);
+    range.setStart(node, charStartBefore(node.data, offset));
     range.setEnd(node, offset);
     const r = range.getBoundingClientRect();
-    if (r.width || r.height) return { left: r.right, top: r.top, height: r.height };
+    if (r.width || r.height) return { left: r.right, top: r.top, height: r.height, width: r.width };
   }
   // Empty node / no measurable box — last resort, the collapsed position.
   range.setStart(node, offset);
   range.collapse(true);
   const r = range.getBoundingClientRect();
-  if (r.width || r.height || r.left || r.top) return { left: r.left, top: r.top, height: r.height };
+  if (r.width || r.height || r.left || r.top) {
+    return { left: r.left, top: r.top, height: r.height, width: r.width };
+  }
   return null;
 }
 

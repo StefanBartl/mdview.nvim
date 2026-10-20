@@ -1,5 +1,5 @@
 ---@module 'mdview.bindings.usrcmds.cursor'
--- Action behind :MDView cursor [line|caret|section|off|toggle] — switch the
+-- Action behind :MDView cursor [line|caret|block|section|off|toggle] — switch the
 -- Neovim-cursor marker mode in the preview at runtime.
 --
 -- "toggle" is a shortcut for flipping "section" on/off specifically (the
@@ -30,7 +30,7 @@ local notify = require("lib.nvim.notify").create("").notify
 local M = {}
 
 ---@type string[]
-M.modes = { "line", "caret", "section", "off", "toggle" }
+M.modes = { "line", "caret", "block", "section", "off", "toggle" }
 
 ---@internal
 ---@param v string
@@ -70,10 +70,17 @@ function M.run(mode)
     return
   end
 
-  ---@cast mode "line"|"caret"|"section"|"off"
+  ---@cast mode "line"|"caret"|"block"|"section"|"off"
   browser.cursor_marker = mode
 
-  if state.get_server() and control.send({ cursor = mode }) then
+  -- Switching to "block" carries the blink setting, so a changed
+  -- `browser.cursor_blink` applies with the switch just as the mode does. The
+  -- other modes ignore blinking, so their message stays just the mode.
+  local fields = { cursor = mode }
+  if mode == "block" then
+    fields.cursorBlink = require("mdview.core.cursor_blink").normalize(browser.cursor_blink)
+  end
+  if state.get_server() and control.send(fields) then
     if mode ~= "off" and not scroll_sync.is_paused() then
       -- Best-effort: paint the new marker immediately instead of leaving it
       -- blank until the cursor happens to move (see module comment above).
