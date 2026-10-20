@@ -31,7 +31,7 @@ M.actions = { "on", "off", "toggle" }
 
 --- The cursor marker that was active before `on` switched to "caret", so `off`
 --- can put it back. nil: none recorded (fall back to the configured default).
----@type "line"|"section"|"off"|nil
+---@type "line"|"block"|"section"|"off"|nil
 local prev_marker = nil
 
 --- Whether write mode is fully on (caret marker AND block editing).
@@ -45,7 +45,7 @@ end
 --- default, else "line" — never "caret" itself (that would leave half of
 --- write mode on).
 ---@internal
----@return "line"|"section"|"off"
+---@return "line"|"block"|"section"|"off"
 local function marker_after_off()
   if prev_marker then
     return prev_marker
