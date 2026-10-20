@@ -17,14 +17,24 @@ local M = {}
 ---@type mdview.config.Defaults
 M.defaults = vim.deepcopy(DEFAULTS)
 
+---Make `target` hold what `source` holds, keeping every table `target` already has in place (the
+---`browser`/`start` sub-tables other modules point at) and giving it no table of `source`'s.
 ---@internal
 ---@param target table
----@param override table
+---@param source table
 ---@return nil
-local function deep_merge_in_place(target, override)
-  for k, v in pairs(override) do
-    if type(v) == "table" and type(target[k]) == "table" then
-      deep_merge_in_place(target[k], v)
+local function reset_into(target, source)
+  for k in pairs(target) do
+    if source[k] == nil then
+      target[k] = nil
+    end
+  end
+  for k, v in pairs(source) do
+    if type(v) == "table" then
+      if type(target[k]) ~= "table" then
+        target[k] = {}
+      end
+      reset_into(target[k], v)
     else
       target[k] = v
     end
@@ -118,10 +128,13 @@ function M.validate(opts)
   end
 end
 
---- Merge user-provided options into M.defaults in place (nested tables like
---- `browser`/`start` merge recursively, so a partial override such as
+--- Set the options in M.defaults, in place. Every call first resets M.defaults to
+--- DEFAULTS (so an option an earlier call set and this one leaves out is back at its
+--- default, and `DEFAULTS` itself is never written to), then merges `opts` over it:
+--- nested tables like `browser`/`start` merge recursively, so a partial override such as
 --- `{ browser = { browser = "firefox" } }` doesn't wipe out the rest of that
---- sub-table's defaults).
+--- sub-table's defaults, while a list of the user's replaces the default list instead of
+--- being merged index by index. The tables `opts` brings are copied, never kept.
 ---
 --- Note: `{ key = nil }` cannot be used to reset `key` back to nil — Lua
 --- never stores a nil-valued key in a table constructor, so `pairs(opts)`
@@ -131,8 +144,9 @@ end
 ---@param opts table|nil
 ---@return mdview.config.Defaults
 function M.merge(opts)
+  reset_into(M.defaults, DEFAULTS)
   if opts and not vim.tbl_isempty(opts) then
-    deep_merge_in_place(M.defaults, opts)
+    require("lib.lua.config").merge_into(M.defaults, opts)
   end
 
   -- `experimental.any_file` was the key's home until TESTS/CHECK.md's release
